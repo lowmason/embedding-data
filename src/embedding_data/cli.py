@@ -2,7 +2,7 @@
 
 import typer
 
-from embedding_data import acs_benchmark_extract, cps_benchmark_extract
+from embedding_data import acs_benchmark_extract, cps_benchmark_extract, osha_benchmark_download
 
 app = typer.Typer(add_completion=False, pretty_exceptions_show_locals=False)
 
@@ -11,8 +11,11 @@ app = typer.Typer(add_completion=False, pretty_exceptions_show_locals=False)
 # even with one command, which Typer would otherwise collapse into that command.
 @app.callback()
 def extracts() -> None:
-    '''Define, submit, and download IPUMS extracts for the embedding benchmark.'''
+    '''Download IPUMS extracts and OSHA ITA data for the embedding benchmark.'''
 
 
 app.command('acs', help=acs_benchmark_extract.__doc__.splitlines()[0])(acs_benchmark_extract.main)
 app.command('cps', help=cps_benchmark_extract.__doc__.splitlines()[0])(cps_benchmark_extract.main)
+app.command('osha', help=osha_benchmark_download.__doc__.splitlines()[0])(
+    osha_benchmark_download.main
+)

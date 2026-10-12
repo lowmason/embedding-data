@@ -27,7 +27,7 @@ def test_console_script_points_to_cli_app():
 def test_extract_commands_are_registered():
     command = get_command(cli.app)
 
-    assert {'acs', 'cps'} <= set(getattr(command, 'commands', {}))
+    assert {'acs', 'cps', 'osha'} <= set(getattr(command, 'commands', {}))
 
 
 def test_tracebacks_hide_local_variables():
@@ -47,6 +47,13 @@ def test_acs_help_describes_acs_benchmark(cli_runner):
 
     assert result.exit_code == 0, result.output
     assert 'IPUMS USA extracts' in result.output
+
+
+def test_osha_help_describes_case_detail_download(cli_runner):
+    result = cli_runner.invoke(cli.app, ['osha', '--help'])
+
+    assert result.exit_code == 0, result.output
+    assert 'OSHA ITA case-detail' in result.output
 
 
 def test_cps_dry_run_reaches_cps_module(cli_runner, output_directory, dotenv_path):

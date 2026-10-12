@@ -13,12 +13,13 @@ training and the protocol for scoring embeddings are separate from this project.
 
 The repository currently implements IPUMS ACS and CPS extract definitions,
 submission, download, and CSV-to-Parquet conversion, run as the `acs` and `cps`
-commands of the `embedding-data` Typer CLI.
+commands of the `embedding-data` Typer CLI. The `osha` command downloads the
+OSHA ITA case-detail CSV and its data dictionary and converts the CSV to Parquet.
 
 OSHA Form 300A ingestion, classification concordances, geography allocation,
 person-month linkage, aggregate targets, and provenance manifests are planned.
-The existing OSHA case-detail files under `data/raw/osha/` are a different input
-from the Form 300A summaries required by the specification.
+The OSHA case-detail files under `data/raw/osha/` are a different input from the
+Form 300A summaries required by the specification.
 
 The extract workflows have been checked with offline definitions and synthetic
 fixtures. Live IPUMS sample and variable acceptance remains to be verified.
@@ -46,8 +47,9 @@ uv sync --locked
 
 The repository's `.python-version` selects Python 3.14 for this environment.
 
-The main libraries are `ipumspy` for IPUMS requests, Polars for conversion,
-Typer for the CLI, and `python-dotenv` for credential loading.
+The main libraries are `ipumspy` for IPUMS requests, `httpx` (with HTTP/2) for
+OSHA downloads, Polars for conversion, Typer for the CLI, and `python-dotenv` for
+credential loading.
 
 Register for both IPUMS USA and IPUMS CPS, then create an
 [IPUMS API key](https://account.ipums.org/api_keys). The same key is used for
@@ -134,6 +136,43 @@ The default destination is `<project-root>/data/raw/cps/`, with `monthly/` and
 occupation as Census codes; conversion pads `IND`, `OCC`, `INDLY`, and `OCCLY`
 to four-character strings. Mapping them to NAICS and SOC remains a later step.
 
+## OSHA case-detail download
+
+The `osha` command needs no account or key. It downloads two files from osha.gov
+over HTTP/2 and converts the CSV to Parquet in the same directory:
+
+| File | Contents |
+| --- | --- |
+| `ITA_Case_Detail_Data_2025_through_08-31-2026.csv` | One row per recordable injury or illness filed for 2025 (`year_of_filing`) and submitted through 2026-08-31; some incident dates fall in 2024 |
+| `case_detail_data_dictionary_2026.pdf` | OSHA's field definitions for the CSV |
+| `ITA_Case_Detail_Data_2025_through_08-31-2026.parquet` | The CSV with typed columns |
+
+```bash
+uv run embedding-data osha
+uv run embedding-data osha --out /tmp/osha
+```
+
+The default destination is `<project-root>/data/raw/osha/`. A file that already
+exists there is kept as delivered and not downloaded again; the Parquet is
+rebuilt on every run. Downloads are written to a `.part` file and renamed only
+when complete. osha.gov refuses non-browser user agents with HTTP 403, so the
+command sends a browser `User-Agent`.
+
+The CSV mixes encodings: most non-ASCII text is Windows-1252, and a few rows are
+UTF-8. Conversion decodes both into UTF-8 Parquet. Code columns (`zip_code`,
+`ein`, `naics_code`, `SOC_code`, `case_number`) stay strings even where the
+dictionary calls them numeric. `zip_code` arrives without leading zeros (for
+example `2134`); conversion does not restore them. Counts become `Int64`, the
+three date columns `Date`, and the two time columns `Time`. A value that does not
+parse stops the conversion.
+
+These are case-detail records from Forms 300 and 301, not the Form 300A
+establishment summaries required by the specification. The delivered file
+differs from its dictionary: the dictionary lists `created_timestamp` and the
+OIICS `*_pred` columns, while the CSV has `date_submitted` and no OIICS columns;
+unassigned SOC codes read `00-9900` rather than `00-9999`; and
+`Unexpected_NAICS_SOC_Combo` also takes the value `Y?`.
+
 ## Files and planned outputs
 
 After a successful download and conversion, each extract directory contains its
@@ -212,12 +251,13 @@ acceptance or survey totals.
 specs/embedding-evaluation-data-spec.md      Full data requirements and verification tasks
 src/embedding_data/acs_benchmark_extract.py  ACS extract definitions and downloader
 src/embedding_data/cps_benchmark_extract.py  CPS catalog selection and downloader
+src/embedding_data/osha_benchmark_download.py OSHA case-detail download and Parquet conversion
 src/embedding_data/cli.py                    embedding-data console entry point
 tests/                                       Offline unit, property, and conversion checks
 features/                                    Behave CPS dry-run acceptance scenarios
 data/raw/acs/                                Default ACS output location
 data/raw/cps/                                Default CPS output location
-data/raw/osha/                               Existing OSHA case-detail inputs
+data/raw/osha/                               OSHA case-detail downloads and Parquet
 pyproject.toml                               Project dependencies and Python requirement
 uv.lock                                      Project dependency lockfile
 ```

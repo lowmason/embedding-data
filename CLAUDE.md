@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-Builds aggregate evaluation targets for industry (NAICS), occupation (SOC), and geography embeddings from three sources: OSHA ITA Form 300A summaries, ACS via IPUMS USA, and CPS via IPUMS CPS. `specs/embedding-evaluation-data-spec.md` is the source of truth. Only the IPUMS extract scripts exist so far (define → submit → download → CSV-to-Parquet); OSHA ingestion, code parsing, geography allocation, targets, and manifests are planned, not built.
+Builds aggregate evaluation targets for industry (NAICS), occupation (SOC), and geography embeddings from three sources: OSHA ITA Form 300A summaries, ACS via IPUMS USA, and CPS via IPUMS CPS. `specs/embedding-evaluation-data-spec.md` is the source of truth. Only the IPUMS extract scripts (define → submit → download → CSV-to-Parquet) and an OSHA case-detail download (download → CSV-to-Parquet) exist so far; OSHA Form 300A ingestion, code parsing, geography allocation, targets, and manifests are planned, not built.
 
 ## Commands
 
@@ -27,15 +27,17 @@ Pre-commit runs the pre-commit-hooks file checks, `ruff-check --fix`, and the fu
 
 ## Architecture
 
-**Extract modules are commands of one console entry point.** `embedding-data = "embedding_data.cli:app"` registers each module's `main` directly (`acs`, `cps`) rather than mounting its Typer `app` with `add_typer`, which would add a `main` subcommand. The top-level `@app.callback()` supplies its help and keeps it a command group, and its `pretty_exceptions_show_locals=False` keeps the API key out of tracebacks. Each module keeps its own single-command `app` for tests. `pyproject.toml` is the only dependency list (the modules carry no PEP 723 blocks). `PROJECT_ROOT = Path(__file__).resolve().parents[2]` assumes the `src/embedding_data/` layout and an editable install, uv's default.
+**Extract modules are commands of one console entry point.** `embedding-data = "embedding_data.cli:app"` registers each module's `main` directly (`acs`, `cps`, `osha`) rather than mounting its Typer `app` with `add_typer`, which would add a `main` subcommand. The top-level `@app.callback()` supplies its help and keeps it a command group, and its `pretty_exceptions_show_locals=False` keeps the API key out of tracebacks. Each module keeps its own single-command `app` for tests. `pyproject.toml` is the only dependency list (the modules carry no PEP 723 blocks). `PROJECT_ROOT = Path(__file__).resolve().parents[2]` assumes the `src/embedding_data/` layout and an editable install, uv's default.
 
 **Shared flow.** `build_extract()` returns an `ipumspy.MicrodataExtract` (CSV, data-quality flags); its definition is written to `<out>/<set>/extract.json`. Unless `--dry-run`, the script submits, waits, downloads, and `csv_to_parquet()` streams each `.csv.gz` to a temporary CSV and lazily sinks Parquet, keeping the `.csv.gz` and deleting the temporary CSV. Code columns stay strings: ACS `INDNAICS`/`OCCSOC` through schema overrides (values like `31M`, `1110XX`); CPS `IND`/`OCC`/`INDLY`/`OCCLY` zero-padded to four characters. Re-running submits a new extract; there is no resume.
 
 **CPS sample IDs come from the live IPUMS catalog, never a hardcoded list.** `select_samples()` keeps one sample per month, preferring the `b` basic file over the `s` supplement, and takes ASEC from 2025 on regardless of `--start`. So a CPS `--dry-run` still needs `IPUMS_API_KEY` and network access; an ACS `--dry-run` is fully offline. Apart from `--help`, do not run CPS commands, or ACS without `--dry-run`, unless the user asks — they call the IPUMS API with the real key.
 
+**OSHA download.** `osha` needs no key. osha.gov's CloudFront returns 403 to non-browser user agents, so `USER_AGENT` is a browser string. Existing files in `--out` are never re-downloaded (raw immutability); downloads go to `.part` and are renamed only after `num_bytes_downloaded` matches `Content-Length`. The CSV mixes Windows-1252 and UTF-8 bytes, sometimes within one line; `decode_line` transcodes it to a temporary UTF-8 CSV that is cast strictly (codes stay strings) and sunk to Parquet beside the raw file. Without existing files, a run downloads about 475 MB.
+
 **Credentials.** Both modules load the root `.env` (`DOTENV_PATH`) with python-dotenv; an exported `IPUMS_API_KEY` takes precedence. ACS loads it only without `--dry-run`, because its definitions need no catalog. Output defaults to `data/raw/acs` and `data/raw/cps` under the project root.
 
-**Test seams.** Tests and Behave steps patch the module-level `IpumsApiClient` (autospec) and `DOTENV_PATH` with `patch.object`, so both must remain module globals looked up at call time. The `cli_runner` fixture in `tests/conftest.py` removes `IPUMS_API_KEY` from the environment. The root `.env` holds a real key: a new test that does not patch both `DOTENV_PATH` and `IpumsApiClient` can load it and make live IPUMS requests.
+**Test seams.** Tests and Behave steps patch the module-level `IpumsApiClient` (autospec) and `DOTENV_PATH` with `patch.object`, so both must remain module globals looked up at call time. OSHA tests patch `make_client` with a `partial` that injects an `httpx.MockTransport`; fake responses must use `stream=httpx.ByteStream(...)`, because a `content=` body is preloaded and leaves `num_bytes_downloaded` at 0. The `cli_runner` fixture in `tests/conftest.py` removes `IPUMS_API_KEY` from the environment. The root `.env` holds a real key: a new test that does not patch both `DOTENV_PATH` and `IpumsApiClient` can load it and make live IPUMS requests.
 
 ## Spec rules
 
