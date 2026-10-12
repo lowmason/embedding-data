@@ -15,7 +15,7 @@ uv run --locked pytest tests/test_cps_benchmark_extract.py::test_monthly_start_o
 uv run --locked behave      # Gherkin acceptance scenarios in features/
 uv run --locked behave -n "Preview monthly samples from a later start"
 uv lock --check
-uv run embedding-data acs core --dry-run --out "$(mktemp -d)"   # offline: no key, no network
+uv run embedding-data acs core --dry-run --data-dir "$(mktemp -d)"   # offline: no key, no network
 uv run --locked ruff check .                 # lint: E, F, isort, single quotes; 99 columns
 uv run --locked pre-commit install           # once per clone
 uv run --locked pre-commit run --all-files

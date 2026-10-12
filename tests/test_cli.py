@@ -76,18 +76,20 @@ def test_cps_dry_run_reaches_cps_module(cli_runner, output_directory, dotenv_pat
 
 
 def test_acs_dry_run_neither_reads_key_nor_creates_client(
-    cli_runner, output_directory, dotenv_path,
+    cli_runner, data_directory, dotenv_path,
 ):
     dotenv_path.write_text('IPUMS_API_KEY=dotenv-test-key\n')
     with (
         patch.object(acs_extract, 'DOTENV_PATH', dotenv_path),
         patch.object(acs_extract, 'IpumsApiClient', autospec=True) as client_factory,
     ):
-        result = cli_runner.invoke(cli.app, ['acs', '--dry-run', '--out', str(output_directory)])
+        result = cli_runner.invoke(
+            cli.app, ['acs', '--dry-run', '--data-dir', str(data_directory)]
+        )
 
         assert 'IPUMS_API_KEY' not in os.environ
 
     assert result.exit_code == 0, result.output
     client_factory.assert_not_called()
-    definition = json.loads((output_directory / 'core/extract.json').read_text())
+    definition = json.loads((data_directory / 'preview/acs/core/extract.json').read_text())
     assert set(definition['samples']) == {'us2023a', 'us2024a'}

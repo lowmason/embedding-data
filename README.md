@@ -98,10 +98,17 @@ Request all three sets:
 uv run embedding-data acs core vintage five_year
 ```
 
-The default destination is `<project-root>/data/raw/acs/`, with one
-subdirectory per set. Use `--out PATH` to override it. Conversion preserves
-`INDNAICS` and `OCCSOC` as strings, including aggregated codes such as `31M`
-and `1110XX`.
+A dry run writes each definition to `data/preview/acs/<set>/extract.json` and
+touches nothing under `data/raw`. A real run gives each extract its own
+directory, `data/raw/acs/<set>/usa_<number>/`, holding the submitted
+`extract.json`, the delivered `.csv.gz` data and the `.xml` DDI codebook. It
+records each file's SHA-256, extract number, sample IDs, retrieval time and
+ipumspy version in `data/raw/manifest.jsonl`, and writes the converted Parquet
+to `data/derived/acs/<set>/usa_<number>.parquet`. A re-run submits a new
+extract into a new directory, so an earlier delivery is never overwritten or
+reconverted. `--data-dir PATH` moves the whole data root (default
+`<project-root>/data`). Conversion preserves `INDNAICS` and `OCCSOC` as
+strings, including aggregated codes such as `31M` and `1110XX`.
 
 ## CPS extracts
 

@@ -8,8 +8,11 @@ Usage:
 Requires an IPUMS USA account and IPUMS_API_KEY in the project-root .env
 (~/Projects/embedding-data/.env; https://account.ipums.org/api_keys). An exported
 IPUMS_API_KEY takes precedence. --dry-run needs neither the key nor network
-access. Downloads default to data/raw/acs under the project root, with one
-subdirectory per extract set.
+access; it writes each definition to data/preview/acs/<set>/extract.json. A real
+run gives each extract its own directory, data/raw/acs/<set>/usa_<number>/, with
+the submitted extract.json and the delivered .csv.gz and .xml; records each file
+in data/raw/manifest.jsonl; and writes Parquet to data/derived/acs/<set>/.
+--data-dir moves the whole data root (default: data/ under the project root).
 
 Each extract is employed persons only, as CSV, with IPUMS data quality flags
 (Q-prefixed columns such as QIND and QOCC mark Census-allocated values). The
@@ -19,7 +22,6 @@ for annual-average totals; compositions and shares are unaffected.
 '''
 
 import gzip
-import json
 import os
 import shutil
 from pathlib import Path
@@ -30,9 +32,9 @@ import typer
 from dotenv import load_dotenv
 from ipumspy import IpumsApiClient, MicrodataExtract
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DOTENV_PATH = PROJECT_ROOT / '.env'
-DEFAULT_OUTPUT_DIR = PROJECT_ROOT / 'data' / 'raw' / 'acs'
+from embedding_data import ipums_delivery, paths
+
+DOTENV_PATH = paths.PROJECT_ROOT / '.env'
 
 app = typer.Typer(add_completion=False, pretty_exceptions_show_locals=False)
 
@@ -92,18 +94,19 @@ def build_extract(name: str) -> MicrodataExtract:
   return extract
 
 
-def csv_to_parquet(csv_gz: Path) -> Path:
-  '''Stream-decompress an IPUMS .csv.gz to disk, then sink it to Parquet lazily.'''
-  csv_path = csv_gz.with_suffix('')
-  with gzip.open(csv_gz, 'rb') as src, csv_path.open('wb') as dst:
-    shutil.copyfileobj(src, dst, length=16 * 1024 * 1024)
-
-  parquet_path = csv_path.with_suffix('.parquet')
-  (
-    pl.scan_csv(csv_path, schema_overrides=SCHEMA_OVERRIDES, infer_schema_length=100_000)
-    .sink_parquet(parquet_path)
-  )
-  csv_path.unlink()
+def csv_to_parquet(csv_gz: Path, parquet_path: Path) -> Path:
+  '''Stream-decompress an IPUMS .csv.gz beside parquet_path, then sink it to Parquet lazily.'''
+  parquet_path.parent.mkdir(parents=True, exist_ok=True)
+  csv_path = parquet_path.with_suffix('.csv')
+  try:
+    with gzip.open(csv_gz, 'rb') as src, csv_path.open('wb') as dst:
+      shutil.copyfileobj(src, dst, length=16 * 1024 * 1024)
+    (
+      pl.scan_csv(csv_path, schema_overrides=SCHEMA_OVERRIDES, infer_schema_length=100_000)
+      .sink_parquet(parquet_path)
+    )
+  finally:
+    csv_path.unlink(missing_ok=True)
   return parquet_path
 
 
@@ -113,13 +116,13 @@ def main(
     list[str] | None,
     typer.Argument(help=f'one or more of: {", ".join(SAMPLE_SETS)} (default: core)'),
   ] = None,
-  out: Annotated[
+  data_dir: Annotated[
     Path,
-    typer.Option('--out', help='Directory for extract downloads.'),
-  ] = DEFAULT_OUTPUT_DIR,
+    typer.Option('--data-dir', help='Data root holding raw/, derived/, and preview/.'),
+  ] = paths.DATA_DIR,
   dry_run: Annotated[
     bool,
-    typer.Option('--dry-run', help='Write definitions without submitting.'),
+    typer.Option('--dry-run', help='Write definitions to preview/ without submitting.'),
   ] = False,
 ) -> None:
   extracts = extracts or ['core']
@@ -141,22 +144,16 @@ def main(
     client = IpumsApiClient(api_key)
 
   for name in extracts:
-    out_dir = out / name
-    out_dir.mkdir(parents=True, exist_ok=True)
     extract = build_extract(name)
-    definition = out_dir / 'extract.json'
-    definition.write_text(json.dumps(extract.build(), indent=2))
-
     if client is None:
-      typer.echo(f'{name}: wrote {definition}')
+      preview = ipums_delivery.write_preview(extract, data_dir, 'acs', name)
+      typer.echo(f'{name}: wrote {preview}')
       continue
 
-    client.submit_extract(extract)
-    typer.echo(f'{name}: submitted extract {extract.extract_id}, waiting')
-    client.wait_for_extract(extract)
-    client.download_extract(extract, download_dir=out_dir)
-    for csv_gz in sorted(out_dir.glob('*.csv.gz')):
-      typer.echo(f'{name}: wrote {csv_to_parquet(csv_gz)}')
+    extract_dir = ipums_delivery.deliver(client, extract, data_dir, 'acs', name)
+    for csv_gz in sorted(extract_dir.glob('*.csv.gz')):
+      parquet = ipums_delivery.parquet_path(data_dir, 'acs', name, csv_gz)
+      typer.echo(f'{name}: wrote {csv_to_parquet(csv_gz, parquet)}')
 
 
 if __name__ == '__main__':
