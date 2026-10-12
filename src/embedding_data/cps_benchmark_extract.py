@@ -17,8 +17,8 @@ The key is needed even for --dry-run,
 because sample IDs come from the IPUMS sample catalog: monthly IDs end in b or
 s depending on whether a supplement was fielded, and October 2025 does not exist.
 
-monthly: every basic monthly sample from --start (default 2025-01, the first
-    month on the 2022 Census industry codes; occupation has used 2018 codes since
+monthly: every basic monthly sample from --start (default and earliest 2025-01, the
+    first month on the 2022 Census industry codes; occupation has used 2018 codes since
     2020), labor force members only, with the panel IDs and dependent-interviewing
     flags (EMPSAME, ACTSAME) needed for month-to-month job transitions.
 asec: every ASEC from 2025 on, all persons, with longest-job-last-year codes
@@ -49,6 +49,8 @@ app = typer.Typer(add_completion=False, pretty_exceptions_show_locals=False)
 
 
 ASEC_FIRST_YEAR = 2025
+# January 2025 is the first month on the 2022 Census industry codes (spec R4.3).
+MONTHLY_FIRST = '2025-01'
 SAMPLE_ID = re.compile(r'^cps(\d{4})_(\d{2})([bs])$')
 
 VARIABLES = {
@@ -148,7 +150,7 @@ def main(
     start: Annotated[
         str,
         typer.Option('--start', help='First monthly sample, YYYY-MM.'),
-    ] = '2025-01',
+    ] = MONTHLY_FIRST,
     data_dir: Annotated[
         Path,
         typer.Option('--data-dir', help='Data root holding raw/, derived/, and preview/.'),
@@ -166,6 +168,13 @@ def main(
             'unknown extract(s): ' + ', '.join(unknown), param_hint='extracts'
         )
 
+    start_month = parse_month(start)
+    if start_month < parse_month(MONTHLY_FIRST):
+        raise typer.BadParameter(
+            f'{start} is before {MONTHLY_FIRST}, the first month on 2022 Census industry codes',
+            param_hint="'--start'",
+        )
+
     load_dotenv(dotenv_path=DOTENV_PATH)
     api_key = os.environ.get('IPUMS_API_KEY')
     if not api_key:
@@ -175,7 +184,6 @@ def main(
         raise typer.Exit(code=1)
     client = IpumsApiClient(api_key)
     catalog = client.get_all_sample_info('cps')
-    start_month = parse_month(start)
 
     for name in extracts:
         samples = select_samples(catalog, name, start_month)

@@ -93,3 +93,17 @@ def test_acs_dry_run_neither_reads_key_nor_creates_client(
     client_factory.assert_not_called()
     definition = json.loads((data_directory / 'preview/acs/core/extract.json').read_text())
     assert set(definition['samples']) == {'us2023a', 'us2024a'}
+
+
+def test_cps_start_before_2025_exits_non_zero(cli_runner, data_directory, dotenv_path):
+    with (
+        patch.object(cps_extract, 'DOTENV_PATH', dotenv_path),
+        patch.object(cps_extract, 'IpumsApiClient', autospec=True) as client_factory,
+    ):
+        result = cli_runner.invoke(
+            cli.app, ['cps', '--start', '2024-12', '--data-dir', str(data_directory)]
+        )
+
+    assert result.exit_code != 0
+    assert '2024-12 is before 2025-01' in result.output
+    client_factory.assert_not_called()

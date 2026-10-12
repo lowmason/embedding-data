@@ -210,3 +210,16 @@ def test_the_api_key_reaches_no_file_and_no_output(run_cli, data_directory):
     for path in data_directory.rglob('*'):
         if path.is_file():
             assert b'dotenv-test-key' not in path.read_bytes(), path
+
+
+@pytest.mark.parametrize('start', ['2024-12', '2020-01'])
+@pytest.mark.parametrize('mode', [[], ['--dry-run']], ids=['live', 'dry-run'])
+def test_a_start_before_january_2025_is_refused_before_the_key_is_read(
+    run_cli, data_directory, start, mode,
+):
+    result, client_factory = run_cli(['monthly', '--start', start, *mode])
+
+    assert result.exit_code == 2, result.output
+    assert f'{start} is before 2025-01' in result.output
+    client_factory.assert_not_called()
+    assert not data_directory.exists()

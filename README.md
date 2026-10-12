@@ -114,7 +114,7 @@ strings, including aggregated codes such as `31M` and `1110XX`.
 
 | Name | Selection | Universe |
 | --- | --- | --- |
-| `monthly` | Catalog samples from `--start`, default `2025-01`; excludes ASEC and prefers a basic sample when both variants exist | Labor-force members, `LABFORCE` = 2 |
+| `monthly` | Catalog samples from `--start`, default and earliest `2025-01` (an earlier start is refused); excludes ASEC and prefers a basic sample when both variants exist | Labor-force members, `LABFORCE` = 2 |
 | `asec` | ASEC catalog samples from 2025 onward; unaffected by `--start` | All persons |
 
 With no extract names, both sets are requested. CPS dry runs **require the API
