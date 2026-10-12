@@ -149,24 +149,26 @@ NAICS and SOC remains a later step.
 ## OSHA case-detail download
 
 The `osha` command needs no account or key. It downloads two files from osha.gov
-over HTTP/2 and converts the CSV to Parquet in the same directory:
+over HTTP/2 into `data/raw/osha/`, records each in `data/raw/manifest.jsonl`
+with its URL, retrieval time, SHA-256, and `httpx` version, and converts the CSV
+to Parquet in `data/derived/osha/`:
 
 | File | Contents |
 | --- | --- |
-| `ITA_Case_Detail_Data_2025_through_08-31-2026.csv` | One row per recordable injury or illness filed for 2025 (`year_of_filing`) and submitted through 2026-08-31; some incident dates fall in 2024 |
-| `case_detail_data_dictionary_2026.pdf` | OSHA's field definitions for the CSV |
-| `ITA_Case_Detail_Data_2025_through_08-31-2026.parquet` | The CSV with typed columns |
+| `raw/osha/ITA_Case_Detail_Data_2025_through_08-31-2026.csv` | One row per recordable injury or illness filed for 2025 (`year_of_filing`) and submitted through 2026-08-31; some incident dates fall in 2024 |
+| `raw/osha/case_detail_data_dictionary_2026.pdf` | OSHA's field definitions for the CSV |
+| `derived/osha/ITA_Case_Detail_Data_2025_through_08-31-2026.parquet` | The CSV with typed columns |
 
 ```bash
 uv run embedding-data osha
-uv run embedding-data osha --out /tmp/osha
+uv run embedding-data osha --data-dir /tmp/osha-data
 ```
 
-The default destination is `<project-root>/data/raw/osha/`. A file that already
-exists there is kept as delivered and not downloaded again; the Parquet is
-rebuilt on every run. Downloads are written to a `.part` file and renamed only
-when complete. osha.gov refuses non-browser user agents with HTTP 403, so the
-command sends a browser `User-Agent`.
+A raw file that already exists is kept as delivered and not downloaded again,
+and the Parquet is built only when it is absent; delete it to rebuild.
+Downloads are written to a `.part` file and renamed only when complete.
+osha.gov refuses non-browser user agents with HTTP 403, so the command sends a
+browser `User-Agent`.
 
 The CSV mixes encodings: most non-ASCII text is Windows-1252, and a few rows are
 UTF-8. Conversion decodes both into UTF-8 Parquet. Code columns (`zip_code`,

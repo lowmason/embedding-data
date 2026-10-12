@@ -2,24 +2,29 @@
 
 Usage:
     uv run embedding-data osha
-    uv run embedding-data osha --out /tmp/osha
+    uv run embedding-data osha --data-dir /tmp/osha-data
 
-Downloads default to data/raw/osha under the project root. A file that already
-exists there is kept as delivered and not downloaded again; the CSV's name carries
-its submission through-date, so a later OSHA release arrives under a new name.
+Raw files go to data/raw/osha, and each download is recorded in
+data/raw/manifest.jsonl with its URL, retrieval time, SHA-256, and httpx version.
+A file that already exists there is kept as delivered and not downloaded again;
+the CSV's name carries its submission through-date, so a later OSHA release
+arrives under a new name. The Parquet goes to data/derived/osha and is built only
+when absent; delete it to rebuild. --data-dir moves the whole data root.
 
 These are case-detail records (one row per injury or illness, Forms 300 and 301),
 not the Form 300A establishment summaries the benchmark specification requires.
 
 The CSV mixes encodings: most non-ASCII text is Windows-1252, a few rows are UTF-8.
-It is transcoded to a temporary UTF-8 copy and sunk to Parquet next to the raw
-file. Code columns stay strings even where the data dictionary calls them numeric
+It is transcoded to a temporary UTF-8 copy beside the Parquet and sunk to Parquet.
+Code columns stay strings even where the data dictionary calls them numeric
 (zip_code has already lost its leading zeros upstream; SOC_code reads 00-9900 when
 unassigned); counts become Int64, dates and times become Date and Time, and a
 value that does not parse fails the conversion.
 '''
 
 import codecs
+from datetime import UTC, datetime
+from importlib.metadata import version
 from pathlib import Path, PurePosixPath
 from typing import Annotated
 from urllib.parse import urlsplit
@@ -29,8 +34,7 @@ import polars as pl
 import polars.selectors as cs
 import typer
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_OUTPUT_DIR = PROJECT_ROOT / 'data' / 'raw' / 'osha'
+from embedding_data import manifest, paths
 
 app = typer.Typer(add_completion=False, pretty_exceptions_show_locals=False)
 
@@ -110,10 +114,10 @@ def decode_line(raw: bytes) -> str:
     return raw.decode('utf-8', errors='osha-cp1252-fallback')
 
 
-def csv_to_parquet(csv_path: Path) -> Path:
-    '''Transcode the raw CSV to a temporary UTF-8 copy, then sink it to typed Parquet lazily.'''
-    utf8_path = csv_path.with_suffix('.utf8.csv')
-    parquet_path = csv_path.with_suffix('.parquet')
+def csv_to_parquet(csv_path: Path, parquet_path: Path) -> Path:
+    '''Transcode the raw CSV to a temporary UTF-8 copy beside parquet_path; sink typed Parquet.'''
+    parquet_path.parent.mkdir(parents=True, exist_ok=True)
+    utf8_path = parquet_path.with_suffix('.utf8.csv')
     partial = parquet_path.with_name(parquet_path.name + '.part')
     try:
         # Splitting on b'\n' is safe for both encodings: neither uses 0x0A inside a character.
@@ -136,20 +140,37 @@ def csv_to_parquet(csv_path: Path) -> Path:
 
 @app.command(help=__doc__.splitlines()[0])
 def main(
-    out: Annotated[
+    data_dir: Annotated[
         Path,
-        typer.Option('--out', help='Directory for the raw files and the Parquet.'),
-    ] = DEFAULT_OUTPUT_DIR,
+        typer.Option('--data-dir', help='Data root holding raw/ and derived/.'),
+    ] = paths.DATA_DIR,
 ) -> None:
-    out.mkdir(parents=True, exist_ok=True)
+    raw = paths.raw_dir(data_dir, 'osha')
+    raw.mkdir(parents=True, exist_ok=True)
+    manifest_path = paths.manifest_path(data_dir)
     with make_client() as client:
         for url in (DICTIONARY_URL, CSV_URL):
-            destination = out / file_name(url)
+            destination = raw / file_name(url)
             if destination.exists():
                 typer.echo(f'{destination.name}: exists, keeping it as delivered')
                 continue
             download(client, url, destination)
-    typer.echo(f'wrote {csv_to_parquet(out / file_name(CSV_URL))}')
+            entry = manifest.describe_file(
+                destination,
+                manifest_path.parent,
+                retrieved_at=datetime.now(UTC),
+                client='httpx',
+                client_version=version('httpx'),
+                source_url=url,
+            )
+            manifest.append_entries(manifest_path, [entry])
+
+    csv_path = raw / file_name(CSV_URL)
+    parquet_path = paths.derived_dir(data_dir, 'osha') / csv_path.with_suffix('.parquet').name
+    if parquet_path.exists():
+        typer.echo(f'{parquet_path.name}: exists, not converting again')
+        return
+    typer.echo(f'wrote {csv_to_parquet(csv_path, parquet_path)}')
 
 
 if __name__ == '__main__':
