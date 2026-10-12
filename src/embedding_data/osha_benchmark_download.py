@@ -53,6 +53,7 @@ USER_AGENT = (
 )
 TIMEOUT = httpx.Timeout(60.0, connect=15.0)
 CHUNK_SIZE = 1024 * 1024
+BACKFILL_COMMAND = 'uv run --locked python -m embedding_data.raw_backfill'
 
 INTEGER_COLUMNS = [
     'ID', 'establishment_ID', 'naics_year', 'establishment_type', 'Size',
@@ -77,6 +78,12 @@ def make_client(transport: httpx.BaseTransport | None = None) -> httpx.Client:
 
 def file_name(url: str) -> str:
     return PurePosixPath(urlsplit(url).path).name
+
+
+def is_recorded(manifest_path: Path, raw_file: Path) -> bool:
+    '''Whether the manifest has an entry for raw_file.'''
+    path = raw_file.relative_to(manifest_path.parent).as_posix()
+    return any(entry.path == path for entry in manifest.read_manifest(manifest_path))
 
 
 def download(client: httpx.Client, url: str, destination: Path) -> None:
@@ -153,6 +160,12 @@ def main(
             destination = raw / file_name(url)
             if destination.exists():
                 typer.echo(f'{destination.name}: exists, keeping it as delivered')
+                if not is_recorded(manifest_path, destination):
+                    typer.echo(
+                        f'{destination.name}: warning: not recorded in {manifest_path}; to '
+                        f'record it, run {BACKFILL_COMMAND} --data-dir {data_dir}',
+                        err=True,
+                    )
                 continue
             download(client, url, destination)
             entry = manifest.describe_file(

@@ -165,7 +165,8 @@ uv run embedding-data osha --data-dir /tmp/osha-data
 ```
 
 A raw file that already exists is kept as delivered and not downloaded again,
-and the Parquet is built only when it is absent; delete it to rebuild.
+and one missing from the manifest is reported on stderr, not recorded.
+The Parquet is built only when it is absent; delete it to rebuild.
 Downloads are written to a `.part` file and renamed only when complete.
 osha.gov refuses non-browser user agents with HTTP 403, so the command sends a
 browser `User-Agent`.

@@ -153,6 +153,63 @@ def test_existing_raw_files_are_neither_downloaded_nor_recorded_again(run_cli, d
     assert manifest.read_manifest(paths.manifest_path(data_directory)) == []
 
 
+def test_unrecorded_existing_raw_files_are_reported_but_not_recorded(run_cli, data_directory):
+    raw = data_directory / 'raw/osha'
+    raw.mkdir(parents=True)
+    (raw / CSV_NAME).write_bytes(CSV_BYTES)
+    (raw / DICTIONARY_NAME).write_bytes(PDF_BYTES)
+
+    result = run_cli(no_requests)
+
+    assert result.exit_code == 0, result.output
+    warnings = [line for line in result.stderr.splitlines() if 'warning' in line]
+    assert len(warnings) == 2
+    for name, line in zip([DICTIONARY_NAME, CSV_NAME], warnings, strict=True):
+        assert name in line
+        assert 'uv run --locked python -m embedding_data.raw_backfill' in line
+    assert 'warning' not in result.stdout
+    assert manifest.read_manifest(paths.manifest_path(data_directory)) == []
+
+
+def test_only_the_existing_raw_file_missing_from_the_manifest_is_reported(
+    run_cli, data_directory,
+):
+    raw = data_directory / 'raw/osha'
+    raw.mkdir(parents=True)
+    (raw / CSV_NAME).write_bytes(CSV_BYTES)
+    (raw / DICTIONARY_NAME).write_bytes(PDF_BYTES)
+    manifest_path = paths.manifest_path(data_directory)
+    recorded = manifest.describe_file(
+        raw / DICTIONARY_NAME,
+        manifest_path.parent,
+        retrieved_at=datetime.datetime.now(datetime.UTC),
+        client='httpx',
+        client_version=version('httpx'),
+        source_url=osha.DICTIONARY_URL,
+    )
+    manifest.append_entries(manifest_path, [recorded])
+
+    result = run_cli(no_requests)
+
+    assert result.exit_code == 0, result.output
+    assert CSV_NAME in result.stderr
+    assert DICTIONARY_NAME not in result.stderr
+    assert manifest.read_manifest(manifest_path) == [recorded]
+
+
+def test_recorded_raw_files_are_not_reported(run_cli, data_directory):
+    first = run_cli()
+    assert first.exit_code == 0, first.output
+    assert 'warning' not in first.output
+
+    second = run_cli(no_requests)
+
+    assert second.exit_code == 0, second.output
+    assert 'exists, keeping it as delivered' in second.stdout
+    assert second.stderr == ''
+    assert 'raw_backfill' not in second.output
+
+
 def test_a_second_run_neither_downloads_nor_reconverts(run_cli, data_directory):
     first = run_cli()
     assert first.exit_code == 0, first.output
