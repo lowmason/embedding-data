@@ -15,7 +15,7 @@ live IPUMS extracts on disk (`usa_00001`–`00003`, `cps_00001`–`00002`).
 `src/embedding_data/osha_benchmark_download.py`.
 
 | Req | Verdict | Evidence | Note |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | R1.1 | implemented-differently | `acs:44`, `cps:52`, `osha:38` | ACS, CPS acquired; ITA acquisition is 2025 case detail, not 300A → S2 |
 | R1.2 | implemented-as-specified | `acs:134`, `cps:166`, `cli.py:7`; key tests in `tests/test_acs_benchmark_extract.py`, `tests/test_cps_benchmark_extract.py` | |
 | R1.3 | out-of-repo | IPUMS account; extracts delivered | Satisfied; owner confirmed registration complete 2026-10-12 |
