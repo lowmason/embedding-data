@@ -47,9 +47,9 @@ uv sync --locked
 The repository's `.python-version` selects Python 3.14 for this environment.
 
 The main libraries are `ipumspy` for IPUMS requests, Polars for conversion,
-Typer for the CPS CLI, and `python-dotenv` for CPS credential loading. The CPS
-script also declares its own dependencies and Python minimum of 3.11 in inline
-metadata; `uv run` creates a separate script environment for it. See
+Typer for the CPS CLI, and `python-dotenv` for CPS credential loading. Both
+extract scripts also declare their own dependencies and Python minimum of 3.11
+in inline metadata; `uv run` creates a separate script environment for each. See
 [uv's script documentation](https://docs.astral.sh/uv/guides/scripts/).
 
 Register for both IPUMS USA and IPUMS CPS, then create an
@@ -107,10 +107,6 @@ including aggregated codes such as `31M` and `1110XX`.
 
 ## CPS extracts
 
-The script is currently saved as `src/embedding_data/cps_benchmarl_extract.py`, with
-that spelling. Use the filename below rather than the alternate spelling in
-the specification.
-
 | Name | Selection | Universe |
 | --- | --- | --- |
 | `monthly` | Catalog samples from `--start`, default `2025-01`; excludes ASEC and prefers a basic sample when both variants exist | Labor-force members, `LABFORCE` = 2 |
@@ -122,19 +118,19 @@ definitions without submitting extracts.
 
 ```bash
 # Inspect the CLI without contacting IPUMS.
-uv run src/embedding_data/cps_benchmarl_extract.py --help
+uv run src/embedding_data/cps_benchmark_extract.py --help
 
 # Retrieve the catalog and write definitions for monthly and ASEC.
-uv run src/embedding_data/cps_benchmarl_extract.py --dry-run
+uv run src/embedding_data/cps_benchmark_extract.py --dry-run
 
 # Preview only monthly samples from August 2026 onward.
-uv run src/embedding_data/cps_benchmarl_extract.py monthly --start 2026-08 --dry-run
+uv run src/embedding_data/cps_benchmark_extract.py monthly --start 2026-08 --dry-run
 
 # Submit, wait, download, and convert both sets.
-uv run src/embedding_data/cps_benchmarl_extract.py
+uv run src/embedding_data/cps_benchmark_extract.py
 
 # Download only monthly samples from August 2026 onward.
-uv run src/embedding_data/cps_benchmarl_extract.py monthly --start 2026-08
+uv run src/embedding_data/cps_benchmark_extract.py monthly --start 2026-08
 ```
 
 The default destination is `<project-root>/data/raw/cps/`, with `monthly/` and
@@ -161,8 +157,8 @@ Benchmark data stay separate from embedder training and model selection.
 IPUMS microdata remain local and must not be committed or redistributed as
 project outputs. Share aggregate targets and cite the collections under the
 [IPUMS USA terms](https://usa.ipums.org/usa/terms.shtml) and
-[IPUMS CPS terms](https://cps.ipums.org/cps/terms.shtml). `.env` is ignored by
-Git; `data/` is not currently ignored, so keep microdata out of staged changes.
+[IPUMS CPS terms](https://cps.ipums.org/cps/terms.shtml). `.env` and `data/` are
+ignored by Git.
 The specification permits establishment-level rows in ITA-derived outputs.
 
 ## Checks
@@ -211,7 +207,7 @@ acceptance or survey totals.
 ```text
 specs/embedding-evaluation-data-spec.md      Full data requirements and verification tasks
 src/embedding_data/acs_benchmark_extract.py  ACS extract definitions and downloader
-src/embedding_data/cps_benchmarl_extract.py  CPS catalog selection and downloader
+src/embedding_data/cps_benchmark_extract.py  CPS catalog selection and downloader
 tests/                                       Offline unit, property, and conversion checks
 features/                                    Behave CPS dry-run acceptance scenarios
 data/raw/acs/                                ACS files when downloaded with --out above

@@ -203,7 +203,6 @@ source = { editable = "." }
 dependencies = [
     { name = "ipumspy" },
     { name = "polars" },
-    { name = "pydotenv" },
     { name = "python-dotenv" },
     { name = "typer" },
 ]
@@ -219,7 +218,6 @@ dev = [
 requires-dist = [
     { name = "ipumspy", specifier = ">=0.8.2" },
     { name = "polars", specifier = ">=2.0.0" },
-    { name = "pydotenv", specifier = ">=0.0.7" },
     { name = "python-dotenv", specifier = ">=1.2.4" },
     { name = "typer", specifier = ">=0.27.3" },
 ]
@@ -529,12 +527,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/cc/f1/11a544b8c3d38a759eb3fbb022039117fd633e9a7b19e4841cc3da091915/pyarrow-23.0.1-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:a09f3876e87f48bc2f13583ab551f0379e5dfb83210391e68ace404181a20690", size = 50629149, upload-time = "2026-02-16T10:13:57.238Z" },
     { url = "https://files.pythonhosted.org/packages/50/f2/c0e76a0b451ffdf0cf788932e182758eb7558953f4f27f1aff8e2518b653/pyarrow-23.0.1-cp314-cp314t-win_amd64.whl", hash = "sha256:527e8d899f14bd15b740cd5a54ad56b7f98044955373a17179d5956ddb93d9ce", size = 28365807, upload-time = "2026-02-16T10:14:03.892Z" },
 ]
-
-[[package]]
-name = "pydotenv"
-version = "0.0.7"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/0a/3a/e591d413b1258daee35900a4e1f41a887c7500ea0e9423ccbe40ae81a635/pydotenv-0.0.7.tar.gz", hash = "sha256:5f6d78d3a7ed5124d7836bc1beeadd855dab4e2fdbea9338e6ff61dc1e46829f", size = 2029, upload-time = "2017-05-15T16:07:04.182Z" }
 
 [[package]]
 name = "pygments"

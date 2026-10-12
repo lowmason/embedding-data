@@ -1,3 +1,10 @@
+# /// script
+# requires-python = '>=3.11'
+# dependencies = [
+#   'ipumspy>=0.8',
+#   'polars>=1.0',
+# ]
+# ///
 '''Define, submit, and download the IPUMS USA extracts for the ACS embedding benchmark.
 
 Usage:
