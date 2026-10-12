@@ -138,10 +138,13 @@ uv run embedding-data cps
 uv run embedding-data cps monthly --start 2026-08
 ```
 
-The default destination is `<project-root>/data/raw/cps/`, with `monthly/` and
-`asec/` subdirectories. Use `--out PATH` to override it. CPS stores industry and
-occupation as Census codes; conversion pads `IND`, `OCC`, `INDLY`, and `OCCLY`
-to four-character strings. Mapping them to NAICS and SOC remains a later step.
+Files follow the ACS layout. Dry-run definitions go to
+`data/preview/cps/<set>/extract.json`. Each delivered extract gets its own
+`data/raw/cps/<set>/cps_<number>/` and is recorded in `data/raw/manifest.jsonl`,
+and Parquet goes to `data/derived/cps/<set>/`. `--data-dir PATH` moves the whole
+data root. CPS stores industry and occupation as Census codes; conversion pads
+`IND`, `OCC`, `INDLY`, and `OCCLY` to four-character strings. Mapping them to
+NAICS and SOC remains a later step.
 
 ## OSHA case-detail download
 

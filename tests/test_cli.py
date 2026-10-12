@@ -56,10 +56,10 @@ def test_osha_help_describes_case_detail_download(cli_runner):
     assert 'OSHA ITA case-detail' in result.output
 
 
-def test_cps_dry_run_reaches_cps_module(cli_runner, output_directory, dotenv_path):
+def test_cps_dry_run_reaches_cps_module(cli_runner, data_directory, dotenv_path):
     dotenv_path.write_text('IPUMS_API_KEY=dotenv-test-key\n')
     arguments = [
-        'cps', 'monthly', '--start', '2026-08', '--dry-run', '--out', str(output_directory),
+        'cps', 'monthly', '--start', '2026-08', '--dry-run', '--data-dir', str(data_directory),
     ]
     with (
         patch.object(cps_extract, 'DOTENV_PATH', dotenv_path),
@@ -71,7 +71,7 @@ def test_cps_dry_run_reaches_cps_module(cli_runner, output_directory, dotenv_pat
     assert result.exit_code == 0, result.output
     client_factory.assert_called_once_with('dotenv-test-key')
     client_factory.return_value.submit_extract.assert_not_called()
-    definition = json.loads((output_directory / 'monthly/extract.json').read_text())
+    definition = json.loads((data_directory / 'preview/cps/monthly/extract.json').read_text())
     assert list(definition['samples']) == ['cps2026_08b', 'cps2026_09s']
 
 
