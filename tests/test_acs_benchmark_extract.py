@@ -2,7 +2,6 @@ import gzip
 import json
 import os
 from pathlib import Path
-import tomllib
 from unittest.mock import patch
 
 import polars as pl
@@ -28,17 +27,6 @@ def test_default_paths_point_to_project_root():
     with command.make_context('benchmark', ['--dry-run']) as context:
         assert context.params['out'] == PROJECT_ROOT / 'data/raw/acs'
     assert benchmark.DOTENV_PATH == PROJECT_ROOT / '.env'
-
-
-def test_inline_dependencies_include_ipums_and_polars():
-    source = Path(benchmark.__file__).read_text()
-    assert '# /// script\n' in source
-    metadata_block = source.split('# /// script\n', 1)[1].split('# ///', 1)[0]
-    metadata = tomllib.loads('\n'.join(line.removeprefix('# ') for line in metadata_block.splitlines()))
-    dependencies = {dependency.split('>=', 1)[0] for dependency in metadata['dependencies']}
-
-    assert 'ipumspy' in dependencies
-    assert 'polars' in dependencies
 
 
 def test_help_describes_the_benchmark(cli_runner):

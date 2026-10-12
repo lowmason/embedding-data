@@ -12,8 +12,8 @@ training and the protocol for scoring embeddings are separate from this project.
 ## Current state
 
 The repository currently implements IPUMS ACS and CPS extract definitions,
-submission, download, and CSV-to-Parquet conversion. The CPS CLI uses Typer;
-the saved ACS script uses `argparse`.
+submission, download, and CSV-to-Parquet conversion, run as the `acs` and `cps`
+commands of the `embedding-data` Typer CLI.
 
 OSHA Form 300A ingestion, classification concordances, geography allocation,
 person-month linkage, aggregate targets, and provenance manifests are planned.
@@ -47,10 +47,7 @@ uv sync --locked
 The repository's `.python-version` selects Python 3.14 for this environment.
 
 The main libraries are `ipumspy` for IPUMS requests, Polars for conversion,
-Typer for the CPS CLI, and `python-dotenv` for CPS credential loading. Both
-extract scripts also declare their own dependencies and Python minimum of 3.11
-in inline metadata; `uv run` creates a separate script environment for each. See
-[uv's script documentation](https://docs.astral.sh/uv/guides/scripts/).
+Typer for the CLI, and `python-dotenv` for credential loading.
 
 Register for both IPUMS USA and IPUMS CPS, then create an
 [IPUMS API key](https://account.ipums.org/api_keys). The same key is used for
@@ -64,9 +61,8 @@ IPUMS_API_KEY=your-api-key
 ```
 
 Use the root `.env`, even if another `.env` exists under `src/embedding_data/`.
-CPS loads the root file with `python-dotenv`; an exported `IPUMS_API_KEY` takes
-precedence. ACS currently reads only the process environment, so its download
-commands below use `uv run --env-file .env`.
+Both commands load the root file with `python-dotenv`; an exported
+`IPUMS_API_KEY` takes precedence.
 
 ## ACS extracts
 
@@ -85,25 +81,25 @@ filter. The five-year extract additionally requests `MULTYEAR`.
 Write definitions without credentials or a network request:
 
 ```bash
-uv run src/embedding_data/acs_benchmark_extract.py core --dry-run --out data/raw/acs
+uv run embedding-data acs core --dry-run
 ```
 
 Submit the core extract, wait for completion, download it, and convert it:
 
 ```bash
-uv run --env-file .env src/embedding_data/acs_benchmark_extract.py core --out data/raw/acs
+uv run embedding-data acs core
 ```
 
 Request all three sets:
 
 ```bash
-uv run --env-file .env src/embedding_data/acs_benchmark_extract.py core vintage five_year --out data/raw/acs
+uv run embedding-data acs core vintage five_year
 ```
 
-The explicit `--out` is needed to use this project's intended raw-data layout:
-the current ACS script otherwise defaults to `data/ipums`. Each set gets its
-own subdirectory. Conversion preserves `INDNAICS` and `OCCSOC` as strings,
-including aggregated codes such as `31M` and `1110XX`.
+The default destination is `<project-root>/data/raw/acs/`, with one
+subdirectory per set. Use `--out PATH` to override it. Conversion preserves
+`INDNAICS` and `OCCSOC` as strings, including aggregated codes such as `31M`
+and `1110XX`.
 
 ## CPS extracts
 
@@ -118,19 +114,19 @@ definitions without submitting extracts.
 
 ```bash
 # Inspect the CLI without contacting IPUMS.
-uv run src/embedding_data/cps_benchmark_extract.py --help
+uv run embedding-data cps --help
 
 # Retrieve the catalog and write definitions for monthly and ASEC.
-uv run src/embedding_data/cps_benchmark_extract.py --dry-run
+uv run embedding-data cps --dry-run
 
 # Preview only monthly samples from August 2026 onward.
-uv run src/embedding_data/cps_benchmark_extract.py monthly --start 2026-08 --dry-run
+uv run embedding-data cps monthly --start 2026-08 --dry-run
 
 # Submit, wait, download, and convert both sets.
-uv run src/embedding_data/cps_benchmark_extract.py
+uv run embedding-data cps
 
 # Download only monthly samples from August 2026 onward.
-uv run src/embedding_data/cps_benchmark_extract.py monthly --start 2026-08
+uv run embedding-data cps monthly --start 2026-08
 ```
 
 The default destination is `<project-root>/data/raw/cps/`, with `monthly/` and
@@ -197,9 +193,8 @@ against a fixture catalog and temporary output files, replacing the IPUMS client
 so it cannot make live requests. The starter test strategy is recorded in
 [specs/cps-test-strategy.md](specs/cps-test-strategy.md).
 
-The ACS tests currently expect a Typer and dotenv interface that the saved ACS
-script does not provide; the full suite has known ACS failures until the
-script and tests are aligned. Fixture checks do not confirm live IPUMS variable
+The ACS tests cover the same CLI defaults, credential loading, offline dry
+runs, and conversion. Fixture checks do not confirm live IPUMS variable
 acceptance or survey totals.
 
 ## Project layout
@@ -208,14 +203,12 @@ acceptance or survey totals.
 specs/embedding-evaluation-data-spec.md      Full data requirements and verification tasks
 src/embedding_data/acs_benchmark_extract.py  ACS extract definitions and downloader
 src/embedding_data/cps_benchmark_extract.py  CPS catalog selection and downloader
+src/embedding_data/cli.py                    embedding-data console entry point
 tests/                                       Offline unit, property, and conversion checks
 features/                                    Behave CPS dry-run acceptance scenarios
-data/raw/acs/                                ACS files when downloaded with --out above
+data/raw/acs/                                Default ACS output location
 data/raw/cps/                                Default CPS output location
 data/raw/osha/                               Existing OSHA case-detail inputs
 pyproject.toml                               Project dependencies and Python requirement
 uv.lock                                      Project dependency lockfile
 ```
-
-The `embedding-data` console entry point is currently package scaffolding. Run the
-extract scripts directly using the commands above.

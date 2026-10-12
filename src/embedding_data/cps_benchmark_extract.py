@@ -1,18 +1,9 @@
-# /// script
-# requires-python = '>=3.11'
-# dependencies = [
-#   'ipumspy>=0.8',
-#   'polars>=1.0',
-#   'python-dotenv>=1.2.4',
-#   'typer>=0.27.3',
-# ]
-# ///
 '''Define, submit, and download the IPUMS CPS extracts for the embedding benchmark.
 
 Usage:
-    uv run src/embedding_data/cps_benchmark_extract.py --dry-run
-    uv run src/embedding_data/cps_benchmark_extract.py
-    uv run src/embedding_data/cps_benchmark_extract.py monthly --start 2026-08
+    uv run embedding-data cps --dry-run
+    uv run embedding-data cps
+    uv run embedding-data cps monthly --start 2026-08
 
 Requires an IPUMS CPS account and IPUMS_API_KEY in the project-root .env
 (~/Projects/embedding-data/.env; https://account.ipums.org/api_keys). An exported

@@ -1,7 +1,6 @@
 import gzip
 import json
 from pathlib import Path
-import tomllib
 from unittest.mock import patch
 
 import polars as pl
@@ -57,16 +56,6 @@ def test_default_paths_point_to_project_root(cli_app):
         assert context.params['out'] == PROJECT_ROOT / 'data/raw/cps'
         assert context.params['start'] == '2025-01'
     assert benchmark.DOTENV_PATH == PROJECT_ROOT / '.env'
-
-
-def test_inline_dependencies_include_cli_and_dotenv():
-    source = Path(benchmark.__file__).read_text()
-    metadata_block = source.split('# /// script\n', 1)[1].split('# ///', 1)[0]
-    metadata = tomllib.loads('\n'.join(line.removeprefix('# ') for line in metadata_block.splitlines()))
-    dependencies = {dependency.split('>=', 1)[0] for dependency in metadata['dependencies']}
-
-    assert 'typer' in dependencies
-    assert 'python-dotenv' in dependencies
 
 
 def test_help_describes_cps_options(cli_app, cli_runner):

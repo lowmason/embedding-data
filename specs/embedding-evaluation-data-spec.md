@@ -477,8 +477,9 @@ synthesis)*
 and requested as CSV; ipumspy's readers return pandas and are not used.
 Ingestion streams each CSV to Parquet with polars, keeping alphanumeric code
 columns as strings. Transformations are lazy polars with method-style
-expressions. Scripts carry inline dependency metadata and run with `uv run`.
-*(implemented; XA, XC)*
+expressions. Each extract runs as a command of the package's console entry point
+(`uv run embedding-data acs`, `uv run embedding-data cps`), with dependencies
+declared in `pyproject.toml`. *(implemented; XA, XC)*
 
 **R9.2** Every transformation is deterministic and runs offline from raw files.
 Tests use fixtures, with no network and no credentials. *(added at synthesis)*

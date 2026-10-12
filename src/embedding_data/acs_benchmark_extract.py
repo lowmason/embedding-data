@@ -1,19 +1,15 @@
-# /// script
-# requires-python = '>=3.11'
-# dependencies = [
-#   'ipumspy>=0.8',
-#   'polars>=1.0',
-# ]
-# ///
 '''Define, submit, and download the IPUMS USA extracts for the ACS embedding benchmark.
 
 Usage:
-    uv run acs_benchmark_extract.py --dry-run               # write extract definitions only
-    uv run acs_benchmark_extract.py core                    # submit, wait, download, convert
-    uv run acs_benchmark_extract.py core vintage five_year
+    uv run embedding-data acs --dry-run  # write extract definitions only
+    uv run embedding-data acs core       # submit, wait, download, convert
+    uv run embedding-data acs core vintage five_year
 
-Requires an IPUMS USA account and an API key in IPUMS_API_KEY
-(https://account.ipums.org/api_keys).
+Requires an IPUMS USA account and IPUMS_API_KEY in the project-root .env
+(~/Projects/embedding-data/.env; https://account.ipums.org/api_keys). An exported
+IPUMS_API_KEY takes precedence. --dry-run needs neither the key nor network
+access. Downloads default to data/raw/acs under the project root, with one
+subdirectory per extract set.
 
 Each extract is employed persons only, as CSV, with IPUMS data quality flags
 (Q-prefixed columns such as QIND and QOCC mark Census-allocated values). The
@@ -22,15 +18,24 @@ kept as strings. When pooling the two core years, halve PERWT and REPWTP1-80
 for annual-average totals; compositions and shares are unaffected.
 '''
 
-import argparse
 import gzip
 import json
 import os
 import shutil
 from pathlib import Path
+from typing import Annotated
 
 import polars as pl
+import typer
+from dotenv import load_dotenv
 from ipumspy import IpumsApiClient, MicrodataExtract
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DOTENV_PATH = PROJECT_ROOT / '.env'
+DEFAULT_OUTPUT_DIR = PROJECT_ROOT / 'data' / 'raw' / 'acs'
+
+app = typer.Typer(add_completion=False, pretty_exceptions_show_locals=False)
 
 
 # core: natively coded on 2022 NAICS, 2018 SOC, and 2020 PUMAs.
@@ -103,46 +108,55 @@ def csv_to_parquet(csv_gz: Path) -> Path:
   return parquet_path
 
 
-def main() -> None:
-  names = ', '.join(SAMPLE_SETS)
-  parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-  parser.add_argument(
-    'extracts', nargs='*', default=['core'],
-    help=f'one or more of: {names} (default: core)',
-  )
-  parser.add_argument('--out', type=Path, default=Path('data/ipums'))
-  parser.add_argument('--dry-run', action='store_true', help='write definitions without submitting')
-  args = parser.parse_args()
+@app.command(help=__doc__.splitlines()[0])
+def main(
+  extracts: Annotated[
+    list[str] | None,
+    typer.Argument(help=f'one or more of: {", ".join(SAMPLE_SETS)} (default: core)'),
+  ] = None,
+  out: Annotated[
+    Path,
+    typer.Option('--out', help='Directory for extract downloads.'),
+  ] = DEFAULT_OUTPUT_DIR,
+  dry_run: Annotated[
+    bool,
+    typer.Option('--dry-run', help='Write definitions without submitting.'),
+  ] = False,
+) -> None:
+  extracts = extracts or ['core']
 
-  unknown = sorted(set(args.extracts).difference(SAMPLE_SETS))
+  unknown = sorted(set(extracts).difference(SAMPLE_SETS))
   if unknown:
-    parser.error('unknown extract(s): ' + ', '.join(unknown))
+    raise typer.BadParameter('unknown extract(s): ' + ', '.join(unknown), param_hint='extracts')
 
+  # Definitions need no catalog lookup, so a dry run reads no key and stays offline.
   client = None
-  if not args.dry_run:
+  if not dry_run:
+    load_dotenv(dotenv_path=DOTENV_PATH)
     api_key = os.environ.get('IPUMS_API_KEY')
-    if api_key is None:
-      raise SystemExit('Set IPUMS_API_KEY (https://account.ipums.org/api_keys).')
+    if not api_key:
+      typer.echo(f'Set IPUMS_API_KEY in {DOTENV_PATH} (https://account.ipums.org/api_keys).', err=True)
+      raise typer.Exit(code=1)
     client = IpumsApiClient(api_key)
 
-  for name in args.extracts:
-    out_dir = args.out / name
+  for name in extracts:
+    out_dir = out / name
     out_dir.mkdir(parents=True, exist_ok=True)
     extract = build_extract(name)
     definition = out_dir / 'extract.json'
     definition.write_text(json.dumps(extract.build(), indent=2))
 
     if client is None:
-      print(f'{name}: wrote {definition}')
+      typer.echo(f'{name}: wrote {definition}')
       continue
 
     client.submit_extract(extract)
-    print(f'{name}: submitted extract {extract.extract_id}, waiting')
+    typer.echo(f'{name}: submitted extract {extract.extract_id}, waiting')
     client.wait_for_extract(extract)
     client.download_extract(extract, download_dir=out_dir)
     for csv_gz in sorted(out_dir.glob('*.csv.gz')):
-      print(f'{name}: wrote {csv_to_parquet(csv_gz)}')
+      typer.echo(f'{name}: wrote {csv_to_parquet(csv_gz)}')
 
 
 if __name__ == '__main__':
-  main()
+  app()
