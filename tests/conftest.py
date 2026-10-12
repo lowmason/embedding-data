@@ -20,3 +20,8 @@ def output_directory(tmp_path):
 @pytest.fixture
 def dotenv_path(tmp_path):
     return tmp_path / '.env'
+
+
+@pytest.fixture
+def data_directory(tmp_path):
+    return tmp_path / 'data'
