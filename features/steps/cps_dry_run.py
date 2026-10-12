@@ -7,7 +7,6 @@ from typer.testing import CliRunner
 
 from embedding_data import cps_benchmark_extract as benchmark
 
-
 @given('this CPS sample catalog:')
 def set_sample_catalog(context):
     context.catalog = {row['sample_id']: row['description'] for row in context.table}
@@ -25,9 +24,15 @@ def preview_extracts(context, start=None):
     ):
         context.client = client_factory.return_value
         context.client.get_all_sample_info.return_value = context.catalog
-        context.client.submit_extract.side_effect = AssertionError('A dry-run must not submit extracts')
-        context.client.wait_for_extract.side_effect = AssertionError('A dry-run must not wait for extracts')
-        context.client.download_extract.side_effect = AssertionError('A dry-run must not download extracts')
+        context.client.submit_extract.side_effect = AssertionError(
+            'A dry-run must not submit extracts'
+        )
+        context.client.wait_for_extract.side_effect = AssertionError(
+            'A dry-run must not wait for extracts'
+        )
+        context.client.download_extract.side_effect = AssertionError(
+            'A dry-run must not download extracts'
+        )
         context.result = CliRunner().invoke(benchmark.app, arguments)
 
     assert context.result.exit_code == 0, context.result.output or repr(context.result.exception)

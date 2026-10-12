@@ -9,16 +9,19 @@ Builds aggregate evaluation targets for industry (NAICS), occupation (SOC), and 
 ## Commands
 
 ```bash
-uv sync --locked            # Python 3.14 project env + dev deps (pytest, hypothesis, behave)
+uv sync --locked            # Python 3.14 env + dev deps (pytest, hypothesis, behave, ruff, pre-commit)
 uv run --locked pytest      # unit + property tests (testpaths = tests/)
 uv run --locked pytest tests/test_cps_benchmark_extract.py::test_monthly_start_option_filters_catalog
 uv run --locked behave      # Gherkin acceptance scenarios in features/
 uv run --locked behave -n "Preview monthly samples from a later start"
 uv lock --check
 uv run embedding-data acs core --dry-run --out "$(mktemp -d)"   # offline: no key, no network
+uv run --locked ruff check .                 # lint: E, F, isort, single quotes; 99 columns
+uv run --locked pre-commit install           # once per clone
+uv run --locked pre-commit run --all-files
 ```
 
-No linter, formatter, type checker, or CI is configured.
+Pre-commit runs the pre-commit-hooks file checks, `ruff-check --fix`, and the full pytest suite under coverage (`COVERAGE_THRESHOLD`, default 0). Its ruff `rev` must match the ruff version in `uv.lock`. yapf is configured in `pyproject.toml` but is a manual tool, not a hook: running it reindents the ACS module to 4 spaces. There is no type checker or CI.
 
 **Expected baseline:** the full pytest suite and every Behave scenario pass; any failure is a regression.
 

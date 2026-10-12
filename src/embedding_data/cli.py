@@ -4,7 +4,6 @@ import typer
 
 from embedding_data import acs_benchmark_extract, cps_benchmark_extract
 
-
 app = typer.Typer(add_completion=False, pretty_exceptions_show_locals=False)
 
 

@@ -10,7 +10,6 @@ from typer.main import get_command
 
 from embedding_data import cps_benchmark_extract as benchmark
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SAMPLE_CATALOG = {
     'cps2024_12b': 'December 2024 Basic Monthly',
@@ -41,7 +40,9 @@ def run_cli(cli_app, cli_runner, output_directory, dotenv_path):
             patch.object(benchmark, 'IpumsApiClient', autospec=True) as client_factory,
         ):
             client = client_factory.return_value
-            client.get_all_sample_info.return_value = SAMPLE_CATALOG if catalog is None else catalog
+            client.get_all_sample_info.return_value = (
+                SAMPLE_CATALOG if catalog is None else catalog
+            )
             client.submit_extract.side_effect = lambda extract: setattr(extract, '_id', 123)
             client.download_extract.side_effect = download
             result = cli_runner.invoke(cli_app, [*arguments, '--out', str(output_directory)])
@@ -103,7 +104,9 @@ def test_exported_key_takes_precedence(run_cli, output_directory, monkeypatch):
 
 
 @pytest.mark.parametrize('contents', [None, 'IPUMS_API_KEY=\n'], ids=['missing', 'empty'])
-def test_missing_or_empty_key_fails_even_for_dry_run(run_cli, output_directory, dotenv_path, contents):
+def test_missing_or_empty_key_fails_even_for_dry_run(
+    run_cli, output_directory, dotenv_path, contents,
+):
     if contents is None:
         dotenv_path.unlink()
     else:

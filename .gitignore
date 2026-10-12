@@ -12,6 +12,8 @@ wheels/
 # Test caches
 .pytest_cache/
 .hypothesis/
+.coverage
+htmlcov/
 
 # Virtual environments
 .venv

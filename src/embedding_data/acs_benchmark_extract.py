@@ -30,7 +30,6 @@ import typer
 from dotenv import load_dotenv
 from ipumspy import IpumsApiClient, MicrodataExtract
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DOTENV_PATH = PROJECT_ROOT / '.env'
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / 'data' / 'raw' / 'acs'
@@ -135,7 +134,9 @@ def main(
     load_dotenv(dotenv_path=DOTENV_PATH)
     api_key = os.environ.get('IPUMS_API_KEY')
     if not api_key:
-      typer.echo(f'Set IPUMS_API_KEY in {DOTENV_PATH} (https://account.ipums.org/api_keys).', err=True)
+      typer.echo(
+        f'Set IPUMS_API_KEY in {DOTENV_PATH} (https://account.ipums.org/api_keys).', err=True
+      )
       raise typer.Exit(code=1)
     client = IpumsApiClient(api_key)
 

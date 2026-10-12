@@ -11,7 +11,6 @@ from typer.main import get_command
 
 from embedding_data import acs_benchmark_extract as benchmark
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 pytestmark = pytest.mark.usefixtures('cli_runner')
 

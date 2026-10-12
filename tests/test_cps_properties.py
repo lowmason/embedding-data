@@ -1,7 +1,7 @@
-from hypothesis import example, given, settings, strategies as st
+from hypothesis import example, given, settings
+from hypothesis import strategies as st
 
 from embedding_data import cps_benchmark_extract as benchmark
-
 
 YEAR_MONTHS = st.tuples(st.integers(min_value=2023, max_value=2035), st.integers(1, 12))
 MONTHLY_VARIANTS = st.dictionaries(

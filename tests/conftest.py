@@ -4,7 +4,6 @@ from unittest.mock import patch
 import pytest
 from typer.testing import CliRunner
 
-
 @pytest.fixture
 def cli_runner():
     with patch.dict(os.environ):

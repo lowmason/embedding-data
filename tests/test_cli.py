@@ -1,7 +1,7 @@
 import json
 import os
-from pathlib import Path
 import tomllib
+from pathlib import Path
 from unittest.mock import patch
 
 from typer.main import get_command
@@ -9,7 +9,6 @@ from typer.main import get_command
 from embedding_data import acs_benchmark_extract as acs_extract
 from embedding_data import cli
 from embedding_data import cps_benchmark_extract as cps_extract
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SAMPLE_CATALOG = {
@@ -52,7 +51,9 @@ def test_acs_help_describes_acs_benchmark(cli_runner):
 
 def test_cps_dry_run_reaches_cps_module(cli_runner, output_directory, dotenv_path):
     dotenv_path.write_text('IPUMS_API_KEY=dotenv-test-key\n')
-    arguments = ['cps', 'monthly', '--start', '2026-08', '--dry-run', '--out', str(output_directory)]
+    arguments = [
+        'cps', 'monthly', '--start', '2026-08', '--dry-run', '--out', str(output_directory),
+    ]
     with (
         patch.object(cps_extract, 'DOTENV_PATH', dotenv_path),
         patch.object(cps_extract, 'IpumsApiClient', autospec=True) as client_factory,
@@ -67,7 +68,9 @@ def test_cps_dry_run_reaches_cps_module(cli_runner, output_directory, dotenv_pat
     assert list(definition['samples']) == ['cps2026_08b', 'cps2026_09s']
 
 
-def test_acs_dry_run_neither_reads_key_nor_creates_client(cli_runner, output_directory, dotenv_path):
+def test_acs_dry_run_neither_reads_key_nor_creates_client(
+    cli_runner, output_directory, dotenv_path,
+):
     dotenv_path.write_text('IPUMS_API_KEY=dotenv-test-key\n')
     with (
         patch.object(acs_extract, 'DOTENV_PATH', dotenv_path),

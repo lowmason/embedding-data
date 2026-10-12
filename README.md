@@ -185,6 +185,15 @@ uv run --locked pytest
 uv lock --check
 ```
 
+Install the [pre-commit](https://pre-commit.com/) hooks once per clone. They
+check whitespace and file syntax, run [Ruff](https://docs.astral.sh/ruff/) with
+autofix, and run the pytest suite under coverage before each commit:
+
+```bash
+uv run --locked pre-commit install
+uv run --locked pre-commit run --all-files
+```
+
 The CPS checks cover CLI defaults, credential loading, catalog selection,
 dry-run behavior, and Parquet conversion. The property tests generate valid
 months and sample catalogs to check date boundaries, chronological ordering,
