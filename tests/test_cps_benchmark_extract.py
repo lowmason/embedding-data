@@ -223,3 +223,21 @@ def test_a_start_before_january_2025_is_refused_before_the_key_is_read(
     assert f'{start} is before 2025-01' in result.output
     client_factory.assert_not_called()
     assert not data_directory.exists()
+
+
+def test_the_default_run_refuses_a_start_before_january_2025(run_cli, data_directory):
+    result, client_factory = run_cli(['--start', '2024-12', '--dry-run'])
+
+    assert result.exit_code == 2, result.output
+    assert '2024-12 is before 2025-01' in result.output
+    client_factory.assert_not_called()
+    assert not data_directory.exists()
+
+
+def test_an_asec_only_run_ignores_the_monthly_floor(run_cli, data_directory):
+    result, client_factory = run_cli(['asec', '--start', '2020-01', '--dry-run'])
+
+    assert result.exit_code == 0, result.output
+    client_factory.assert_called_once_with('dotenv-test-key')
+    assert list(preview(data_directory, 'asec')['samples']) == ['cps2025_03s', 'cps2026_03s']
+    assert not (data_directory / 'preview/cps/monthly').exists()

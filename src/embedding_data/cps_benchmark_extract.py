@@ -169,7 +169,7 @@ def main(
         )
 
     start_month = parse_month(start)
-    if start_month < parse_month(MONTHLY_FIRST):
+    if 'monthly' in extracts and start_month < parse_month(MONTHLY_FIRST):
         raise typer.BadParameter(
             f'{start} is before {MONTHLY_FIRST}, the first month on 2022 Census industry codes',
             param_hint="'--start'",
