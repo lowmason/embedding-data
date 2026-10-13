@@ -12,10 +12,13 @@ summary: every Form 300A summary file the ITA data page (https://www.osha.gov/it
     earlier one and is recorded as a new manifest entry with its through-date. A summary
     file found on disk but not in the manifest stops the run, because nothing can record
     it after the fact, and so, before any download, does a year whose files plus the
-    listed one leave no single latest through-date; a file OSHA replaces under an
-    unchanged name is not detected. Then data/derived/osha/ita_300a_summary.parquet is
-    rebuilt from each year's latest release (embedding_data.ita_summary), and rows per
-    year are printed beside OSHA's published submission counts.
+    listed one leave no single latest release (an undated file beside another, or two with
+    one through-date). A page that lists a year twice, skips a year, names an impossible
+    through-date, or gives the current year's file no through-date is refused too. A file
+    OSHA replaces under an unchanged name is not detected. Then
+    data/derived/osha/ita_300a_summary.parquet is rebuilt from each year's latest release
+    (embedding_data.ita_summary), and rows per year are printed beside OSHA's published
+    submission counts.
 case-detail: the 2025 case-detail CSV and its dictionary, one row per injury or illness
     (Forms 300 and 301), acquired but feeding no target. An existing case-detail file
     missing from the manifest draws a warning naming the backfill command. The CSV is

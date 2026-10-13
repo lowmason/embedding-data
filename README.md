@@ -164,10 +164,11 @@ The current year's file name carries its submission through-date
 (`..._2025_through_08-31-2026.csv`). OSHA renames the file as it grows, so a later
 release is downloaded beside the earlier one and recorded as a new manifest entry with
 its `through_date`; the earlier file and entry are untouched. The run refuses a page
-that skips a year or whose current file names no through-date, a summary file found on
-disk but missing from the manifest, and, before downloading anything, a year whose files
-would leave no single latest release (an undated file beside another, or two with one
-through-date). A file OSHA replaces under an unchanged name is not detected.
+that lists a year twice, skips a year, names a through-date that is not a real date, or
+gives the current year's file no through-date; a summary file found on disk but missing
+from the manifest; and, before downloading anything, a year whose files would leave no
+single latest release (an undated file beside another, or two with one through-date). A
+file OSHA replaces under an unchanged name is not detected.
 
 The table is rebuilt on every run from each year's latest release. It keeps the
 specification's R2.4 columns plus OSHA's record `id`, the raw file it came from
