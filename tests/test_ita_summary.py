@@ -10,10 +10,12 @@ from ita_fixtures import (
     RELEASE_NAMES,
     csv_bytes,
     record,
+    write_release,
     year_file,
     zipped,
 )
 from polars.exceptions import InvalidOperationError
+from polars.testing import assert_frame_equal
 
 from embedding_data import ita_summary
 
@@ -180,3 +182,134 @@ def test_implausible_records_are_flagged_not_dropped(tmp_path):
         'flag_hours_per_employee': pl.Boolean,
         'flag_below_filing_size': pl.Boolean,
     }
+
+
+TABLE_SCHEMA = {
+    'year_filing_for': pl.Int64, 'id': pl.Int64, 'establishment_id': pl.Int64,
+    'establishment_name': pl.String, 'company_name': pl.String, 'ein': pl.String,
+    'street_address': pl.String, 'city': pl.String, 'state': pl.String, 'zip_code': pl.String,
+    'naics_code': pl.String, 'naics_year': pl.Int64, 'naics_year_from_dictionary': pl.Boolean,
+    'industry_description': pl.String, 'establishment_type': pl.Int64, 'size': pl.Int64,
+    'size_class': pl.Int64, 'annual_average_employees': pl.Int64,
+    'total_hours_worked': pl.Int64, 'flag_employment': pl.Boolean,
+    'flag_hours_per_employee': pl.Boolean, 'flag_below_filing_size': pl.Boolean,
+    'source_file': pl.String,
+}
+NEXT_2025 = 'ITA_300A_Summary_Data_2025_through_11-30-2026.csv'
+
+
+def table_path(data_directory):
+    return data_directory / 'derived/osha' / ita_summary.TABLE_NAME
+
+
+def test_every_year_stacks_into_one_sorted_table_without_injury_counts(data_directory):
+    write_release(data_directory, 2022)
+    unsorted = [record(2023, id='5'), record(2023, id='3')]
+    write_release(data_directory, 2023, year_file(2023, unsorted))
+    write_release(data_directory, 2024)
+
+    table = pl.read_parquet(ita_summary.build_summary_table(data_directory))
+
+    assert table.columns == list(TABLE_SCHEMA)
+    assert table.schema == TABLE_SCHEMA
+    assert table.select('year_filing_for', 'id').rows() == [
+        (2022, 20220), (2023, 3), (2023, 5), (2024, 20240),
+    ]
+    assert table['source_file'].unique(maintain_order=True).to_list() == [
+        f'osha/summary/{year}/{RELEASE_NAMES[year]}' for year in (2022, 2023, 2024)
+    ]
+
+
+def test_each_year_uses_its_latest_release(data_directory):
+    write_release(data_directory, 2025)
+    newer = [record(2025, id=str(n)) for n in range(3)]
+    write_release(data_directory, 2025, year_file(2025, newer), NEXT_2025)
+
+    table = pl.read_parquet(ita_summary.build_summary_table(data_directory))
+
+    assert table.height == 3
+    assert table['source_file'].unique().to_list() == [f'osha/summary/2025/{NEXT_2025}']
+
+
+def test_two_files_in_a_year_without_distinct_through_dates_fail(data_directory):
+    write_release(data_directory, 2016)
+    write_release(data_directory, 2016, name='ITA Data CY 2016 (1).zip')
+
+    with pytest.raises(ValueError, match='distinct through-date'):
+        ita_summary.build_summary_table(data_directory)
+
+
+def test_hidden_files_and_partial_downloads_beside_a_release_are_ignored(data_directory):
+    release = write_release(data_directory, 2016)
+    (release.parent / '.DS_Store').write_bytes(b'\x00\x00\x00\x01Bud1')
+    (release.parent / 'ITA Data CY 2016.zip.part').write_bytes(b'PK')
+
+    table = pl.read_parquet(ita_summary.build_summary_table(data_directory))
+
+    assert table['source_file'].to_list() == ['osha/summary/2016/ITA Data CY 2016.zip']
+
+
+def test_an_unrecorded_raw_file_is_not_stacked(data_directory):
+    write_release(data_directory, 2024, recorded=False)
+
+    with pytest.raises(KeyError, match='not recorded'):
+        ita_summary.build_summary_table(data_directory)
+
+    assert not table_path(data_directory).exists()
+
+
+def test_the_table_is_rebuilt_on_every_call(data_directory):
+    write_release(data_directory, 2025)
+    assert pl.read_parquet(ita_summary.build_summary_table(data_directory)).height == 1
+    newer = [record(2025, id=str(n)) for n in range(3)]
+    write_release(data_directory, 2025, year_file(2025, newer), NEXT_2025)
+
+    assert pl.read_parquet(ita_summary.build_summary_table(data_directory)).height == 3
+
+
+def test_a_failed_build_keeps_the_previous_table(data_directory):
+    write_release(data_directory, 2025)
+    table = ita_summary.build_summary_table(data_directory)
+    before = table.read_bytes()
+    bad = year_file(2025, [record(2025, annual_average_employees='23.50')])
+    write_release(data_directory, 2025, bad, NEXT_2025)
+
+    with pytest.raises(InvalidOperationError):
+        ita_summary.build_summary_table(data_directory)
+
+    assert table.read_bytes() == before
+    assert sorted(path.name for path in table.parent.iterdir()) == [ita_summary.TABLE_NAME]
+
+
+def test_rebuilding_unchanged_inputs_gives_the_same_table(data_directory):
+    for year in (2019, 2022, 2025):
+        write_release(data_directory, year)
+    first = pl.read_parquet(ita_summary.build_summary_table(data_directory))
+
+    second = pl.read_parquet(ita_summary.build_summary_table(data_directory))
+
+    assert_frame_equal(first, second)
+
+
+def test_totals_report_sets_rows_beside_published_counts(data_directory):
+    write_release(data_directory, 2022)
+    two_rows = [record(2023, id='1'), record(2023, id='2')]
+    write_release(data_directory, 2023, year_file(2023, two_rows))
+    write_release(data_directory, 2024)
+
+    report = ita_summary.totals_report(ita_summary.build_summary_table(data_directory))
+
+    assert report.select('year_filing_for', 'rows', 'published', 'gap').rows() == [
+        (2022, 1, None, None),
+        (2023, 2, 385_488, -385_486),
+        (2024, 1, 390_000, -389_999),
+    ]
+    assert ita_summary.report_lines(report) == [
+        '2022: 1 rows from osha/summary/2022/ITA-data-cy2022.zip; no published count located',
+        '2023: 2 rows from osha/summary/2023/ITA_300A_Summary_Data_2023_through_12-31-2024.zip;'
+        ' OSHA published exactly 385,488 as of 2024-05-31'
+        ' (OSHA 2023 Work-Related Injury and Illness Summary); gap -385,486',
+        '2024: 1 rows from osha/summary/2024/ITA_300A_Summary_Data_2024_through_12-31-2025.zip;'
+        ' OSHA published over 390,000'
+        ' (OSHA 2024 Work-Related Injury and Illness Summary); gap -389,999',
+    ]

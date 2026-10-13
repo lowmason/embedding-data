@@ -6,6 +6,10 @@ files; the values are invented. year_file(year) renders records as that year's f
 
 import io
 import zipfile
+from datetime import UTC, datetime
+from pathlib import Path
+
+from embedding_data import ita_catalog, manifest, paths
 
 OLD_COLUMNS = (
     'id', 'company_name', 'establishment_name', 'ein', 'street_address', 'city', 'state',
@@ -120,3 +124,30 @@ def year_file(year: int, records: list[dict[str, str]] | None = None) -> bytes:
     else:
         return csv_bytes(COLUMNS_2025, records)
     return zipped(MEMBER_NAMES[year], data)
+
+
+RETRIEVED_AT = datetime(2026, 10, 12, tzinfo=UTC)
+
+
+def write_release(
+    data_dir: Path, year: int, data: bytes | None = None, name: str | None = None,
+    *, recorded: bool = True,
+) -> Path:
+    '''Place a summary file at raw/osha/summary/<year>/<name> and, by default, record it.'''
+    name = name or RELEASE_NAMES[year]
+    path = paths.raw_dir(data_dir, 'osha') / 'summary' / str(year) / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(year_file(year) if data is None else data)
+    if recorded:
+        manifest_path = paths.manifest_path(data_dir)
+        entry = manifest.describe_file(
+            path,
+            manifest_path.parent,
+            retrieved_at=RETRIEVED_AT,
+            client='httpx',
+            client_version='0.28.1',
+            source_url=f'https://www.osha.gov/sites/default/files/{name}',
+            through_date=ita_catalog.through_date(name),
+        )
+        manifest.append_entries(manifest_path, [entry])
+    return path

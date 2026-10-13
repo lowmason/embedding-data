@@ -22,12 +22,16 @@ are flagged, never dropped (R2.9). Injury and illness counts, submission timesta
 change reasons stay in the raw files.
 '''
 
+import tempfile
 import zipfile
 from contextlib import ExitStack
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import polars as pl
 
+from embedding_data import manifest, paths
+from embedding_data.ita_catalog import through_date
 from embedding_data.osha_encoding import decode_line
 
 INTEGER_COLUMNS = [
@@ -45,6 +49,39 @@ NAICS_YEARS = [2012, 2017, 2022]
 SIZE_CLASS = {1: 1, 2: 2, 21: 2, 22: 2, 3: 3}
 # Plausible annual hours worked per average employee, inclusive: about 10 to 77 hours a week.
 HOURS_PER_EMPLOYEE = (500, 4_000)
+TABLE_NAME = 'ita_300a_summary.parquet'
+COLUMNS = [
+    'year_filing_for', 'id', 'establishment_id', 'establishment_name', 'company_name', 'ein',
+    'street_address', 'city', 'state', 'zip_code', 'naics_code', 'naics_year',
+    'naics_year_from_dictionary', 'industry_description', 'establishment_type', 'size',
+    'size_class', 'annual_average_employees', 'total_hours_worked', 'flag_employment',
+    'flag_hours_per_employee', 'flag_below_filing_size', 'source_file',
+]
+
+
+@dataclass(frozen=True)
+class PublishedCount:
+    '''An establishment count OSHA itself published for one filing year (spec V10).'''
+    year_filing_for: int
+    published: int
+    qualifier: str
+    as_of: str | None
+    source: str
+
+
+PUBLISHED_COUNTS = (
+    PublishedCount(
+        2023, 385_488, 'exactly', '2024-05-31',
+        'OSHA 2023 Work-Related Injury and Illness Summary',
+    ),
+    PublishedCount(
+        2024, 390_000, 'over', None, 'OSHA 2024 Work-Related Injury and Illness Summary',
+    ),
+)
+PUBLISHED_SCHEMA = {
+    'year_filing_for': pl.Int64, 'published': pl.Int64, 'qualifier': pl.String,
+    'as_of': pl.String, 'source': pl.String,
+}
 
 
 def transcode(raw_file: Path, utf8_path: Path) -> None:
@@ -151,3 +188,106 @@ def add_flags(lf: pl.LazyFrame) -> pl.LazyFrame:
         flag_hours_per_employee=pl.when(no_employment).then(None).otherwise(implausible_hours),
         flag_below_filing_size=pl.col('size_class') == 1,
     )
+
+
+def summary_dir(data_dir: Path) -> Path:
+    return paths.raw_dir(data_dir, 'osha') / 'summary'
+
+
+def latest_release(year_dir: Path) -> Path:
+    '''A year's only raw file, or the one whose name carries the latest through-date.
+
+    Hidden files (a Finder .DS_Store) and interrupted .part downloads are not releases.
+    '''
+    files = sorted(
+        path for path in year_dir.iterdir()
+        if path.is_file() and not path.name.startswith('.') and not path.name.endswith('.part')
+    )
+    if len(files) == 1:
+        return files[0]
+    dates = {through_date(path.name): path for path in files}
+    if not files or None in dates or len(dates) < len(files):
+        raise ValueError(
+            f'{year_dir}: cannot choose one of {[path.name for path in files]}; each file '
+            'in a year needs a distinct through-date in its name'
+        )
+    return dates[max(dates)]
+
+
+def summary_files(data_dir: Path) -> dict[int, Path]:
+    '''The raw file each year's rows come from (raw/osha/summary/<year>/), by year.'''
+    root = summary_dir(data_dir)
+    year_dirs = (
+        sorted(path for path in root.iterdir() if path.is_dir() and path.name.isdigit())
+        if root.is_dir() else []
+    )
+    if not year_dirs:
+        raise ValueError(f'{root}: no summary files to stack')
+    return {int(year_dir.name): latest_release(year_dir) for year_dir in year_dirs}
+
+
+def build_summary_table(data_dir: Path) -> Path:
+    '''Rebuild the stacked table from each year's latest recorded raw file; return its path.
+
+    Unlike the case-detail Parquet, the table is rebuilt on every call, because a new
+    release replaces its year's rows. Each input must be in the manifest, and its manifest
+    path becomes source_file. The table is written to a .part file, renamed on success.
+    '''
+    manifest_path = paths.manifest_path(data_dir)
+    derived = paths.derived_dir(data_dir, 'osha')
+    derived.mkdir(parents=True, exist_ok=True)
+    table = derived / TABLE_NAME
+    partial = table.with_name(table.name + '.part')
+    with tempfile.TemporaryDirectory(dir=derived) as work:
+        frames = []
+        for year, raw_file in summary_files(data_dir).items():
+            source_file = manifest.entry_for(manifest_path, raw_file).path
+            utf8_path = Path(work) / f'{year}.csv'
+            frames.append(harmonize_file(raw_file, year, source_file, utf8_path))
+        try:
+            (
+                add_flags(pl.concat(frames))
+                .select(COLUMNS)
+                .sort('year_filing_for', 'id', maintain_order=True)
+                .sink_parquet(partial)
+            )
+            partial.replace(table)
+        finally:
+            partial.unlink(missing_ok=True)
+    return table
+
+
+def totals_report(table: Path) -> pl.DataFrame:
+    '''Rows and source file per year beside OSHA's published counts; gaps kept, not tuned.'''
+    published = pl.LazyFrame(
+        [asdict(count) for count in PUBLISHED_COUNTS], schema=PUBLISHED_SCHEMA
+    )
+    return (
+        pl.scan_parquet(table)
+        .group_by('year_filing_for')
+        .agg(rows=pl.len().cast(pl.Int64), source_file=pl.col('source_file').first())
+        .join(published, on='year_filing_for', how='left')
+        .with_columns(gap=pl.col('rows') - pl.col('published'))
+        .sort('year_filing_for')
+        .collect()
+    )
+
+
+def report_lines(report: pl.DataFrame) -> list[str]:
+    '''One line per year: rows, source file, and the published count and gap where known.'''
+    lines = []
+    for row in report.iter_rows(named=True):
+        year, rows, source_file = row['year_filing_for'], row['rows'], row['source_file']
+        line = f'{year}: {rows:,} rows from {source_file}'
+        if row['published'] is None:
+            line += '; no published count located'
+        else:
+            qualifier, published, source, gap, as_of_date = (
+                row['qualifier'], row['published'], row['source'], row['gap'], row['as_of']
+            )
+            as_of = f' as of {as_of_date}' if as_of_date else ''
+            line += (
+                f'; OSHA published {qualifier} {published:,}{as_of} ({source}); gap {gap:+,}'
+            )
+        lines.append(line)
+    return lines
