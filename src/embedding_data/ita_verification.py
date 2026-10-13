@@ -164,13 +164,18 @@ def unique_ids(lf: pl.LazyFrame, year: int) -> pl.LazyFrame:
     '''Retain IDs with one distinct source row after exact duplicate collapse.'''
     return (
         with_keys(lf.filter(pl.col('year_filing_for').eq(year)).unique()).with_columns(
-            n_id_rows=pl.len().over('establishment_id')
-        ).filter(pl.col('n_id_rows').eq(1))
+            n_id_rows=pl.len().over('establishment_id'),
+            # Competing rows remain evidence of ambiguity even when their IDs are excluded.
+            n_address=pl.len().over(['ein_key', 'name_key', 'address_key']),
+        ).filter(pl.col('n_id_rows').eq(1).and_(pl.col('establishment_id').is_not_null()))
     )
 
 def link_report(lf: pl.LazyFrame, base_year: int, later_year: int) -> dict:
     '''Measure raw ID recurrence and conservative unambiguous linkage.'''
-    columns = ['establishment_id', 'ein', 'ein_key', 'flag_ein_padded', 'name_key', 'address_key']
+    columns = [
+        'establishment_id', 'ein', 'ein_key', 'flag_ein_padded', 'name_key', 'address_key',
+        'n_address'
+    ]
     cohort = unique_ids(lf, base_year).select(columns)
     later = unique_ids(lf, later_year).select(columns)
     later = later.with_columns(id_present=pl.lit(True))
@@ -203,9 +208,7 @@ def link_report(lf: pl.LazyFrame, base_year: int, later_year: int) -> dict:
                 pl.col('ein_key').is_not_null().and_(pl.col('flag_ein_padded').not_()).and_(
                     pl.col('address_key').is_not_null()
                 ).and_(pl.col('name_key').ne(''))
-            ).with_columns(n_address=pl.len().over(address_columns)).filter(
-                pl.col('n_address').eq(1)
-            )
+            ).filter(pl.col('n_address').eq(1))
         )
 
     addresses = unique_addresses(cohort).join(
@@ -220,13 +223,21 @@ def link_report(lf: pl.LazyFrame, base_year: int, later_year: int) -> dict:
             pl.col('establishment_id_later')
         ).sum(),
     ).collect().row(0, named=True)
-    n_ids = lf.filter(pl.col('year_filing_for').eq(base_year)).select(
-        pl.col('establishment_id').n_unique()
-    ).collect().item()
-    cohort_ids = lf.filter(pl.col('year_filing_for').eq(base_year)
-                           ).select('establishment_id').unique()
-    later_ids = lf.filter(pl.col('year_filing_for').eq(later_year)
-                          ).select('establishment_id').unique()
+    cohort_rows = lf.filter(pl.col('year_filing_for').eq(base_year))
+    later_rows = lf.filter(pl.col('year_filing_for').eq(later_year))
+    missing_counts = {
+        'n_base_missing_id_rows': cohort_rows.select(pl.col('establishment_id').is_null().sum()
+                                                     ).collect().item(),
+        'n_later_missing_id_rows': later_rows.select(pl.col('establishment_id').is_null().sum()
+                                                     ).collect().item(),
+    }
+    cohort_ids = cohort_rows.filter(pl.col('establishment_id').is_not_null()).select(
+        'establishment_id'
+    ).unique()
+    later_ids = later_rows.filter(pl.col('establishment_id').is_not_null()).select(
+        'establishment_id'
+    ).unique()
+    n_ids = cohort_ids.select(pl.len()).collect().item()
     n_raw_reappeared = cohort_ids.join(later_ids, on='establishment_id',
                                        how='inner').select(pl.len()).collect().item()
     output = {
@@ -235,6 +246,7 @@ def link_report(lf: pl.LazyFrame, base_year: int, later_year: int) -> dict:
         'n_cohort_ids': n_ids,
         'n_raw_reappeared': n_raw_reappeared,
         **counts,
+        **missing_counts,
         **addresses
     }
     output['share_raw_reappeared'] = n_raw_reappeared / n_ids if n_ids else None

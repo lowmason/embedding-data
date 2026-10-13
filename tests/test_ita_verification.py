@@ -248,3 +248,87 @@ def test_empty_cohort_rates_are_missing():
     assert out['share_raw_reappeared'] is None
     assert out['share_same_ein_address'] is None
     assert out['share_address_matches_different_id'] is None
+
+def test_excluded_competing_id_still_makes_address_tuple_ambiguous():
+    for ambiguous_year, other_year in [(2023, 2024), (2024, 2023)]:
+        lf = rows(
+            [
+                {
+                    'year_filing_for': ambiguous_year,
+                    'establishment_id': 10
+                },
+                {
+                    'year_filing_for': ambiguous_year,
+                    'id': 2,
+                    'establishment_id': 10,
+                    'street_address': 'Other Street'
+                },
+                {
+                    'year_filing_for': ambiguous_year,
+                    'id': 3,
+                    'establishment_id': 20
+                },
+                {
+                    'year_filing_for': other_year,
+                    'id': 4,
+                    'establishment_id': 30
+                },
+            ]
+        )
+        out = verify.link_report(lf, 2023, 2024)
+        assert out['n_unique_address_matches'] == 0
+        assert out['n_address_matches_different_id'] == 0
+
+def test_missing_ids_are_separate_from_cohort_denominators():
+    lf = rows(
+        [
+            {
+                'establishment_id': None,
+                'street_address': '2 Main St'
+            },
+            {},
+            {
+                'year_filing_for': 2024,
+                'id': 2
+            },
+            {
+                'year_filing_for': 2024,
+                'id': 3,
+                'establishment_id': None,
+                'street_address': '2 Main St'
+            },
+            {
+                'year_filing_for': 2024,
+                'id': 3,
+                'establishment_id': None,
+                'street_address': '2 Main St'
+            },
+        ]
+    )
+    out = verify.link_report(lf, 2023, 2024)
+    assert out['n_cohort_ids'] == 1
+    assert out['n_unique_cohort_ids'] == 1
+    assert out['share_raw_reappeared'] == 1.0
+    assert out['share_same_ein_address'] == 1.0
+    assert out['n_base_missing_id_rows'] == 1
+    assert out['n_later_missing_id_rows'] == 2
+    assert out['n_unique_address_matches'] == 1
+    assert out['n_address_matches_different_id'] == 0
+
+def test_missing_id_never_confirms_changed_id_by_address():
+    for missing_year in [2023, 2024]:
+        lf = rows(
+            [
+                {
+                    'establishment_id': None if missing_year == 2023 else 10
+                },
+                {
+                    'year_filing_for': 2024,
+                    'id': 2,
+                    'establishment_id': None if missing_year == 2024 else 20
+                },
+            ]
+        )
+        out = verify.link_report(lf, 2023, 2024)
+        assert out['n_unique_address_matches'] == 0
+        assert out['n_address_matches_different_id'] == 0
