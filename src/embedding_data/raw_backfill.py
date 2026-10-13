@@ -11,7 +11,7 @@ files into <set>/<name>/, moves every Parquet under data/derived, and records
 each raw file in data/raw/manifest.jsonl. Retrieval time and client version were
 not recorded at download, so entries use the file's modification time and the
 uv.lock version and flag both as proxies. A tree already migrated has nothing
-to move, but OSHA raw files missing from the manifest are still recorded. Every
+to move, but OSHA case-detail files missing from the manifest are still recorded. Every
 check and hash runs before the first file moves, but a failure after files moved
 (a failing rename, or append_entries failing after the renames) is not
 recoverable by re-running, because a fully moved set no longer has a top-level
