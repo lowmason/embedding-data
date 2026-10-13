@@ -131,7 +131,7 @@ placements:
       > Stage 2: COMPLETE (2026-10-13) — implemented by plan 2 (specs/plans/completed/2-ita-300a-summaries.md). Its Handoff section names what Stages 3, 4, 6 and 10 consume.
       > Next: resume the roadmap.
 
-- [ ] Stage 3: ITA verification
+- [x] Stage 3: ITA verification
       Objective: Settle the three open ITA facts by measurement before any ITA target is built.
       Spec: V1, V2, V3; R2.6, R2.7, R2.8; R2.3 (the "2023 data" wording; plan 2, Handoff; Resolved at resume, 2026-10-13)
       Gap closed: V1, V2, V3 (the open markers on R2.6, R2.7, R2.8)
@@ -139,6 +139,9 @@ placements:
       Produces: recorded decisions on R2.6 cleaning rules, R2.7 link key, R2.8 county-assignment method; official NAICS title files (2012, 2017, 2022) acquired under the manifest for V1; the manifest audit of `specs/deferred_items.md` section `1-raw-provenance`, item "Manifest audit" (plan 1, Handoff; Resolved at resume, 2026-10-12), which `build_summary_table`'s own hash check covers for the summary inputs only (plan 2, Handoff; Resolved at resume, 2026-10-13)
       Exit: a committed finding reports V1's per-year shares, V2's ID-persistence and address-match shares, and V3's match rates and county agreement; spec amendments replace the three open markers with the adopted rules; the "Manifest audit" item's Done-when holds and the item is ticked
       ROUTING: writing-plans
+
+      > Stage 3: COMPLETE (2026-10-13) — implemented by plan 3 (specs/plans/completed/3-ita-verification.md). Its [Handoff section](plans/completed/3-ita-verification.md#handoff-to-later-stages) names what Stages 4, 5, 6, 7 and 10 consume.
+      > Next: resume the roadmap.
 
 - [ ] Stage 4: Code tables and ITA NAICS mapping
       Objective: NAICS 2022 and SOC 2018 node and edge tables exist, and every ITA NAICS code maps to the 2022 vintage as a node or flagged candidate set.

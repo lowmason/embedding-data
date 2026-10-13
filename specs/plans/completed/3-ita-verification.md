@@ -1,5 +1,7 @@
 # ITA Verification Implementation Plan
 
+**Status: COMPLETE (2026-10-13)** — executed via subagent-driven-development; nothing deferred
+
 > **For agentic workers:** REQUIRED SUB-SKILL: implement this plan task-by-task via subagent-driven-development (the default) — or executing-plans when the owner chooses inline execution at the handoff. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 > Roadmap: specs/embedding-evaluation-data-spec-roadmap.md, Stage 3 — on plan
@@ -218,7 +220,7 @@ Produces `recorded_entry_for(Path, Path) -> ManifestEntry` (lookup only),
 verified `entry_for(Path, Path) -> ManifestEntry`, and
 `audit(Path) -> list[AuditIssue]` with sorted discrepancy records.
 
-- [ ] **Step 1: Write failing provenance/audit tests.** Append to the manifest
+- [x] **Step 1: Write failing provenance/audit tests.** Append to the manifest
   tests using their existing `describe` helper:
 
 ```python
@@ -287,10 +289,10 @@ def test_audit_command_exits_nonzero_on_discrepancy(cli_runner, tmp_path):
     assert 'unrecorded' in top_level.output and 'stray.csv' in top_level.output
 ```
 
-- [ ] **Step 2: Run RED.** `uv run --locked pytest tests/test_manifest.py tests/test_manifest_audit.py -q`.
+- [x] **Step 2: Run RED.** `uv run --locked pytest tests/test_manifest.py tests/test_manifest_audit.py -q`.
   Expected failure: missing `recorded_entry_for` / module / verification behavior.
 
-- [ ] **Step 3: Implement verified lookup and audit.** Rename the current lookup
+- [x] **Step 3: Implement verified lookup and audit.** Rename the current lookup
   to `recorded_entry_for`, change it to reject duplicate matching entries, and
   add verified citation below it:
 
@@ -435,10 +437,12 @@ app.command('audit', help=manifest_audit.__doc__.splitlines()[0])(manifest_audit
   the audit; empty staging directories contain no raw file and are not entries.
   `.DS_Store` is filesystem metadata, the sole file exclusion besides the manifest.
 
-- [ ] **Step 4: Run GREEN and the existing regressions.**
+- [x] **Step 4: Run GREEN and the existing regressions.**
   `uv run --locked pytest tests/test_manifest.py tests/test_manifest_audit.py tests/test_osha_benchmark_download.py tests/test_ita_summary.py tests/test_cli.py -q`.
   Require the missing-recorded-file tests and changed-summary-byte refusal to pass.
   Include these additional failing tests in Step 1, then re-run them here:
+
+> Deviation: Final review added direct duplicate recorded_entry_for and matching-hash/wrong-size entry_for refusal tests; production citation branches were already correct.
 
 ```python
 def test_clean_tree_and_duplicate_manifest_entry(tmp_path):
@@ -461,7 +465,7 @@ def test_clean_tree_and_duplicate_manifest_entry(tmp_path):
     ]
 ```
 
-- [ ] **Step 5: Commit.**
+- [x] **Step 5: Commit.**
   `git add src/embedding_data/manifest.py src/embedding_data/manifest_audit.py src/embedding_data/osha_benchmark_download.py src/embedding_data/ita_summary.py src/embedding_data/cli.py tests/test_manifest.py tests/test_manifest_audit.py`
   then `git commit -m 'feat(provenance): audit raw files and verify citations'`.
 
@@ -486,7 +490,7 @@ industry descriptions: that program's coverage is not the full NAICS structure.
 [Polars' calamine engine](https://docs.pola.rs/api/python/version/1/reference/api/polars.read_excel.html)
 reads both XLS and XLSX via fastexcel without pandas.
 
-- [ ] **Step 1: Write the failing parser/acquisition tests.**
+- [x] **Step 1: Write the failing parser/acquisition tests.**
 
 ```python
 import httpx
@@ -581,12 +585,14 @@ def test_manual_hud_import_validates_and_records_import_time_proxy(tmp_path, mon
     assert paths.manifest_path(tmp_path).read_bytes() == before
 ```
 
-- [ ] **Step 2: Run RED.** `uv run --locked pytest tests/test_ita_references.py -q`.
+- [x] **Step 2: Run RED.** `uv run --locked pytest tests/test_ita_references.py -q`.
   Expected failure: new module is absent.
 
-- [ ] **Step 3: Add fastexcel and implement references.** Run `uv add fastexcel`;
+- [x] **Step 3: Add fastexcel and implement references.** Run `uv add fastexcel`;
   commit the dependency and lock with this task. Do not upgrade other dependencies.
   Create the module:
+
+> Deviation: Reader rejects null HUD candidates; actual ZIP-COUNTY GEOID alias is filename-validated and eight recognized short out-of-scope zero-BUS rows are retained unpadded with noncounty_geography.
 
 ```python
 '''Acquire immutable official ITA verification references and read NAICS titles.'''
@@ -749,11 +755,11 @@ def read_titles(data_dir: Path) -> pl.DataFrame:
   reason to silently truncate the reference. This stage emits title tables,
   not the parent/edge/concordance tables Stage 4 will build.
 
-- [ ] **Step 4: Run GREEN.** `uv run --locked pytest tests/test_ita_references.py -q`
+- [x] **Step 4: Run GREEN.** `uv run --locked pytest tests/test_ita_references.py -q`
   and `uv lock --check`. Exercise the full XLS/XLSX reader at Task 6; the
   offline parser test uses a tiny in-memory representation of the header layout.
 
-- [ ] **Step 5: Commit.**
+- [x] **Step 5: Commit.**
   `git add src/embedding_data/ita_references.py tests/test_ita_references.py pyproject.toml uv.lock`
   then `git commit -m 'feat(ita): acquire and validate official verification references'`.
 
@@ -767,7 +773,7 @@ Produces `with_keys(lf) -> pl.LazyFrame`, `description_report(lf, titles) -> pl.
 `link_report(lf, base_year, later_year) -> dict`, and `quality_report(lf) -> pl.DataFrame`.
 No normalization changes the source Parquet.
 
-- [ ] **Step 1: Write tests with hand-calculated results.**
+- [x] **Step 1: Write tests with hand-calculated results.**
 
 ```python
 import polars as pl
@@ -898,9 +904,11 @@ def test_link_denominators_null_ein_collisions_and_changed_id():
     assert verify.link_report(conflict, 2023, 2024)['n_same_ein_address'] == 0
 ```
 
-- [ ] **Step 2: Run RED.** `uv run --locked pytest tests/test_ita_verification.py -q`.
+- [x] **Step 2: Run RED.** `uv run --locked pytest tests/test_ita_verification.py -q`.
 
-- [ ] **Step 3: Implement keys and reports.**
+- [x] **Step 3: Implement keys and reports.**
+
+> Deviation: Owner D4 requires full-year exact-distinct tuple multiplicity before eligible-ID filtering, null-ID exclusion and original n_base_missing_id_rows/n_later_missing_id_rows diagnostics.
 
 ```python
 '''Offline measurements for ITA text content and establishment linkage.'''
@@ -1155,7 +1163,7 @@ def link_report(lf: pl.LazyFrame, base_year: int, later_year: int) -> dict:
   non-empty descriptions with usable employer keys; unknown-employer rows
   never join one another. No raw `ein`, description or address is overwritten.
 
-- [ ] **Step 4: Run GREEN.** `uv run --locked pytest tests/test_ita_verification.py -q`.
+- [x] **Step 4: Run GREEN.** `uv run --locked pytest tests/test_ita_verification.py -q`.
   Add the following explicit sentinel regression before passing this milestone:
 
 ```python
@@ -1166,7 +1174,7 @@ def test_reappearing_id_with_unusable_address_is_still_present():
     assert out['n_same_ein_address'] == 0
 ```
 
-- [ ] **Step 5: Commit.**
+- [x] **Step 5: Commit.**
   `git add src/embedding_data/ita_verification.py tests/test_ita_verification.py`
   then `git commit -m 'feat(ita): measure description content and conservative ID linkage'`.
 
@@ -1193,7 +1201,7 @@ warns that batch match counts can vary with service load: immutable response
 caching is essential. Address-range coordinates are interpolated; `Exact`
 means the service's address-match class, not verified rooftop coordinates.
 
-- [ ] **Step 1: Write the failing sample and response tests.** Reuse `rows`
+- [x] **Step 1: Write the failing sample and response tests.** Reuse `rows`
   from Task 3 by placing it in `tests/ita_verification_fixtures.py` and importing
   it into both test modules; move the helper unchanged, not the tests.
 
@@ -1341,9 +1349,11 @@ def test_status_scope_and_incompatible_geocoder_are_reported():
     assert result['share_joint_single_agree'] == 1.0
 ```
 
-- [ ] **Step 2: Run RED.** `uv run --locked pytest tests/test_ita_county_verification.py -q`.
+- [x] **Step 2: Run RED.** `uv run --locked pytest tests/test_ita_county_verification.py -q`.
 
-- [ ] **Step 3: Implement the county comparison module.**
+- [x] **Step 3: Implement the county comparison module.**
+
+> Deviation: Owner D5 adds explicit `<missing-state>` strata and normalized delivered-state scope; owner D8 adds method-specific returned-county scope flags and guards chosen assignment/both comparison counties without changing raw coverage.
 
 ```python
 '''Sample and compare ITA county methods offline from manifested references/responses.'''
@@ -1558,10 +1568,10 @@ def county_report(sample: pl.DataFrame, geocodes: pl.DataFrame) -> tuple[pl.Data
   single-county ZIPs as an additional diagnostic at Task 6; no single-county
   conversion is applied to ambiguous ZIPs by this investigation.
 
-- [ ] **Step 4: Run GREEN.** `uv run --locked pytest tests/test_ita_verification.py tests/test_ita_county_verification.py -q`.
+- [x] **Step 4: Run GREEN.** `uv run --locked pytest tests/test_ita_verification.py tests/test_ita_county_verification.py -q`.
   Assert sorted sample rows and stratum counts agree across input reorderings.
 
-- [ ] **Step 5: Commit.**
+- [x] **Step 5: Commit.**
   `git add src/embedding_data/ita_county_verification.py tests/test_ita_county_verification.py tests/ita_verification_fixtures.py tests/test_ita_verification.py`
   then `git commit -m 'feat(ita): compare county methods on a reproducible stratified sample'`.
 
@@ -1577,7 +1587,7 @@ paragraphs. No new top-level extract command besides Task 1's `audit`.
 quality Parquets, V2 JSON, V3 strata Parquet, and `finding.md`. Raw reference and
 response files remain under `raw/references/`; the raw manifest covers them.
 
-- [ ] **Step 1: Write the failing offline runner test.**
+- [x] **Step 1: Write the failing offline runner test.**
 
 ```python
 import csv
@@ -1714,9 +1724,11 @@ def test_raw_summary_to_cached_offline_reports(tmp_path, monkeypatch):
             run.measure(tmp_path, 'fixture')
 ```
 
-- [ ] **Step 2: Run RED.** `uv run --locked pytest tests/test_ita_verification_run.py -q`.
+- [x] **Step 2: Run RED.** `uv run --locked pytest tests/test_ita_verification_run.py -q`.
 
-- [ ] **Step 3: Implement the runner.**
+- [x] **Step 3: Implement the runner.**
+
+> Deviation: Owner D6 requires exact request-ID validation before immutable response publication/manifest receipt; invalid-response retry and cached no-network replay regressions cover this contract.
 
 ```python
 '''Explicit ITA reference/geocode acquisition and offline verification reports.'''
@@ -2046,12 +2058,12 @@ if __name__ == '__main__':
   HUD's `retrieved_at` is the local import time, flagged as a proxy; it is not
   presented as the original browser download time.
 
-- [ ] **Step 4: Run GREEN and the full code milestone.**
+- [x] **Step 4: Run GREEN and the full code milestone.**
   `uv run --locked pytest`, `uv run --locked behave`,
   `uv run --locked ruff check .`, `uv lock --check`.
   This completes software, not V1–V3; no stage checkbox changes yet.
 
-- [ ] **Step 5: Commit.**
+- [x] **Step 5: Commit.**
   `git add src/embedding_data/ita_verification_run.py tests/test_ita_verification_run.py README.md CLAUDE.md`
   then `git commit -m 'feat(ita): replay provenance-backed verification reports offline'`.
 
@@ -2069,7 +2081,7 @@ the ignored `data/` tree.
 task has an evidence-dependent owner checkpoint: approval of the plan does not
 pre-approve a finding that has not yet been measured.
 
-- [ ] **Step 1: Resolve the manual HUD prerequisite.** D1 authorizes the
+- [x] **Step 1: Resolve the manual HUD prerequisite.** D1 authorizes the
   prerequisite. The owner downloads the official ZIP–county workbook for the
   reviewed quarter through [HUD's download login](https://www.huduser.gov/portal/datasets/usps_crosswalk.html).
   Obtain its local path; no credential is requested by this pipeline. Check
@@ -2077,10 +2089,14 @@ pre-approve a finding that has not yet been measured.
   If the quarter differs from P6, log that owner choice before sampling.
   All earlier fixture/software tasks can proceed without the workbook.
 
-- [ ] **Step 2: Run the live provenance and reference checks.** From the
+> Deviation: Owner selected data/raw/hud/ZIP-COUNTY_122025.xlsx (2025Q4), not the earlier ZIP-TRACT workbook or example Downloads path.
+
+- [x] **Step 2: Run the live provenance and reference checks.** From the
   execution worktree, set these task-specific variables (the actual HUD
   filename below is the expected 2025 Q4 release; substitute the owner's
   selected local path if its filename differs):
+
+> Deviation: Initial audit exit 1 found only the unrecorded original authoritative HUD workbook; its bytes were first recorded via manual-import retrieval-time proxy, then prescribed immutable import; subsequent audits exit 0.
 
 ```bash
 ITA_DATA_DIR=/Users/lowell/Projects/embedding-data/data
@@ -2099,7 +2115,10 @@ uv run --locked python -m embedding_data.ita_verification_run import-hud "$ITA_H
   repairing the entire raw tree. Refuse HTML/login content pretending to be a
   workbook. Title parsing must pass the full-file count checks from Task 2.
 
-- [ ] **Step 3: Prepare the frozen sample, acquire its responses, then measure offline.**
+- [x] **Step 3: Prepare the frozen sample, acquire its responses, then measure offline.**
+
+> Deviation: Original full requests resumed after Census timeout/502, with exact frozen 628-row batch diagnosis and all three responses ultimately acquired; immutable receipt timestamps retained.
+> Deviation: Owner D8 scope correction refreshed evidence under v1_v3_20261013_scopefix with identical sample/requests and five verified cached receipt copies, original timestamps and zero HTTP calls; original run is retained, and shared-table physical-hash replay limits are documented.
 
 ```bash
 ITA_HUD_RAW="$ITA_DATA_DIR/raw/references/hud/2025Q4/$(basename "$ITA_HUD_WORKBOOK")"
@@ -2120,7 +2139,7 @@ uv run --locked embedding-data audit --data-dir "$ITA_DATA_DIR"
   catalog caching does not remove that limitation. A fresh comparison uses a
   new run identifier. Never turn partial acquisition into a full-sample claim.
 
-- [ ] **Step 4: Inspect denominators and descriptive results before choosing rules.**
+- [x] **Step 4: Inspect denominators and descriptive results before choosing rules.**
   Run the following offline inspection (change only the run identifier if it
   was reviewed differently):
 
@@ -2200,7 +2219,7 @@ print(report['v3_overall'])
   The temporary inspection is not a substitute for provenance checks or the
   reproducible `reports.json` artifact.
 
-- [ ] **Step 5: Present one evidence checkpoint and adopt rules.** Copy the
+- [x] **Step 5: Present one evidence checkpoint and adopt rules.** Copy the
   generated `finding.md` into `specs/findings/v1-v3-ita-verification.md`, then
   add the denominator definitions, per-year shares, strata summary, method
   limitations, audit results and the proposed amendment text below. Present
@@ -2287,7 +2306,7 @@ print(report['v3_overall'])
   The verified markers cite the committed finding; do not remove V1–V3 from
   the Verification section, which remains the audit trail of their contracts.
 
-- [ ] **Step 6: Verify the exit requirements and commit the finding/amendments.**
+- [x] **Step 6: Verify the exit requirements and commit the finding/amendments.**
   Require a readable committed finding with all ten V1 years, both required
   V2 comparisons, V3 stratum/match/agreement evidence, raw input hashes,
   dependency/code versions, official source links, adopted rules and audit
@@ -2301,14 +2320,16 @@ git add specs/findings/v1-v3-ita-verification.md specs/embedding-evaluation-data
 git commit -m 'docs(ita): record V1-V3 evidence and adopted verification rules'
 ```
 
-- [ ] **Step 7: Review the whole plan before completion markup.** Use
+- [x] **Step 7: Review the whole plan before completion markup.** Use
   requesting-code-review for concurrent code-reviewer and independent Codex
   reviews against the plan and source spec, from `git merge-base main HEAD`.
   Review uncommitted changes as well if any exist. Resolve the merged findings
   through receiving-code-review, re-run affected checks/measurements, and commit
   fixes. Do not defer an unanswered method choice; it is a Stage 3 exit blocker.
 
-- [ ] **Step 8: Complete the plan and re-validate later stages against what shipped.**
+> Deviation: Codex-controller review recipe omits its redundant Codex second opinion; whole-branch scope finding and Minor T1 were owner-approved, fixed and scoped rereview CLEAN at cd4639d, with zero leftovers.
+
+- [x] **Step 8: Complete the plan and re-validate later stages against what shipped.**
   Run writing-plans' Plan Completion Protocol: resolve-before-defer, tick
   completed steps and add deviation notes, tick the earlier `Manifest audit`
   item with `→ done in plan 3`, and append only genuine remaining deferred
@@ -2332,7 +2353,7 @@ git commit -m 'docs(ita): record V1-V3 evidence and adopted verification rules'
   entries belongs to the next derive-roadmap resume; do not plan a later stage
   in this execution session.
 
-- [ ] **Step 9: Backlog health, retirement and integration handoff.** Run
+- [x] **Step 9: Backlog health, retirement and integration handoff.** Run
   `uv run --no-project --python 3.13 python /Users/lowell/.agents/skills/writing-plans/scripts/deferred_stats.py`
   from the repo root (use the writable uv cache if needed). Report its summary;
   if the rubric's size/age trigger fires, present its read-only triage proposal.
@@ -2341,3 +2362,194 @@ git commit -m 'docs(ita): record V1-V3 evidence and adopted verification rules'
   Use finishing-a-development-branch to select integration deliberately and
   clean up the worktree after integration. End with the outcome-specific
   roadmap resume handoff, naming no later stage to execute in this session.
+
+## Handoff to later stages
+
+The adopted [V1–V3 finding](../../findings/v1-v3-ita-verification.md) is the
+current aggregate evidence for [R2](../../embedding-evaluation-data-spec.md#r2--osha-ita-establishment-summaries),
+with R5/R6/R7 consumers below. This stage adds verified citations, official title
+inputs and measurement modules beyond its roadmap Produces; it builds no target,
+county hierarchy, production link table or code concordance. No items were deferred
+from this plan; existing backlog items retain their original stages and closure
+conditions. Source spec and roadmap remain live. No interim interface was removed:
+`read_hud` gained `noncounty_geography`, linkage gained missing-ID counts, sampling
+gained an explicit missing-state label, and final county reports gained returned-method
+scope counts. The original delivered-state predicate remains a separate diagnostic.
+
+- **Stage 4 consumes** `ita_references.TITLE_FILES`, `acquire_titles(data_dir)`,
+  `read_titles(data_dir) -> pl.DataFrame`, and `parse_titles(raw, vintage)` under
+  R2.5/R5.2/R5.4. The exact manifested sources and counts are in the table below.
+  Parsed schema is `vintage:Int64, code:String, title:String`, sorted by vintage/code;
+  ranged sectors remain intact, and the reader removes the terminal workbook
+  trilateral T marker from titles. Header ambiguity, empty/duplicate codes, missing
+  titles and changed full/six-digit counts fail loudly. No partial workbook or guessed
+  title lookup is accepted. V1 compares exact normalized titles across all three
+  vintages while native-vintage identity is conditional on known `naics_year`;
+  unknown vintage remains unknown. Title-only comparison has not built parents,
+  edges, concordances, canonical mappings or the deferred R2.9 industry flag. Those
+  remain the existing Stage 4 contract, including `specs/deferred_items.md` section
+  `2-ita-300a-summaries`, item “Industry half of the R2.9 filing-rule flag”.
+
+- **Stage 5 consumes** the adopted R2.8 method and R6 compatibility decisions,
+  `ita_references.import_hud(data_dir, workbook, quarter) -> Path`,
+  `read_hud(file) -> pl.DataFrame` and `ita_county_verification.zip_candidates(frame)`.
+  Actual reference is `data/raw/references/hud/2025Q4/ZIP-COUNTY_122025.xlsx`, SHA256
+  `554379b618f21380bed6777a9c69845ac138843c1a57f951886d605bc9611c68`, official
+  [HUD ZIP–county source](https://www.huduser.gov/portal/datasets/usps_crosswalk.html).
+  Delivered GEOID aliases COUNTY only for a validated ZIP-COUNTY original filename;
+  ZIP-TRACT is refused. Read schema is `zip_key:String, county_geoid:String,
+  bus_ratio:Float64, noncounty_geography:Boolean`; 54,571 rows/39,494 ZIPs include
+  eight recognized short AS/FM/MH/PW zero-BUS geographies flagged and retained
+  unpadded. Null/invalid/duplicate candidates, malformed ratios and login/HTML
+  impostors fail. CT source codes are 09110–09190 planning regions; legacy 090*
+  counties are incompatible, not ordinary agreement errors. Census benchmark
+  `Public_AR_Current` ID 4 with `ACS2025_Current` ID 425 supplies a deliberate common
+  2025 county frame, not historical geography for older filing addresses. Positive
+  business-share candidate sets are retained; dominant maximum/ties are diagnostic,
+  never a headline shortcut. This sample is not the county hierarchy. Full production
+  county/state/division/region/CBSA references and typed nodes/edges remain to be
+  acquired/built under the existing R6/Stage 5 contract. The owner-mentioned HUD API
+  is a future acquisition option only; no API credentials or integration were added.
+
+- **Stage 6 consumes** R2.8/R6/R7 decisions plus
+  `ita_verification_run.prepare(data_dir, hud, run_id) -> Path`,
+  `check_inputs(data_dir, directory) -> dict`, `acquire_geocodes(data_dir, run_id)`
+  and `measure(data_dir, run_id) -> dict`; explicit module CLI commands are
+  `references`, `import-hud WORKBOOK QUARTER`, `sample HUD RUN_ID`, `geocode RUN_ID`,
+  `measure RUN_ID`, each with `--data-dir`. `sample` rebuilds the shared Stage 2
+  source table and freezes 20,628 exact-distinct sampled rows in 3,378 strata,
+  representing 3,204,828 distinct source rows; sample schema is recorded below.
+  Ranking uses `SAMPLE_SALT='embedding-data:V3:2026-10-13:v1'`, at most eight rows per
+  stratum, with weights `population_n/sample_n`. Strata use delivered year/state,
+  explicit missing-state label, ZIP format and positive-BUS candidate class.
+  Headerless `requests/0000.csv`, `0001.csv`, `0002.csv` contain only row_key,
+  street_address, city, delivered state and zip_key (10,000/10,000/628); no EIN or
+  company data is sent. `parse_geocodes(text)` produces strings `row_key,
+  geocode_status, match_type, county_geoid`, with Match/No_Match/Tie, Exact/Non_Exact
+  and state+county GEOID; duplicate or incomplete geography rows fail. Exact
+  request-ID equality is checked before publishing/manifests, including cached reads.
+  `county_report(sample, geocodes) -> (strata, overall)` refuses incomplete ID sets.
+  Its raw coverage/status counts remain on all sampled rows; assignment requires
+  selected exact compatible Census first, otherwise compatible single-positive-BUS
+  HUD, and delivered-state scope. Returned county prefixes 60/66/69/72/74/78 are
+  separately excluded for each method. An excluded exact Census result remains
+  flagged/unassigned rather than redirecting to HUD; a valid exact Census result
+  can assign despite excluded HUD. Conditional comparisons require both counties
+  and delivered state in scope. `n_out_of_scope`, `n_geocode_out_of_scope`,
+  `n_zip_single_out_of_scope`, `n_zip_dominant_out_of_scope` and their weighted/share
+  variants remain separate; raw `n_geocode_exact`/ZIP coverage is not in-scope
+  assignment. CT/vintage, non-exact/no-match/tie, candidate ambiguity and scope
+  flags are retained. Refreshed assignable 12,611/20,628, weighted
+  2,919,075.75/3,204,828; agreement is comparative evidence, not accuracy.
+  Current run is `data/derived/osha/verification/v1_v3_20261013_scopefix/` with
+  `inputs.json`, `sample.parquet`, requests, `geocoding.json`, `reports.json`,
+  `v1.parquet`, `quality.parquet`, `v2.json`, `v3-strata.parquet`, `finding.md`.
+  Raw catalogs/responses are immutable under
+  `data/raw/references/census-geocoder/v1_v3_20261013_scopefix/`; filenames of
+  responses are exact request SHA256 values. The original run `v1_v3_20261013`
+  remains retained. Scopefix used five parity-verified immutable copies (two
+  catalogs/three responses), original receipt metadata except path, and **zero HTTP
+  calls**, not fresh acquisition. Original response timestamps are 14:32:59Z,
+  14:38:37Z, 14:43:59Z on 2026-10-13; catalog timestamps 14:20:37Z. Current catalog
+  options do not freeze mutable address ranges; earlier timeout/502 and resumption
+  can combine source revisions. Code or dependency changes require a new run.
+  `prepare` also regenerates shared summary physical Parquet bytes; canonical full
+  rows matched despite different physical hashes. Current physical hash is
+  `6335cda7adb40a41c4a11d57d22048999449ac8d078a2ec0291f0198cd9136a8`,
+  canonical full-row hash
+  `7667489f3b6a3820665a5081ecfe0b406d57e4a3a49ad8230d532b6b2d1b7c7f`.
+  Physical input checks intentionally fail if that shared file is regenerated;
+  original run replay needs its original code and physical table bytes. Preserved
+  original reports/cache are evidence, not current-code reexecution. Full-table
+  county assignments, production references, target writer/manifests and R7/V12
+  target construction remain the existing Stage 6 work, not shipped here.
+
+- **Stage 7 consumes** `manifest_audit.audit(data_dir) -> list[AuditIssue]`
+  (`path`, `kind`) and `embedding-data audit --data-dir ...`: read-only sorted
+  discrepancies for unrecorded/changed/missing/size/duplicate/invalid/symlink raw
+  inputs, exit 1 on discrepancies. `manifest.entry_for` hashes and verifies current
+  bytes/size before citing; `recorded_entry_for` is only lookup for restoration or
+  existence diagnostics and never evidence that bytes match. Positive, duplicate,
+  changed-hash and matching-hash/wrong-size refusals are covered by the final suite.
+  Initial audit found only the unrecorded original owner HUD workbook; original
+  bytes were first recorded manual-import at 14:18:53Z and reference import at
+  14:19:32Z, each retrieval-time proxy, leaving all recorded hashes untouched.
+  Final whole-tree audits exit 0 with zero discrepancies, including no outstanding
+  non-ITA/IPUMS discrepancies. This does not inspect or settle V4–V7, validate
+  IPUMS transformations, or establish historical delivery/version semantics. The
+  earlier `Manifest audit` backlog item is closed by this stage; other
+  `1-raw-provenance` items retain their original closure conditions.
+
+- **Stage 10 consumes** `ita_verification.normalize_key`, `ein_key`, `zip_key`,
+  `zip_format`, `with_keys(lf)`, `description_report(lf,titles)`,
+  `quality_report(lf)`, `unique_ids(lf,year)` and `link_report(lf,base_year,later_year)`
+  for adopted R2.6/R2.7 and R7.2. Original strings remain delivered; keys use NFKC,
+  Unicode casefold, collapsed/trimmed whitespace and preserve punctuation. Exact
+  placeholders are `n/a`, `na`, `none`, `unknown`, `not applicable`, `not specified`,
+  `-`, `--`, `.`; any/native official-title identity and suspected mojibake remain
+  flags, with unknown vintage kept unknown. Employer keys use syntactically usable
+  eight/nine-digit EIN (hyphens removed, eight digits padded and flagged), rejecting
+  padded nine-digit keys whose digits are all identical; otherwise nonempty normalized company, otherwise
+  unknown rather than one shared blank group. Employer fallback does not establish
+  EIN co-ownership. Unknown-employer rows do not participate in employer grouping;
+  repetition-row and excess diagnostics differ from exact duplicates. Full source
+  3,206,055 rows are retained; 1,227 exact duplicate excess rows are all in 2021.
+  Conflicting exact-distinct 2021 record IDs 814/1,628 rows and establishment IDs
+  815/1,630 rows remain ambiguous. All nonnull distinct cohort IDs form persistence
+  denominator, eligible unique IDs an additional denominator; changed-ID share uses
+  uniquely matched unreconstructed EIN/name/full-address tuples. Tuple multiplicity
+  is computed on all exact-distinct yearly rows before eligible-ID filtering, and
+  original `n_base_missing_id_rows`/`n_later_missing_id_rows` preserve missing-ID
+  diagnostics. Missing/reconstructed EIN or incomplete address never confirms;
+  relocation can break address confirmation without proving different identity.
+  V1 reports all ten years; V2 includes required 2023→2024/2025 plus all consecutive
+  earlier years. Nearly missing early EIN leaves 2016→2017 zero confirmed links
+  despite 129,292 IDs reappearing; unknown-employer/year-specific company fallback,
+  padded-EIN sensitivity and frequencies are explicitly measured. No production
+  link table, text pairs or co-ownership targets have shipped; those remain the
+  existing Stage 10/R7.2 contract.
+
+### Manifested official title inputs
+
+Paths below are relative to the actual `data/raw/`; expected/actual counts both
+passed, with all levels 2–6 and six-digit detail separately checked.
+
+| Vintage | Original manifested file | Official source | SHA256 | All / six-digit rows |
+| --- | --- | --- | --- | --- |
+| 2012 | `references/naics/2012_NAICS_Structure.xls` | [Census 2012](https://www.census.gov/naics/2012NAICS/2012_NAICS_Structure.xls) | `50eba48db4e11f863e015d4d2bbaaf618565bd94ef9b019fe62b9bbaddbaaafb` | 2209 / 1065 |
+| 2017 | `references/naics/2017_NAICS_Structure.xlsx` | [Census 2017](https://www.census.gov/naics/2017NAICS/2017_NAICS_Structure.xlsx) | `662b5a2bdff10938997acd7f59f84331527d6f06ff24d5533331581a00a94aad` | 2196 / 1057 |
+| 2022 | `references/naics/2022_NAICS_Structure.xlsx` | [Census 2022](https://www.census.gov/naics/2022NAICS/2022_NAICS_Structure.xlsx) | `217c9e0d4d74e7517bc288f5f308b73aa0de5ee787976a6dd222412be28ada22` | 2125 / 1012 |
+
+### Frozen sample schema and reproducibility pins
+
+`sample.parquet` retains source columns plus matching keys/candidates/ranking and
+sampling metadata. The exact shipped schema follows (field names only, no public
+address or identifying EIN values):
+
+| Dtype | Fields |
+| --- | --- |
+| `String` | `stratum`, `establishment_name`, `company_name`, `ein`, `street_address`, `city`, `state`, `zip_code`, `naics_code`, `industry_description`, `source_file`, `description_key`, `company_key`, `name_key`, `street_key`, `city_key`, `state_key`, `ein_key`, `zip_key`, `zip_format`, `employer_key`, `address_key`, `row_key`, `zip_dominant_county`, `zip_single_county`, `county_count_class`, `rank_key` |
+| `Int64` | `year_filing_for`, `id`, `establishment_id`, `naics_year`, `establishment_type`, `size`, `size_class`, `annual_average_employees`, `total_hours_worked` |
+| `Boolean` | `naics_year_from_dictionary`, `flag_employment`, `flag_hours_per_employee`, `flag_below_filing_size`, `flag_naics_year_unknown`, `flag_ein_padded`, `flag_suspected_mojibake`, `flag_empty`, `flag_placeholder`, `flag_zip_legacy_ct` |
+| `UInt32` | `n_business_counties`, `population_n`, `sample_n` |
+| `List(String)` | `business_counties`, `dominant_candidates` |
+| `Float64` | `max_business_ratio`, `inclusion_probability`, `sample_weight` |
+
+Scopefix `reports.json` canonical SHA256 is
+`1f43879a895450d7448dfb1876e08c4fe2e7e4e86977dd75f05d586e015644ba`;
+sample canonical SHA256 is
+`309021f3b113b219b134a8749b7b72e97760d5014e19c8ddc3916c238dbf8676`.
+Both full offline measurements matched; all 3,378 committed stratum cells and
+overall counts match the refreshed report. Current county module SHA256 is
+`b7ce702f41ecd7a6008f1e90624576f5772f742c6f5bd8ffa16c964f5196830f`;
+measured dependency versions are Polars 2.0.0, httpx 0.28.1, fastexcel 0.21.0.
+Raw source hashes, all code hashes, exact request hashes, catalogs, receipt-copy
+metadata and operational limitations are in the finding's input inventory.
+Final fresh milestone: 284 pytest passed (one network canary deselected), two
+Behave scenarios/ten steps passed, ruff and lock checks passed; scoped final
+rereview CLEAN at `cd4639d`. Source audit closure and implementation correction
+are settled; no review finding or plan step is deferred.
+
+Resume the [roadmap](../../embedding-evaluation-data-spec-roadmap.md) through
+its reconcile step after root selects the integration outcome. This completed
+stage does not plan or execute any later stage in this session.
