@@ -12,6 +12,7 @@ earlier one.
 '''
 
 import json
+from dataclasses import replace
 from datetime import UTC, datetime
 from importlib.metadata import version
 from pathlib import Path
@@ -74,25 +75,29 @@ def deliver(
             raise FileNotFoundError(
                 f'{staging / file_name}: not delivered; {staging} is incomplete'
             )
-    staging.rename(extract_dir)
 
+    # Hash in staging and check the manifest first, so only the rename-to-append gap remains.
     manifest_path = paths.manifest_path(data_dir)
-    manifest.append_entries(
-        manifest_path,
-        [
+    raw_root = manifest_path.parent
+    entries = [
+        replace(
             manifest.describe_file(
-                extract_dir / file_name,
-                manifest_path.parent,
+                staging / file_name,
+                raw_root,
                 retrieved_at=retrieved_at,
                 client='ipumspy',
                 client_version=version('ipumspy'),
                 collection=extract.collection,
                 extract_number=extract.extract_id,
                 samples=definition['samples'],
-            )
-            for file_name in sorted(delivered)
-        ],
-    )
+            ),
+            path=(extract_dir / file_name).relative_to(raw_root).as_posix(),
+        )
+        for file_name in sorted(delivered)
+    ]
+    manifest.check_appendable(manifest_path, entries)
+    staging.rename(extract_dir)
+    manifest.append_entries(manifest_path, entries)
     return extract_dir
 
 

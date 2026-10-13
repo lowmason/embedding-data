@@ -1,3 +1,4 @@
+import dataclasses
 import gzip
 import hashlib
 import json
@@ -243,6 +244,52 @@ def test_a_delivery_without_its_codebook_is_not_moved_into_place(run_live, data_
     assert isinstance(result.exception, FileNotFoundError), result.output
     assert 'usa_00123.xml' in str(result.exception)
     assert_not_delivered(data_directory)
+    assert (data_directory / 'raw/acs/core/usa_00123.part/usa_00123.csv.gz').exists()
+
+
+def test_a_failure_to_hash_the_delivery_leaves_it_in_staging(run_live, data_directory):
+    with patch.object(manifest, 'describe_file', side_effect=OSError('read error')):
+        result, _ = run_live()
+
+    assert isinstance(result.exception, OSError), result.output
+    assert_not_delivered(data_directory)
+    assert (data_directory / 'raw/acs/core/usa_00123.part/usa_00123.csv.gz').exists()
+
+
+@pytest.mark.parametrize(
+    'manifest_line',
+    [
+        json.dumps(
+            dataclasses.asdict(
+                manifest.ManifestEntry(
+                    path='acs/core/usa_00123/extract.json',
+                    sha256='0' * 64,
+                    size=0,
+                    retrieved_at='2026-01-01T00:00:00+00:00',
+                    client='ipumspy',
+                    client_version='0',
+                )
+            )
+        ),
+        'not json',
+    ],
+    ids=['already-recorded', 'malformed'],
+)
+def test_a_manifest_that_refuses_the_delivery_leaves_it_in_staging(
+    run_live, data_directory, manifest_line,
+):
+    manifest_path = paths.manifest_path(data_directory)
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_text(manifest_line + '\n')
+    recorded = manifest_path.read_bytes()
+
+    result, _ = run_live()
+
+    assert isinstance(result.exception, ValueError), result.output
+    assert not (data_directory / 'raw/acs/core/usa_00123').exists()
+    assert (data_directory / 'raw/acs/core/usa_00123.part/usa_00123.csv.gz').exists()
+    assert manifest_path.read_bytes() == recorded
+    assert not (data_directory / 'derived').exists()
 
 
 def test_only_the_three_expected_files_are_recorded(run_live, data_directory):

@@ -78,11 +78,8 @@ def read_manifest(manifest_path: Path) -> list[ManifestEntry]:
     return entries
 
 
-def append_entries(manifest_path: Path, entries: Iterable[ManifestEntry]) -> None:
-    '''Append entries, refusing all of them if any path is already recorded.'''
-    entries = list(entries)
-    if not entries:
-        return
+def check_appendable(manifest_path: Path, entries: Iterable[ManifestEntry]) -> None:
+    '''Refuse entries if any path is already recorded or repeated among them.'''
     recorded = {entry.path for entry in read_manifest(manifest_path)}
     appending = set()
     for entry in entries:
@@ -91,6 +88,14 @@ def append_entries(manifest_path: Path, entries: Iterable[ManifestEntry]) -> Non
         if entry.path in appending:
             raise ValueError(f'{entry.path} is repeated in this append')
         appending.add(entry.path)
+
+
+def append_entries(manifest_path: Path, entries: Iterable[ManifestEntry]) -> None:
+    '''Append entries, refusing all if any path is already recorded or repeated in this append.'''
+    entries = list(entries)
+    if not entries:
+        return
+    check_appendable(manifest_path, entries)
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     with manifest_path.open('a') as stream:
         stream.writelines(json.dumps(asdict(entry)) + '\n' for entry in entries)
