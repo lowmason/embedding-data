@@ -5,6 +5,7 @@ from pathlib import Path
 import httpx
 import polars as pl
 import typer
+from fastexcel import FastExcelError
 
 from embedding_data import code_build, code_references, paths
 
@@ -19,7 +20,9 @@ def codes():
 def invoke(function, *args, **kwargs):
     try:
         return function(*args, **kwargs)
-    except (OSError, ValueError, KeyError, httpx.HTTPError, pl.exceptions.PolarsError) as error:
+    except (
+        OSError, ValueError, KeyError, httpx.HTTPError, pl.exceptions.PolarsError, FastExcelError
+    ) as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(2) from None
 

@@ -72,3 +72,20 @@ def test_cached_acquire_and_identical_import_are_offline(tmp_path, monkeypatch):
     ])
     assert result.exit_code == 0, result.output
     assert str(code_references.reference_path(tmp_path, registry['soc_2018'])) in result.output
+
+
+def test_invalid_workbook_import_exits_cleanly_without_publication(tmp_path):
+    original = tmp_path / 'saved.xlsx'
+    original.write_text('<html>Access denied</html>')
+    result = CliRunner().invoke(cli.app, [
+        'codes', 'import-reference', 'naics_2022', str(original),
+        '--data-dir', str(tmp_path),
+    ])
+    assert result.exit_code == 2, repr(result.exception)
+    assert 'calamine' in result.output.lower()
+    assert 'Traceback' not in result.output
+    assert not code_references.reference_path(
+        tmp_path, code_references.REGISTRY['naics_2022']
+    ).exists()
+    assert not (tmp_path / 'raw/manifest.jsonl').exists()
+    assert not (tmp_path / 'derived/codes').exists()
