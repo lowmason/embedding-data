@@ -194,6 +194,82 @@ def test_each_column_that_is_not_a_whole_number_is_named_with_its_row_count(tmp_
     )
 
 
+def test_scientific_notation_hours_are_read_as_the_whole_number_they_spell(tmp_path):
+    # A spreadsheet wrote four real 2024 and 2025 hours this way (D11).
+    records = [
+        record(2024, id='1', annual_average_employees='133', total_hours_worked='8.62847E+11'),
+    ]
+
+    rows = harmonize_raw(tmp_path, 2024, year_file(2024, records))
+    flagged = ita_summary.add_flags(rows).collect()
+
+    assert flagged.select('id', 'total_hours_worked', 'flag_hours_per_employee').rows() == [
+        (1, 862_847_000_000, True),
+    ]
+
+
+@pytest.mark.parametrize(
+    ('written', 'hours'),
+    [
+        ('1.5E+3', 1_500),
+        ('1.5e+3', 1_500),
+        ('1.5E3', 1_500),
+        ('150E-1', 15),       # trailing zeros absorb a negative exponent
+        ('1.50E+1', 15),
+        ('0.0E-5', 0),
+        ('-1.5E+3', -1_500),  # signed, as a plain number may be
+        # The largest Int64, which a float would round up to 2**63.
+        ('9.223372036854775807E+18', 9_223_372_036_854_775_807),
+        # More digits than a float holds: expanded exactly, not rejected.
+        ('1.23456789012345678E+17', 123_456_789_012_345_678),
+    ],
+)
+def test_scientific_notation_hours_are_expanded_exactly(tmp_path, written, hours):
+    data = year_file(2024, [record(2024, total_hours_worked=written)])
+
+    frame = harmonized(tmp_path, 2024, data)
+
+    assert frame['total_hours_worked'].to_list() == [hours]
+
+
+@pytest.mark.parametrize(
+    'written',
+    [
+        '1.5E+0',                    # spells 1.5
+        '15E-1',                     # spells 1.5
+        '12.5',
+        'abc',
+        '1E+30',                     # too large for Int64
+        '9.223372036854775808E+18',  # 2**63, one past the largest Int64
+        '1E+99999999999999999999',   # an exponent too large for Int64
+        ' 1.5E+3',                   # padded, as a plain number may not be either
+        '1.5E+3 ',
+    ],
+)
+def test_hours_that_spell_no_whole_number_an_int64_holds_fail(tmp_path, written):
+    data = year_file(2024, [record(2024, total_hours_worked=written)])
+
+    with pytest.raises(
+        ValueError, match=not_a_whole_number(source_file(2024), 'total_hours_worked'),
+    ):
+        harmonize_raw(tmp_path, 2024, data)
+
+
+@pytest.mark.parametrize(
+    'column',
+    [
+        'id', 'establishment_id', 'size', 'annual_average_employees', 'year_filing_for',
+        'naics_year',
+    ],
+)
+def test_scientific_notation_in_another_integer_column_fails(tmp_path, column):
+    # establishment_type is not listed: E-notation there is text, which becomes null.
+    data = year_file(2024, [record(2024, **{column: '1E+2'})])
+
+    with pytest.raises(ValueError, match=not_a_whole_number(source_file(2024), column)):
+        harmonize_raw(tmp_path, 2024, data)
+
+
 def test_a_text_establishment_type_becomes_null_and_its_row_is_kept(tmp_path):
     # One 2019 row carries an industry title where the establishment type code belongs.
     records = [
@@ -337,6 +413,26 @@ def test_every_year_stacks_into_one_sorted_table_without_injury_counts(data_dire
     ]
     assert table['source_file'].unique(maintain_order=True).to_list() == [
         f'osha/summary/{year}/{RELEASE_NAMES[year]}' for year in (2022, 2023, 2024)
+    ]
+
+
+def test_the_stacked_table_holds_expanded_hours_and_unknown_vintages(data_directory):
+    write_release(data_directory, 2022)
+    records = [
+        record(2024, id='1', naics_code='485410', naics_year='0'),
+        record(2024, id='2', annual_average_employees='133', total_hours_worked='8.62847E+11'),
+    ]
+    write_release(data_directory, 2024, year_file(2024, records))
+
+    table = pl.read_parquet(ita_summary.build_summary_table(data_directory))
+
+    assert table.select(
+        'year_filing_for', 'id', 'naics_year', 'flag_naics_year_unknown',
+        'total_hours_worked', 'flag_hours_per_employee',
+    ).rows() == [
+        (2022, 20220, 2012, False, 200_000, False),
+        (2024, 1, None, True, 200_000, False),
+        (2024, 2, 2022, False, 862_847_000_000, True),
     ]
 
 

@@ -185,10 +185,12 @@ specification's R2.4 columns plus OSHA's record `id`, the raw file it came from
   provenance, not implausibility.
 
 Codes, names, addresses, ZIP codes, and EINs stay as delivered, except that a
-non-numeric `establishment_type` (one 2019 row holds an industry title) becomes null. A
-file the harmonization does not cover stops the build rather than being guessed at.
-After the build the command prints rows per year beside OSHA's published submission
-counts. A full first run downloads about 258 MB.
+non-numeric `establishment_type` (one 2019 row holds an industry title) becomes null and
+`total_hours_worked` in scientific notation (four rows in the 2024 and 2025 files, such
+as `8.62847E+11`) is read as the whole number it spells. A file the harmonization does
+not cover stops the build rather than being guessed at. After the build the command
+prints rows per year beside OSHA's published submission counts. A full first run
+downloads about 258 MB.
 
 ## OSHA case-detail download
 

@@ -3,11 +3,15 @@
 Each year's raw file (a zip holding one CSV, or the current year's plain CSV) is transcoded
 to UTF-8, its headers are lowercased (2025 writes ID and establishment_ID), and the columns
 spec R2.4 retains are cast: codes and text stay strings, counts become Int64. The 2019 file
-writes every number with a zero fraction (452990.00), which is accepted; any other value
-that is not a whole number fails the build with the file and column named. The one
-exception is establishment_type, where text (one 2019 row holds Executive and Legislative
-Offices) becomes null; a number there must still be whole. Two dictionary changes are
-harmonized:
+writes every number with a zero fraction (452990.00), which is accepted. Four 2024 and 2025
+rows write total_hours_worked in scientific notation (8.62847E+11), as a spreadsheet writes
+a long number; in that column alone, such a value is read as the whole number it spells.
+It is expanded on its digit string, not through a float, whose 53-bit significand would
+silently round a longer value (1.23456789012345678E+17). Any other value that is not a
+whole number, or that Int64 cannot hold, fails the build with the file and column named.
+The one exception is establishment_type, where text (one 2019 row holds Executive and
+Legislative Offices) becomes null; a number there must still be whole. Two dictionary
+changes are harmonized:
 
 - size: code 2 (20-249 employees) was split into 21 (20-99) and 22 (100-249) with the 2023
   data, but the 2023 and later files still carry 2 for some establishments. size keeps the
@@ -53,6 +57,11 @@ DICTIONARY_NAICS_YEAR = 2012
 NAICS_YEARS = [2012, 2017, 2022]
 # Digits and points, optionally signed or padded: an establishment_type that looks numeric.
 NUMERIC = r'^\s*[-+]?[\d.]+\s*$'
+# Scientific notation as a spreadsheet writes a long number (8.62847E+11), signed like a
+# plain number and, like one, not padded.
+SCIENTIFIC = r'^(?<sign>[-+]?)(?<whole>\d+)(?:\.(?<fraction>\d+))?[eE](?<exponent>[-+]?\d+)$'
+# Digits in the largest Int64; a whole number with more cannot be one.
+INT64_DIGITS = len(str(2**63 - 1))
 SIZE_CLASS = {1: 1, 2: 2, 21: 2, 22: 2, 3: 3}
 # Plausible annual hours worked per average employee, inclusive: about 10 to 77 hours a week.
 HOURS_PER_EMPLOYEE = (500, 4_000)
@@ -115,15 +124,52 @@ def whole_number(value: pl.Expr, *, strict: bool = True) -> pl.Expr:
     return value.str.replace(r'\.0+$', '').cast(pl.Int64, strict=strict)
 
 
+def expand_scientific(value: pl.Expr) -> pl.Expr:
+    '''value, with scientific notation that spells a whole number written out in digits.
+
+    The digits are moved, never converted through a float, so the result is exact:
+    8.62847E+11 becomes 862847000000. Any other value, including a fraction (1.5E+0) or a
+    number with more digits than an Int64 holds (1E+30), is returned unchanged, so the
+    cast it feeds rejects it.
+    '''
+    parts = value.str.extract_groups(SCIENTIFIC).struct
+    fraction = parts.field('fraction').fill_null('')
+    digits = parts.field('whole') + fraction
+    trimmed = digits.str.strip_chars_end('0')
+    significant = trimmed.str.strip_chars_start('0')
+    # The value is significant * 10**zeros. An exponent beyond Int64 is null, leaving the
+    # value unchanged (none spells a nonzero Int64); widened to Int128, the sum cannot
+    # overflow.
+    zeros = (
+        parts.field('exponent').cast(pl.Int64, strict=False).cast(pl.Int128)
+        - fraction.str.len_chars()
+        + (digits.str.len_chars() - trimmed.str.len_chars())
+    )
+    width = significant.str.len_chars() + zeros
+    fits = (zeros >= 0) & (width <= INT64_DIGITS)
+    # Polars evaluates every branch on every row, so the width is masked where it does not
+    # fit, or 1E+999999999 would be padded to a billion digits before being discarded.
+    written_out = parts.field('sign') + significant.str.pad_end(pl.when(fits).then(width), '0')
+    return (
+        pl.when(significant == '').then(pl.lit('0'))
+        .when(fits).then(written_out)
+        .otherwise(value)
+    )
+
+
 def integer_value(column: str) -> pl.Expr:
     '''The raw string an integer column is cast from; non-numeric establishment_type is null.
 
     The text is masked out before the cast rather than skipped by a branch around it, so
     the strict cast never sees it, whichever rows Polars evaluates a branch on.
+    total_hours_worked in scientific notation is written out in digits (expand_scientific);
+    no other column reads that notation as a number.
     '''
     value = pl.col(column)
     if column == 'establishment_type':
         return pl.when(value.str.contains(NUMERIC)).then(value)
+    if column == 'total_hours_worked':
+        return expand_scientific(value)
     return value
 
 
