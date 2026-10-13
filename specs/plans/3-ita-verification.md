@@ -88,6 +88,18 @@ checks, not Stage 3 implementation or full-data investigation results.
   Applied in: source spec R2.3/R2.6–R2.8, finding, README and CLAUDE. No
   replacement default or software change required; measurement provenance retained.
 
+- **D8** (owner, final whole-branch correction, 2026-10-13): approved
+  method-specific returned-county territory exclusions (60/66/69/72/74/78),
+  separate delivered-state/Census/HUD diagnostics, assignment checks on the
+  chosen method and comparison checks on both counties, retaining raw statuses,
+  candidate classes, all rows and population denominators. Approved direct
+  manifest duplicate/size refusal tests and full evidence refresh under new run
+  `v1_v3_20261013_scopefix`, using parity-verified immutable cached requests and
+  response copies with original receipt metadata and no new HTTP acquisition.
+  Original run `v1_v3_20261013` remains retained. This corrects implementation
+  of adopted A4/R6.4; adopted A1–A4 are unchanged, with no new method choice.
+  Applied in: county-report gates/tests, refreshed finding and operational docs.
+
 The defaults below are approved for execution; measurement-dependent
 decisions are adopted only at Task 6's evidence checkpoint.
 

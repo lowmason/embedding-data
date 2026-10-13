@@ -7,9 +7,31 @@ All ten V1 filing years and all required V2 comparisons are measured. V1 empty d
 
 For the 2023 cohort, candidate ID reappearance is **55.77% in 2024** and **45.69% in 2025**, while conservative confirmed same-EIN/full-address links are **40.73%** and **33.93%** of all cohort IDs. Among eligible uniquely matched EIN/name/address tuples, changed-ID shares are **8.47%** and **9.19%**. Reappearance alone is not confirmed identity. Zero confirmed links for 2016→2017 reflects missing EIN evidence, despite 129,292 candidate IDs reappearing.
 
-The complete V3 sample has **20,628 rows in 3,378 strata**, representing 3,204,828 exact-distinct ITA source rows. Exact compatible geocode coverage is **47.04% of sampled rows / 64.41% population-weighted**; compatible single-county HUD coverage is **38.73% / 76.64%**. The adopted exact-geocode-first, single-county-HUD-fallback rule can assign **61.18% / 91.08%**, respectively. Conditional single-county agreement is **4,717/4,718 = 99.9788% raw**, **99.9994% weighted**; dominant-county agreement is **8,579/8,835 = 97.1024% raw**, **98.2361% weighted**. Agreement supports comparison, not accuracy. No legacy Connecticut county result occurred in this sample or the selected HUD reference; that does not remove the general vintage compatibility requirement.
+The complete V3 sample has **20,628 rows in 3,378 strata**, representing 3,204,828 exact-distinct ITA source rows. Exact compatible geocode coverage is **47.04% of sampled rows / 64.41% population-weighted**; compatible single-county HUD coverage is **38.73% / 76.64%**. The adopted exact-geocode-first, single-county-HUD-fallback rule can assign **61.14% / 91.08%**, respectively. Conditional single-county agreement is **4,717/4,718 = 99.9788% raw**, **99.9994% weighted**; dominant-county agreement is **8,579/8,835 = 97.1024% raw**, **98.2361% weighted**. Agreement supports comparison, not accuracy. No legacy Connecticut county result occurred in this sample or the selected HUD reference; that does not remove the general vintage compatibility requirement.
 
-Official title parsing passed full-file checks: **2012 expected/actual 2,209; 2017 expected/actual 2,196; 2022 expected/actual 2,125**, with levels 2–6 and official ranged sector codes retained. Both full offline `measure` runs completed with exit 0. Canonical content hashes matched for V1, quality, V2, V3 strata, sample and full reports. Full `reports.json` canonical SHA256 is `f6e5db38806de33f7acafd745f0eebf3d8a68c012e2ed24e266e7de621d24261`; sample canonical SHA256 is `309021f3b113b219b134a8749b7b72e97760d5014e19c8ddc3916c238dbf8676`. Reproduction artifacts remain under the local run directory above; detailed command/output and parity hashes are recorded in the ignored execution report `.sdd/3-ita-verification/task-6-evidence-report.md`.
+Official title parsing passed full-file checks: **2012 expected/actual 2,209; 2017 expected/actual 2,196; 2022 expected/actual 2,125**, with levels 2–6 and official ranged sector codes retained. Both full offline `measure` runs completed with exit 0. Canonical content hashes matched for V1, quality, V2, V3 strata, sample and full reports. Full `reports.json` canonical SHA256 is `1f43879a895450d7448dfb1876e08c4fe2e7e4e86977dd75f05d586e015644ba`; sample canonical SHA256 is `309021f3b113b219b134a8749b7b72e97760d5014e19c8ddc3916c238dbf8676`. Reproduction artifacts remain under `data/derived/osha/verification/v1_v3_20261013_scopefix`; detailed command/output and parity hashes are recorded in the ignored execution report `.sdd/3-ita-verification/final-fixes-report.md` (the original run history remains in `task-6-evidence-report.md`).
+
+
+## Owner-approved returned-county scope correction and cache replay
+
+On 2026-10-13 the owner approved D8: enforce existing R6.4/A4 scope using the returned county as well as the normalized delivered state. No cleaning, linkage or county method was newly selected; adopted A1–A4 below remain unchanged. The corrected full run is `v1_v3_20261013_scopefix`, with county-code SHA256 `b7ce702f41ecd7a6008f1e90624576f5772f742c6f5bd8ffa16c964f5196830f` from commit `1a7ec1b`. Original run `v1_v3_20261013`, its inventory, reports, samples, requests and immutable raw catalog/response files remain retained and unchanged.
+
+Before any cache copy, canonical sample rows and all three request hashes, CSV bytes and IDs were verified identical to the original run; raw input receipts were identical. Five catalog/response files were copied to new relative raw paths, verified against original hashes and sizes, and recorded through `manifest.describe_file`/`append_entries` with the exact original source URL, client/version, retrieval timestamp, proxies and other receipt metadata. The new `geocoding.json` and report inventory explicitly record replay type, original run and both paths/receipts per copied file. Cached `acquire_geocodes` then regenerated the inventory and revalidated all 20,628 response IDs under an HTTP guard: **zero HTTP calls**. This is replay of original receipts, never fresh acquisition; acquisition_start/end in the inventory remain original response receipt times. Original mutable Current service limitations still apply.
+
+The shipped `prepare` rebuilt the common derived summary Parquet, whose physical bytes differ from the old run's table hash. A second rebuild had the same canonical full-row hash `7667489f3b6a3820665a5081ecfe0b406d57e4a3a49ad8230d532b6b2d1b7c7f`; V1, quality and V2 aggregates also equal the original reports exactly. New inputs record the actual current shared-table hash after this parity rebuild; original inputs are never relabeled. The original run's frozen reports/cache remain evidence, but directly rerunning its old input check against the regenerated shared table would require the original physical table bytes and original code.
+
+Assignment checks the county selected by exact-compatible Census first, otherwise compatible single-positive-BUS HUD, and excludes state prefixes **60/66/69/72/74/78** plus existing normalized delivered-state exclusions. A selected out-of-scope exact Census county is retained/flagged and cannot become an assignment; it does not silently redirect to HUD. Comparison checks both returned counties, separately for dominant and single diagnostics. `n_out_of_scope` continues to count excluded delivered state only; `n_geocode_out_of_scope`, `n_zip_single_out_of_scope` and `n_zip_dominant_out_of_scope` count each returned-method territory flag independently. Those flags can overlap and use all 20,628 sample rows (weighted denominator 3,204,828); they never change population/stratum denominators or raw Match/Non_Exact/No_Match/Tie classifications. `n_geocode_exact` and `n_zip_single_compatible` retain their coverage/vintage meaning and can include excluded geography; assignment and joint-comparison counts apply scope gates.
+
+Measured correction: assignable rows **12,621 → 12,611**, weighted rows **2,919,085.75 → 2,919,075.75**, a decrease of ten in both. The affected HUD fallbacks comprise four Non_Exact and six No_Match rows with excluded PR/GU/VI counties despite NJ/AE/PW delivered state. No observed exact Census assignment was affected. Coverage, raw response statuses, ZIP candidate classes, both agreement numerators/denominators, all V1/V2/quality aggregates and all sample/population denominators are unchanged. All **3,378** stratum rows below have been regenerated from the corrected full `reports.json`.
+
+| flag | raw_n | sample_denominator | raw_share | weighted_n | population_denominator | weighted_share |
+| --- | --- | --- | --- | --- | --- | --- |
+| n_out_of_scope | 719 | 20628 | 0.034855536164436686 | 14883.0 | 3204828.0 | 0.004643930969150295 |
+| n_geocode_out_of_scope | 75 | 20628 | 0.0036358347876672484 | 1555.75 | 3204828.0 | 0.0004854394682023497 |
+| n_zip_single_out_of_scope | 323 | 20628 | 0.015658328485553617 | 5390.125 | 3204828.0 | 0.0016818765312834262 |
+| n_zip_dominant_out_of_scope | 423 | 20628 | 0.02050610820244328 | 9991.125 | 3204828.0 | 0.0031175229996742416 |
+
+Both full offline measurements completed: all canonical Parquet/JSON outputs match between runs; final whole-tree audit reports **0 raw provenance discrepancies**. The full milestone suite passed **284 tests, 1 deselected**, **2 Behave scenarios/10 steps**, ruff and lock checks. The county regression was RED (26 failures) before implementation, GREEN afterward; direct duplicate-record and correct-hash/wrong-size manifest refusal tests exercise already-correct production branches.
 
 ## Inputs and versions
 
@@ -27,7 +49,7 @@ Official title parsing passed full-file checks: **2012 expected/actual 2,209; 20
         "client_version": "0.28.1",
         "collection": null,
         "extract_number": null,
-        "path": "references/census-geocoder/v1_v3_20261013/benchmarks.json",
+        "path": "references/census-geocoder/v1_v3_20261013_scopefix/benchmarks.json",
         "proxies": [],
         "retrieved_at": "2026-10-13T14:20:37+00:00",
         "samples": [],
@@ -41,7 +63,7 @@ Official title parsing passed full-file checks: **2012 expected/actual 2,209; 20
         "client_version": "0.28.1",
         "collection": null,
         "extract_number": null,
-        "path": "references/census-geocoder/v1_v3_20261013/vintages.json",
+        "path": "references/census-geocoder/v1_v3_20261013_scopefix/vintages.json",
         "proxies": [],
         "retrieved_at": "2026-10-13T14:20:37+00:00",
         "samples": [],
@@ -51,13 +73,171 @@ Official title parsing passed full-file checks: **2012 expected/actual 2,209; 20
         "through_date": null
       }
     ],
+    "replay": {
+      "files": [
+        {
+          "copy": {
+            "client": "httpx",
+            "client_version": "0.28.1",
+            "collection": null,
+            "extract_number": null,
+            "path": "references/census-geocoder/v1_v3_20261013_scopefix/benchmarks.json",
+            "proxies": [],
+            "retrieved_at": "2026-10-13T14:20:37+00:00",
+            "samples": [],
+            "sha256": "d3434b3cfc79fbc6b33f8452e719dffba1416b44a3817b3dfb721067416242ce",
+            "size": 547,
+            "source_url": "https://geocoding.geo.census.gov/geocoder/benchmarks",
+            "through_date": null
+          },
+          "original": {
+            "client": "httpx",
+            "client_version": "0.28.1",
+            "collection": null,
+            "extract_number": null,
+            "path": "references/census-geocoder/v1_v3_20261013/benchmarks.json",
+            "proxies": [],
+            "retrieved_at": "2026-10-13T14:20:37+00:00",
+            "samples": [],
+            "sha256": "d3434b3cfc79fbc6b33f8452e719dffba1416b44a3817b3dfb721067416242ce",
+            "size": 547,
+            "source_url": "https://geocoding.geo.census.gov/geocoder/benchmarks",
+            "through_date": null
+          }
+        },
+        {
+          "copy": {
+            "client": "httpx",
+            "client_version": "0.28.1",
+            "collection": null,
+            "extract_number": null,
+            "path": "references/census-geocoder/v1_v3_20261013_scopefix/vintages.json",
+            "proxies": [],
+            "retrieved_at": "2026-10-13T14:20:37+00:00",
+            "samples": [],
+            "sha256": "4b4235e3efd7142d2aa1564584619cb7cbf8712b1142aaa8661283fac895856d",
+            "size": 2057,
+            "source_url": "https://geocoding.geo.census.gov/geocoder/vintages?benchmark=4",
+            "through_date": null
+          },
+          "original": {
+            "client": "httpx",
+            "client_version": "0.28.1",
+            "collection": null,
+            "extract_number": null,
+            "path": "references/census-geocoder/v1_v3_20261013/vintages.json",
+            "proxies": [],
+            "retrieved_at": "2026-10-13T14:20:37+00:00",
+            "samples": [],
+            "sha256": "4b4235e3efd7142d2aa1564584619cb7cbf8712b1142aaa8661283fac895856d",
+            "size": 2057,
+            "source_url": "https://geocoding.geo.census.gov/geocoder/vintages?benchmark=4",
+            "through_date": null
+          }
+        },
+        {
+          "copy": {
+            "client": "httpx",
+            "client_version": "0.28.1",
+            "collection": null,
+            "extract_number": null,
+            "path": "references/census-geocoder/v1_v3_20261013_scopefix/926bb0cea8e783e4a80dcf5c5bf54130a75267dfbb17b9da3429d5653a2c1437.csv",
+            "proxies": [],
+            "retrieved_at": "2026-10-13T14:38:37+00:00",
+            "samples": [],
+            "sha256": "ec01d6973d81c4bbd7c1c59d06828d690321703249c1a8beddea8bbbe19ca88d",
+            "size": 2143879,
+            "source_url": "https://geocoding.geo.census.gov/geocoder/geographies/addressbatch",
+            "through_date": null
+          },
+          "original": {
+            "client": "httpx",
+            "client_version": "0.28.1",
+            "collection": null,
+            "extract_number": null,
+            "path": "references/census-geocoder/v1_v3_20261013/926bb0cea8e783e4a80dcf5c5bf54130a75267dfbb17b9da3429d5653a2c1437.csv",
+            "proxies": [],
+            "retrieved_at": "2026-10-13T14:38:37+00:00",
+            "samples": [],
+            "sha256": "ec01d6973d81c4bbd7c1c59d06828d690321703249c1a8beddea8bbbe19ca88d",
+            "size": 2143879,
+            "source_url": "https://geocoding.geo.census.gov/geocoder/geographies/addressbatch",
+            "through_date": null
+          }
+        },
+        {
+          "copy": {
+            "client": "httpx",
+            "client_version": "0.28.1",
+            "collection": null,
+            "extract_number": null,
+            "path": "references/census-geocoder/v1_v3_20261013_scopefix/9631f974891dd379c30a276388e2932d3e663c896edef85bc0afa4a7b12e8072.csv",
+            "proxies": [],
+            "retrieved_at": "2026-10-13T14:43:59+00:00",
+            "samples": [],
+            "sha256": "96749f76f51dc0861dd2a0302d9c145b56f0b7de96130ebf9cf9aaa7b903d4c2",
+            "size": 2121171,
+            "source_url": "https://geocoding.geo.census.gov/geocoder/geographies/addressbatch",
+            "through_date": null
+          },
+          "original": {
+            "client": "httpx",
+            "client_version": "0.28.1",
+            "collection": null,
+            "extract_number": null,
+            "path": "references/census-geocoder/v1_v3_20261013/9631f974891dd379c30a276388e2932d3e663c896edef85bc0afa4a7b12e8072.csv",
+            "proxies": [],
+            "retrieved_at": "2026-10-13T14:43:59+00:00",
+            "samples": [],
+            "sha256": "96749f76f51dc0861dd2a0302d9c145b56f0b7de96130ebf9cf9aaa7b903d4c2",
+            "size": 2121171,
+            "source_url": "https://geocoding.geo.census.gov/geocoder/geographies/addressbatch",
+            "through_date": null
+          }
+        },
+        {
+          "copy": {
+            "client": "httpx",
+            "client_version": "0.28.1",
+            "collection": null,
+            "extract_number": null,
+            "path": "references/census-geocoder/v1_v3_20261013_scopefix/213084b85ffea6e76bfe40923bd38d8870ffc33bcecb12cab3cca08b38732062.csv",
+            "proxies": [],
+            "retrieved_at": "2026-10-13T14:32:59+00:00",
+            "samples": [],
+            "sha256": "7905cbb4b4f175919609e521e05da0447637b24324e271aec7cbd7ae369c64a4",
+            "size": 134167,
+            "source_url": "https://geocoding.geo.census.gov/geocoder/geographies/addressbatch",
+            "through_date": null
+          },
+          "original": {
+            "client": "httpx",
+            "client_version": "0.28.1",
+            "collection": null,
+            "extract_number": null,
+            "path": "references/census-geocoder/v1_v3_20261013/213084b85ffea6e76bfe40923bd38d8870ffc33bcecb12cab3cca08b38732062.csv",
+            "proxies": [],
+            "retrieved_at": "2026-10-13T14:32:59+00:00",
+            "samples": [],
+            "sha256": "7905cbb4b4f175919609e521e05da0447637b24324e271aec7cbd7ae369c64a4",
+            "size": 134167,
+            "source_url": "https://geocoding.geo.census.gov/geocoder/geographies/addressbatch",
+            "through_date": null
+          }
+        }
+      ],
+      "http_calls": 0,
+      "kind": "verified immutable cache copy; no fresh acquisition",
+      "original_receipt_metadata_preserved": true,
+      "original_run_id": "v1_v3_20261013"
+    },
     "responses": [
       {
         "client": "httpx",
         "client_version": "0.28.1",
         "collection": null,
         "extract_number": null,
-        "path": "references/census-geocoder/v1_v3_20261013/926bb0cea8e783e4a80dcf5c5bf54130a75267dfbb17b9da3429d5653a2c1437.csv",
+        "path": "references/census-geocoder/v1_v3_20261013_scopefix/926bb0cea8e783e4a80dcf5c5bf54130a75267dfbb17b9da3429d5653a2c1437.csv",
         "proxies": [],
         "retrieved_at": "2026-10-13T14:38:37+00:00",
         "samples": [],
@@ -71,7 +251,7 @@ Official title parsing passed full-file checks: **2012 expected/actual 2,209; 20
         "client_version": "0.28.1",
         "collection": null,
         "extract_number": null,
-        "path": "references/census-geocoder/v1_v3_20261013/9631f974891dd379c30a276388e2932d3e663c896edef85bc0afa4a7b12e8072.csv",
+        "path": "references/census-geocoder/v1_v3_20261013_scopefix/9631f974891dd379c30a276388e2932d3e663c896edef85bc0afa4a7b12e8072.csv",
         "proxies": [],
         "retrieved_at": "2026-10-13T14:43:59+00:00",
         "samples": [],
@@ -85,7 +265,7 @@ Official title parsing passed full-file checks: **2012 expected/actual 2,209; 20
         "client_version": "0.28.1",
         "collection": null,
         "extract_number": null,
-        "path": "references/census-geocoder/v1_v3_20261013/213084b85ffea6e76bfe40923bd38d8870ffc33bcecb12cab3cca08b38732062.csv",
+        "path": "references/census-geocoder/v1_v3_20261013_scopefix/213084b85ffea6e76bfe40923bd38d8870ffc33bcecb12cab3cca08b38732062.csv",
         "proxies": [],
         "retrieved_at": "2026-10-13T14:32:59+00:00",
         "samples": [],
@@ -101,7 +281,7 @@ Official title parsing passed full-file checks: **2012 expected/actual 2,209; 20
   "inputs": {
     "algorithm": "ita-verification-v1",
     "code_sha256": {
-      "ita_county_verification.py": "5d7c7d3d0e25ab26232c625bc496f0d53947e2995be7fb58367afb270f01aa31",
+      "ita_county_verification.py": "b7ce702f41ecd7a6008f1e90624576f5772f742c6f5bd8ffa16c964f5196830f",
       "ita_references.py": "2fbb723fdec6a712b76e82a687de76cc631b023e6ff8520419d9c920588b452c",
       "ita_summary.py": "082ccabe0ab00d7b03fcfbaea5e2622fced83b4cf1cdef2d51b9a5f5d05f6229",
       "ita_verification.py": "5322a770c808972f1dcb6e640b04750d2f1337bc06a399bcfa87bb59d2464a38",
@@ -317,7 +497,7 @@ Official title parsing passed full-file checks: **2012 expected/actual 2,209; 20
     },
     "sample_salt": "embedding-data:V3:2026-10-13:v1",
     "sample_sha256": "e0d84bb7e9561cf2646f89242222185cb537875db94864f217d3d73a94638af7",
-    "table_sha256": "91445801a239c493fd02de79e9abd016a37f2d3903bebf035236f9589724a0fc",
+    "table_sha256": "6335cda7adb40a41c4a11d57d22048999449ac8d078a2ec0291f0198cd9136a8",
     "title_counts": [
       {
         "len": 2209,
@@ -388,9 +568,9 @@ Official title parsing passed full-file checks: **2012 expected/actual 2,209; 20
 
 ## V3 sample totals
 
-| n_sample | n_population | n_geocode_exact | n_zip_covered | n_zip_single_compatible | n_joint_dominant_comparable | n_joint_dominant_agree | n_joint_single_comparable | n_joint_single_agree | n_proposed_assignable | n_geocode_non_exact | n_geocode_no_match | n_geocode_tie | n_geocode_legacy_ct | n_ct_incomparable | n_out_of_scope | weighted_n_geocode_exact | weighted_n_zip_covered | weighted_n_zip_single_compatible | weighted_n_joint_dominant_comparable | weighted_n_joint_dominant_agree | weighted_n_joint_single_comparable | weighted_n_joint_single_agree | weighted_n_proposed_assignable | weighted_n_geocode_non_exact | weighted_n_geocode_no_match | weighted_n_geocode_tie | weighted_n_geocode_legacy_ct | weighted_n_ct_incomparable | weighted_n_out_of_scope | share_geocode_exact | weighted_share_geocode_exact | share_zip_covered | weighted_share_zip_covered | share_zip_single_compatible | weighted_share_zip_single_compatible | share_joint_dominant_comparable | weighted_share_joint_dominant_comparable | share_joint_dominant_agree | weighted_share_joint_dominant_agree | share_joint_single_comparable | weighted_share_joint_single_comparable | share_joint_single_agree | weighted_share_joint_single_agree | share_proposed_assignable | weighted_share_proposed_assignable | share_geocode_non_exact | weighted_share_geocode_non_exact | share_geocode_no_match | weighted_share_geocode_no_match | share_geocode_tie | weighted_share_geocode_tie | share_geocode_legacy_ct | weighted_share_geocode_legacy_ct | share_ct_incomparable | weighted_share_ct_incomparable | share_out_of_scope | weighted_share_out_of_scope |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 20628 | 3204828.0 | 9703 | 14529 | 7990 | 8835 | 8579 | 4718 | 4717 | 12621 | 5994 | 4718 | 213 | 0 | 0 | 719 | 2064165.5 | 3162040.0 | 2456027.0 | 2049904.25 | 2013745.25 | 1595212.625 | 1595203.125 | 2919085.75 | 675039.875 | 441561.75 | 24060.875 | 0.0 | 0.0 | 14883.0 | 0.47038006592980414 | 0.6440799631056643 | 0.7043339150668994 | 0.986648893481959 | 0.3873375993794842 | 0.7663522036127992 | 0.4283013379872019 | 0.6396300363077208 | 0.9710243350311262 | 0.9823606395274316 | 0.22871824704285437 | 0.4977529605332954 | 0.9997880457821111 | 0.9999940446810343 | 0.6118382780686445 | 0.9108400669240284 | 0.2905759162303665 | 0.21063216965153825 | 0.22871824704285437 | 0.13778017104194049 | 0.010325770796974986 | 0.007507696200856957 | 0.0 | 0.0 | 0.0 | 0.0 | 0.034855536164436686 | 0.004643930969150295 |
+| n_ct_incomparable | n_geocode_exact | n_geocode_legacy_ct | n_geocode_no_match | n_geocode_non_exact | n_geocode_out_of_scope | n_geocode_tie | n_joint_dominant_agree | n_joint_dominant_comparable | n_joint_single_agree | n_joint_single_comparable | n_out_of_scope | n_population | n_proposed_assignable | n_sample | n_zip_covered | n_zip_dominant_out_of_scope | n_zip_single_compatible | n_zip_single_out_of_scope | share_ct_incomparable | share_geocode_exact | share_geocode_legacy_ct | share_geocode_no_match | share_geocode_non_exact | share_geocode_out_of_scope | share_geocode_tie | share_joint_dominant_agree | share_joint_dominant_comparable | share_joint_single_agree | share_joint_single_comparable | share_out_of_scope | share_proposed_assignable | share_zip_covered | share_zip_dominant_out_of_scope | share_zip_single_compatible | share_zip_single_out_of_scope | weighted_n_ct_incomparable | weighted_n_geocode_exact | weighted_n_geocode_legacy_ct | weighted_n_geocode_no_match | weighted_n_geocode_non_exact | weighted_n_geocode_out_of_scope | weighted_n_geocode_tie | weighted_n_joint_dominant_agree | weighted_n_joint_dominant_comparable | weighted_n_joint_single_agree | weighted_n_joint_single_comparable | weighted_n_out_of_scope | weighted_n_proposed_assignable | weighted_n_zip_covered | weighted_n_zip_dominant_out_of_scope | weighted_n_zip_single_compatible | weighted_n_zip_single_out_of_scope | weighted_share_ct_incomparable | weighted_share_geocode_exact | weighted_share_geocode_legacy_ct | weighted_share_geocode_no_match | weighted_share_geocode_non_exact | weighted_share_geocode_out_of_scope | weighted_share_geocode_tie | weighted_share_joint_dominant_agree | weighted_share_joint_dominant_comparable | weighted_share_joint_single_agree | weighted_share_joint_single_comparable | weighted_share_out_of_scope | weighted_share_proposed_assignable | weighted_share_zip_covered | weighted_share_zip_dominant_out_of_scope | weighted_share_zip_single_compatible | weighted_share_zip_single_out_of_scope |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 | 9703 | 0 | 4718 | 5994 | 75 | 213 | 8579 | 8835 | 4717 | 4718 | 719 | 3204828.0 | 12611 | 20628 | 14529 | 423 | 7990 | 323 | 0.0 | 0.47038006592980414 | 0.0 | 0.22871824704285437 | 0.2905759162303665 | 0.0036358347876672484 | 0.010325770796974986 | 0.9710243350311262 | 0.4283013379872019 | 0.9997880457821111 | 0.22871824704285437 | 0.034855536164436686 | 0.6113535000969555 | 0.7043339150668994 | 0.02050610820244328 | 0.3873375993794842 | 0.015658328485553617 | 0.0 | 2064165.5 | 0.0 | 441561.75 | 675039.875 | 1555.75 | 24060.875 | 2013745.25 | 2049904.25 | 1595203.125 | 1595212.625 | 14883.0 | 2919075.75 | 3162040.0 | 9991.125 | 2456027.0 | 5390.125 | 0.0 | 0.6440799631056643 | 0.0 | 0.13778017104194049 | 0.21063216965153825 | 0.0004854394682023497 | 0.007507696200856957 | 0.9823606395274316 | 0.6396300363077208 | 0.9999940446810343 | 0.4977529605332954 | 0.004643930969150295 | 0.9108369466317693 | 0.986648893481959 | 0.0031175229996742416 | 0.7663522036127992 | 0.0016818765312834262 |
 
 ## Interpretation
 
@@ -404,9 +584,9 @@ V1 uses original source rows per filing year. Original length counts Unicode cha
 
 V2 raw reappearance divides by all distinct nonnull cohort establishment IDs, including IDs with conflicting rows. Confirmed links use eligible unique IDs after exact duplicate collapse, same usable unreconstructed EIN, and identical complete normalized full address; reported confirmation share uses the all-ID cohort denominator. The extra eligible denominator `n_unique_cohort_ids` excludes conflicting IDs. `n_reappeared` records candidate overlap among eligible unique IDs, not confirmed establishment identity. Reappeared unknown EIN and conflicts are diagnostics; missing EIN is unknown evidence. Address mismatch can reflect relocation, correction or changed formatting and does not prove a different establishment. Raw-EIN equality and reconstructed/padded sensitivity are separate from unreconstructed normalized-EIN confirmation. Changed-ID shares divide by uniquely matched usable unreconstructed EIN/name/full-address tuples in both years, with tuple multiplicity evaluated on all exact-distinct yearly rows before eligible-ID filtering. Original missing-ID row counts are reported and absent IDs cannot confirm links.
 
-V3 population is the exact-distinct source-row table, including flagged/territory rows; sample stratifies by delivered filing year/state, ZIP format, and count of positive-BUS county candidates. Missing state has an explicit label; territory exclusion uses normalized state. Deterministic hash rank uses the recorded descriptive salt; each stratum selects at most 8 rows, inclusion probability sample_n/population_n, weight population_n/sample_n. Every sample request receives exactly one validated response ID. All-sample raw shares use 20,628 rows. Weighted coverage divides weighted flag counts by 3,204,828 population rows. Conditional agreement divides agreeing exact-geocode/jointly-compatible rows by the corresponding joint comparable rows, with separately weighted numerators and denominators. Within a stratum all weights are equal, so its raw and weighted proportions coincide. Neither raw nor weighted county agreement estimates accuracy.
+V3 population is the exact-distinct source-row table, including flagged/territory rows; sample stratifies by delivered filing year/state, ZIP format, and count of positive-BUS county candidates. Missing state has an explicit label; territory exclusion checks normalized delivered state and method-specific returned county prefixes separately. Deterministic hash rank uses the recorded descriptive salt; each stratum selects at most 8 rows, inclusion probability sample_n/population_n, weight population_n/sample_n. Every sample request receives exactly one validated response ID. All-sample raw shares use 20,628 rows. Weighted coverage divides weighted flag counts by 3,204,828 population rows. Conditional agreement divides agreeing exact-geocode/jointly-compatible rows by the corresponding joint comparable rows, with separately weighted numerators and denominators. Within a stratum all weights are equal, so its raw and weighted proportions coincide. Neither raw nor weighted county agreement estimates accuracy.
 
-ZIP coverage means at least one positive business-share candidate, not a unique county. Single fallback requires exactly one positive candidate and compatible county geography. Dominant fallback is diagnostic only, never a headline assignment; tied maxima lack a dominant candidate. Raw HUD presence distinguishes unmapped ZIP from mapped zero-positive-BUS. Geography is the common ACS2025 frame even for older addresses, not their historical county boundaries. Old Connecticut county differences are geography-vintage incompatibility, not ordinary method errors; planning regions are required under R6.2. Scope excludes Puerto Rico/island-area filings under R6.4.
+ZIP coverage means at least one positive business-share candidate, not a unique county. Single fallback requires exactly one positive candidate and compatible county geography. Dominant fallback is diagnostic only, never a headline assignment; tied maxima lack a dominant candidate. Raw HUD presence distinguishes unmapped ZIP from mapped zero-positive-BUS. Geography is the common ACS2025 frame even for older addresses, not their historical county boundaries. Old Connecticut county differences are geography-vintage incompatibility, not ordinary method errors; planning regions are required under R6.2. Scope excludes Puerto Rico/island areas under R6.4, including returned counties when delivered state is missing or conflicting. County coverage and raw match status remain diagnostic coverage, before scope assignment gates.
 
 ## Extra aggregate diagnostics
 
@@ -678,3390 +858,3390 @@ Each row retains its population_n and n_sample. Every method coverage/status/sco
 | Compatible exact geocode | 9703 | 20628 | 0.47038006592980414 | 2064165.5 | 3204828.0 | 0.6440799631056643 |
 | Positive-BUS ZIP coverage | 14529 | 20628 | 0.7043339150668994 | 3162040.0 | 3204828.0 | 0.986648893481959 |
 | Compatible single ZIP county | 7990 | 20628 | 0.3873375993794842 | 2456027.0 | 3204828.0 | 0.7663522036127992 |
-| Proposed assignable | 12621 | 20628 | 0.6118382780686445 | 2919085.75 | 3204828.0 | 0.9108400669240284 |
+| Proposed assignable | 12611 | 20628 | 0.6113535000969555 | 2919075.75 | 3204828.0 | 0.9108369466317693 |
 | Single-county agreement | 4717 | 4718 | 0.9997880457821111 | 1595203.125 | 1595212.625 | 0.9999940446810343 |
 | Dominant-county agreement (diagnostic) | 8579 | 8835 | 0.9710243350311262 | 2013745.25 | 2049904.25 | 0.9823606395274316 |
 
-| n_ct_incomparable | n_geocode_exact | n_geocode_legacy_ct | n_geocode_no_match | n_geocode_non_exact | n_geocode_tie | n_joint_dominant_agree | n_joint_dominant_comparable | n_joint_single_agree | n_joint_single_comparable | n_out_of_scope | n_proposed_assignable | n_sample | n_zip_covered | n_zip_single_compatible | population_n | stratum |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|AA\|five_digit\|none |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2016\|AA\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|AA\|invalid\|none |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2016\|AE\|padded_four_digit\|none |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 0 | 3 | 2016\|AK\|five_digit\|multiple |
-| 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 37 | 2016\|AK\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 658 | 2016\|AK\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|AK\|invalid\|none |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 10 | 2016\|AK\|zip_plus_four\|single |
-| 0 | 5 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1051 | 2016\|AL\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 26 | 2016\|AL\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 2494 | 2016\|AL\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|AL\|invalid\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 2 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 25 | 2016\|AL\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 99 | 2016\|AL\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 742 | 2016\|AR\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 29 | 2016\|AR\|five_digit\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1373 | 2016\|AR\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|AR\|invalid\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 17 | 2016\|AR\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|AR\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 42 | 2016\|AR\|zip_plus_four\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 | 0 | 1 | 2016\|AS\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 100 | 2016\|AZ\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 60 | 2016\|AZ\|five_digit\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 4081 | 2016\|AZ\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|AZ\|invalid\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 9 | 2016\|AZ\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|AZ\|zip_plus_four\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 214 | 2016\|AZ\|zip_plus_four\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 588 | 2016\|CA\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 43 | 2016\|CA\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 6674 | 2016\|CA\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2016\|CA\|invalid\|none |
-| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 4 | 4 | 2016\|CA\|padded_four_digit\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 40 | 2016\|CA\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|CA\|zip_plus_four\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 632 | 2016\|CA\|zip_plus_four\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 5 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 1906 | 2016\|CO\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 28 | 2016\|CO\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 2507 | 2016\|CO\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|CO\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2016\|CO\|padded_four_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 41 | 2016\|CO\|zip_plus_four\|multiple |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 64 | 2016\|CO\|zip_plus_four\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 147 | 2016\|CT\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 6 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 22 | 2016\|CT\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 3395 | 2016\|CT\|five_digit\|single |
-| 0 | 4 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 20 | 2016\|CT\|invalid\|none |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2016\|CT\|zip_plus_four\|multiple |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 76 | 2016\|CT\|zip_plus_four\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2016\|Ca\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2016\|DC\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 377 | 2016\|DC\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|DC\|invalid\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|DC\|padded_four_digit\|none |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2016\|DC\|padded_four_digit\|single |
-| 0 | 2 | 0 | 6 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 8 | 18 | 2016\|DC\|zip_plus_four\|single |
-| 0 | 5 | 0 | 2 | 0 | 1 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 39 | 2016\|DE\|five_digit\|multiple |
-| 0 | 1 | 0 | 1 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 6 | 0 | 0 | 6 | 2016\|DE\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 618 | 2016\|DE\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|DE\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2016\|DE\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|DE\|padded_four_digit\|none |
-| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 14 | 2016\|DE\|padded_four_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 21 | 2016\|DE\|zip_plus_four\|single |
-| 0 | 2 | 0 | 1 | 5 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 1068 | 2016\|FL\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 70 | 2016\|FL\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 10752 | 2016\|FL\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2016\|FL\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|FL\|padded_four_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 107 | 2016\|FL\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 7 | 2016\|FL\|zip_plus_four\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 879 | 2016\|FL\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2016\|Fl\|five_digit\|multiple |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 11 | 2016\|Fl\|five_digit\|single |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 2933 | 2016\|GA\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 36 | 2016\|GA\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 4036 | 2016\|GA\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|GA\|invalid\|none |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2016\|GA\|padded_four_digit\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2016\|GA\|padded_four_digit\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 137 | 2016\|GA\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 174 | 2016\|GA\|zip_plus_four\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 2 | 2016\|GU\|five_digit\|none |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 12 | 2016\|GU\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 2016\|GU\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 2 | 2016\|Ga\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2016\|Ga\|five_digit\|single |
-| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 8 | 2016\|HI\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 963 | 2016\|HI\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|HI\|invalid\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 35 | 2016\|HI\|zip_plus_four\|single |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 1128 | 2016\|IA\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 18 | 2016\|IA\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 2711 | 2016\|IA\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|IA\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2016\|IA\|padded_four_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 36 | 2016\|IA\|zip_plus_four\|multiple |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 71 | 2016\|IA\|zip_plus_four\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 358 | 2016\|ID\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 9 | 2016\|ID\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 865 | 2016\|ID\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|ID\|invalid\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 14 | 2016\|ID\|zip_plus_four\|multiple |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 40 | 2016\|ID\|zip_plus_four\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 2112 | 2016\|IL\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 34 | 2016\|IL\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 7379 | 2016\|IL\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|IL\|invalid\|none |
-| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 17 | 2016\|IL\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|IL\|padded_four_digit\|none |
-| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 145 | 2016\|IL\|padded_four_digit\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 46 | 2016\|IL\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 297 | 2016\|IL\|zip_plus_four\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 1690 | 2016\|IN\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 49 | 2016\|IN\|five_digit\|none |
-| 0 | 3 | 0 | 0 | 4 | 1 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 4212 | 2016\|IN\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|IN\|invalid\|none |
-| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 4 | 4 | 2016\|IN\|padded_four_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 34 | 2016\|IN\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 140 | 2016\|IN\|zip_plus_four\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2016\|Il\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2016\|In\|five_digit\|multiple |
-| 0 | 3 | 0 | 1 | 4 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 526 | 2016\|KS\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 14 | 2016\|KS\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 2145 | 2016\|KS\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|KS\|invalid\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 9 | 2016\|KS\|zip_plus_four\|multiple |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 50 | 2016\|KS\|zip_plus_four\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1398 | 2016\|KY\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 35 | 2016\|KY\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 2209 | 2016\|KY\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|KY\|invalid\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2016\|KY\|padded_four_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 36 | 2016\|KY\|zip_plus_four\|multiple |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 54 | 2016\|KY\|zip_plus_four\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 632 | 2016\|LA\|five_digit\|multiple |
-| 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 42 | 2016\|LA\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 2500 | 2016\|LA\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|LA\|invalid\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 9 | 2016\|LA\|zip_plus_four\|multiple |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 82 | 2016\|LA\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 23 | 2016\|La\|five_digit\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 15 | 2016\|La\|five_digit\|single |
-| 0 | 4 | 0 | 0 | 4 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 374 | 2016\|MA\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 42 | 2016\|MA\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 3778 | 2016\|MA\|five_digit\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 37 | 2016\|MA\|invalid\|none |
-| 0 | 7 | 0 | 0 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 7 | 7 | 0 | 7 | 2016\|MA\|zip_plus_four\|multiple |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 110 | 2016\|MA\|zip_plus_four\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 415 | 2016\|MD\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 9 | 2016\|MD\|five_digit\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 1511 | 2016\|MD\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|MD\|invalid\|none |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 2 | 2016\|MD\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 6 | 2016\|MD\|padded_four_digit\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 20 | 2016\|MD\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 83 | 2016\|MD\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 9 | 2016\|ME\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 6 | 2016\|ME\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 2 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1052 | 2016\|ME\|five_digit\|single |
-| 0 | 1 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 3 | 0 | 0 | 3 | 2016\|ME\|invalid\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 17 | 2016\|ME\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 1623 | 2016\|MI\|five_digit\|multiple |
-| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 40 | 2016\|MI\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 5743 | 2016\|MI\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|MI\|invalid\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 42 | 2016\|MI\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 143 | 2016\|MI\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 623 | 2016\|MN\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 8 | 2016\|MN\|five_digit\|none |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 1671 | 2016\|MN\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|MN\|invalid\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 31 | 2016\|MN\|zip_plus_four\|multiple |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 61 | 2016\|MN\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 1403 | 2016\|MO\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 38 | 2016\|MO\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 3717 | 2016\|MO\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|MO\|invalid\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 33 | 2016\|MO\|zip_plus_four\|multiple |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 110 | 2016\|MO\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 828 | 2016\|MS\|five_digit\|multiple |
-| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 23 | 2016\|MS\|five_digit\|none |
-| 0 | 2 | 0 | 4 | 2 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 8 | 1126 | 2016\|MS\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|MS\|invalid\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 28 | 2016\|MS\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|MS\|zip_plus_four\|none |
-| 0 | 2 | 0 | 5 | 1 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 8 | 64 | 2016\|MS\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 94 | 2016\|MT\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 6 | 0 | 0 | 6 | 2016\|MT\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 746 | 2016\|MT\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|MT\|invalid\|none |
-| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 0 | 4 | 2016\|MT\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|MT\|zip_plus_four\|none |
-| 0 | 5 | 0 | 0 | 2 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 52 | 2016\|MT\|zip_plus_four\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2016\|Ma\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2 | 2 | 0 | 2 | 2016\|Mi\|five_digit\|multiple |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2016\|Mi\|five_digit\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 3338 | 2016\|NC\|five_digit\|multiple |
-| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 76 | 2016\|NC\|five_digit\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 5544 | 2016\|NC\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|NC\|invalid\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 60 | 2016\|NC\|zip_plus_four\|multiple |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 146 | 2016\|NC\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 2 | 1 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 133 | 2016\|ND\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 5 | 2016\|ND\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 772 | 2016\|ND\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|ND\|invalid\|none |
-| 0 | 2 | 0 | 1 | 5 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 14 | 2016\|ND\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 2 | 0 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 47 | 2016\|ND\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 527 | 2016\|NE\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 9 | 2016\|NE\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1316 | 2016\|NE\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|NE\|invalid\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 15 | 2016\|NE\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 41 | 2016\|NE\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 109 | 2016\|NH\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 7 | 2016\|NH\|five_digit\|none |
-| 0 | 2 | 0 | 1 | 5 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 8 | 1207 | 2016\|NH\|five_digit\|single |
-| 0 | 2 | 0 | 3 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 7 | 0 | 0 | 7 | 2016\|NH\|invalid\|none |
-| 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 2016\|NH\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 22 | 2016\|NH\|zip_plus_four\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 712 | 2016\|NJ\|five_digit\|multiple |
-| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 30 | 2016\|NJ\|five_digit\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 3736 | 2016\|NJ\|five_digit\|single |
-| 0 | 3 | 0 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 41 | 2016\|NJ\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2016\|NJ\|padded_four_digit\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 22 | 2016\|NJ\|zip_plus_four\|multiple |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 140 | 2016\|NJ\|zip_plus_four\|single |
-| 0 | 3 | 0 | 1 | 4 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 60 | 2016\|NM\|five_digit\|multiple |
-| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 16 | 2016\|NM\|five_digit\|none |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 1126 | 2016\|NM\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|NM\|invalid\|none |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2016\|NM\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 31 | 2016\|NM\|zip_plus_four\|single |
-| 0 | 4 | 0 | 4 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 152 | 2016\|NV\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 15 | 2016\|NV\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 1801 | 2016\|NV\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|NV\|invalid\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2016\|NV\|padded_four_digit\|single |
-| 0 | 3 | 0 | 2 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 5 | 5 | 0 | 5 | 2016\|NV\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 83 | 2016\|NV\|zip_plus_four\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 1515 | 2016\|NY\|five_digit\|multiple |
-| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 104 | 2016\|NY\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 0 | 1 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 8315 | 2016\|NY\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2016\|NY\|invalid\|none |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 2 | 2016\|NY\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 23 | 2016\|NY\|padded_four_digit\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 61 | 2016\|NY\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2016\|NY\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 332 | 2016\|NY\|zip_plus_four\|single |
-| 0 | 1 | 0 | 1 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 2 | 2 | 2016\|Ne\|five_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 3261 | 2016\|OH\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 77 | 2016\|OH\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 1 | 1 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 8183 | 2016\|OH\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2016\|OH\|invalid\|none |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2016\|OH\|padded_four_digit\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 79 | 2016\|OH\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 5 | 2016\|OH\|zip_plus_four\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 217 | 2016\|OH\|zip_plus_four\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 918 | 2016\|OK\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 19 | 2016\|OK\|five_digit\|none |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 1824 | 2016\|OK\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|OK\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|OK\|padded_four_digit\|none |
-| 0 | 3 | 0 | 3 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 29 | 2016\|OK\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 49 | 2016\|OK\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 728 | 2016\|OR\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 23 | 2016\|OR\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 3037 | 2016\|OR\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|OR\|invalid\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 18 | 2016\|OR\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2016\|OR\|zip_plus_four\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 112 | 2016\|OR\|zip_plus_four\|single |
-| 0 | 2 | 0 | 2 | 1 | 0 | 2 | 2 | 2 | 2 | 0 | 5 | 5 | 5 | 5 | 5 | 2016\|Oh\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2016\|Ok\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2016\|Or\|five_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 2441 | 2016\|PA\|five_digit\|multiple |
-| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 107 | 2016\|PA\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 8779 | 2016\|PA\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|PA\|invalid\|none |
-| 0 | 0 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 7 | 0 | 7 | 2016\|PA\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2016\|PA\|padded_four_digit\|none |
-| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 50 | 2016\|PA\|padded_four_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 62 | 2016\|PA\|zip_plus_four\|multiple |
-| 0 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 5 | 0 | 0 | 5 | 2016\|PA\|zip_plus_four\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 308 | 2016\|PA\|zip_plus_four\|single |
-| 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 0 | 563 | 2016\|PR\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 2 | 2016\|PR\|five_digit\|none |
-| 0 | 1 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 310 | 2016\|PR\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 3 | 0 | 0 | 3 | 2016\|PR\|invalid\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 | 0 | 1 | 2016\|PR\|padded_four_digit\|none |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 0 | 9 | 2016\|PR\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 28 | 2016\|PR\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2016\|PW\|padded_four_digit\|single |
-| 0 | 3 | 0 | 1 | 4 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 91 | 2016\|RI\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 5 | 2016\|RI\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 581 | 2016\|RI\|five_digit\|single |
-| 0 | 2 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 4 | 0 | 0 | 4 | 2016\|RI\|invalid\|none |
-| 0 | 2 | 0 | 1 | 1 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 4 | 4 | 0 | 4 | 2016\|RI\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 18 | 2016\|RI\|zip_plus_four\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 621 | 2016\|SC\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 6 | 2016\|SC\|five_digit\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 1420 | 2016\|SC\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|SC\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|SC\|padded_four_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 25 | 2016\|SC\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 47 | 2016\|SC\|zip_plus_four\|single |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 371 | 2016\|SD\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 6 | 2016\|SD\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 630 | 2016\|SD\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|SD\|invalid\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 22 | 2016\|SD\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|SD\|zip_plus_four\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 35 | 2016\|SD\|zip_plus_four\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 1857 | 2016\|TN\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 23 | 2016\|TN\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 3422 | 2016\|TN\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|TN\|invalid\|none |
-| 0 | 4 | 0 | 1 | 2 | 1 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 71 | 2016\|TN\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|TN\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 181 | 2016\|TN\|zip_plus_four\|single |
-| 0 | 2 | 0 | 3 | 3 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 3854 | 2016\|TX\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 90 | 2016\|TX\|five_digit\|none |
-| 0 | 2 | 0 | 4 | 2 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 8 | 13153 | 2016\|TX\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2016\|TX\|invalid\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2016\|TX\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2016\|TX\|padded_four_digit\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 3 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 158 | 2016\|TX\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2016\|TX\|zip_plus_four\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 590 | 2016\|TX\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 56 | 2016\|UT\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 7 | 2016\|UT\|five_digit\|none |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 739 | 2016\|UT\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2016\|UT\|invalid\|none |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2016\|UT\|zip_plus_four\|multiple |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 41 | 2016\|UT\|zip_plus_four\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 2653 | 2016\|VA\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 37 | 2016\|VA\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 3302 | 2016\|VA\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|VA\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|VA\|padded_four_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 5 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 72 | 2016\|VA\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 103 | 2016\|VA\|zip_plus_four\|single |
-| 0 | 0 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 3 | 0 | 0 | 3 | 2016\|VI\|five_digit\|none |
-| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 17 | 2016\|VI\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 2 | 2016\|VI\|invalid\|none |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 2 | 2 | 2 | 2016\|VI\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 43 | 2016\|VT\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 7 | 0 | 0 | 7 | 2016\|VT\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 453 | 2016\|VT\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2016\|VT\|invalid\|none |
-| 0 | 5 | 0 | 1 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 7 | 7 | 7 | 7 | 7 | 2016\|VT\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 143 | 2016\|WA\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 16 | 2016\|WA\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1978 | 2016\|WA\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|WA\|invalid\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 9 | 2016\|WA\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 144 | 2016\|WA\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1948 | 2016\|WI\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 31 | 2016\|WI\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 4413 | 2016\|WI\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|WI\|invalid\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 65 | 2016\|WI\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2016\|WI\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 0 | 1 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 157 | 2016\|WI\|zip_plus_four\|single |
-| 0 | 3 | 0 | 4 | 1 | 0 | 1 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 313 | 2016\|WV\|five_digit\|multiple |
-| 0 | 1 | 0 | 6 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 16 | 2016\|WV\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 946 | 2016\|WV\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|WV\|invalid\|none |
-| 0 | 2 | 0 | 3 | 3 | 0 | 1 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 12 | 2016\|WV\|zip_plus_four\|multiple |
-| 0 | 2 | 0 | 2 | 4 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 8 | 25 | 2016\|WV\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 20 | 2016\|WY\|five_digit\|multiple |
-| 0 | 1 | 0 | 6 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 14 | 2016\|WY\|five_digit\|none |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 254 | 2016\|WY\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2016\|WY\|invalid\|none |
-| 0 | 2 | 0 | 2 | 3 | 0 | 2 | 2 | 2 | 2 | 0 | 7 | 7 | 7 | 7 | 7 | 2016\|WY\|zip_plus_four\|single |
-| 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 2 | 2 | 2 | 2 | 2 | 2016\|al\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 9 | 2016\|fl\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2016\|ga\|five_digit\|multiple |
-| 0 | 4 | 0 | 0 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 6 | 6 | 6 | 6 | 6 | 2016\|ga\|five_digit\|single |
-| 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 2 | 2 | 2 | 2 | 2 | 2016\|nc\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2016\|ny\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2016\|ny\|five_digit\|single |
-| 0 | 3 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 3 | 3 | 3 | 3 | 3 | 2016\|tn\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2016\|tx\|five_digit\|multiple |
-| 0 | 1 | 0 | 0 | 2 | 0 | 1 | 1 | 1 | 1 | 0 | 3 | 3 | 3 | 3 | 3 | 2016\|tx\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2017\|AA\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2017\|AA\|five_digit\|none |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2017\|AA\|five_digit\|single |
-| 0 | 3 | 0 | 4 | 1 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 10 | 2017\|AK\|five_digit\|multiple |
-| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 119 | 2017\|AK\|five_digit\|none |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 1077 | 2017\|AK\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2017\|AK\|zip_plus_four\|none |
-| 0 | 2 | 0 | 2 | 4 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 8 | 19 | 2017\|AK\|zip_plus_four\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1012 | 2017\|AL\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 30 | 2017\|AL\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 2612 | 2017\|AL\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2017\|AL\|invalid\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 4 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 83 | 2017\|AL\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 1 | 2017\|AL\|zip_plus_four\|none |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 201 | 2017\|AL\|zip_plus_four\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 710 | 2017\|AR\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 23 | 2017\|AR\|five_digit\|none |
-| 0 | 2 | 0 | 2 | 4 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 8 | 1338 | 2017\|AR\|five_digit\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 46 | 2017\|AR\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2017\|AR\|zip_plus_four\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 87 | 2017\|AR\|zip_plus_four\|single |
-| 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 5 | 0 | 0 | 5 | 2017\|AS\|five_digit\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 2017\|AS\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 96 | 2017\|AZ\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 56 | 2017\|AZ\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 3936 | 2017\|AZ\|five_digit\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 17 | 2017\|AZ\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 5 | 0 | 0 | 5 | 2017\|AZ\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 324 | 2017\|AZ\|zip_plus_four\|single |
-| 0 | 1 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 2 | 2 | 2017\|Al\|five_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 2567 | 2017\|CA\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 173 | 2017\|CA\|five_digit\|none |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 25450 | 2017\|CA\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 4 | 4 | 2017\|CA\|padded_four_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 118 | 2017\|CA\|zip_plus_four\|multiple |
-| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 13 | 2017\|CA\|zip_plus_four\|none |
-| 0 | 3 | 0 | 1 | 4 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 1788 | 2017\|CA\|zip_plus_four\|single |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 1978 | 2017\|CO\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 24 | 2017\|CO\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 0 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 2529 | 2017\|CO\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 3 | 3 | 2017\|CO\|padded_four_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 98 | 2017\|CO\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 1 | 2017\|CO\|zip_plus_four\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 172 | 2017\|CO\|zip_plus_four\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 171 | 2017\|CT\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 27 | 2017\|CT\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 4016 | 2017\|CT\|five_digit\|single |
-| 0 | 5 | 0 | 2 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 30 | 2017\|CT\|invalid\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 10 | 2017\|CT\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 2 | 0 | 0 | 2 | 2017\|CT\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 178 | 2017\|CT\|zip_plus_four\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2017\|Ca\|five_digit\|multiple |
-| 0 | 4 | 0 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 6 | 6 | 6 | 6 | 6 | 2017\|Ca\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2017\|DC\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 341 | 2017\|DC\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2017\|DC\|zip_plus_four\|none |
-| 0 | 2 | 0 | 1 | 5 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 8 | 39 | 2017\|DC\|zip_plus_four\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 4 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 40 | 2017\|DE\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2017\|DE\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 607 | 2017\|DE\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2017\|DE\|padded_four_digit\|none |
-| 0 | 2 | 0 | 0 | 1 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 3 | 3 | 0 | 3 | 2017\|DE\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2017\|DE\|zip_plus_four\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 54 | 2017\|DE\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1095 | 2017\|FL\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 67 | 2017\|FL\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 11193 | 2017\|FL\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2017\|FL\|padded_four_digit\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2017\|FL\|padded_four_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 126 | 2017\|FL\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 2 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 7 | 2017\|FL\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1190 | 2017\|FL\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2017\|Fl\|five_digit\|multiple |
-| 0 | 5 | 0 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 6 | 6 | 6 | 6 | 6 | 2017\|Fl\|five_digit\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 3050 | 2017\|GA\|five_digit\|multiple |
-| 0 | 1 | 0 | 1 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 38 | 2017\|GA\|five_digit\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 4199 | 2017\|GA\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2017\|GA\|padded_four_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 225 | 2017\|GA\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 8 | 2017\|GA\|zip_plus_four\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 298 | 2017\|GA\|zip_plus_four\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 2 | 2017\|GU\|five_digit\|none |
-| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 21 | 2017\|GU\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 2 | 2 | 2 | 2017\|GU\|zip_plus_four\|single |
-| 0 | 1 | 0 | 0 | 2 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 3 | 3 | 0 | 3 | 2017\|Ga\|five_digit\|multiple |
-| 0 | 2 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 5 | 0 | 0 | 5 | 2017\|HI\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 929 | 2017\|HI\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2017\|HI\|padded_four_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 57 | 2017\|HI\|zip_plus_four\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1036 | 2017\|IA\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 18 | 2017\|IA\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 2579 | 2017\|IA\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 65 | 2017\|IA\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 155 | 2017\|IA\|zip_plus_four\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 414 | 2017\|ID\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 11 | 2017\|ID\|five_digit\|none |
-| 0 | 3 | 0 | 3 | 2 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 889 | 2017\|ID\|five_digit\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 23 | 2017\|ID\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 74 | 2017\|ID\|zip_plus_four\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 2446 | 2017\|IL\|five_digit\|multiple |
-| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 38 | 2017\|IL\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 8639 | 2017\|IL\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 140 | 2017\|IL\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2017\|IL\|zip_plus_four\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 627 | 2017\|IL\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 2 | 1 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 1733 | 2017\|IN\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 42 | 2017\|IN\|five_digit\|none |
-| 0 | 3 | 0 | 1 | 3 | 1 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 4288 | 2017\|IN\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 110 | 2017\|IN\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2017\|IN\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 266 | 2017\|IN\|zip_plus_four\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2017\|Id\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2017\|Il\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2017\|In\|five_digit\|multiple |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 512 | 2017\|KS\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 19 | 2017\|KS\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 2019 | 2017\|KS\|five_digit\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 24 | 2017\|KS\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2017\|KS\|zip_plus_four\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 127 | 2017\|KS\|zip_plus_four\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 1572 | 2017\|KY\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 33 | 2017\|KY\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 2436 | 2017\|KY\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2017\|KY\|invalid\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 100 | 2017\|KY\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2017\|KY\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 127 | 2017\|KY\|zip_plus_four\|single |
-| 0 | 5 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 600 | 2017\|LA\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 41 | 2017\|LA\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 2533 | 2017\|LA\|five_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 51 | 2017\|LA\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2017\|LA\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 189 | 2017\|LA\|zip_plus_four\|single |
-| 0 | 3 | 0 | 0 | 5 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 23 | 2017\|La\|five_digit\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 15 | 2017\|La\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 385 | 2017\|MA\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 38 | 2017\|MA\|five_digit\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 3951 | 2017\|MA\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 48 | 2017\|MA\|invalid\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 24 | 2017\|MA\|zip_plus_four\|multiple |
-| 0 | 2 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 5 | 0 | 0 | 5 | 2017\|MA\|zip_plus_four\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 281 | 2017\|MA\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 644 | 2017\|MD\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 11 | 2017\|MD\|five_digit\|none |
-| 0 | 3 | 0 | 1 | 4 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 2250 | 2017\|MD\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2017\|MD\|padded_four_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 4 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 69 | 2017\|MD\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2017\|MD\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 245 | 2017\|MD\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 11 | 2017\|ME\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 7 | 0 | 0 | 7 | 2017\|ME\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1096 | 2017\|ME\|five_digit\|single |
-| 0 | 4 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 7 | 0 | 0 | 7 | 2017\|ME\|invalid\|none |
-| 0 | 1 | 0 | 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2 | 2 | 0 | 2 | 2017\|ME\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 64 | 2017\|ME\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2017\|MH\|five_digit\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 1555 | 2017\|MI\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 39 | 2017\|MI\|five_digit\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 5761 | 2017\|MI\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2017\|MI\|padded_four_digit\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 129 | 2017\|MI\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 7 | 2017\|MI\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 384 | 2017\|MI\|zip_plus_four\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 2801 | 2017\|MN\|five_digit\|multiple |
-| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 39 | 2017\|MN\|five_digit\|none |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 6090 | 2017\|MN\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 117 | 2017\|MN\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2017\|MN\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 265 | 2017\|MN\|zip_plus_four\|single |
-| 0 | 1 | 0 | 2 | 4 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 8 | 8 | 0 | 1304 | 2017\|MO\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 35 | 2017\|MO\|five_digit\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 3662 | 2017\|MO\|five_digit\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 87 | 2017\|MO\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2017\|MO\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 268 | 2017\|MO\|zip_plus_four\|single |
-| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 11 | 2017\|MP\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 2017\|MP\|zip_plus_four\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 773 | 2017\|MS\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 24 | 2017\|MS\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 0 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1102 | 2017\|MS\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2017\|MS\|padded_four_digit\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 69 | 2017\|MS\|zip_plus_four\|multiple |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 87 | 2017\|MS\|zip_plus_four\|single |
-| 0 | 4 | 0 | 3 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 73 | 2017\|MT\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2017\|MT\|five_digit\|none |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 665 | 2017\|MT\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 6 | 6 | 0 | 6 | 2017\|MT\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 56 | 2017\|MT\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 0 | 3 | 2017\|Mi\|five_digit\|multiple |
-| 0 | 2 | 0 | 0 | 1 | 0 | 2 | 2 | 2 | 2 | 0 | 3 | 3 | 3 | 3 | 3 | 2017\|Mi\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2017\|Mo\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 3415 | 2017\|NC\|five_digit\|multiple |
-| 0 | 1 | 0 | 5 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 73 | 2017\|NC\|five_digit\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 5345 | 2017\|NC\|five_digit\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 170 | 2017\|NC\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2017\|NC\|zip_plus_four\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 297 | 2017\|NC\|zip_plus_four\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 123 | 2017\|ND\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 5 | 2017\|ND\|five_digit\|none |
-| 0 | 3 | 0 | 4 | 1 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 839 | 2017\|ND\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 9 | 2017\|ND\|zip_plus_four\|multiple |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 44 | 2017\|ND\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 474 | 2017\|NE\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 14 | 2017\|NE\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1245 | 2017\|NE\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 28 | 2017\|NE\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2017\|NE\|zip_plus_four\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 7 | 8 | 7 | 8 | 0 | 8 | 8 | 8 | 8 | 76 | 2017\|NE\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 98 | 2017\|NH\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 10 | 2017\|NH\|five_digit\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 1213 | 2017\|NH\|five_digit\|single |
-| 0 | 3 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 7 | 0 | 0 | 7 | 2017\|NH\|invalid\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 10 | 2017\|NH\|zip_plus_four\|multiple |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 78 | 2017\|NH\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 784 | 2017\|NJ\|five_digit\|multiple |
-| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 29 | 2017\|NJ\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 3729 | 2017\|NJ\|five_digit\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 52 | 2017\|NJ\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2017\|NJ\|padded_four_digit\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2017\|NJ\|padded_four_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 58 | 2017\|NJ\|zip_plus_four\|multiple |
-| 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 2 | 2017\|NJ\|zip_plus_four\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 268 | 2017\|NJ\|zip_plus_four\|single |
-| 0 | 2 | 0 | 1 | 5 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 52 | 2017\|NM\|five_digit\|multiple |
-| 0 | 3 | 0 | 1 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 17 | 2017\|NM\|five_digit\|none |
-| 0 | 3 | 0 | 3 | 2 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 1068 | 2017\|NM\|five_digit\|single |
-| 0 | 4 | 0 | 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 4 | 4 | 0 | 4 | 2017\|NM\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 77 | 2017\|NM\|zip_plus_four\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 4 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 153 | 2017\|NV\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 14 | 2017\|NV\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1861 | 2017\|NV\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2017\|NV\|padded_four_digit\|single |
-| 0 | 3 | 0 | 2 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 5 | 5 | 0 | 5 | 2017\|NV\|zip_plus_four\|multiple |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 131 | 2017\|NV\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 1494 | 2017\|NY\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 80 | 2017\|NY\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 8790 | 2017\|NY\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2017\|NY\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2017\|NY\|padded_four_digit\|none |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 9 | 2017\|NY\|padded_four_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 149 | 2017\|NY\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 5 | 0 | 0 | 5 | 2017\|NY\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 0 | 1 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 857 | 2017\|NY\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 1 | 1 | 3 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 3197 | 2017\|OH\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 80 | 2017\|OH\|five_digit\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 8636 | 2017\|OH\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2017\|OH\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2017\|OH\|padded_four_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 162 | 2017\|OH\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2017\|OH\|zip_plus_four\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 414 | 2017\|OH\|zip_plus_four\|single |
-| 0 | 3 | 0 | 1 | 4 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 875 | 2017\|OK\|five_digit\|multiple |
-| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 19 | 2017\|OK\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1808 | 2017\|OK\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2017\|OK\|padded_four_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 61 | 2017\|OK\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2017\|OK\|zip_plus_four\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 133 | 2017\|OK\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 717 | 2017\|OR\|five_digit\|multiple |
-| 0 | 1 | 0 | 5 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 17 | 2017\|OR\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 2920 | 2017\|OR\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 46 | 2017\|OR\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2017\|OR\|zip_plus_four\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 209 | 2017\|OR\|zip_plus_four\|single |
-| 0 | 1 | 0 | 1 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2 | 2 | 0 | 2 | 2017\|Oh\|five_digit\|multiple |
-| 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 2 | 2 | 2 | 2 | 2 | 2017\|Oh\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 2 | 2017\|Ok\|five_digit\|multiple |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 2420 | 2017\|PA\|five_digit\|multiple |
-| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 91 | 2017\|PA\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 8620 | 2017\|PA\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2017\|PA\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2017\|PA\|padded_four_digit\|none |
-| 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 4 | 4 | 2017\|PA\|padded_four_digit\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 160 | 2017\|PA\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 11 | 2017\|PA\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 570 | 2017\|PA\|zip_plus_four\|single |
-| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 0 | 483 | 2017\|PR\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 4 | 1 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 12 | 2017\|PR\|five_digit\|none |
-| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 464 | 2017\|PR\|five_digit\|single |
-| 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 14 | 2017\|PR\|invalid\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 | 0 | 1 | 2017\|PR\|padded_four_digit\|none |
-| 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 0 | 13 | 2017\|PR\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 6 | 1 | 1 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 66 | 2017\|PR\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2017\|PW\|padded_four_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2017\|Pa\|five_digit\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 93 | 2017\|RI\|five_digit\|multiple |
-| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 2 | 0 | 0 | 2 | 2017\|RI\|five_digit\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 675 | 2017\|RI\|five_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 8 | 2017\|RI\|invalid\|none |
-| 0 | 2 | 0 | 0 | 2 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 4 | 4 | 0 | 4 | 2017\|RI\|zip_plus_four\|multiple |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 51 | 2017\|RI\|zip_plus_four\|single |
-| 0 | 4 | 0 | 3 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 1021 | 2017\|SC\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 14 | 2017\|SC\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 2440 | 2017\|SC\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2017\|SC\|padded_four_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 83 | 2017\|SC\|zip_plus_four\|multiple |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 148 | 2017\|SC\|zip_plus_four\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 349 | 2017\|SD\|five_digit\|multiple |
-| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 2 | 0 | 0 | 2 | 2017\|SD\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 1 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 596 | 2017\|SD\|five_digit\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 24 | 2017\|SD\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2017\|SD\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 0 | 1 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 33 | 2017\|SD\|zip_plus_four\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 1808 | 2017\|TN\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 26 | 2017\|TN\|five_digit\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 3409 | 2017\|TN\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 111 | 2017\|TN\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2017\|TN\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 195 | 2017\|TN\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 3926 | 2017\|TX\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 96 | 2017\|TX\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 13688 | 2017\|TX\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2017\|TX\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2017\|TX\|padded_four_digit\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 276 | 2017\|TX\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 10 | 2017\|TX\|zip_plus_four\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 972 | 2017\|TX\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2017\|Tx\|five_digit\|single |
-| 0 | 3 | 0 | 2 | 2 | 1 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 102 | 2017\|UT\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 12 | 2017\|UT\|five_digit\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 1281 | 2017\|UT\|five_digit\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 10 | 2017\|UT\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 117 | 2017\|UT\|zip_plus_four\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 2734 | 2017\|VA\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 37 | 2017\|VA\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 3376 | 2017\|VA\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 155 | 2017\|VA\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 2 | 0 | 0 | 2 | 2017\|VA\|zip_plus_four\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 248 | 2017\|VA\|zip_plus_four\|single |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 8 | 2017\|VI\|five_digit\|none |
-| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 25 | 2017\|VI\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 | 0 | 1 | 2017\|VI\|invalid\|none |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 2 | 2 | 2 | 2017\|VI\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 60 | 2017\|VT\|five_digit\|multiple |
-| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 12 | 2017\|VT\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 1 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 562 | 2017\|VT\|five_digit\|single |
-| 0 | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 2 | 0 | 0 | 2 | 2017\|VT\|invalid\|none |
-| 0 | 4 | 0 | 0 | 1 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 5 | 5 | 0 | 5 | 2017\|VT\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 33 | 2017\|VT\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 201 | 2017\|WA\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 27 | 2017\|WA\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 3065 | 2017\|WA\|five_digit\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 29 | 2017\|WA\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2017\|WA\|zip_plus_four\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 329 | 2017\|WA\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 2 | 1 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 1953 | 2017\|WI\|five_digit\|multiple |
-| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 39 | 2017\|WI\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 1 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 4301 | 2017\|WI\|five_digit\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 102 | 2017\|WI\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2017\|WI\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 253 | 2017\|WI\|zip_plus_four\|single |
-| 0 | 2 | 0 | 4 | 2 | 0 | 1 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 306 | 2017\|WV\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 10 | 2017\|WV\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 906 | 2017\|WV\|five_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 22 | 2017\|WV\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2017\|WV\|zip_plus_four\|none |
-| 0 | 4 | 0 | 4 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 71 | 2017\|WV\|zip_plus_four\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 23 | 2017\|WY\|five_digit\|multiple |
-| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 8 | 2017\|WY\|five_digit\|none |
-| 0 | 3 | 0 | 4 | 1 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 299 | 2017\|WY\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2017\|WY\|zip_plus_four\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 20 | 2017\|WY\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2017\|Wa\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2017\|al\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 8 | 2017\|fl\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2017\|ga\|five_digit\|multiple |
-| 0 | 4 | 0 | 0 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 6 | 6 | 6 | 6 | 6 | 2017\|ga\|five_digit\|single |
-| 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 2 | 2 | 2 | 2 | 2 | 2017\|nc\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2017\|ny\|five_digit\|multiple |
-| 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 2 | 2 | 2 | 2 | 2 | 2017\|tn\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 2 | 2 | 2017\|tx\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2018\|AA\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 4 | 4 | 2018\|AA\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2018\|AA\|zip_plus_four\|none |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2018\|AE\|five_digit\|none |
-| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 4 | 4 | 2018\|AE\|five_digit\|single |
-| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2018\|AE\|padded_four_digit\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2018\|AE\|padded_four_digit\|single |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 12 | 2018\|AK\|five_digit\|multiple |
-| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 115 | 2018\|AK\|five_digit\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 1119 | 2018\|AK\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|AK\|invalid\|none |
-| 0 | 0 | 0 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 5 | 2018\|AK\|zip_plus_four\|none |
-| 0 | 3 | 0 | 3 | 2 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 29 | 2018\|AK\|zip_plus_four\|single |
-| 0 | 5 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1066 | 2018\|AL\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 22 | 2018\|AL\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 2753 | 2018\|AL\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2018\|AL\|invalid\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 74 | 2018\|AL\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 1 | 2018\|AL\|zip_plus_four\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 179 | 2018\|AL\|zip_plus_four\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2018\|AP\|five_digit\|none |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 860 | 2018\|AR\|five_digit\|multiple |
-| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 31 | 2018\|AR\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1606 | 2018\|AR\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|AR\|invalid\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 45 | 2018\|AR\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|AR\|zip_plus_four\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 93 | 2018\|AR\|zip_plus_four\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 2 | 2018\|AS\|five_digit\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 2018\|AS\|five_digit\|single |
-| 0 | 2 | 0 | 0 | 6 | 0 | 1 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 118 | 2018\|AZ\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 69 | 2018\|AZ\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 5049 | 2018\|AZ\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|AZ\|invalid\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 3 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 15 | 2018\|AZ\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 279 | 2018\|AZ\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2018\|Al\|five_digit\|multiple |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 2590 | 2018\|CA\|five_digit\|multiple |
-| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 179 | 2018\|CA\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 28193 | 2018\|CA\|five_digit\|single |
-| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2018\|CA\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2018\|CA\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 4 | 4 | 2018\|CA\|padded_four_digit\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 101 | 2018\|CA\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 11 | 2018\|CA\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 1654 | 2018\|CA\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 2155 | 2018\|CO\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 26 | 2018\|CO\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 2713 | 2018\|CO\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|CO\|invalid\|none |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2018\|CO\|padded_four_digit\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 115 | 2018\|CO\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|CO\|zip_plus_four\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 177 | 2018\|CO\|zip_plus_four\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 160 | 2018\|CT\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 29 | 2018\|CT\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 4345 | 2018\|CT\|five_digit\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 26 | 2018\|CT\|invalid\|none |
-| 0 | 6 | 0 | 0 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 7 | 7 | 0 | 7 | 2018\|CT\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 4 | 0 | 0 | 4 | 2018\|CT\|zip_plus_four\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 157 | 2018\|CT\|zip_plus_four\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2018\|Ca\|five_digit\|multiple |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 12 | 2018\|Ca\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|DC\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 513 | 2018\|DC\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|DC\|invalid\|none |
-| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 3 | 3 | 2018\|DC\|padded_four_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 39 | 2018\|DC\|zip_plus_four\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 46 | 2018\|DE\|five_digit\|multiple |
-| 0 | 1 | 0 | 1 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 6 | 0 | 0 | 6 | 2018\|DE\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 693 | 2018\|DE\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|DE\|invalid\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2018\|DE\|padded_four_digit\|none |
-| 0 | 1 | 0 | 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2 | 2 | 0 | 2 | 2018\|DE\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|DE\|zip_plus_four\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 42 | 2018\|DE\|zip_plus_four\|single |
-| 0 | 3 | 0 | 1 | 4 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 1211 | 2018\|FL\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 84 | 2018\|FL\|five_digit\|none |
-| 0 | 5 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 12609 | 2018\|FL\|five_digit\|single |
-| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2018\|FL\|invalid\|none |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|FL\|padded_four_digit\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2018\|FL\|padded_four_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 113 | 2018\|FL\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2018\|FL\|zip_plus_four\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1153 | 2018\|FL\|zip_plus_four\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2018\|FM\|five_digit\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2018\|FM\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 5 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 10 | 2018\|Fl\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2018\|Fl\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 185 | 2018\|Fl\|five_digit\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 3447 | 2018\|GA\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 36 | 2018\|GA\|five_digit\|none |
-| 0 | 1 | 0 | 3 | 4 | 0 | 1 | 1 | 1 | 1 | 0 | 8 | 8 | 8 | 8 | 4555 | 2018\|GA\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|GA\|invalid\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 210 | 2018\|GA\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 6 | 2018\|GA\|zip_plus_four\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 274 | 2018\|GA\|zip_plus_four\|single |
-| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 0 | 36 | 2018\|GU\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 4 | 0 | 0 | 4 | 2018\|GU\|five_digit\|none |
-| 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 31 | 2018\|GU\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 2018\|GU\|zip_plus_four\|single |
-| 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 2 | 2 | 2 | 2 | 2 | 2018\|Ga\|five_digit\|single |
-| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 8 | 2018\|HI\|five_digit\|none |
-| 0 | 3 | 0 | 1 | 4 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 2073 | 2018\|HI\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2018\|HI\|invalid\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 46 | 2018\|HI\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 3 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 1176 | 2018\|IA\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 22 | 2018\|IA\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 2822 | 2018\|IA\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|IA\|invalid\|none |
-| 0 | 4 | 0 | 2 | 1 | 1 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 73 | 2018\|IA\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 163 | 2018\|IA\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 414 | 2018\|ID\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 9 | 2018\|ID\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 965 | 2018\|ID\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|ID\|invalid\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 26 | 2018\|ID\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2018\|ID\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 62 | 2018\|ID\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 2686 | 2018\|IL\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 38 | 2018\|IL\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 9707 | 2018\|IL\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|IL\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2018\|IL\|padded_four_digit\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 118 | 2018\|IL\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 7 | 0 | 0 | 7 | 2018\|IL\|zip_plus_four\|none |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 624 | 2018\|IL\|zip_plus_four\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1984 | 2018\|IN\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 47 | 2018\|IN\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 4892 | 2018\|IN\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|IN\|invalid\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 107 | 2018\|IN\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 5 | 0 | 0 | 5 | 2018\|IN\|zip_plus_four\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 272 | 2018\|IN\|zip_plus_four\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2018\|Id\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2018\|In\|five_digit\|multiple |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 587 | 2018\|KS\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 18 | 2018\|KS\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 2203 | 2018\|KS\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|KS\|invalid\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 30 | 2018\|KS\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 126 | 2018\|KS\|zip_plus_four\|single |
-| 0 | 4 | 0 | 3 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 1532 | 2018\|KY\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 27 | 2018\|KY\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 2375 | 2018\|KY\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2018\|KY\|invalid\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 74 | 2018\|KY\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 1 | 0 | 1 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 116 | 2018\|KY\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 710 | 2018\|LA\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 40 | 2018\|LA\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 2826 | 2018\|LA\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|LA\|invalid\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 41 | 2018\|LA\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2018\|LA\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 161 | 2018\|LA\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 403 | 2018\|MA\|five_digit\|multiple |
-| 0 | 2 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 48 | 2018\|MA\|five_digit\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 4526 | 2018\|MA\|five_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 43 | 2018\|MA\|invalid\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 19 | 2018\|MA\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2018\|MA\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 255 | 2018\|MA\|zip_plus_four\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 758 | 2018\|MD\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 15 | 2018\|MD\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 2619 | 2018\|MD\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|MD\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2018\|MD\|padded_four_digit\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 69 | 2018\|MD\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2018\|MD\|zip_plus_four\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 210 | 2018\|MD\|zip_plus_four\|single |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 16 | 2018\|ME\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 8 | 2018\|ME\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1321 | 2018\|ME\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2018\|ME\|invalid\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 69 | 2018\|ME\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2018\|MH\|five_digit\|multiple |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 1893 | 2018\|MI\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 34 | 2018\|MI\|five_digit\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 6402 | 2018\|MI\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|MI\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2018\|MI\|padded_four_digit\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2018\|MI\|padded_four_digit\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 138 | 2018\|MI\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 5 | 2018\|MI\|zip_plus_four\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 406 | 2018\|MI\|zip_plus_four\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 2842 | 2018\|MN\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 39 | 2018\|MN\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 6001 | 2018\|MN\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2018\|MN\|invalid\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 149 | 2018\|MN\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2018\|MN\|zip_plus_four\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 329 | 2018\|MN\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 1 | 1 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1521 | 2018\|MO\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 43 | 2018\|MO\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 4039 | 2018\|MO\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|MO\|invalid\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 83 | 2018\|MO\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 3 | 0 | 0 | 3 | 2018\|MO\|zip_plus_four\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 216 | 2018\|MO\|zip_plus_four\|single |
-| 0 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 7 | 7 | 7 | 7 | 2018\|MP\|five_digit\|single |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 912 | 2018\|MS\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 30 | 2018\|MS\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1196 | 2018\|MS\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|MS\|invalid\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 66 | 2018\|MS\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 76 | 2018\|MS\|zip_plus_four\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 85 | 2018\|MT\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|MT\|five_digit\|none |
-| 0 | 2 | 0 | 1 | 5 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 8 | 666 | 2018\|MT\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2018\|MT\|invalid\|none |
-| 0 | 5 | 0 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 6 | 6 | 0 | 6 | 2018\|MT\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 1 | 2018\|MT\|zip_plus_four\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 55 | 2018\|MT\|zip_plus_four\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2018\|Ma\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2 | 2 | 0 | 2 | 2018\|Mi\|five_digit\|multiple |
-| 0 | 2 | 0 | 0 | 1 | 0 | 2 | 2 | 2 | 2 | 0 | 3 | 3 | 3 | 3 | 3 | 2018\|Mi\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 3751 | 2018\|NC\|five_digit\|multiple |
-| 0 | 2 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 84 | 2018\|NC\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 6129 | 2018\|NC\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2018\|NC\|invalid\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 185 | 2018\|NC\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 8 | 2018\|NC\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 303 | 2018\|NC\|zip_plus_four\|single |
-| 0 | 3 | 0 | 3 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 106 | 2018\|ND\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 6 | 2018\|ND\|five_digit\|none |
-| 0 | 3 | 0 | 1 | 4 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 807 | 2018\|ND\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|ND\|invalid\|none |
-| 0 | 4 | 0 | 0 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 6 | 6 | 0 | 6 | 2018\|ND\|zip_plus_four\|multiple |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 47 | 2018\|ND\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 537 | 2018\|NE\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 11 | 2018\|NE\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1365 | 2018\|NE\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|NE\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2018\|NE\|padded_four_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 26 | 2018\|NE\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 1 | 2018\|NE\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 90 | 2018\|NE\|zip_plus_four\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 115 | 2018\|NH\|five_digit\|multiple |
-| 0 | 1 | 0 | 1 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 9 | 2018\|NH\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 1343 | 2018\|NH\|five_digit\|single |
-| 0 | 1 | 0 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 5 | 0 | 0 | 5 | 2018\|NH\|invalid\|none |
-| 0 | 5 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 9 | 2018\|NH\|zip_plus_four\|multiple |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 65 | 2018\|NH\|zip_plus_four\|single |
-| 0 | 5 | 0 | 3 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 920 | 2018\|NJ\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 25 | 2018\|NJ\|five_digit\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 4396 | 2018\|NJ\|five_digit\|single |
-| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 34 | 2018\|NJ\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2018\|NJ\|padded_four_digit\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2018\|NJ\|padded_four_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 47 | 2018\|NJ\|zip_plus_four\|multiple |
-| 0 | 2 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 3 | 0 | 0 | 3 | 2018\|NJ\|zip_plus_four\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 256 | 2018\|NJ\|zip_plus_four\|single |
-| 0 | 3 | 0 | 1 | 4 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 51 | 2018\|NM\|five_digit\|multiple |
-| 0 | 1 | 0 | 4 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 18 | 2018\|NM\|five_digit\|none |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 1199 | 2018\|NM\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|NM\|invalid\|none |
-| 0 | 6 | 0 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 6 | 6 | 0 | 6 | 2018\|NM\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|NM\|zip_plus_four\|none |
-| 0 | 3 | 0 | 1 | 4 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 82 | 2018\|NM\|zip_plus_four\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 177 | 2018\|NV\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 14 | 2018\|NV\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 2193 | 2018\|NV\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|NV\|invalid\|none |
-| 0 | 3 | 0 | 1 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 4 | 4 | 0 | 4 | 2018\|NV\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 1 | 0 | 1 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 125 | 2018\|NV\|zip_plus_four\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 4 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 1629 | 2018\|NY\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 100 | 2018\|NY\|five_digit\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 9581 | 2018\|NY\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2018\|NY\|invalid\|none |
-| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2018\|NY\|padded_four_digit\|none |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 8 | 2018\|NY\|padded_four_digit\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 134 | 2018\|NY\|zip_plus_four\|multiple |
-| 0 | 3 | 0 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 10 | 2018\|NY\|zip_plus_four\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 775 | 2018\|NY\|zip_plus_four\|single |
-| 0 | 1 | 0 | 1 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 2 | 2 | 2018\|Ne\|five_digit\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 3647 | 2018\|OH\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 81 | 2018\|OH\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 8753 | 2018\|OH\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2018\|OH\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2018\|OH\|padded_four_digit\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 170 | 2018\|OH\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 6 | 2018\|OH\|zip_plus_four\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 413 | 2018\|OH\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 1 | 1 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 871 | 2018\|OK\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 26 | 2018\|OK\|five_digit\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1996 | 2018\|OK\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|OK\|invalid\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 60 | 2018\|OK\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2018\|OK\|zip_plus_four\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 128 | 2018\|OK\|zip_plus_four\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 4 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 902 | 2018\|OR\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 31 | 2018\|OR\|five_digit\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 3696 | 2018\|OR\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|OR\|invalid\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 50 | 2018\|OR\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2018\|OR\|zip_plus_four\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 222 | 2018\|OR\|zip_plus_four\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2018\|Oh\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 2 | 2018\|Ok\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2018\|Ok\|five_digit\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 2669 | 2018\|PA\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 114 | 2018\|PA\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 9464 | 2018\|PA\|five_digit\|single |
-| 0 | 1 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 3 | 0 | 0 | 3 | 2018\|PA\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2018\|PA\|padded_four_digit\|multiple |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 164 | 2018\|PA\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 13 | 2018\|PA\|zip_plus_four\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 551 | 2018\|PA\|zip_plus_four\|single |
-| 0 | 0 | 0 | 6 | 0 | 2 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 0 | 737 | 2018\|PR\|five_digit\|multiple |
-| 0 | 0 | 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 8 | 2018\|PR\|five_digit\|none |
-| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 585 | 2018\|PR\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 3 | 0 | 3 | 0 | 0 | 3 | 2018\|PR\|invalid\|none |
-| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 0 | 21 | 2018\|PR\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 82 | 2018\|PR\|zip_plus_four\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2018\|PW\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2018\|Pa\|five_digit\|none |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2018\|Pa\|five_digit\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 111 | 2018\|RI\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2018\|RI\|five_digit\|none |
-| 0 | 3 | 0 | 1 | 4 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 690 | 2018\|RI\|five_digit\|single |
-| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 8 | 2018\|RI\|invalid\|none |
-| 0 | 3 | 0 | 0 | 1 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 4 | 4 | 0 | 4 | 2018\|RI\|zip_plus_four\|multiple |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 44 | 2018\|RI\|zip_plus_four\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 1303 | 2018\|SC\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 18 | 2018\|SC\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 2979 | 2018\|SC\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|SC\|invalid\|none |
-| 0 | 5 | 0 | 2 | 0 | 1 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 82 | 2018\|SC\|zip_plus_four\|multiple |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 148 | 2018\|SC\|zip_plus_four\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 347 | 2018\|SD\|five_digit\|multiple |
-| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 2 | 0 | 0 | 2 | 2018\|SD\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 656 | 2018\|SD\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2018\|SD\|invalid\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 25 | 2018\|SD\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2018\|SD\|zip_plus_four\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 38 | 2018\|SD\|zip_plus_four\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 1961 | 2018\|TN\|five_digit\|multiple |
-| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 31 | 2018\|TN\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 3805 | 2018\|TN\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|TN\|invalid\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 154 | 2018\|TN\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|TN\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 251 | 2018\|TN\|zip_plus_four\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 3 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 4607 | 2018\|TX\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 82 | 2018\|TX\|five_digit\|none |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 15900 | 2018\|TX\|five_digit\|single |
-| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2018\|TX\|invalid\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2018\|TX\|padded_four_digit\|multiple |
-| 0 | 2 | 0 | 1 | 5 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 322 | 2018\|TX\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 10 | 2018\|TX\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 1044 | 2018\|TX\|zip_plus_four\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 175 | 2018\|UT\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 19 | 2018\|UT\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1814 | 2018\|UT\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|UT\|invalid\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 10 | 2018\|UT\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2018\|UT\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 0 | 1 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 136 | 2018\|UT\|zip_plus_four\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 3061 | 2018\|VA\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 31 | 2018\|VA\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 3850 | 2018\|VA\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|VA\|invalid\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 148 | 2018\|VA\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 225 | 2018\|VA\|zip_plus_four\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 2 | 2018\|VI\|five_digit\|none |
-| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 29 | 2018\|VI\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 3 | 1 | 0 | 0 | 0 | 0 | 5 | 0 | 5 | 0 | 0 | 5 | 2018\|VI\|invalid\|none |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 2 | 2 | 2 | 2018\|VI\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 58 | 2018\|VT\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 6 | 0 | 0 | 6 | 2018\|VT\|five_digit\|none |
-| 0 | 4 | 0 | 2 | 1 | 1 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 502 | 2018\|VT\|five_digit\|single |
-| 0 | 1 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 3 | 0 | 0 | 3 | 2018\|VT\|invalid\|none |
-| 0 | 3 | 0 | 0 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 5 | 5 | 0 | 5 | 2018\|VT\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2018\|VT\|zip_plus_four\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 31 | 2018\|VT\|zip_plus_four\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 249 | 2018\|WA\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 29 | 2018\|WA\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 3973 | 2018\|WA\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|WA\|invalid\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 35 | 2018\|WA\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 4 | 0 | 0 | 4 | 2018\|WA\|zip_plus_four\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 377 | 2018\|WA\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 2236 | 2018\|WI\|five_digit\|multiple |
-| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 34 | 2018\|WI\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 4903 | 2018\|WI\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|WI\|invalid\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 117 | 2018\|WI\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2018\|WI\|zip_plus_four\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 271 | 2018\|WI\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 284 | 2018\|WV\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 18 | 2018\|WV\|five_digit\|none |
-| 0 | 3 | 0 | 3 | 2 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 886 | 2018\|WV\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|WV\|invalid\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 23 | 2018\|WV\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2018\|WV\|zip_plus_four\|none |
-| 0 | 3 | 0 | 3 | 2 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 70 | 2018\|WV\|zip_plus_four\|single |
-| 0 | 2 | 0 | 2 | 4 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 37 | 2018\|WY\|five_digit\|multiple |
-| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 11 | 2018\|WY\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 380 | 2018\|WY\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2018\|WY\|invalid\|none |
-| 0 | 3 | 0 | 0 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 3 | 3 | 0 | 3 | 2018\|WY\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 27 | 2018\|WY\|zip_plus_four\|single |
-| 0 | 1 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 2 | 2 | 2018\|Wa\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2018\|al\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 8 | 2018\|fl\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2018\|ga\|five_digit\|multiple |
-| 0 | 4 | 0 | 0 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 6 | 6 | 6 | 6 | 6 | 2018\|ga\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2018\|ky\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2018\|nc\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2018\|pa\|five_digit\|single |
-| 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 2 | 2 | 2 | 2 | 2 | 2018\|tn\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2019\|AA\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2019\|AA\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2019\|AA\|invalid\|none |
-| 0 | 1 | 0 | 5 | 2 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 8 | 8 | 0 | 15 | 2019\|AK\|five_digit\|multiple |
-| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 119 | 2019\|AK\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 1128 | 2019\|AK\|five_digit\|single |
-| 0 | 1 | 0 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 7 | 0 | 0 | 7 | 2019\|AK\|zip_plus_four\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 32 | 2019\|AK\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 1135 | 2019\|AL\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 31 | 2019\|AL\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 2796 | 2019\|AL\|five_digit\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 81 | 2019\|AL\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 2 | 0 | 0 | 2 | 2019\|AL\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 233 | 2019\|AL\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2019\|AP\|five_digit\|single |
-| 0 | 3 | 0 | 1 | 4 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 852 | 2019\|AR\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 26 | 2019\|AR\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 1547 | 2019\|AR\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 60 | 2019\|AR\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2019\|AR\|zip_plus_four\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 104 | 2019\|AR\|zip_plus_four\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 | 0 | 1 | 2019\|AS\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 122 | 2019\|AZ\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 61 | 2019\|AZ\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 4896 | 2019\|AZ\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2019\|AZ\|padded_four_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 12 | 2019\|AZ\|zip_plus_four\|multiple |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 298 | 2019\|AZ\|zip_plus_four\|single |
-| 0 | 1 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 2 | 2 | 2019\|Az\|five_digit\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 2513 | 2019\|CA\|five_digit\|multiple |
-| 0 | 2 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 151 | 2019\|CA\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 26090 | 2019\|CA\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 4 | 4 | 2019\|CA\|padded_four_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 125 | 2019\|CA\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 9 | 2019\|CA\|zip_plus_four\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1892 | 2019\|CA\|zip_plus_four\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 2144 | 2019\|CO\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 31 | 2019\|CO\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 3007 | 2019\|CO\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2019\|CO\|padded_four_digit\|none |
-| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 3 | 3 | 2019\|CO\|padded_four_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 111 | 2019\|CO\|zip_plus_four\|multiple |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 182 | 2019\|CO\|zip_plus_four\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 137 | 2019\|CT\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 27 | 2019\|CT\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 4198 | 2019\|CT\|five_digit\|single |
-| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 15 | 2019\|CT\|invalid\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 11 | 2019\|CT\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 3 | 0 | 0 | 3 | 2019\|CT\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 209 | 2019\|CT\|zip_plus_four\|single |
-| 0 | 4 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 4 | 4 | 4 | 4 | 4 | 2019\|Ca\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2019\|DC\|five_digit\|none |
-| 0 | 2 | 0 | 2 | 4 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 8 | 431 | 2019\|DC\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 3 | 3 | 2019\|DC\|padded_four_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2019\|DC\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 44 | 2019\|DC\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 1 | 1 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 38 | 2019\|DE\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 4 | 0 | 0 | 4 | 2019\|DE\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 0 | 1 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 645 | 2019\|DE\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2019\|DE\|padded_four_digit\|none |
-| 0 | 3 | 0 | 0 | 0 | 0 | 2 | 3 | 0 | 0 | 0 | 3 | 3 | 3 | 0 | 3 | 2019\|DE\|zip_plus_four\|multiple |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 57 | 2019\|DE\|zip_plus_four\|single |
-| 0 | 5 | 0 | 0 | 2 | 1 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1272 | 2019\|FL\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 83 | 2019\|FL\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 12749 | 2019\|FL\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2019\|FL\|padded_four_digit\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 134 | 2019\|FL\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2019\|FL\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 1298 | 2019\|FL\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2019\|FM\|five_digit\|multiple |
-| 0 | 1 | 0 | 0 | 2 | 0 | 1 | 1 | 1 | 1 | 0 | 3 | 3 | 3 | 3 | 3 | 2019\|Fl\|five_digit\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 3366 | 2019\|GA\|five_digit\|multiple |
-| 0 | 3 | 0 | 0 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 36 | 2019\|GA\|five_digit\|none |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 4499 | 2019\|GA\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2019\|GA\|padded_four_digit\|single |
-| 0 | 4 | 0 | 0 | 4 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 249 | 2019\|GA\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2019\|GA\|zip_plus_four\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 349 | 2019\|GA\|zip_plus_four\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 2 | 2019\|GU\|five_digit\|none |
-| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 35 | 2019\|GU\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 | 0 | 1 | 2019\|GU\|zip_plus_four\|none |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 3 | 3 | 3 | 3 | 2019\|GU\|zip_plus_four\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2019\|Ga\|five_digit\|single |
-| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 10 | 2019\|HI\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 1047 | 2019\|HI\|five_digit\|single |
-| 0 | 5 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 83 | 2019\|HI\|zip_plus_four\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 1203 | 2019\|IA\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 20 | 2019\|IA\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 2928 | 2019\|IA\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2019\|IA\|padded_four_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 61 | 2019\|IA\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 1 | 2019\|IA\|zip_plus_four\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 168 | 2019\|IA\|zip_plus_four\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 440 | 2019\|ID\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 5 | 2019\|ID\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 1031 | 2019\|ID\|five_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 28 | 2019\|ID\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 87 | 2019\|ID\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 2695 | 2019\|IL\|five_digit\|multiple |
-| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 45 | 2019\|IL\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 9629 | 2019\|IL\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 169 | 2019\|IL\|zip_plus_four\|multiple |
-| 0 | 3 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 5 | 0 | 0 | 5 | 2019\|IL\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 715 | 2019\|IL\|zip_plus_four\|single |
-| 0 | 3 | 0 | 1 | 4 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 2081 | 2019\|IN\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 57 | 2019\|IN\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 4984 | 2019\|IN\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2019\|IN\|padded_four_digit\|multiple |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 134 | 2019\|IN\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2019\|IN\|zip_plus_four\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 337 | 2019\|IN\|zip_plus_four\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2019\|In\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 577 | 2019\|KS\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 14 | 2019\|KS\|five_digit\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 2235 | 2019\|KS\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2019\|KS\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2019\|KS\|padded_four_digit\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 45 | 2019\|KS\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 163 | 2019\|KS\|zip_plus_four\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 1609 | 2019\|KY\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 35 | 2019\|KY\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 2491 | 2019\|KY\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 97 | 2019\|KY\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 154 | 2019\|KY\|zip_plus_four\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 693 | 2019\|LA\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 44 | 2019\|LA\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 0 | 1 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 2870 | 2019\|LA\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2019\|LA\|padded_four_digit\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 51 | 2019\|LA\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2019\|LA\|zip_plus_four\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 196 | 2019\|LA\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 441 | 2019\|MA\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 58 | 2019\|MA\|five_digit\|none |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 4521 | 2019\|MA\|five_digit\|single |
-| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 32 | 2019\|MA\|invalid\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 37 | 2019\|MA\|zip_plus_four\|multiple |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 363 | 2019\|MA\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 775 | 2019\|MD\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 5 | 2019\|MD\|five_digit\|none |
-| 0 | 5 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 2705 | 2019\|MD\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 3 | 3 | 2019\|MD\|padded_four_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 75 | 2019\|MD\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2019\|MD\|zip_plus_four\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 276 | 2019\|MD\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 12 | 2019\|ME\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 5 | 2019\|ME\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1402 | 2019\|ME\|five_digit\|single |
-| 0 | 2 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 5 | 0 | 0 | 5 | 2019\|ME\|invalid\|none |
-| 0 | 1 | 0 | 1 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2 | 2 | 0 | 2 | 2019\|ME\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2019\|ME\|zip_plus_four\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 81 | 2019\|ME\|zip_plus_four\|single |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2019\|MH\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2019\|MH\|padded_four_digit\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 1943 | 2019\|MI\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 26 | 2019\|MI\|five_digit\|none |
-| 0 | 3 | 0 | 1 | 4 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 6309 | 2019\|MI\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2019\|MI\|padded_four_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 136 | 2019\|MI\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 6 | 2019\|MI\|zip_plus_four\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 447 | 2019\|MI\|zip_plus_four\|single |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 2732 | 2019\|MN\|five_digit\|multiple |
-| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 32 | 2019\|MN\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 6110 | 2019\|MN\|five_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 162 | 2019\|MN\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 335 | 2019\|MN\|zip_plus_four\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 1406 | 2019\|MO\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 32 | 2019\|MO\|five_digit\|none |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 3956 | 2019\|MO\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 103 | 2019\|MO\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2019\|MO\|zip_plus_four\|none |
-| 0 | 3 | 0 | 1 | 3 | 1 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 290 | 2019\|MO\|zip_plus_four\|single |
-| 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 11 | 2019\|MP\|five_digit\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 978 | 2019\|MS\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 28 | 2019\|MS\|five_digit\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1260 | 2019\|MS\|five_digit\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 74 | 2019\|MS\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2019\|MS\|zip_plus_four\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 84 | 2019\|MS\|zip_plus_four\|single |
-| 0 | 4 | 0 | 2 | 1 | 1 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 94 | 2019\|MT\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2019\|MT\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 689 | 2019\|MT\|five_digit\|single |
-| 0 | 4 | 0 | 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 4 | 4 | 0 | 4 | 2019\|MT\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2019\|MT\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 0 | 1 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 72 | 2019\|MT\|zip_plus_four\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2019\|Mi\|five_digit\|multiple |
-| 0 | 1 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 2 | 2 | 2019\|Mi\|five_digit\|single |
-| 0 | 4 | 0 | 0 | 4 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 3704 | 2019\|NC\|five_digit\|multiple |
-| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 84 | 2019\|NC\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 5760 | 2019\|NC\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 226 | 2019\|NC\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2019\|NC\|zip_plus_four\|none |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 369 | 2019\|NC\|zip_plus_four\|single |
-| 0 | 1 | 0 | 5 | 2 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 8 | 8 | 0 | 125 | 2019\|ND\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 7 | 2019\|ND\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 869 | 2019\|ND\|five_digit\|single |
-| 0 | 4 | 0 | 0 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 6 | 6 | 0 | 6 | 2019\|ND\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 44 | 2019\|ND\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 566 | 2019\|NE\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 8 | 2019\|NE\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1307 | 2019\|NE\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 2 | 2019\|NE\|padded_four_digit\|multiple |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 30 | 2019\|NE\|zip_plus_four\|multiple |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 90 | 2019\|NE\|zip_plus_four\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 112 | 2019\|NH\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 10 | 2019\|NH\|five_digit\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 1406 | 2019\|NH\|five_digit\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 8 | 2019\|NH\|invalid\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 12 | 2019\|NH\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 89 | 2019\|NH\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 914 | 2019\|NJ\|five_digit\|multiple |
-| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 28 | 2019\|NJ\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 4226 | 2019\|NJ\|five_digit\|single |
-| 0 | 2 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 72 | 2019\|NJ\|invalid\|none |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2019\|NJ\|padded_four_digit\|none |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2019\|NJ\|padded_four_digit\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 72 | 2019\|NJ\|zip_plus_four\|multiple |
-| 0 | 4 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 5 | 0 | 0 | 5 | 2019\|NJ\|zip_plus_four\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 385 | 2019\|NJ\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 57 | 2019\|NM\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 14 | 2019\|NM\|five_digit\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 1198 | 2019\|NM\|five_digit\|single |
-| 0 | 1 | 0 | 4 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 5 | 5 | 0 | 5 | 2019\|NM\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2019\|NM\|zip_plus_four\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 93 | 2019\|NM\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 185 | 2019\|NV\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 15 | 2019\|NV\|five_digit\|none |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 2150 | 2019\|NV\|five_digit\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 10 | 2019\|NV\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 122 | 2019\|NV\|zip_plus_four\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 1621 | 2019\|NY\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 3 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 107 | 2019\|NY\|five_digit\|none |
-| 0 | 3 | 0 | 3 | 2 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 9471 | 2019\|NY\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2019\|NY\|padded_four_digit\|none |
-| 0 | 0 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 6 | 2019\|NY\|padded_four_digit\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 148 | 2019\|NY\|zip_plus_four\|multiple |
-| 0 | 2 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 6 | 0 | 0 | 6 | 2019\|NY\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 908 | 2019\|NY\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 3744 | 2019\|OH\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 72 | 2019\|OH\|five_digit\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 8840 | 2019\|OH\|five_digit\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 210 | 2019\|OH\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2019\|OH\|zip_plus_four\|none |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 535 | 2019\|OH\|zip_plus_four\|single |
-| 0 | 3 | 0 | 1 | 4 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 953 | 2019\|OK\|five_digit\|multiple |
-| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 18 | 2019\|OK\|five_digit\|none |
-| 0 | 3 | 0 | 3 | 2 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 1945 | 2019\|OK\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 68 | 2019\|OK\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2019\|OK\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 145 | 2019\|OK\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 945 | 2019\|OR\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 26 | 2019\|OR\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 3687 | 2019\|OR\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2019\|OR\|padded_four_digit\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 55 | 2019\|OR\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 5 | 2019\|OR\|zip_plus_four\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 231 | 2019\|OR\|zip_plus_four\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2019\|Oh\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2019\|Ok\|five_digit\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 2719 | 2019\|PA\|five_digit\|multiple |
-| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 106 | 2019\|PA\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 9359 | 2019\|PA\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2019\|PA\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 3 | 3 | 2019\|PA\|padded_four_digit\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 3 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 169 | 2019\|PA\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 7 | 0 | 0 | 7 | 2019\|PA\|zip_plus_four\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 655 | 2019\|PA\|zip_plus_four\|single |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 0 | 560 | 2019\|PR\|five_digit\|multiple |
-| 0 | 0 | 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 8 | 2019\|PR\|five_digit\|none |
-| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 590 | 2019\|PR\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 2 | 2 | 0 | 0 | 0 | 0 | 5 | 0 | 5 | 0 | 0 | 5 | 2019\|PR\|invalid\|none |
-| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 0 | 30 | 2019\|PR\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 72 | 2019\|PR\|zip_plus_four\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2019\|PW\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2019\|Pa\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2019\|Pa\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 111 | 2019\|RI\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2019\|RI\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 728 | 2019\|RI\|five_digit\|single |
-| 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 2 | 2019\|RI\|invalid\|none |
-| 0 | 3 | 0 | 4 | 1 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 9 | 2019\|RI\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 54 | 2019\|RI\|zip_plus_four\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 5 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 1321 | 2019\|SC\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 21 | 2019\|SC\|five_digit\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 2988 | 2019\|SC\|five_digit\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 80 | 2019\|SC\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 193 | 2019\|SC\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 359 | 2019\|SD\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 3 | 0 | 0 | 3 | 2019\|SD\|five_digit\|none |
-| 0 | 2 | 0 | 2 | 4 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 8 | 662 | 2019\|SD\|five_digit\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 29 | 2019\|SD\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 2 | 0 | 0 | 2 | 2019\|SD\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 41 | 2019\|SD\|zip_plus_four\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1996 | 2019\|TN\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 29 | 2019\|TN\|five_digit\|none |
-| 0 | 1 | 0 | 3 | 4 | 0 | 1 | 1 | 1 | 1 | 0 | 8 | 8 | 8 | 8 | 3713 | 2019\|TN\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2019\|TN\|padded_four_digit\|multiple |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 166 | 2019\|TN\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2019\|TN\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 304 | 2019\|TN\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 4 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 4724 | 2019\|TX\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 101 | 2019\|TX\|five_digit\|none |
-| 0 | 5 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 15822 | 2019\|TX\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2019\|TX\|padded_four_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 4 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 323 | 2019\|TX\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 8 | 2019\|TX\|zip_plus_four\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1103 | 2019\|TX\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2019\|Tx\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2019\|Tx\|five_digit\|single |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 196 | 2019\|UT\|five_digit\|multiple |
-| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 12 | 2019\|UT\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1889 | 2019\|UT\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2019\|UT\|padded_four_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 14 | 2019\|UT\|zip_plus_four\|multiple |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 135 | 2019\|UT\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 4 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 2974 | 2019\|VA\|five_digit\|multiple |
-| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 36 | 2019\|VA\|five_digit\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 3776 | 2019\|VA\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 202 | 2019\|VA\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 3 | 0 | 0 | 3 | 2019\|VA\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 281 | 2019\|VA\|zip_plus_four\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 2 | 2019\|VI\|five_digit\|none |
-| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 28 | 2019\|VI\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 2 | 2019\|VI\|invalid\|none |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 2 | 2 | 2 | 2019\|VI\|zip_plus_four\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 59 | 2019\|VT\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 5 | 0 | 0 | 5 | 2019\|VT\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 617 | 2019\|VT\|five_digit\|single |
-| 0 | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 2 | 0 | 0 | 2 | 2019\|VT\|invalid\|none |
-| 0 | 5 | 0 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 6 | 6 | 0 | 6 | 2019\|VT\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 33 | 2019\|VT\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 397 | 2019\|WA\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 47 | 2019\|WA\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 5426 | 2019\|WA\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2019\|WA\|missing\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 30 | 2019\|WA\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2019\|WA\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 454 | 2019\|WA\|zip_plus_four\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 2205 | 2019\|WI\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 45 | 2019\|WI\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 4759 | 2019\|WI\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2019\|WI\|padded_four_digit\|multiple |
-| 0 | 7 | 0 | 0 | 1 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 120 | 2019\|WI\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2019\|WI\|zip_plus_four\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 280 | 2019\|WI\|zip_plus_four\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 336 | 2019\|WV\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 12 | 2019\|WV\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 963 | 2019\|WV\|five_digit\|single |
-| 0 | 4 | 0 | 4 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 31 | 2019\|WV\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 70 | 2019\|WV\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 37 | 2019\|WY\|five_digit\|multiple |
-| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 43 | 2019\|WY\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 420 | 2019\|WY\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2019\|WY\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 23 | 2019\|WY\|zip_plus_four\|single |
-| 0 | 1 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 2 | 2 | 2019\|Wa\|five_digit\|single |
-| 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 2 | 2 | 2 | 2 | 2 | 2019\|fl\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2019\|nc\|zip_plus_four\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2019\|ny\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 2 | 0 | 1 | 1 | 1 | 1 | 0 | 3 | 3 | 3 | 3 | 3 | 2019\|ny\|zip_plus_four\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2019\|oh\|five_digit\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2019\|oh\|zip_plus_four\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2019\|pa\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2019\|va\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2020\|AA\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2020\|AA\|five_digit\|single |
-| 0 | 2 | 0 | 3 | 3 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 17 | 2020\|AK\|five_digit\|multiple |
-| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 106 | 2020\|AK\|five_digit\|none |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 1158 | 2020\|AK\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|AK\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2020\|AK\|padded_four_digit\|single |
-| 0 | 1 | 0 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 0 | 3 | 3 | 3 | 3 | 3 | 2020\|AK\|zip_plus_four\|single |
-| 0 | 2 | 0 | 4 | 2 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 1187 | 2020\|AL\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 24 | 2020\|AL\|five_digit\|none |
-| 0 | 4 | 0 | 3 | 0 | 1 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 2968 | 2020\|AL\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|AL\|invalid\|none |
-| 0 | 2 | 0 | 3 | 3 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 26 | 2020\|AL\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 94 | 2020\|AL\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2020\|AP\|five_digit\|single |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 897 | 2020\|AR\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 22 | 2020\|AR\|five_digit\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 1556 | 2020\|AR\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|AR\|invalid\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 21 | 2020\|AR\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|AR\|zip_plus_four\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 40 | 2020\|AR\|zip_plus_four\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 2 | 2020\|AS\|five_digit\|none |
-| 0 | 3 | 0 | 0 | 5 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 147 | 2020\|AZ\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 71 | 2020\|AZ\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 5142 | 2020\|AZ\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|AZ\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2020\|AZ\|padded_four_digit\|single |
-| 0 | 2 | 0 | 0 | 2 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 4 | 4 | 0 | 4 | 2020\|AZ\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 146 | 2020\|AZ\|zip_plus_four\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2020\|Ak\|five_digit\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 2598 | 2020\|CA\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 163 | 2020\|CA\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 28073 | 2020\|CA\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2020\|CA\|invalid\|none |
-| 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 5 | 5 | 5 | 5 | 2020\|CA\|padded_four_digit\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 63 | 2020\|CA\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|CA\|zip_plus_four\|none |
-| 0 | 3 | 0 | 0 | 5 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 1114 | 2020\|CA\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 2167 | 2020\|CO\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 31 | 2020\|CO\|five_digit\|none |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 2710 | 2020\|CO\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|CO\|invalid\|none |
-| 0 | 0 | 0 | 1 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 5 | 5 | 5 | 5 | 2020\|CO\|padded_four_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 49 | 2020\|CO\|zip_plus_four\|multiple |
-| 0 | 4 | 0 | 0 | 3 | 1 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 78 | 2020\|CO\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 142 | 2020\|CT\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 27 | 2020\|CT\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 4323 | 2020\|CT\|five_digit\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 38 | 2020\|CT\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2020\|CT\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|CT\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 46 | 2020\|CT\|zip_plus_four\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2020\|Ca\|five_digit\|multiple |
-| 0 | 1 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 2 | 2 | 2020\|Ca\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2020\|DC\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 1 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 477 | 2020\|DC\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|DC\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2020\|DC\|padded_four_digit\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 14 | 2020\|DC\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 40 | 2020\|DE\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 6 | 0 | 0 | 6 | 2020\|DE\|five_digit\|none |
-| 0 | 5 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 670 | 2020\|DE\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|DE\|invalid\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|DE\|padded_four_digit\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2020\|DE\|padded_four_digit\|single |
-| 0 | 1 | 0 | 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2 | 2 | 0 | 2 | 2020\|DE\|zip_plus_four\|multiple |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 24 | 2020\|DE\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 1364 | 2020\|FL\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 87 | 2020\|FL\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 13199 | 2020\|FL\|five_digit\|single |
-| 0 | 1 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 5 | 0 | 0 | 5 | 2020\|FL\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2020\|FL\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|FL\|padded_four_digit\|none |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2020\|FL\|padded_four_digit\|single |
-| 0 | 4 | 0 | 0 | 4 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 67 | 2020\|FL\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|FL\|zip_plus_four\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 750 | 2020\|FL\|zip_plus_four\|single |
-| 0 | 1 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 2 | 2 | 2020\|Fl\|five_digit\|single |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 3679 | 2020\|GA\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 43 | 2020\|GA\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 4954 | 2020\|GA\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|GA\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2020\|GA\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|GA\|padded_four_digit\|none |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2020\|GA\|padded_four_digit\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 95 | 2020\|GA\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 147 | 2020\|GA\|zip_plus_four\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 0 | 1 | 2020\|GU\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 5 | 0 | 0 | 5 | 2020\|GU\|five_digit\|none |
-| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 33 | 2020\|GU\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 2020\|GU\|zip_plus_four\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2020\|Ga\|five_digit\|multiple |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2020\|Ga\|five_digit\|single |
-| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 12 | 2020\|HI\|five_digit\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 1045 | 2020\|HI\|five_digit\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 31 | 2020\|HI\|zip_plus_four\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1148 | 2020\|IA\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 24 | 2020\|IA\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 3017 | 2020\|IA\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|IA\|invalid\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 26 | 2020\|IA\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 45 | 2020\|IA\|zip_plus_four\|single |
-| 0 | 3 | 0 | 0 | 5 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 407 | 2020\|ID\|five_digit\|multiple |
-| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 12 | 2020\|ID\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 1069 | 2020\|ID\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|ID\|invalid\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 25 | 2020\|ID\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|ID\|zip_plus_four\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 47 | 2020\|ID\|zip_plus_four\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 2823 | 2020\|IL\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 51 | 2020\|IL\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 9890 | 2020\|IL\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|IL\|invalid\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2020\|IL\|padded_four_digit\|single |
-| 0 | 3 | 0 | 3 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 75 | 2020\|IL\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|IL\|zip_plus_four\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 402 | 2020\|IL\|zip_plus_four\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 2066 | 2020\|IN\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 52 | 2020\|IN\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 5123 | 2020\|IN\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|IN\|invalid\|none |
-| 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 5 | 5 | 5 | 5 | 2020\|IN\|padded_four_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 57 | 2020\|IN\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 1 | 1 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 142 | 2020\|IN\|zip_plus_four\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2020\|Il\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2020\|In\|five_digit\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 620 | 2020\|KS\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 17 | 2020\|KS\|five_digit\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 2392 | 2020\|KS\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|KS\|invalid\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 13 | 2020\|KS\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|KS\|zip_plus_four\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 73 | 2020\|KS\|zip_plus_four\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 1738 | 2020\|KY\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 40 | 2020\|KY\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 2651 | 2020\|KY\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|KY\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2020\|KY\|padded_four_digit\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 43 | 2020\|KY\|zip_plus_four\|multiple |
-| 0 | 7 | 0 | 0 | 0 | 1 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 46 | 2020\|KY\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 770 | 2020\|LA\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 38 | 2020\|LA\|five_digit\|none |
-| 0 | 5 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 2986 | 2020\|LA\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|LA\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2020\|LA\|padded_four_digit\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 14 | 2020\|LA\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 72 | 2020\|LA\|zip_plus_four\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 511 | 2020\|MA\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 44 | 2020\|MA\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 5160 | 2020\|MA\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 98 | 2020\|MA\|invalid\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 8 | 2020\|MA\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|MA\|zip_plus_four\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 55 | 2020\|MA\|zip_plus_four\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 852 | 2020\|MD\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 10 | 2020\|MD\|five_digit\|none |
-| 0 | 3 | 0 | 1 | 4 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 3398 | 2020\|MD\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|MD\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2020\|MD\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 6 | 2020\|MD\|padded_four_digit\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 28 | 2020\|MD\|zip_plus_four\|multiple |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 103 | 2020\|MD\|zip_plus_four\|single |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 17 | 2020\|ME\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 11 | 2020\|ME\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1333 | 2020\|ME\|five_digit\|single |
-| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 15 | 2020\|ME\|invalid\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 13 | 2020\|ME\|zip_plus_four\|single |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2020\|MH\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2020\|MH\|padded_four_digit\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 2070 | 2020\|MI\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 37 | 2020\|MI\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 6645 | 2020\|MI\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2020\|MI\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|MI\|padded_four_digit\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2020\|MI\|padded_four_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 53 | 2020\|MI\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|MI\|zip_plus_four\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 171 | 2020\|MI\|zip_plus_four\|single |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 2950 | 2020\|MN\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 42 | 2020\|MN\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 6454 | 2020\|MN\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2020\|MN\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|MN\|padded_four_digit\|none |
-| 0 | 3 | 0 | 1 | 4 | 0 | 2 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 70 | 2020\|MN\|zip_plus_four\|multiple |
-| 0 | 3 | 0 | 1 | 4 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 164 | 2020\|MN\|zip_plus_four\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 1537 | 2020\|MO\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 45 | 2020\|MO\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 4066 | 2020\|MO\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|MO\|invalid\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 26 | 2020\|MO\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|MO\|zip_plus_four\|none |
-| 0 | 5 | 0 | 1 | 1 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 118 | 2020\|MO\|zip_plus_four\|single |
-| 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 10 | 2020\|MP\|five_digit\|single |
-| 0 | 6 | 0 | 1 | 0 | 1 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 979 | 2020\|MS\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 28 | 2020\|MS\|five_digit\|none |
-| 0 | 3 | 0 | 3 | 2 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 1287 | 2020\|MS\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|MS\|invalid\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 31 | 2020\|MS\|zip_plus_four\|multiple |
-| 0 | 3 | 0 | 3 | 2 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 31 | 2020\|MS\|zip_plus_four\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 84 | 2020\|MT\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2020\|MT\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 721 | 2020\|MT\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|MT\|invalid\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2020\|MT\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 30 | 2020\|MT\|zip_plus_four\|single |
-| 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 2 | 2 | 2 | 2 | 2 | 2020\|Ma\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2020\|Mi\|five_digit\|multiple |
-| 0 | 5 | 0 | 2 | 0 | 1 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 3926 | 2020\|NC\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 93 | 2020\|NC\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 6100 | 2020\|NC\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2020\|NC\|invalid\|none |
-| 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 4 | 4 | 2020\|NC\|padded_four_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 72 | 2020\|NC\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|NC\|zip_plus_four\|none |
-| 0 | 6 | 0 | 0 | 1 | 1 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 150 | 2020\|NC\|zip_plus_four\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 126 | 2020\|ND\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 7 | 2020\|ND\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 909 | 2020\|ND\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|ND\|invalid\|none |
-| 0 | 1 | 0 | 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2 | 2 | 0 | 2 | 2020\|ND\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 28 | 2020\|ND\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 613 | 2020\|NE\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 13 | 2020\|NE\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1429 | 2020\|NE\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|NE\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2020\|NE\|padded_four_digit\|multiple |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 11 | 2020\|NE\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 36 | 2020\|NE\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 121 | 2020\|NH\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 9 | 2020\|NH\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1449 | 2020\|NH\|five_digit\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 21 | 2020\|NH\|invalid\|none |
-| 0 | 2 | 0 | 1 | 1 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 4 | 4 | 0 | 4 | 2020\|NH\|zip_plus_four\|multiple |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 16 | 2020\|NH\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 994 | 2020\|NJ\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 36 | 2020\|NJ\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 4847 | 2020\|NJ\|five_digit\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 104 | 2020\|NJ\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|NJ\|padded_four_digit\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2020\|NJ\|padded_four_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 9 | 2020\|NJ\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 78 | 2020\|NJ\|zip_plus_four\|single |
-| 0 | 3 | 0 | 3 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 51 | 2020\|NM\|five_digit\|multiple |
-| 0 | 1 | 0 | 5 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 17 | 2020\|NM\|five_digit\|none |
-| 0 | 3 | 0 | 5 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 1230 | 2020\|NM\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|NM\|invalid\|none |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2020\|NM\|zip_plus_four\|multiple |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 26 | 2020\|NM\|zip_plus_four\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 193 | 2020\|NV\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 17 | 2020\|NV\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 2309 | 2020\|NV\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|NV\|invalid\|none |
-| 0 | 4 | 0 | 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 4 | 4 | 0 | 4 | 2020\|NV\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 63 | 2020\|NV\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 1642 | 2020\|NY\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 96 | 2020\|NY\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 10252 | 2020\|NY\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|NY\|invalid\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2020\|NY\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2020\|NY\|padded_four_digit\|none |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 9 | 2020\|NY\|padded_four_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 47 | 2020\|NY\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|NY\|zip_plus_four\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 299 | 2020\|NY\|zip_plus_four\|single |
-| 0 | 1 | 0 | 1 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 2 | 2 | 2020\|Ne\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 3767 | 2020\|OH\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 88 | 2020\|OH\|five_digit\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 8988 | 2020\|OH\|five_digit\|single |
-| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2020\|OH\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2020\|OH\|padded_four_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 4 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 76 | 2020\|OH\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|OH\|zip_plus_four\|none |
-| 0 | 6 | 0 | 0 | 1 | 1 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 201 | 2020\|OH\|zip_plus_four\|single |
-| 0 | 4 | 0 | 3 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 1006 | 2020\|OK\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 25 | 2020\|OK\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 1996 | 2020\|OK\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|OK\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|OK\|padded_four_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 29 | 2020\|OK\|zip_plus_four\|multiple |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 60 | 2020\|OK\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 927 | 2020\|OR\|five_digit\|multiple |
-| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 25 | 2020\|OR\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 3613 | 2020\|OR\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|OR\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|OR\|padded_four_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 23 | 2020\|OR\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2020\|OR\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 114 | 2020\|OR\|zip_plus_four\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2020\|Oh\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2020\|Ok\|five_digit\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 3 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 2928 | 2020\|PA\|five_digit\|multiple |
-| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 107 | 2020\|PA\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 10031 | 2020\|PA\|five_digit\|single |
-| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2020\|PA\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2020\|PA\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|PA\|padded_four_digit\|none |
-| 0 | 0 | 0 | 1 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 5 | 5 | 5 | 5 | 2020\|PA\|padded_four_digit\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 59 | 2020\|PA\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 3 | 0 | 0 | 3 | 2020\|PA\|zip_plus_four\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 211 | 2020\|PA\|zip_plus_four\|single |
-| 0 | 0 | 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 0 | 657 | 2020\|PR\|five_digit\|multiple |
-| 0 | 0 | 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 9 | 2020\|PR\|five_digit\|none |
-| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 652 | 2020\|PR\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 3 | 0 | 3 | 0 | 0 | 3 | 2020\|PR\|invalid\|none |
-| 0 | 0 | 0 | 6 | 1 | 1 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 0 | 24 | 2020\|PR\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 64 | 2020\|PR\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2020\|PW\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2020\|PW\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|Pa\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 118 | 2020\|RI\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 6 | 2020\|RI\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 746 | 2020\|RI\|five_digit\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 10 | 2020\|RI\|invalid\|none |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 2 | 2020\|RI\|zip_plus_four\|multiple |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 12 | 2020\|RI\|zip_plus_four\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 1417 | 2020\|SC\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 20 | 2020\|SC\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 3143 | 2020\|SC\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|SC\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2020\|SC\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2020\|SC\|padded_four_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 27 | 2020\|SC\|zip_plus_four\|multiple |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 57 | 2020\|SC\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 349 | 2020\|SD\|five_digit\|multiple |
-| 0 | 1 | 0 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 7 | 0 | 0 | 7 | 2020\|SD\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 689 | 2020\|SD\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|SD\|invalid\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 14 | 2020\|SD\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|SD\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 21 | 2020\|SD\|zip_plus_four\|single |
-| 0 | 4 | 0 | 3 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 2143 | 2020\|TN\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 28 | 2020\|TN\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 4065 | 2020\|TN\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|TN\|invalid\|none |
-| 0 | 6 | 0 | 0 | 1 | 1 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 68 | 2020\|TN\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|TN\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 148 | 2020\|TN\|zip_plus_four\|single |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 4793 | 2020\|TX\|five_digit\|multiple |
-| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 98 | 2020\|TX\|five_digit\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 16077 | 2020\|TX\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2020\|TX\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2020\|TX\|padded_four_digit\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 140 | 2020\|TX\|zip_plus_four\|multiple |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 514 | 2020\|TX\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 182 | 2020\|UT\|five_digit\|multiple |
-| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 14 | 2020\|UT\|five_digit\|none |
-| 0 | 2 | 0 | 2 | 4 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 8 | 1981 | 2020\|UT\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|UT\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|UT\|padded_four_digit\|none |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2020\|UT\|padded_four_digit\|single |
-| 0 | 2 | 0 | 0 | 1 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 3 | 3 | 0 | 3 | 2020\|UT\|zip_plus_four\|multiple |
-| 0 | 3 | 0 | 2 | 2 | 1 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 61 | 2020\|UT\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 3130 | 2020\|VA\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 32 | 2020\|VA\|five_digit\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 3929 | 2020\|VA\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2020\|VA\|invalid\|none |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2020\|VA\|padded_four_digit\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 85 | 2020\|VA\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 103 | 2020\|VA\|zip_plus_four\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 2 | 2020\|VI\|five_digit\|none |
-| 0 | 1 | 0 | 5 | 1 | 1 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 31 | 2020\|VI\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 4 | 1 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 8 | 2020\|VI\|invalid\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 64 | 2020\|VT\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 8 | 2020\|VT\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 586 | 2020\|VT\|five_digit\|single |
-| 0 | 3 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 5 | 0 | 0 | 5 | 2020\|VT\|invalid\|none |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2020\|VT\|zip_plus_four\|multiple |
-| 0 | 4 | 0 | 1 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 5 | 5 | 5 | 5 | 5 | 2020\|VT\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 396 | 2020\|WA\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 48 | 2020\|WA\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 5530 | 2020\|WA\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|WA\|invalid\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 16 | 2020\|WA\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|WA\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 265 | 2020\|WA\|zip_plus_four\|single |
-| 0 | 3 | 0 | 4 | 1 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 2305 | 2020\|WI\|five_digit\|multiple |
-| 0 | 2 | 0 | 0 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 55 | 2020\|WI\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 5064 | 2020\|WI\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|WI\|invalid\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 4 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 44 | 2020\|WI\|zip_plus_four\|multiple |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 154 | 2020\|WI\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 334 | 2020\|WV\|five_digit\|multiple |
-| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 12 | 2020\|WV\|five_digit\|none |
-| 0 | 2 | 0 | 3 | 3 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 8 | 991 | 2020\|WV\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2020\|WV\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2020\|WV\|padded_four_digit\|multiple |
-| 0 | 5 | 0 | 3 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 11 | 2020\|WV\|zip_plus_four\|multiple |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 21 | 2020\|WV\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 1 | 1 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 42 | 2020\|WY\|five_digit\|multiple |
-| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 17 | 2020\|WY\|five_digit\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 444 | 2020\|WY\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2020\|WY\|invalid\|none |
-| 0 | 3 | 0 | 4 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 7 | 7 | 7 | 7 | 7 | 2020\|WY\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2020\|Wi\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2020\|wv\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2021\|AA\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2021\|AE\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2021\|AE\|padded_four_digit\|none |
-| 0 | 2 | 0 | 3 | 3 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 17 | 2021\|AK\|five_digit\|multiple |
-| 0 | 3 | 0 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 112 | 2021\|AK\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 1277 | 2021\|AK\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2021\|AK\|invalid\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 10 | 2021\|AK\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 1242 | 2021\|AL\|five_digit\|multiple |
-| 0 | 2 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 33 | 2021\|AL\|five_digit\|none |
-| 0 | 4 | 0 | 3 | 0 | 1 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 3104 | 2021\|AL\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|AL\|invalid\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 4 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 93 | 2021\|AL\|zip_plus_four\|multiple |
-| 0 | 2 | 0 | 6 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 8 | 231 | 2021\|AL\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2021\|AP\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2021\|AP\|invalid\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 943 | 2021\|AR\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 29 | 2021\|AR\|five_digit\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 1685 | 2021\|AR\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|AR\|invalid\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 68 | 2021\|AR\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2021\|AR\|zip_plus_four\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 109 | 2021\|AR\|zip_plus_four\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 3 | 0 | 0 | 3 | 2021\|AS\|five_digit\|none |
-| 0 | 4 | 0 | 0 | 4 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 154 | 2021\|AZ\|five_digit\|multiple |
-| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 57 | 2021\|AZ\|five_digit\|none |
-| 0 | 3 | 0 | 1 | 4 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 5098 | 2021\|AZ\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2021\|AZ\|invalid\|none |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 9 | 2021\|AZ\|zip_plus_four\|multiple |
-| 0 | 3 | 0 | 1 | 4 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 318 | 2021\|AZ\|zip_plus_four\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2021\|Ak\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2021\|Al\|five_digit\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 2576 | 2021\|CA\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 191 | 2021\|CA\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 27725 | 2021\|CA\|five_digit\|single |
-| 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 5 | 2021\|CA\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2021\|CA\|padded_four_digit\|none |
-| 0 | 0 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 6 | 2021\|CA\|padded_four_digit\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 124 | 2021\|CA\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 2 | 0 | 0 | 2 | 2021\|CA\|zip_plus_four\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1576 | 2021\|CA\|zip_plus_four\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 2338 | 2021\|CO\|five_digit\|multiple |
-| 0 | 3 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 27 | 2021\|CO\|five_digit\|none |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 2894 | 2021\|CO\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|CO\|invalid\|none |
-| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 3 | 3 | 2021\|CO\|padded_four_digit\|single |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 112 | 2021\|CO\|zip_plus_four\|multiple |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 153 | 2021\|CO\|zip_plus_four\|single |
-| 0 | 0 | 0 | 1 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 5 | 0 | 5 | 2021\|CT\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 22 | 2021\|CT\|five_digit\|none |
-| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 15 | 2021\|CT\|five_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 87 | 2021\|CT\|invalid\|none |
-| 0 | 3 | 0 | 0 | 5 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 164 | 2021\|CT\|padded_four_digit\|multiple |
-| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 34 | 2021\|CT\|padded_four_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 4252 | 2021\|CT\|padded_four_digit\|single |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|CT\|zip_plus_four\|none |
-| 0 | 1 | 0 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 0 | 3 | 3 | 3 | 3 | 3 | 2021\|Ca\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2021\|DC\|five_digit\|none |
-| 0 | 2 | 0 | 3 | 3 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 8 | 1257 | 2021\|DC\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|DC\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2021\|DC\|padded_four_digit\|single |
-| 0 | 1 | 0 | 7 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 8 | 8 | 8 | 8 | 99 | 2021\|DC\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 55 | 2021\|DE\|five_digit\|multiple |
-| 0 | 1 | 0 | 4 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 8 | 2021\|DE\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 704 | 2021\|DE\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|DE\|invalid\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2021\|DE\|padded_four_digit\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2021\|DE\|padded_four_digit\|single |
-| 0 | 1 | 0 | 1 | 1 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 3 | 3 | 0 | 3 | 2021\|DE\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 60 | 2021\|DE\|zip_plus_four\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 1483 | 2021\|FL\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 81 | 2021\|FL\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 13531 | 2021\|FL\|five_digit\|single |
-| 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 5 | 2021\|FL\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2021\|FL\|padded_four_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 122 | 2021\|FL\|zip_plus_four\|multiple |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 1425 | 2021\|FL\|zip_plus_four\|single |
-| 0 | 3 | 0 | 1 | 3 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 7 | 7 | 0 | 7 | 2021\|Fl\|five_digit\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 52 | 2021\|Fl\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2 | 2 | 0 | 2 | 2021\|Fl\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 17 | 2021\|Fl\|zip_plus_four\|single |
-| 0 | 3 | 0 | 4 | 1 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 3956 | 2021\|GA\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 52 | 2021\|GA\|five_digit\|none |
-| 0 | 3 | 0 | 0 | 5 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 5030 | 2021\|GA\|five_digit\|single |
-| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2021\|GA\|invalid\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 290 | 2021\|GA\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 425 | 2021\|GA\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 0 | 1 | 2021\|GU\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 5 | 0 | 0 | 5 | 2021\|GU\|five_digit\|none |
-| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 52 | 2021\|GU\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2021\|Ga\|five_digit\|multiple |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2021\|Ga\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2021\|HI\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 10 | 2021\|HI\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1018 | 2021\|HI\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|HI\|invalid\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 38 | 2021\|HI\|zip_plus_four\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 1178 | 2021\|IA\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 18 | 2021\|IA\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 3047 | 2021\|IA\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|IA\|invalid\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 50 | 2021\|IA\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 124 | 2021\|IA\|zip_plus_four\|single |
-| 0 | 2 | 0 | 3 | 3 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 473 | 2021\|ID\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 12 | 2021\|ID\|five_digit\|none |
-| 0 | 2 | 0 | 0 | 6 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 8 | 1761 | 2021\|ID\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|ID\|invalid\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 36 | 2021\|ID\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 86 | 2021\|ID\|zip_plus_four\|single |
-| 0 | 2 | 0 | 2 | 4 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 3095 | 2021\|IL\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 49 | 2021\|IL\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 10580 | 2021\|IL\|five_digit\|single |
-| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2021\|IL\|invalid\|none |
-| 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2021\|IL\|padded_four_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 4 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 138 | 2021\|IL\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|IL\|zip_plus_four\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 695 | 2021\|IL\|zip_plus_four\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 2125 | 2021\|IN\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 54 | 2021\|IN\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 5228 | 2021\|IN\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2021\|IN\|invalid\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 108 | 2021\|IN\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2021\|IN\|zip_plus_four\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 338 | 2021\|IN\|zip_plus_four\|single |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2021\|Il\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2021\|In\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 663 | 2021\|KS\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 12 | 2021\|KS\|five_digit\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 2481 | 2021\|KS\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|KS\|invalid\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 31 | 2021\|KS\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 146 | 2021\|KS\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 1910 | 2021\|KY\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 49 | 2021\|KY\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 3076 | 2021\|KY\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|KY\|invalid\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 91 | 2021\|KY\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2021\|KY\|zip_plus_four\|none |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 164 | 2021\|KY\|zip_plus_four\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 896 | 2021\|LA\|five_digit\|multiple |
-| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 41 | 2021\|LA\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 3109 | 2021\|LA\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|LA\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2021\|LA\|padded_four_digit\|single |
-| 0 | 3 | 0 | 3 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 75 | 2021\|LA\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 2 | 0 | 0 | 2 | 2021\|LA\|zip_plus_four\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 236 | 2021\|LA\|zip_plus_four\|single |
-| 0 | 0 | 0 | 3 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 7 | 0 | 7 | 2021\|MA\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 38 | 2021\|MA\|five_digit\|none |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 23 | 2021\|MA\|five_digit\|single |
-| 0 | 5 | 0 | 2 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 149 | 2021\|MA\|invalid\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 507 | 2021\|MA\|padded_four_digit\|multiple |
-| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 50 | 2021\|MA\|padded_four_digit\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 5323 | 2021\|MA\|padded_four_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2021\|MA\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 901 | 2021\|MD\|five_digit\|multiple |
-| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 16 | 2021\|MD\|five_digit\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 3329 | 2021\|MD\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|MD\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2021\|MD\|padded_four_digit\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 78 | 2021\|MD\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 241 | 2021\|MD\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2021\|ME\|five_digit\|none |
-| 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 4 | 4 | 2021\|ME\|five_digit\|single |
-| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 35 | 2021\|ME\|invalid\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 14 | 2021\|ME\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 1 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 5 | 2021\|ME\|padded_four_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 1417 | 2021\|ME\|padded_four_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2021\|MH\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2021\|MH\|padded_four_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 2252 | 2021\|MI\|five_digit\|multiple |
-| 0 | 1 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 32 | 2021\|MI\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 7155 | 2021\|MI\|five_digit\|single |
-| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2021\|MI\|invalid\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 124 | 2021\|MI\|zip_plus_four\|multiple |
-| 0 | 3 | 0 | 1 | 4 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 537 | 2021\|MI\|zip_plus_four\|single |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 2981 | 2021\|MN\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 38 | 2021\|MN\|five_digit\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 6370 | 2021\|MN\|five_digit\|single |
-| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2021\|MN\|invalid\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 132 | 2021\|MN\|zip_plus_four\|multiple |
-| 0 | 3 | 0 | 3 | 2 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 298 | 2021\|MN\|zip_plus_four\|single |
-| 0 | 5 | 0 | 0 | 2 | 1 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1467 | 2021\|MO\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 37 | 2021\|MO\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 4115 | 2021\|MO\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|MO\|invalid\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 94 | 2021\|MO\|zip_plus_four\|multiple |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 247 | 2021\|MO\|zip_plus_four\|single |
-| 0 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 7 | 7 | 7 | 7 | 2021\|MP\|five_digit\|single |
-| 0 | 2 | 0 | 5 | 1 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 1089 | 2021\|MS\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 27 | 2021\|MS\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1416 | 2021\|MS\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2021\|MS\|invalid\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 87 | 2021\|MS\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 111 | 2021\|MS\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 105 | 2021\|MT\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 8 | 2021\|MT\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 798 | 2021\|MT\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|MT\|invalid\|none |
-| 0 | 2 | 0 | 1 | 2 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 5 | 5 | 0 | 5 | 2021\|MT\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2021\|MT\|zip_plus_four\|none |
-| 0 | 4 | 0 | 4 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 75 | 2021\|MT\|zip_plus_four\|single |
-| 0 | 6 | 0 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 6 | 6 | 6 | 6 | 6 | 2021\|Ma\|padded_four_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2021\|Mi\|five_digit\|multiple |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2021\|Ms\|five_digit\|multiple |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 4089 | 2021\|NC\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 106 | 2021\|NC\|five_digit\|none |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 6343 | 2021\|NC\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|NC\|invalid\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 277 | 2021\|NC\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2021\|NC\|zip_plus_four\|none |
-| 0 | 3 | 0 | 0 | 5 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 445 | 2021\|NC\|zip_plus_four\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 130 | 2021\|ND\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 3 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 6 | 2021\|ND\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 1 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 922 | 2021\|ND\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2021\|ND\|invalid\|none |
-| 0 | 1 | 0 | 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2 | 2 | 0 | 2 | 2021\|ND\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 42 | 2021\|ND\|zip_plus_four\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 666 | 2021\|NE\|five_digit\|multiple |
-| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 11 | 2021\|NE\|five_digit\|none |
-| 0 | 5 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1511 | 2021\|NE\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|NE\|invalid\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 28 | 2021\|NE\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 84 | 2021\|NE\|zip_plus_four\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 2 | 2021\|NH\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2021\|NH\|five_digit\|none |
-| 0 | 0 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 6 | 2021\|NH\|five_digit\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 44 | 2021\|NH\|invalid\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 129 | 2021\|NH\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 9 | 2021\|NH\|padded_four_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 1487 | 2021\|NH\|padded_four_digit\|single |
-| 0 | 0 | 0 | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 5 | 0 | 5 | 2021\|NJ\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 15 | 2021\|NJ\|five_digit\|none |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 34 | 2021\|NJ\|five_digit\|single |
-| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 184 | 2021\|NJ\|invalid\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1050 | 2021\|NJ\|padded_four_digit\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 35 | 2021\|NJ\|padded_four_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 5180 | 2021\|NJ\|padded_four_digit\|single |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 64 | 2021\|NM\|five_digit\|multiple |
-| 0 | 1 | 0 | 4 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 16 | 2021\|NM\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1339 | 2021\|NM\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2021\|NM\|invalid\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2021\|NM\|padded_four_digit\|single |
-| 0 | 2 | 0 | 2 | 3 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 7 | 7 | 0 | 7 | 2021\|NM\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 106 | 2021\|NM\|zip_plus_four\|single |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 198 | 2021\|NV\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 19 | 2021\|NV\|five_digit\|none |
-| 0 | 3 | 0 | 0 | 3 | 2 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 3091 | 2021\|NV\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|NV\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2021\|NV\|padded_four_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 12 | 2021\|NV\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 128 | 2021\|NV\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1678 | 2021\|NY\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 92 | 2021\|NY\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 10389 | 2021\|NY\|five_digit\|single |
-| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2021\|NY\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2021\|NY\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|NY\|padded_four_digit\|none |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 12 | 2021\|NY\|padded_four_digit\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 135 | 2021\|NY\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|NY\|zip_plus_four\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 696 | 2021\|NY\|zip_plus_four\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2021\|Ne\|five_digit\|multiple |
-| 0 | 3 | 0 | 1 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 4 | 4 | 4 | 4 | 4 | 2021\|Ne\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 3832 | 2021\|OH\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 113 | 2021\|OH\|five_digit\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 9320 | 2021\|OH\|five_digit\|single |
-| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2021\|OH\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2021\|OH\|padded_four_digit\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 204 | 2021\|OH\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|OH\|zip_plus_four\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 591 | 2021\|OH\|zip_plus_four\|single |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 1039 | 2021\|OK\|five_digit\|multiple |
-| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 32 | 2021\|OK\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 2133 | 2021\|OK\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|OK\|invalid\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 64 | 2021\|OK\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 158 | 2021\|OK\|zip_plus_four\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 937 | 2021\|OR\|five_digit\|multiple |
-| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 22 | 2021\|OR\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 3904 | 2021\|OR\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|OR\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2021\|OR\|padded_four_digit\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2021\|OR\|padded_four_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 46 | 2021\|OR\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2021\|OR\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 185 | 2021\|OR\|zip_plus_four\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2021\|Ok\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2021\|Or\|five_digit\|multiple |
-| 0 | 4 | 0 | 2 | 2 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 3031 | 2021\|PA\|five_digit\|multiple |
-| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 105 | 2021\|PA\|five_digit\|none |
-| 0 | 3 | 0 | 3 | 2 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 10010 | 2021\|PA\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2021\|PA\|invalid\|none |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 2 | 2021\|PA\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2021\|PA\|padded_four_digit\|none |
-| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 3 | 3 | 2021\|PA\|padded_four_digit\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 124 | 2021\|PA\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 3 | 0 | 0 | 3 | 2021\|PA\|zip_plus_four\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 622 | 2021\|PA\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 | 0 | 1 | 2021\|PR\|five_digit\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 2021\|PR\|five_digit\|single |
-| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 1400 | 2021\|PR\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2021\|PW\|five_digit\|multiple |
-| 0 | 2 | 0 | 1 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 3 | 3 | 3 | 3 | 3 | 2021\|Pa\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2021\|RI\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2021\|RI\|five_digit\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2021\|RI\|five_digit\|single |
-| 0 | 4 | 0 | 1 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 23 | 2021\|RI\|invalid\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 121 | 2021\|RI\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 6 | 2021\|RI\|padded_four_digit\|none |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 834 | 2021\|RI\|padded_four_digit\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 2 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1436 | 2021\|SC\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 24 | 2021\|SC\|five_digit\|none |
-| 0 | 4 | 0 | 2 | 1 | 1 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 3207 | 2021\|SC\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|SC\|invalid\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 87 | 2021\|SC\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2021\|SC\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 259 | 2021\|SC\|zip_plus_four\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 4 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 349 | 2021\|SD\|five_digit\|multiple |
-| 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 3 | 0 | 0 | 3 | 2021\|SD\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 686 | 2021\|SD\|five_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 25 | 2021\|SD\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2021\|SD\|zip_plus_four\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 40 | 2021\|SD\|zip_plus_four\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 2393 | 2021\|TN\|five_digit\|multiple |
-| 0 | 1 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 21 | 2021\|TN\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 4229 | 2021\|TN\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|TN\|invalid\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 141 | 2021\|TN\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 1 | 1 | 1 | 1 | 0 | 8 | 8 | 8 | 8 | 300 | 2021\|TN\|zip_plus_four\|single |
-| 0 | 2 | 0 | 3 | 3 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 5359 | 2021\|TX\|five_digit\|multiple |
-| 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 96 | 2021\|TX\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 17645 | 2021\|TX\|five_digit\|single |
-| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2021\|TX\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2021\|TX\|padded_four_digit\|multiple |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 287 | 2021\|TX\|zip_plus_four\|multiple |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 1204 | 2021\|TX\|zip_plus_four\|single |
-| 0 | 1 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 2 | 2 | 2021\|Tx\|five_digit\|single |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 206 | 2021\|UT\|five_digit\|multiple |
-| 0 | 1 | 0 | 5 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 26 | 2021\|UT\|five_digit\|none |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 2780 | 2021\|UT\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|UT\|invalid\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 13 | 2021\|UT\|zip_plus_four\|multiple |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 139 | 2021\|UT\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 3162 | 2021\|VA\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 25 | 2021\|VA\|five_digit\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 4202 | 2021\|VA\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2021\|VA\|invalid\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 227 | 2021\|VA\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 259 | 2021\|VA\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 2021\|VI\|five_digit\|single |
-| 0 | 1 | 0 | 6 | 0 | 1 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 51 | 2021\|VI\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 2021\|VI\|padded_four_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2021\|VT\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|VT\|five_digit\|none |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2021\|VT\|five_digit\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 8 | 2021\|VT\|invalid\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 62 | 2021\|VT\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 8 | 2021\|VT\|padded_four_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 559 | 2021\|VT\|padded_four_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2021\|Va\|five_digit\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 434 | 2021\|WA\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 51 | 2021\|WA\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 5617 | 2021\|WA\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|WA\|invalid\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2021\|WA\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2021\|WA\|padded_four_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 24 | 2021\|WA\|zip_plus_four\|multiple |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 345 | 2021\|WA\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 2485 | 2021\|WI\|five_digit\|multiple |
-| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 50 | 2021\|WI\|five_digit\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 5208 | 2021\|WI\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|WI\|invalid\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 78 | 2021\|WI\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|WI\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 256 | 2021\|WI\|zip_plus_four\|single |
-| 0 | 3 | 0 | 5 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 344 | 2021\|WV\|five_digit\|multiple |
-| 0 | 2 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 25 | 2021\|WV\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1036 | 2021\|WV\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2021\|WV\|invalid\|none |
-| 0 | 4 | 0 | 4 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 23 | 2021\|WV\|zip_plus_four\|multiple |
-| 0 | 3 | 0 | 3 | 2 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 81 | 2021\|WV\|zip_plus_four\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 38 | 2021\|WY\|five_digit\|multiple |
-| 0 | 3 | 0 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 19 | 2021\|WY\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 434 | 2021\|WY\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2021\|WY\|invalid\|none |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2021\|WY\|zip_plus_four\|multiple |
-| 0 | 3 | 0 | 3 | 2 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 30 | 2021\|WY\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2021\|Wi\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2021\|ga\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2021\|ky\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2021\|mn\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 134 | 2021\|nv\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2021\|ny\|five_digit\|multiple |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2021\|tx\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2022\|AA\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2022\|AA\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2022\|AE\|five_digit\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 17 | 2022\|AK\|five_digit\|multiple |
-| 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 116 | 2022\|AK\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1252 | 2022\|AK\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2022\|AK\|invalid\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 17 | 2022\|AK\|zip_plus_four\|single |
-| 0 | 4 | 0 | 4 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 1396 | 2022\|AL\|five_digit\|multiple |
-| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 35 | 2022\|AL\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 3488 | 2022\|AL\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2022\|AL\|invalid\|none |
-| 0 | 3 | 0 | 2 | 3 | 0 | 1 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 46 | 2022\|AL\|zip_plus_four\|multiple |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 108 | 2022\|AL\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2022\|AP\|five_digit\|none |
-| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 3 | 3 | 2022\|AP\|five_digit\|single |
-| 0 | 0 | 0 | 6 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 12 | 2022\|AP\|invalid\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 1054 | 2022\|AR\|five_digit\|multiple |
-| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 23 | 2022\|AR\|five_digit\|none |
-| 0 | 3 | 0 | 1 | 4 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 2020 | 2022\|AR\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2022\|AR\|invalid\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 35 | 2022\|AR\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 46 | 2022\|AR\|zip_plus_four\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 | 0 | 1 | 2022\|AS\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 202 | 2022\|AZ\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 70 | 2022\|AZ\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 6549 | 2022\|AZ\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2022\|AZ\|invalid\|none |
-| 0 | 3 | 0 | 0 | 1 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 4 | 4 | 0 | 4 | 2022\|AZ\|zip_plus_four\|multiple |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 190 | 2022\|AZ\|zip_plus_four\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2022\|Ak\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2022\|Al\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2022\|Al\|five_digit\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 2871 | 2022\|CA\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 229 | 2022\|CA\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 31571 | 2022\|CA\|five_digit\|single |
-| 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 6 | 2022\|CA\|invalid\|none |
-| 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 5 | 5 | 5 | 5 | 2022\|CA\|padded_four_digit\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 85 | 2022\|CA\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2022\|CA\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1278 | 2022\|CA\|zip_plus_four\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 5 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 2754 | 2022\|CO\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 30 | 2022\|CO\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 2 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 3377 | 2022\|CO\|five_digit\|single |
-| 0 | 1 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 4 | 0 | 0 | 4 | 2022\|CO\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2022\|CO\|padded_four_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 80 | 2022\|CO\|zip_plus_four\|multiple |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 93 | 2022\|CO\|zip_plus_four\|single |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 2 | 2022\|CT\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 43 | 2022\|CT\|five_digit\|none |
-| 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 5 | 5 | 5 | 5 | 2022\|CT\|five_digit\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 109 | 2022\|CT\|invalid\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 172 | 2022\|CT\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 26 | 2022\|CT\|padded_four_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 4551 | 2022\|CT\|padded_four_digit\|single |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2022\|CT\|zip_plus_four\|none |
-| 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 2022\|Ca\|five_digit\|multiple |
-| 0 | 1 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 2 | 2 | 2022\|Ca\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2022\|Co\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 2 | 2022\|DC\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2022\|DC\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 733 | 2022\|DC\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2022\|DC\|invalid\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2022\|DC\|padded_four_digit\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 19 | 2022\|DC\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 1 | 1 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 74 | 2022\|DE\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2022\|DE\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 883 | 2022\|DE\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2022\|DE\|invalid\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2022\|DE\|padded_four_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 21 | 2022\|DE\|zip_plus_four\|single |
-| 0 | 2 | 0 | 4 | 2 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 1752 | 2022\|FL\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 6 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 79 | 2022\|FL\|five_digit\|none |
-| 0 | 3 | 0 | 1 | 3 | 1 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 16127 | 2022\|FL\|five_digit\|single |
-| 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 5 | 2022\|FL\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2022\|FL\|padded_four_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 73 | 2022\|FL\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 838 | 2022\|FL\|zip_plus_four\|single |
-| 0 | 1 | 0 | 1 | 3 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 5 | 5 | 0 | 5 | 2022\|Fl\|five_digit\|multiple |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 45 | 2022\|Fl\|five_digit\|single |
-| 0 | 5 | 0 | 1 | 1 | 1 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 4442 | 2022\|GA\|five_digit\|multiple |
-| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 52 | 2022\|GA\|five_digit\|none |
-| 0 | 3 | 0 | 0 | 5 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 5634 | 2022\|GA\|five_digit\|single |
-| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2022\|GA\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2022\|GA\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2022\|GA\|padded_four_digit\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 3 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 117 | 2022\|GA\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 195 | 2022\|GA\|zip_plus_four\|single |
-| 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 5 | 0 | 0 | 5 | 2022\|GU\|five_digit\|none |
-| 0 | 1 | 0 | 5 | 2 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 52 | 2022\|GU\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 2022\|GU\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2022\|Ga\|five_digit\|none |
-| 0 | 2 | 0 | 0 | 1 | 0 | 2 | 2 | 2 | 2 | 0 | 3 | 3 | 3 | 3 | 3 | 2022\|Ga\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 2 | 2022\|HI\|five_digit\|multiple |
-| 0 | 1 | 0 | 5 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 8 | 2022\|HI\|five_digit\|none |
-| 0 | 3 | 0 | 4 | 1 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 1309 | 2022\|HI\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2022\|HI\|invalid\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2022\|HI\|padded_four_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 43 | 2022\|HI\|zip_plus_four\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 1418 | 2022\|IA\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 21 | 2022\|IA\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 3712 | 2022\|IA\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2022\|IA\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2022\|IA\|padded_four_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 30 | 2022\|IA\|zip_plus_four\|multiple |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 70 | 2022\|IA\|zip_plus_four\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 548 | 2022\|ID\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 17 | 2022\|ID\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 2 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1370 | 2022\|ID\|five_digit\|single |
-| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2022\|ID\|invalid\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 19 | 2022\|ID\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 49 | 2022\|ID\|zip_plus_four\|single |
-| 0 | 3 | 0 | 4 | 1 | 0 | 2 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 3281 | 2022\|IL\|five_digit\|multiple |
-| 0 | 2 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 51 | 2022\|IL\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 11455 | 2022\|IL\|five_digit\|single |
-| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2022\|IL\|invalid\|none |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2022\|IL\|padded_four_digit\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 73 | 2022\|IL\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2022\|IL\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 373 | 2022\|IL\|zip_plus_four\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 2415 | 2022\|IN\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 52 | 2022\|IN\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 5778 | 2022\|IN\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2022\|IN\|invalid\|none |
-| 0 | 5 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 71 | 2022\|IN\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2022\|IN\|zip_plus_four\|none |
-| 0 | 5 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 170 | 2022\|IN\|zip_plus_four\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2022\|Il\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 692 | 2022\|KS\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 18 | 2022\|KS\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 2635 | 2022\|KS\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2022\|KS\|invalid\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 18 | 2022\|KS\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 84 | 2022\|KS\|zip_plus_four\|single |
-| 0 | 3 | 0 | 3 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 2145 | 2022\|KY\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 43 | 2022\|KY\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 3534 | 2022\|KY\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2022\|KY\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2022\|KY\|padded_four_digit\|single |
-| 0 | 4 | 0 | 2 | 1 | 1 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 44 | 2022\|KY\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 87 | 2022\|KY\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 0 | 1 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 897 | 2022\|LA\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 44 | 2022\|LA\|five_digit\|none |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 3266 | 2022\|LA\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2022\|LA\|invalid\|none |
-| 0 | 5 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 19 | 2022\|LA\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 1 | 2022\|LA\|zip_plus_four\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 77 | 2022\|LA\|zip_plus_four\|single |
-| 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 2 | 2 | 2 | 2 | 2 | 2022\|La\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 0 | 4 | 2022\|MA\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 46 | 2022\|MA\|five_digit\|none |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 21 | 2022\|MA\|five_digit\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 183 | 2022\|MA\|invalid\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 596 | 2022\|MA\|padded_four_digit\|multiple |
-| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 51 | 2022\|MA\|padded_four_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 5958 | 2022\|MA\|padded_four_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2022\|MA\|zip_plus_four\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 1117 | 2022\|MD\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 15 | 2022\|MD\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 3989 | 2022\|MD\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2022\|MD\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2022\|MD\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 3 | 3 | 2022\|MD\|padded_four_digit\|single |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 41 | 2022\|MD\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 1 | 1 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 139 | 2022\|MD\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 2 | 2022\|ME\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2022\|ME\|five_digit\|none |
-| 0 | 0 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 6 | 2022\|ME\|five_digit\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 31 | 2022\|ME\|invalid\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 19 | 2022\|ME\|padded_four_digit\|multiple |
-| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 9 | 2022\|ME\|padded_four_digit\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 1751 | 2022\|ME\|padded_four_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2022\|MH\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2022\|MH\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2022\|MH\|padded_four_digit\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 2766 | 2022\|MI\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 34 | 2022\|MI\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 8504 | 2022\|MI\|five_digit\|single |
-| 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 5 | 2022\|MI\|invalid\|none |
-| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 3 | 3 | 2022\|MI\|padded_four_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 88 | 2022\|MI\|zip_plus_four\|multiple |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 338 | 2022\|MI\|zip_plus_four\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 3515 | 2022\|MN\|five_digit\|multiple |
-| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 37 | 2022\|MN\|five_digit\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 7479 | 2022\|MN\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2022\|MN\|invalid\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 154 | 2022\|MN\|zip_plus_four\|multiple |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 304 | 2022\|MN\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 1662 | 2022\|MO\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 40 | 2022\|MO\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 1 | 1 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 4604 | 2022\|MO\|five_digit\|single |
-| 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 6 | 2022\|MO\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2022\|MO\|padded_four_digit\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 48 | 2022\|MO\|zip_plus_four\|multiple |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 140 | 2022\|MO\|zip_plus_four\|single |
-| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 10 | 2022\|MP\|five_digit\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 1181 | 2022\|MS\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 31 | 2022\|MS\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1527 | 2022\|MS\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2022\|MS\|invalid\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 29 | 2022\|MS\|zip_plus_four\|multiple |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 33 | 2022\|MS\|zip_plus_four\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 112 | 2022\|MT\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 12 | 2022\|MT\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 897 | 2022\|MT\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2022\|MT\|invalid\|none |
-| 0 | 2 | 0 | 2 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 4 | 4 | 0 | 4 | 2022\|MT\|zip_plus_four\|multiple |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 38 | 2022\|MT\|zip_plus_four\|single |
-| 0 | 6 | 0 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 6 | 6 | 6 | 6 | 6 | 2022\|Ma\|padded_four_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2022\|Mi\|five_digit\|multiple |
-| 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 2 | 2 | 2 | 2 | 2 | 2022\|Mi\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2022\|Ms\|five_digit\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 4798 | 2022\|NC\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 115 | 2022\|NC\|five_digit\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 7323 | 2022\|NC\|five_digit\|single |
-| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2022\|NC\|invalid\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 150 | 2022\|NC\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2022\|NC\|zip_plus_four\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 235 | 2022\|NC\|zip_plus_four\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 140 | 2022\|ND\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 7 | 0 | 0 | 7 | 2022\|ND\|five_digit\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 1057 | 2022\|ND\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2022\|ND\|invalid\|none |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 2 | 2022\|ND\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 26 | 2022\|ND\|zip_plus_four\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 747 | 2022\|NE\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 14 | 2022\|NE\|five_digit\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 1581 | 2022\|NE\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2022\|NE\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2022\|NE\|padded_four_digit\|multiple |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 23 | 2022\|NE\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 38 | 2022\|NE\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2022\|NH\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2022\|NH\|five_digit\|none |
-| 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 4 | 4 | 2022\|NH\|five_digit\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 41 | 2022\|NH\|invalid\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 130 | 2022\|NH\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 10 | 2022\|NH\|padded_four_digit\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 1740 | 2022\|NH\|padded_four_digit\|single |
-| 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 5 | 0 | 5 | 2022\|NJ\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 89 | 2022\|NJ\|five_digit\|none |
-| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 33 | 2022\|NJ\|five_digit\|single |
-| 0 | 4 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 198 | 2022\|NJ\|invalid\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 1170 | 2022\|NJ\|padded_four_digit\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 34 | 2022\|NJ\|padded_four_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 5706 | 2022\|NJ\|padded_four_digit\|single |
-| 0 | 2 | 0 | 3 | 3 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 77 | 2022\|NM\|five_digit\|multiple |
-| 0 | 3 | 0 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 12 | 2022\|NM\|five_digit\|none |
-| 0 | 2 | 0 | 1 | 5 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 8 | 1518 | 2022\|NM\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2022\|NM\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2022\|NM\|padded_four_digit\|single |
-| 0 | 1 | 0 | 2 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 3 | 3 | 0 | 3 | 2022\|NM\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 39 | 2022\|NM\|zip_plus_four\|single |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 230 | 2022\|NV\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 13 | 2022\|NV\|five_digit\|none |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 2818 | 2022\|NV\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2022\|NV\|invalid\|none |
-| 0 | 4 | 0 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 6 | 6 | 0 | 6 | 2022\|NV\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2022\|NV\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 72 | 2022\|NV\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1898 | 2022\|NY\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 6 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 115 | 2022\|NY\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 12283 | 2022\|NY\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2022\|NY\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2022\|NY\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 8 | 2022\|NY\|padded_four_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 72 | 2022\|NY\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 2 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2022\|NY\|zip_plus_four\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 420 | 2022\|NY\|zip_plus_four\|single |
-| 0 | 1 | 0 | 1 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 2 | 2 | 2022\|Ne\|five_digit\|single |
-| 0 | 6 | 0 | 1 | 0 | 1 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 4276 | 2022\|OH\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 107 | 2022\|OH\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 10366 | 2022\|OH\|five_digit\|single |
-| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2022\|OH\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2022\|OH\|padded_four_digit\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 123 | 2022\|OH\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2022\|OH\|zip_plus_four\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 298 | 2022\|OH\|zip_plus_four\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 1116 | 2022\|OK\|five_digit\|multiple |
-| 0 | 2 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 35 | 2022\|OK\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 2311 | 2022\|OK\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2022\|OK\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2022\|OK\|padded_four_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 41 | 2022\|OK\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 74 | 2022\|OK\|zip_plus_four\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 1107 | 2022\|OR\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 22 | 2022\|OR\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 4469 | 2022\|OR\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2022\|OR\|invalid\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 27 | 2022\|OR\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 126 | 2022\|OR\|zip_plus_four\|single |
-| 0 | 1 | 0 | 1 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 2 | 2 | 2022\|Ok\|five_digit\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 3345 | 2022\|PA\|five_digit\|multiple |
-| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 105 | 2022\|PA\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 11173 | 2022\|PA\|five_digit\|single |
-| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2022\|PA\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2022\|PA\|padded_four_digit\|none |
-| 0 | 0 | 0 | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 5 | 5 | 5 | 5 | 2022\|PA\|padded_four_digit\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 78 | 2022\|PA\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 5 | 0 | 0 | 5 | 2022\|PA\|zip_plus_four\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 354 | 2022\|PA\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 2022\|PR\|five_digit\|single |
-| 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 1332 | 2022\|PR\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 2022\|PR\|padded_four_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2022\|PW\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2022\|PW\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2022\|PW\|invalid\|none |
-| 0 | 1 | 0 | 2 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 3 | 3 | 3 | 3 | 3 | 2022\|Pa\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2022\|RI\|five_digit\|none |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2022\|RI\|five_digit\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 17 | 2022\|RI\|invalid\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 129 | 2022\|RI\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 7 | 2022\|RI\|padded_four_digit\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 827 | 2022\|RI\|padded_four_digit\|single |
-| 0 | 6 | 0 | 0 | 1 | 1 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 1576 | 2022\|SC\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 26 | 2022\|SC\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 3551 | 2022\|SC\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2022\|SC\|invalid\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 45 | 2022\|SC\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 121 | 2022\|SC\|zip_plus_four\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 429 | 2022\|SD\|five_digit\|multiple |
-| 0 | 1 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 7 | 0 | 0 | 7 | 2022\|SD\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 796 | 2022\|SD\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2022\|SD\|invalid\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 12 | 2022\|SD\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2022\|SD\|zip_plus_four\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 24 | 2022\|SD\|zip_plus_four\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 2644 | 2022\|TN\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 28 | 2022\|TN\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 4687 | 2022\|TN\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2022\|TN\|invalid\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 66 | 2022\|TN\|zip_plus_four\|multiple |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 147 | 2022\|TN\|zip_plus_four\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 6027 | 2022\|TX\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 104 | 2022\|TX\|five_digit\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 19538 | 2022\|TX\|five_digit\|single |
-| 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 5 | 2022\|TX\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2022\|TX\|padded_four_digit\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 138 | 2022\|TX\|zip_plus_four\|multiple |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 604 | 2022\|TX\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2022\|Tx\|five_digit\|single |
-| 0 | 2 | 0 | 3 | 3 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 259 | 2022\|UT\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 19 | 2022\|UT\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 2687 | 2022\|UT\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2022\|UT\|invalid\|none |
-| 0 | 3 | 0 | 0 | 1 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 4 | 4 | 0 | 4 | 2022\|UT\|zip_plus_four\|multiple |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 70 | 2022\|UT\|zip_plus_four\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 3530 | 2022\|VA\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 36 | 2022\|VA\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 4780 | 2022\|VA\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2022\|VA\|invalid\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 5 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 119 | 2022\|VA\|zip_plus_four\|multiple |
-| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 1 | 2022\|VA\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 157 | 2022\|VA\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 0 | 1 | 2022\|VI\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 3 | 3 | 3 | 3 | 2022\|VI\|five_digit\|single |
-| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 46 | 2022\|VI\|invalid\|none |
-| 0 | 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 6 | 2022\|VT\|five_digit\|none |
-| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 3 | 3 | 2022\|VT\|five_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 13 | 2022\|VT\|invalid\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 62 | 2022\|VT\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 8 | 2022\|VT\|padded_four_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 645 | 2022\|VT\|padded_four_digit\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 474 | 2022\|WA\|five_digit\|multiple |
-| 0 | 2 | 0 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 51 | 2022\|WA\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 6563 | 2022\|WA\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2022\|WA\|invalid\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2022\|WA\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2022\|WA\|padded_four_digit\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 17 | 2022\|WA\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2022\|WA\|zip_plus_four\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 276 | 2022\|WA\|zip_plus_four\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 2604 | 2022\|WI\|five_digit\|multiple |
-| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 52 | 2022\|WI\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 5587 | 2022\|WI\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2022\|WI\|invalid\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 53 | 2022\|WI\|zip_plus_four\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2022\|WI\|zip_plus_four\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 135 | 2022\|WI\|zip_plus_four\|single |
-| 0 | 3 | 0 | 3 | 2 | 0 | 2 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 361 | 2022\|WV\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 27 | 2022\|WV\|five_digit\|none |
-| 0 | 3 | 0 | 2 | 2 | 1 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 1191 | 2022\|WV\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2022\|WV\|invalid\|none |
-| 0 | 3 | 0 | 5 | 0 | 0 | 2 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 11 | 2022\|WV\|zip_plus_four\|multiple |
-| 0 | 3 | 0 | 4 | 1 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 35 | 2022\|WV\|zip_plus_four\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 48 | 2022\|WY\|five_digit\|multiple |
-| 0 | 1 | 0 | 6 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 21 | 2022\|WY\|five_digit\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 517 | 2022\|WY\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2022\|WY\|invalid\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2022\|WY\|zip_plus_four\|multiple |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 12 | 2022\|WY\|zip_plus_four\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2022\|Wi\|five_digit\|single |
-| 0 | 1 | 0 | 1 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 2 | 2 | 2022\|ca\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2022\|fl\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2022\|ga\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2022\|ky\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 2022\|ny\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2022\|oh\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 2022\|tx\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2022\|wv\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2023\|AA\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2023\|AA\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2023\|AE\|five_digit\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2023\|AE\|five_digit\|single |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 18 | 2023\|AK\|five_digit\|multiple |
-| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 155 | 2023\|AK\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1595 | 2023\|AK\|five_digit\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 22 | 2023\|AK\|invalid\|none |
-| 0 | 2 | 0 | 5 | 0 | 1 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 1542 | 2023\|AL\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 21 | 2023\|AL\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 3796 | 2023\|AL\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 253 | 2023\|AL\|invalid\|none |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 2 | 2023\|AP\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 4 | 4 | 2023\|AP\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 1146 | 2023\|AR\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 27 | 2023\|AR\|five_digit\|none |
-| 0 | 2 | 0 | 4 | 2 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 8 | 2177 | 2023\|AR\|five_digit\|single |
-| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 149 | 2023\|AR\|invalid\|none |
-| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 4 | 0 | 0 | 4 | 2023\|AS\|five_digit\|none |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 2 | 2 | 2 | 2023\|AS\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 239 | 2023\|AZ\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 78 | 2023\|AZ\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 7435 | 2023\|AZ\|five_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 261 | 2023\|AZ\|invalid\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 3327 | 2023\|CA\|five_digit\|multiple |
-| 0 | 1 | 0 | 5 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 241 | 2023\|CA\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 35783 | 2023\|CA\|five_digit\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 1552 | 2023\|CA\|invalid\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 3099 | 2023\|CO\|five_digit\|multiple |
-| 0 | 2 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 38 | 2023\|CO\|five_digit\|none |
-| 0 | 5 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 3839 | 2023\|CO\|five_digit\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 215 | 2023\|CO\|invalid\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 195 | 2023\|CT\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 47 | 2023\|CT\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 1 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 5064 | 2023\|CT\|five_digit\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 134 | 2023\|CT\|invalid\|none |
-| 0 | 0 | 0 | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 5 | 0 | 5 | 2023\|DC\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2023\|DC\|five_digit\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 793 | 2023\|DC\|five_digit\|single |
-| 0 | 6 | 0 | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 40 | 2023\|DC\|invalid\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 5 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 81 | 2023\|DE\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 7 | 2023\|DE\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1075 | 2023\|DE\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 41 | 2023\|DE\|invalid\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1965 | 2023\|FL\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 129 | 2023\|FL\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 1 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 18065 | 2023\|FL\|five_digit\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 1282 | 2023\|FL\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2023\|FM\|five_digit\|multiple |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 4907 | 2023\|GA\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 55 | 2023\|GA\|five_digit\|none |
-| 0 | 3 | 0 | 3 | 2 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 6266 | 2023\|GA\|five_digit\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 427 | 2023\|GA\|invalid\|none |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 2 | 0 | 2 | 2023\|GU\|five_digit\|multiple |
-| 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 8 | 2023\|GU\|five_digit\|none |
-| 0 | 1 | 0 | 6 | 1 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 68 | 2023\|GU\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 2 | 2023\|GU\|invalid\|none |
-| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 13 | 2023\|HI\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1536 | 2023\|HI\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 45 | 2023\|HI\|invalid\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1580 | 2023\|IA\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 21 | 2023\|IA\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 4073 | 2023\|IA\|five_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 131 | 2023\|IA\|invalid\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 665 | 2023\|ID\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 23 | 2023\|ID\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1617 | 2023\|ID\|five_digit\|single |
-| 0 | 5 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 85 | 2023\|ID\|invalid\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 3632 | 2023\|IL\|five_digit\|multiple |
-| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 51 | 2023\|IL\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 12719 | 2023\|IL\|five_digit\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 606 | 2023\|IL\|invalid\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 2704 | 2023\|IN\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 59 | 2023\|IN\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 6410 | 2023\|IN\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 405 | 2023\|IN\|invalid\|none |
-| 0 | 3 | 0 | 1 | 4 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 814 | 2023\|KS\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 15 | 2023\|KS\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 3156 | 2023\|KS\|five_digit\|single |
-| 0 | 5 | 0 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 142 | 2023\|KS\|invalid\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 2383 | 2023\|KY\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 47 | 2023\|KY\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 3862 | 2023\|KY\|five_digit\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 208 | 2023\|KY\|invalid\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 1006 | 2023\|LA\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 45 | 2023\|LA\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 3669 | 2023\|LA\|five_digit\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 137 | 2023\|LA\|invalid\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 694 | 2023\|MA\|five_digit\|multiple |
-| 0 | 1 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 87 | 2023\|MA\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 7026 | 2023\|MA\|five_digit\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 233 | 2023\|MA\|invalid\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 1218 | 2023\|MD\|five_digit\|multiple |
-| 0 | 2 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 17 | 2023\|MD\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 4419 | 2023\|MD\|five_digit\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 202 | 2023\|MD\|invalid\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 20 | 2023\|ME\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 17 | 2023\|ME\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1882 | 2023\|ME\|five_digit\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 49 | 2023\|ME\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2023\|MH\|five_digit\|multiple |
-| 0 | 7 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 3129 | 2023\|MI\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 49 | 2023\|MI\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 9610 | 2023\|MI\|five_digit\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 613 | 2023\|MI\|invalid\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 3895 | 2023\|MN\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 39 | 2023\|MN\|five_digit\|none |
-| 0 | 2 | 0 | 3 | 3 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 8 | 8427 | 2023\|MN\|five_digit\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 404 | 2023\|MN\|invalid\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1883 | 2023\|MO\|five_digit\|multiple |
-| 0 | 1 | 0 | 5 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 37 | 2023\|MO\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 5188 | 2023\|MO\|five_digit\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 270 | 2023\|MO\|invalid\|none |
-| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 13 | 2023\|MP\|five_digit\|single |
-| 0 | 4 | 0 | 2 | 1 | 1 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 1272 | 2023\|MS\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 34 | 2023\|MS\|five_digit\|none |
-| 0 | 3 | 0 | 3 | 2 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 1629 | 2023\|MS\|five_digit\|single |
-| 0 | 3 | 0 | 1 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 89 | 2023\|MS\|invalid\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 158 | 2023\|MT\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 12 | 2023\|MT\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 1091 | 2023\|MT\|five_digit\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 42 | 2023\|MT\|invalid\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 5354 | 2023\|NC\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 115 | 2023\|NC\|five_digit\|none |
-| 0 | 5 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 8021 | 2023\|NC\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 478 | 2023\|NC\|invalid\|none |
-| 0 | 3 | 0 | 2 | 3 | 0 | 2 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 177 | 2023\|ND\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 6 | 2023\|ND\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1190 | 2023\|ND\|five_digit\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 42 | 2023\|ND\|invalid\|none |
-| 0 | 1 | 0 | 0 | 7 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 8 | 8 | 0 | 874 | 2023\|NE\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 14 | 2023\|NE\|five_digit\|none |
-| 0 | 3 | 0 | 4 | 1 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 1864 | 2023\|NE\|five_digit\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 99 | 2023\|NE\|invalid\|none |
-| 0 | 3 | 0 | 2 | 2 | 1 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 148 | 2023\|NH\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 13 | 2023\|NH\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1871 | 2023\|NH\|five_digit\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 59 | 2023\|NH\|invalid\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 1450 | 2023\|NJ\|five_digit\|multiple |
-| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 80 | 2023\|NJ\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 7202 | 2023\|NJ\|five_digit\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 244 | 2023\|NJ\|invalid\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 83 | 2023\|NM\|five_digit\|multiple |
-| 0 | 2 | 0 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 23 | 2023\|NM\|five_digit\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 1746 | 2023\|NM\|five_digit\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 57 | 2023\|NM\|invalid\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 2 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 275 | 2023\|NV\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 22 | 2023\|NV\|five_digit\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 3341 | 2023\|NV\|five_digit\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 111 | 2023\|NV\|invalid\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 2135 | 2023\|NY\|five_digit\|multiple |
-| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 114 | 2023\|NY\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 13720 | 2023\|NY\|five_digit\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 546 | 2023\|NY\|invalid\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 4902 | 2023\|OH\|five_digit\|multiple |
-| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 111 | 2023\|OH\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 11479 | 2023\|OH\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 616 | 2023\|OH\|invalid\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 1292 | 2023\|OK\|five_digit\|multiple |
-| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 40 | 2023\|OK\|five_digit\|none |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 2649 | 2023\|OK\|five_digit\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 164 | 2023\|OK\|invalid\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 1315 | 2023\|OR\|five_digit\|multiple |
-| 0 | 1 | 0 | 0 | 6 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 39 | 2023\|OR\|five_digit\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 5276 | 2023\|OR\|five_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 188 | 2023\|OR\|invalid\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 3766 | 2023\|PA\|five_digit\|multiple |
-| 0 | 3 | 0 | 2 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 108 | 2023\|PA\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 12615 | 2023\|PA\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 620 | 2023\|PA\|invalid\|none |
-| 0 | 1 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 0 | 721 | 2023\|PR\|five_digit\|multiple |
-| 0 | 0 | 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 13 | 2023\|PR\|five_digit\|none |
-| 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 800 | 2023\|PR\|five_digit\|single |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 36 | 2023\|PR\|invalid\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2023\|PW\|five_digit\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 167 | 2023\|RI\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 14 | 2023\|RI\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1011 | 2023\|RI\|five_digit\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 38 | 2023\|RI\|invalid\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1824 | 2023\|SC\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 25 | 2023\|SC\|five_digit\|none |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 4115 | 2023\|SC\|five_digit\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 228 | 2023\|SC\|invalid\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 519 | 2023\|SD\|five_digit\|multiple |
-| 0 | 1 | 0 | 1 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 6 | 0 | 0 | 6 | 2023\|SD\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 976 | 2023\|SD\|five_digit\|single |
-| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 60 | 2023\|SD\|invalid\|none |
-| 0 | 2 | 0 | 2 | 4 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 2904 | 2023\|TN\|five_digit\|multiple |
-| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 31 | 2023\|TN\|five_digit\|none |
-| 0 | 2 | 0 | 2 | 3 | 1 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 8 | 5228 | 2023\|TN\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 310 | 2023\|TN\|invalid\|none |
-| 0 | 3 | 0 | 3 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 6883 | 2023\|TX\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 113 | 2023\|TX\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 21576 | 2023\|TX\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 1205 | 2023\|TX\|invalid\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 267 | 2023\|UT\|five_digit\|multiple |
-| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 26 | 2023\|UT\|five_digit\|none |
-| 0 | 2 | 0 | 2 | 4 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 8 | 3097 | 2023\|UT\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 118 | 2023\|UT\|invalid\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 4046 | 2023\|VA\|five_digit\|multiple |
-| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 62 | 2023\|VA\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 5516 | 2023\|VA\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 384 | 2023\|VA\|invalid\|none |
-| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 4 | 4 | 0 | 4 | 2023\|VI\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 | 0 | 1 | 2023\|VI\|five_digit\|none |
-| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 54 | 2023\|VI\|five_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 3 | 0 | 0 | 3 | 2023\|VI\|invalid\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 71 | 2023\|VT\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 11 | 2023\|VT\|five_digit\|none |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 719 | 2023\|VT\|five_digit\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 18 | 2023\|VT\|invalid\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 603 | 2023\|WA\|five_digit\|multiple |
-| 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 70 | 2023\|WA\|five_digit\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 7938 | 2023\|WA\|five_digit\|single |
-| 0 | 4 | 0 | 1 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 338 | 2023\|WA\|invalid\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 2835 | 2023\|WI\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 60 | 2023\|WI\|five_digit\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 6324 | 2023\|WI\|five_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 300 | 2023\|WI\|invalid\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 408 | 2023\|WV\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 30 | 2023\|WV\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1315 | 2023\|WV\|five_digit\|single |
-| 0 | 3 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 93 | 2023\|WV\|invalid\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 52 | 2023\|WY\|five_digit\|multiple |
-| 0 | 1 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 23 | 2023\|WY\|five_digit\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 671 | 2023\|WY\|five_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 24 | 2023\|WY\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2024\|AA\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2024\|AA\|five_digit\|none |
-| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 3 | 3 | 2024\|AA\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2024\|AE\|five_digit\|none |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2024\|AE\|five_digit\|single |
-| 0 | 1 | 0 | 2 | 5 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 8 | 8 | 0 | 21 | 2024\|AK\|five_digit\|multiple |
-| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 118 | 2024\|AK\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1628 | 2024\|AK\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 1 | 2024\|AK\|invalid\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 1643 | 2024\|AL\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 39 | 2024\|AL\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 4161 | 2024\|AL\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2024\|AL\|padded_four_digit\|single |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 3 | 3 | 2024\|AP\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2024\|AP\|invalid\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 1246 | 2024\|AR\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 26 | 2024\|AR\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 2279 | 2024\|AR\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 2 | 2024\|AS\|five_digit\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 2024\|AS\|five_digit\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 237 | 2024\|AZ\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 81 | 2024\|AZ\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 7750 | 2024\|AZ\|five_digit\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 3330 | 2024\|CA\|five_digit\|multiple |
-| 0 | 1 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 226 | 2024\|CA\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 36887 | 2024\|CA\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2024\|CA\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2024\|CA\|padded_four_digit\|none |
-| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 4 | 4 | 2024\|CA\|padded_four_digit\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 3166 | 2024\|CO\|five_digit\|multiple |
-| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 41 | 2024\|CO\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 4033 | 2024\|CO\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 3 | 3 | 2024\|CO\|padded_four_digit\|single |
-| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 0 | 3 | 2024\|CT\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 15 | 2024\|CT\|five_digit\|none |
-| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 8 | 2024\|CT\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2024\|CT\|invalid\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 202 | 2024\|CT\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 24 | 2024\|CT\|padded_four_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 5176 | 2024\|CT\|padded_four_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2024\|DC\|five_digit\|multiple |
-| 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 8 | 2024\|DC\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 840 | 2024\|DC\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2024\|DC\|padded_four_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 92 | 2024\|DE\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 7 | 0 | 0 | 7 | 2024\|DE\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 1074 | 2024\|DE\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2024\|DE\|padded_four_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 2135 | 2024\|FL\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 122 | 2024\|FL\|five_digit\|none |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 19395 | 2024\|FL\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2024\|FL\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2024\|FL\|padded_four_digit\|none |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2024\|FL\|padded_four_digit\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 5331 | 2024\|GA\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 57 | 2024\|GA\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 6572 | 2024\|GA\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2024\|GA\|padded_four_digit\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2024\|GA\|padded_four_digit\|single |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 2 | 0 | 2 | 2024\|GU\|five_digit\|multiple |
-| 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 6 | 0 | 0 | 6 | 2024\|GU\|five_digit\|none |
-| 0 | 1 | 0 | 6 | 1 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 71 | 2024\|GU\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 2 | 2024\|HI\|five_digit\|multiple |
-| 0 | 1 | 0 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 7 | 0 | 0 | 7 | 2024\|HI\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1687 | 2024\|HI\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 1639 | 2024\|IA\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 24 | 2024\|IA\|five_digit\|none |
-| 0 | 5 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 4183 | 2024\|IA\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2024\|IA\|padded_four_digit\|none |
-| 0 | 3 | 0 | 3 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 739 | 2024\|ID\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 19 | 2024\|ID\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 1686 | 2024\|ID\|five_digit\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 3694 | 2024\|IL\|five_digit\|multiple |
-| 0 | 2 | 0 | 3 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 50 | 2024\|IL\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 13084 | 2024\|IL\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2024\|IL\|invalid\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 2929 | 2024\|IN\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 65 | 2024\|IN\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 7050 | 2024\|IN\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2024\|IN\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2024\|IN\|padded_four_digit\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 834 | 2024\|KS\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 15 | 2024\|KS\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 3323 | 2024\|KS\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2024\|KS\|padded_four_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 2464 | 2024\|KY\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 37 | 2024\|KY\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 4047 | 2024\|KY\|five_digit\|single |
-| 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 2 | 2024\|KY\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2024\|KY\|padded_four_digit\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1098 | 2024\|LA\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 39 | 2024\|LA\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 3957 | 2024\|LA\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2024\|LA\|padded_four_digit\|single |
-| 0 | 0 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 6 | 0 | 6 | 2024\|MA\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 15 | 2024\|MA\|five_digit\|none |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 34 | 2024\|MA\|five_digit\|single |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 698 | 2024\|MA\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 56 | 2024\|MA\|padded_four_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 7232 | 2024\|MA\|padded_four_digit\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 1239 | 2024\|MD\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 21 | 2024\|MD\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 4549 | 2024\|MD\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2024\|MD\|padded_four_digit\|none |
-| 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 4 | 4 | 2024\|MD\|padded_four_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2024\|ME\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2024\|ME\|five_digit\|none |
-| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 8 | 2024\|ME\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2024\|ME\|invalid\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 22 | 2024\|ME\|padded_four_digit\|multiple |
-| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 13 | 2024\|ME\|padded_four_digit\|none |
-| 0 | 5 | 0 | 0 | 2 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1947 | 2024\|ME\|padded_four_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2024\|MH\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2024\|MH\|padded_four_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 3282 | 2024\|MI\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 47 | 2024\|MI\|five_digit\|none |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 10596 | 2024\|MI\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2024\|MI\|invalid\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 3963 | 2024\|MN\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 50 | 2024\|MN\|five_digit\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 8457 | 2024\|MN\|five_digit\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 2094 | 2024\|MO\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 38 | 2024\|MO\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 5781 | 2024\|MO\|five_digit\|single |
-| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 15 | 2024\|MP\|five_digit\|single |
-| 0 | 5 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1399 | 2024\|MS\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 34 | 2024\|MS\|five_digit\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 1813 | 2024\|MS\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2024\|MS\|padded_four_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 166 | 2024\|MT\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 12 | 2024\|MT\|five_digit\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 1136 | 2024\|MT\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2024\|MT\|padded_four_digit\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 5632 | 2024\|NC\|five_digit\|multiple |
-| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 110 | 2024\|NC\|five_digit\|none |
-| 0 | 3 | 0 | 3 | 2 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 8598 | 2024\|NC\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 3 | 3 | 2024\|NC\|padded_four_digit\|single |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 177 | 2024\|ND\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 7 | 2024\|ND\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1204 | 2024\|ND\|five_digit\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 902 | 2024\|NE\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 11 | 2024\|NE\|five_digit\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 2038 | 2024\|NE\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2024\|NE\|padded_four_digit\|single |
-| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 0 | 3 | 2024\|NH\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2024\|NH\|five_digit\|none |
-| 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 4 | 4 | 2024\|NH\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2024\|NH\|invalid\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 166 | 2024\|NH\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 10 | 2024\|NH\|padded_four_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1853 | 2024\|NH\|padded_four_digit\|single |
-| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 0 | 3 | 2024\|NJ\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 26 | 2024\|NJ\|five_digit\|none |
-| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 27 | 2024\|NJ\|five_digit\|single |
-| 0 | 1 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 3 | 0 | 0 | 3 | 2024\|NJ\|invalid\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 5 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 1515 | 2024\|NJ\|padded_four_digit\|multiple |
-| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 53 | 2024\|NJ\|padded_four_digit\|none |
-| 0 | 5 | 0 | 2 | 0 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 7097 | 2024\|NJ\|padded_four_digit\|single |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 90 | 2024\|NM\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 23 | 2024\|NM\|five_digit\|none |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 1853 | 2024\|NM\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2024\|NM\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2024\|NM\|padded_four_digit\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 279 | 2024\|NV\|five_digit\|multiple |
-| 0 | 1 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 27 | 2024\|NV\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 3562 | 2024\|NV\|five_digit\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 2256 | 2024\|NY\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 120 | 2024\|NY\|five_digit\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 14222 | 2024\|NY\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2024\|NY\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2024\|NY\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2024\|NY\|padded_four_digit\|none |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 8 | 2024\|NY\|padded_four_digit\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 4962 | 2024\|OH\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 129 | 2024\|OH\|five_digit\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 11721 | 2024\|OH\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2024\|OH\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2024\|OH\|padded_four_digit\|none |
-| 0 | 0 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 3 | 3 | 2024\|OH\|padded_four_digit\|single |
-| 0 | 3 | 0 | 2 | 3 | 0 | 2 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 1380 | 2024\|OK\|five_digit\|multiple |
-| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 35 | 2024\|OK\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 2760 | 2024\|OK\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2024\|OK\|padded_four_digit\|none |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2024\|OK\|padded_four_digit\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1394 | 2024\|OR\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 28 | 2024\|OR\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 5447 | 2024\|OR\|five_digit\|single |
-| 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 8 | 2024\|OR\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2024\|OR\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 3 | 3 | 2024\|OR\|padded_four_digit\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 3747 | 2024\|PA\|five_digit\|multiple |
-| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 112 | 2024\|PA\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 13154 | 2024\|PA\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2024\|PA\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2024\|PA\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2024\|PA\|padded_four_digit\|none |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 13 | 2024\|PA\|padded_four_digit\|single |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 2 | 0 | 2 | 2024\|PR\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 4 | 0 | 0 | 4 | 2024\|PR\|five_digit\|none |
-| 0 | 0 | 0 | 3 | 2 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 5 | 5 | 5 | 5 | 2024\|PR\|five_digit\|single |
-| 0 | 1 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 1573 | 2024\|PR\|invalid\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2024\|PW\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2024\|PW\|invalid\|none |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2024\|RI\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 4 | 2024\|RI\|five_digit\|none |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2024\|RI\|five_digit\|single |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 170 | 2024\|RI\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 8 | 2024\|RI\|padded_four_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 1064 | 2024\|RI\|padded_four_digit\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 2023 | 2024\|SC\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 28 | 2024\|SC\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 4462 | 2024\|SC\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 3 | 3 | 2024\|SC\|padded_four_digit\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 536 | 2024\|SD\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 10 | 2024\|SD\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 983 | 2024\|SD\|five_digit\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 3181 | 2024\|TN\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 27 | 2024\|TN\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 5574 | 2024\|TN\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2024\|TN\|padded_four_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 7274 | 2024\|TX\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 134 | 2024\|TX\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 23690 | 2024\|TX\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2024\|TX\|padded_four_digit\|none |
-| 0 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 7 | 2024\|TX\|padded_four_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 283 | 2024\|UT\|five_digit\|multiple |
-| 0 | 2 | 0 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 25 | 2024\|UT\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 3231 | 2024\|UT\|five_digit\|single |
-| 0 | 3 | 0 | 1 | 4 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 4299 | 2024\|VA\|five_digit\|multiple |
-| 0 | 1 | 0 | 1 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 63 | 2024\|VA\|five_digit\|none |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 5610 | 2024\|VA\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 3 | 3 | 2024\|VA\|padded_four_digit\|single |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 2 | 0 | 2 | 2024\|VI\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 2 | 2 | 2 | 2024\|VI\|five_digit\|single |
-| 0 | 0 | 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 51 | 2024\|VI\|invalid\|none |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2024\|VT\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 2024\|VT\|five_digit\|none |
-| 0 | 0 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 6 | 2024\|VT\|five_digit\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 80 | 2024\|VT\|padded_four_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 8 | 2024\|VT\|padded_four_digit\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 738 | 2024\|VT\|padded_four_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 615 | 2024\|WA\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 59 | 2024\|WA\|five_digit\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 8139 | 2024\|WA\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2024\|WA\|invalid\|none |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2024\|WA\|padded_four_digit\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 2923 | 2024\|WI\|five_digit\|multiple |
-| 0 | 3 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 55 | 2024\|WI\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 6623 | 2024\|WI\|five_digit\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 477 | 2024\|WV\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 33 | 2024\|WV\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1427 | 2024\|WV\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2024\|WV\|padded_four_digit\|single |
-| 0 | 3 | 0 | 0 | 5 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 54 | 2024\|WY\|five_digit\|multiple |
-| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 24 | 2024\|WY\|five_digit\|none |
-| 0 | 5 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 702 | 2024\|WY\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2025\|AA\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2025\|AA\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2025\|AE\|five_digit\|single |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 14 | 2025\|AK\|five_digit\|multiple |
-| 0 | 2 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 131 | 2025\|AK\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1672 | 2025\|AK\|five_digit\|single |
-| 0 | 2 | 0 | 4 | 2 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 1633 | 2025\|AL\|five_digit\|multiple |
-| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 33 | 2025\|AL\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 4034 | 2025\|AL\|five_digit\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1219 | 2025\|AR\|five_digit\|multiple |
-| 0 | 1 | 0 | 5 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 31 | 2025\|AR\|five_digit\|none |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 2259 | 2025\|AR\|five_digit\|single |
-| 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 6 | 0 | 0 | 6 | 2025\|AS\|five_digit\|none |
-| 0 | 0 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 3 | 3 | 3 | 3 | 2025\|AS\|five_digit\|single |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 236 | 2025\|AZ\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 64 | 2025\|AZ\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 8164 | 2025\|AZ\|five_digit\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 3417 | 2025\|CA\|five_digit\|multiple |
-| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 241 | 2025\|CA\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 40221 | 2025\|CA\|five_digit\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 3202 | 2025\|CO\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 36 | 2025\|CO\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 3974 | 2025\|CO\|five_digit\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 183 | 2025\|CT\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 44 | 2025\|CT\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 5093 | 2025\|CT\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 2 | 2025\|DC\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 2025\|DC\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 1 | 1 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 880 | 2025\|DC\|five_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 81 | 2025\|DE\|five_digit\|multiple |
-| 0 | 2 | 0 | 1 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 7 | 0 | 0 | 7 | 2025\|DE\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1099 | 2025\|DE\|five_digit\|single |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 2092 | 2025\|FL\|five_digit\|multiple |
-| 0 | 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 131 | 2025\|FL\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 19031 | 2025\|FL\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 2025\|FM\|five_digit\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 5219 | 2025\|GA\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 50 | 2025\|GA\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 6606 | 2025\|GA\|five_digit\|single |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 0 | 1 | 2025\|GU\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 6 | 0 | 0 | 6 | 2025\|GU\|five_digit\|none |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 82 | 2025\|GU\|five_digit\|single |
-| 0 | 1 | 0 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 6 | 0 | 0 | 6 | 2025\|HI\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 2124 | 2025\|HI\|five_digit\|single |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 1619 | 2025\|IA\|five_digit\|multiple |
-| 0 | 1 | 0 | 6 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 17 | 2025\|IA\|five_digit\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 4328 | 2025\|IA\|five_digit\|single |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 773 | 2025\|ID\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 18 | 2025\|ID\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 1715 | 2025\|ID\|five_digit\|single |
-| 0 | 4 | 0 | 0 | 4 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 3795 | 2025\|IL\|five_digit\|multiple |
-| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 51 | 2025\|IL\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 13221 | 2025\|IL\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 2846 | 2025\|IN\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 61 | 2025\|IN\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 6848 | 2025\|IN\|five_digit\|single |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 783 | 2025\|KS\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 17 | 2025\|KS\|five_digit\|none |
-| 0 | 3 | 0 | 0 | 5 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 3154 | 2025\|KS\|five_digit\|single |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 2391 | 2025\|KY\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 23 | 2025\|KY\|five_digit\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 3973 | 2025\|KY\|five_digit\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 1027 | 2025\|LA\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 34 | 2025\|LA\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 3915 | 2025\|LA\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 654 | 2025\|MA\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 70 | 2025\|MA\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 6569 | 2025\|MA\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 1173 | 2025\|MD\|five_digit\|multiple |
-| 0 | 1 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 31 | 2025\|MD\|five_digit\|none |
-| 0 | 5 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 4472 | 2025\|MD\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 19 | 2025\|ME\|five_digit\|multiple |
-| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 16 | 2025\|ME\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1951 | 2025\|ME\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 2025\|MH\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2025\|MH\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 3207 | 2025\|MI\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 48 | 2025\|MI\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 10446 | 2025\|MI\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 4075 | 2025\|MN\|five_digit\|multiple |
-| 0 | 2 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 48 | 2025\|MN\|five_digit\|none |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 8791 | 2025\|MN\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 2008 | 2025\|MO\|five_digit\|multiple |
-| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 33 | 2025\|MO\|five_digit\|none |
-| 0 | 2 | 0 | 1 | 5 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 8 | 5565 | 2025\|MO\|five_digit\|single |
-| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 14 | 2025\|MP\|five_digit\|single |
-| 0 | 5 | 0 | 2 | 0 | 1 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1324 | 2025\|MS\|five_digit\|multiple |
-| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 24 | 2025\|MS\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 1658 | 2025\|MS\|five_digit\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 166 | 2025\|MT\|five_digit\|multiple |
-| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 10 | 2025\|MT\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 1125 | 2025\|MT\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 5636 | 2025\|NC\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 99 | 2025\|NC\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 8490 | 2025\|NC\|five_digit\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 176 | 2025\|ND\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 8 | 2025\|ND\|five_digit\|none |
-| 0 | 2 | 0 | 2 | 4 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 8 | 1246 | 2025\|ND\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 881 | 2025\|NE\|five_digit\|multiple |
-| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 12 | 2025\|NE\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 1965 | 2025\|NE\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 155 | 2025\|NH\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 18 | 2025\|NH\|five_digit\|none |
-| 0 | 3 | 0 | 1 | 4 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 1809 | 2025\|NH\|five_digit\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 1393 | 2025\|NJ\|five_digit\|multiple |
-| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 89 | 2025\|NJ\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 6635 | 2025\|NJ\|five_digit\|single |
-| 0 | 1 | 0 | 3 | 4 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 8 | 8 | 0 | 107 | 2025\|NM\|five_digit\|multiple |
-| 0 | 2 | 0 | 3 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 18 | 2025\|NM\|five_digit\|none |
-| 0 | 3 | 0 | 1 | 4 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 8 | 1874 | 2025\|NM\|five_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 259 | 2025\|NV\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 21 | 2025\|NV\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 3606 | 2025\|NV\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 2171 | 2025\|NY\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 114 | 2025\|NY\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 14211 | 2025\|NY\|five_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 5036 | 2025\|OH\|five_digit\|multiple |
-| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 128 | 2025\|OH\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 11858 | 2025\|OH\|five_digit\|single |
-| 0 | 3 | 0 | 2 | 3 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 1332 | 2025\|OK\|five_digit\|multiple |
-| 0 | 2 | 0 | 1 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 35 | 2025\|OK\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 2547 | 2025\|OK\|five_digit\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 1348 | 2025\|OR\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 39 | 2025\|OR\|five_digit\|none |
-| 0 | 7 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 5350 | 2025\|OR\|five_digit\|single |
-| 0 | 5 | 0 | 0 | 3 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 3620 | 2025\|PA\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 124 | 2025\|PA\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 12539 | 2025\|PA\|five_digit\|single |
-| 0 | 0 | 0 | 5 | 2 | 1 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 0 | 779 | 2025\|PR\|five_digit\|multiple |
-| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 18 | 2025\|PR\|five_digit\|none |
-| 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 965 | 2025\|PR\|five_digit\|single |
-| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2025\|PW\|five_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 167 | 2025\|RI\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 12 | 2025\|RI\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1024 | 2025\|RI\|five_digit\|single |
-| 0 | 7 | 0 | 0 | 1 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 1936 | 2025\|SC\|five_digit\|multiple |
-| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 19 | 2025\|SC\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 4359 | 2025\|SC\|five_digit\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 550 | 2025\|SD\|five_digit\|multiple |
-| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 10 | 2025\|SD\|five_digit\|none |
-| 0 | 4 | 0 | 2 | 1 | 1 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 933 | 2025\|SD\|five_digit\|single |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 3147 | 2025\|TN\|five_digit\|multiple |
-| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 30 | 2025\|TN\|five_digit\|none |
-| 0 | 6 | 0 | 0 | 2 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 5505 | 2025\|TN\|five_digit\|single |
-| 0 | 4 | 0 | 1 | 3 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 7998 | 2025\|TX\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 108 | 2025\|TX\|five_digit\|none |
-| 0 | 4 | 0 | 1 | 2 | 1 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 24471 | 2025\|TX\|five_digit\|single |
-| 0 | 5 | 0 | 0 | 2 | 1 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 302 | 2025\|UT\|five_digit\|multiple |
-| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 19 | 2025\|UT\|five_digit\|none |
-| 0 | 4 | 0 | 3 | 1 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 8 | 3308 | 2025\|UT\|five_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 4 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 4216 | 2025\|VA\|five_digit\|multiple |
-| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 62 | 2025\|VA\|five_digit\|none |
-| 0 | 5 | 0 | 2 | 1 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 5634 | 2025\|VA\|five_digit\|single |
-| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 4 | 4 | 0 | 4 | 2025\|VI\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 3 | 0 | 0 | 3 | 2025\|VI\|five_digit\|none |
-| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 61 | 2025\|VI\|five_digit\|single |
-| 0 | 6 | 0 | 1 | 1 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 78 | 2025\|VT\|five_digit\|multiple |
-| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 14 | 2025\|VT\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 707 | 2025\|VT\|five_digit\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 643 | 2025\|WA\|five_digit\|multiple |
-| 0 | 0 | 0 | 2 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 72 | 2025\|WA\|five_digit\|none |
-| 0 | 7 | 0 | 0 | 1 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 8 | 8664 | 2025\|WA\|five_digit\|single |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 2871 | 2025\|WI\|five_digit\|multiple |
-| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 57 | 2025\|WI\|five_digit\|none |
-| 0 | 8 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 8 | 6618 | 2025\|WI\|five_digit\|single |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 444 | 2025\|WV\|five_digit\|multiple |
-| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 23 | 2025\|WV\|five_digit\|none |
-| 0 | 6 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 8 | 1351 | 2025\|WV\|five_digit\|single |
-| 0 | 4 | 0 | 2 | 2 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 47 | 2025\|WY\|five_digit\|multiple |
-| 0 | 3 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 21 | 2025\|WY\|five_digit\|none |
-| 0 | 5 | 0 | 1 | 2 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 8 | 644 | 2025\|WY\|five_digit\|single |
+| n_ct_incomparable | n_geocode_exact | n_geocode_legacy_ct | n_geocode_no_match | n_geocode_non_exact | n_geocode_out_of_scope | n_geocode_tie | n_joint_dominant_agree | n_joint_dominant_comparable | n_joint_single_agree | n_joint_single_comparable | n_out_of_scope | n_proposed_assignable | n_sample | n_zip_covered | n_zip_dominant_out_of_scope | n_zip_single_compatible | n_zip_single_out_of_scope | population_n | stratum |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|AA\|five_digit\|none |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2016\|AA\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|AA\|invalid\|none |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2016\|AE\|padded_four_digit\|none |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 2016\|AK\|five_digit\|multiple |
+| 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 37 | 2016\|AK\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 658 | 2016\|AK\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|AK\|invalid\|none |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 10 | 2016\|AK\|zip_plus_four\|single |
+| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1051 | 2016\|AL\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 26 | 2016\|AL\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2494 | 2016\|AL\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|AL\|invalid\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 2 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 25 | 2016\|AL\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 99 | 2016\|AL\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 742 | 2016\|AR\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 29 | 2016\|AR\|five_digit\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1373 | 2016\|AR\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|AR\|invalid\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 17 | 2016\|AR\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|AR\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 42 | 2016\|AR\|zip_plus_four\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|AS\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 100 | 2016\|AZ\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 60 | 2016\|AZ\|five_digit\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4081 | 2016\|AZ\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|AZ\|invalid\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 2 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 9 | 2016\|AZ\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|AZ\|zip_plus_four\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 214 | 2016\|AZ\|zip_plus_four\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 588 | 2016\|CA\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 43 | 2016\|CA\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 6674 | 2016\|CA\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2016\|CA\|invalid\|none |
+| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 0 | 4 | 0 | 4 | 2016\|CA\|padded_four_digit\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 40 | 2016\|CA\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|CA\|zip_plus_four\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 632 | 2016\|CA\|zip_plus_four\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 5 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 1906 | 2016\|CO\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 28 | 2016\|CO\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2507 | 2016\|CO\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|CO\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2016\|CO\|padded_four_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 41 | 2016\|CO\|zip_plus_four\|multiple |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 64 | 2016\|CO\|zip_plus_four\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 147 | 2016\|CT\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 6 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 22 | 2016\|CT\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3395 | 2016\|CT\|five_digit\|single |
+| 0 | 4 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 0 | 0 | 20 | 2016\|CT\|invalid\|none |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2016\|CT\|zip_plus_four\|multiple |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 76 | 2016\|CT\|zip_plus_four\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2016\|Ca\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2016\|DC\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 377 | 2016\|DC\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|DC\|invalid\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|DC\|padded_four_digit\|none |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2016\|DC\|padded_four_digit\|single |
+| 0 | 2 | 0 | 6 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 18 | 2016\|DC\|zip_plus_four\|single |
+| 0 | 5 | 0 | 2 | 0 | 0 | 1 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 39 | 2016\|DE\|five_digit\|multiple |
+| 0 | 1 | 0 | 1 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 6 | 2016\|DE\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 618 | 2016\|DE\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|DE\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2016\|DE\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|DE\|padded_four_digit\|none |
+| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 14 | 2016\|DE\|padded_four_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 21 | 2016\|DE\|zip_plus_four\|single |
+| 0 | 2 | 0 | 1 | 5 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 0 | 0 | 1068 | 2016\|FL\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 70 | 2016\|FL\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 10752 | 2016\|FL\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2016\|FL\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|FL\|padded_four_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 107 | 2016\|FL\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 4 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 7 | 2016\|FL\|zip_plus_four\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 879 | 2016\|FL\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2016\|Fl\|five_digit\|multiple |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 11 | 2016\|Fl\|five_digit\|single |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 2933 | 2016\|GA\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 36 | 2016\|GA\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4036 | 2016\|GA\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|GA\|invalid\|none |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2016\|GA\|padded_four_digit\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2016\|GA\|padded_four_digit\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 137 | 2016\|GA\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 174 | 2016\|GA\|zip_plus_four\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2016\|GU\|five_digit\|none |
+| 0 | 0 | 0 | 3 | 5 | 4 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 7 | 8 | 7 | 12 | 2016\|GU\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 1 | 2016\|GU\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 2016\|Ga\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2016\|Ga\|five_digit\|single |
+| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 8 | 2016\|HI\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 963 | 2016\|HI\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|HI\|invalid\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 35 | 2016\|HI\|zip_plus_four\|single |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 1128 | 2016\|IA\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 18 | 2016\|IA\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2711 | 2016\|IA\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|IA\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2016\|IA\|padded_four_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 36 | 2016\|IA\|zip_plus_four\|multiple |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 71 | 2016\|IA\|zip_plus_four\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 358 | 2016\|ID\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 9 | 2016\|ID\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 865 | 2016\|ID\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|ID\|invalid\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 14 | 2016\|ID\|zip_plus_four\|multiple |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 40 | 2016\|ID\|zip_plus_four\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 2112 | 2016\|IL\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 3 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 34 | 2016\|IL\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 7379 | 2016\|IL\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|IL\|invalid\|none |
+| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 17 | 2016\|IL\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|IL\|padded_four_digit\|none |
+| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 145 | 2016\|IL\|padded_four_digit\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 46 | 2016\|IL\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 297 | 2016\|IL\|zip_plus_four\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 1690 | 2016\|IN\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 49 | 2016\|IN\|five_digit\|none |
+| 0 | 3 | 0 | 0 | 4 | 0 | 1 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4212 | 2016\|IN\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|IN\|invalid\|none |
+| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 0 | 4 | 0 | 4 | 2016\|IN\|padded_four_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 34 | 2016\|IN\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 140 | 2016\|IN\|zip_plus_four\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2016\|Il\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2016\|In\|five_digit\|multiple |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 526 | 2016\|KS\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 3 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 14 | 2016\|KS\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2145 | 2016\|KS\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|KS\|invalid\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 9 | 2016\|KS\|zip_plus_four\|multiple |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 50 | 2016\|KS\|zip_plus_four\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1398 | 2016\|KY\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 35 | 2016\|KY\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2209 | 2016\|KY\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|KY\|invalid\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2016\|KY\|padded_four_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 36 | 2016\|KY\|zip_plus_four\|multiple |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 54 | 2016\|KY\|zip_plus_four\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 632 | 2016\|LA\|five_digit\|multiple |
+| 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 42 | 2016\|LA\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2500 | 2016\|LA\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|LA\|invalid\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 9 | 2016\|LA\|zip_plus_four\|multiple |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 82 | 2016\|LA\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 23 | 2016\|La\|five_digit\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 15 | 2016\|La\|five_digit\|single |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 374 | 2016\|MA\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 42 | 2016\|MA\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3778 | 2016\|MA\|five_digit\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 0 | 0 | 37 | 2016\|MA\|invalid\|none |
+| 0 | 7 | 0 | 0 | 0 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 7 | 7 | 0 | 0 | 0 | 7 | 2016\|MA\|zip_plus_four\|multiple |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 110 | 2016\|MA\|zip_plus_four\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 415 | 2016\|MD\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 9 | 2016\|MD\|five_digit\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1511 | 2016\|MD\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|MD\|invalid\|none |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 2016\|MD\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 6 | 6 | 0 | 6 | 0 | 6 | 2016\|MD\|padded_four_digit\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 20 | 2016\|MD\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 83 | 2016\|MD\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 9 | 2016\|ME\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 3 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 6 | 2016\|ME\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 2 | 0 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1052 | 2016\|ME\|five_digit\|single |
+| 0 | 1 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 3 | 2016\|ME\|invalid\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 17 | 2016\|ME\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 1623 | 2016\|MI\|five_digit\|multiple |
+| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 40 | 2016\|MI\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5743 | 2016\|MI\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|MI\|invalid\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 42 | 2016\|MI\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 143 | 2016\|MI\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 623 | 2016\|MN\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 5 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 8 | 2016\|MN\|five_digit\|none |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1671 | 2016\|MN\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|MN\|invalid\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 31 | 2016\|MN\|zip_plus_four\|multiple |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 61 | 2016\|MN\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 1403 | 2016\|MO\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 38 | 2016\|MO\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3717 | 2016\|MO\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|MO\|invalid\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 33 | 2016\|MO\|zip_plus_four\|multiple |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 110 | 2016\|MO\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 828 | 2016\|MS\|five_digit\|multiple |
+| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 23 | 2016\|MS\|five_digit\|none |
+| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1126 | 2016\|MS\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|MS\|invalid\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 28 | 2016\|MS\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|MS\|zip_plus_four\|none |
+| 0 | 2 | 0 | 5 | 1 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 64 | 2016\|MS\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 94 | 2016\|MT\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 6 | 2016\|MT\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 746 | 2016\|MT\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|MT\|invalid\|none |
+| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 2016\|MT\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|MT\|zip_plus_four\|none |
+| 0 | 5 | 0 | 0 | 2 | 0 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 52 | 2016\|MT\|zip_plus_four\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2016\|Ma\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2 | 2 | 0 | 0 | 0 | 2 | 2016\|Mi\|five_digit\|multiple |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2016\|Mi\|five_digit\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 3338 | 2016\|NC\|five_digit\|multiple |
+| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 76 | 2016\|NC\|five_digit\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5544 | 2016\|NC\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|NC\|invalid\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 60 | 2016\|NC\|zip_plus_four\|multiple |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 146 | 2016\|NC\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 2 | 0 | 1 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 133 | 2016\|ND\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 3 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 5 | 2016\|ND\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 772 | 2016\|ND\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|ND\|invalid\|none |
+| 0 | 2 | 0 | 1 | 5 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 0 | 0 | 14 | 2016\|ND\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 2 | 0 | 0 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 47 | 2016\|ND\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 527 | 2016\|NE\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 5 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 9 | 2016\|NE\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1316 | 2016\|NE\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|NE\|invalid\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 15 | 2016\|NE\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 41 | 2016\|NE\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 109 | 2016\|NH\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 2 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 7 | 2016\|NH\|five_digit\|none |
+| 0 | 2 | 0 | 1 | 5 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1207 | 2016\|NH\|five_digit\|single |
+| 0 | 2 | 0 | 3 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 7 | 0 | 0 | 0 | 0 | 7 | 2016\|NH\|invalid\|none |
+| 0 | 2 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 0 | 0 | 2 | 2016\|NH\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 22 | 2016\|NH\|zip_plus_four\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 712 | 2016\|NJ\|five_digit\|multiple |
+| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 30 | 2016\|NJ\|five_digit\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3736 | 2016\|NJ\|five_digit\|single |
+| 0 | 3 | 0 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 0 | 0 | 41 | 2016\|NJ\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 1 | 2016\|NJ\|padded_four_digit\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 22 | 2016\|NJ\|zip_plus_four\|multiple |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 140 | 2016\|NJ\|zip_plus_four\|single |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 60 | 2016\|NM\|five_digit\|multiple |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 16 | 2016\|NM\|five_digit\|none |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1126 | 2016\|NM\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|NM\|invalid\|none |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2016\|NM\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 31 | 2016\|NM\|zip_plus_four\|single |
+| 0 | 4 | 0 | 4 | 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 152 | 2016\|NV\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 15 | 2016\|NV\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1801 | 2016\|NV\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|NV\|invalid\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2016\|NV\|padded_four_digit\|single |
+| 0 | 3 | 0 | 2 | 0 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 5 | 5 | 0 | 0 | 0 | 5 | 2016\|NV\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 83 | 2016\|NV\|zip_plus_four\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 1515 | 2016\|NY\|five_digit\|multiple |
+| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 104 | 2016\|NY\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 0 | 0 | 1 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8315 | 2016\|NY\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2016\|NY\|invalid\|none |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 2016\|NY\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 23 | 2016\|NY\|padded_four_digit\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 61 | 2016\|NY\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2016\|NY\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 332 | 2016\|NY\|zip_plus_four\|single |
+| 0 | 1 | 0 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2016\|Ne\|five_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 3261 | 2016\|OH\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 77 | 2016\|OH\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 1 | 0 | 1 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8183 | 2016\|OH\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2016\|OH\|invalid\|none |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2016\|OH\|padded_four_digit\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 79 | 2016\|OH\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 5 | 2016\|OH\|zip_plus_four\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 217 | 2016\|OH\|zip_plus_four\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 918 | 2016\|OK\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 19 | 2016\|OK\|five_digit\|none |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1824 | 2016\|OK\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|OK\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|OK\|padded_four_digit\|none |
+| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 29 | 2016\|OK\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 49 | 2016\|OK\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 728 | 2016\|OR\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 23 | 2016\|OR\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3037 | 2016\|OR\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|OR\|invalid\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 18 | 2016\|OR\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2016\|OR\|zip_plus_four\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 112 | 2016\|OR\|zip_plus_four\|single |
+| 0 | 2 | 0 | 2 | 1 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 5 | 5 | 5 | 0 | 5 | 0 | 5 | 2016\|Oh\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2016\|Ok\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2016\|Or\|five_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 2441 | 2016\|PA\|five_digit\|multiple |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 107 | 2016\|PA\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8779 | 2016\|PA\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|PA\|invalid\|none |
+| 0 | 0 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 2016\|PA\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2016\|PA\|padded_four_digit\|none |
+| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 50 | 2016\|PA\|padded_four_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 62 | 2016\|PA\|zip_plus_four\|multiple |
+| 0 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 0 | 5 | 2016\|PA\|zip_plus_four\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 308 | 2016\|PA\|zip_plus_four\|single |
+| 0 | 0 | 0 | 7 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 0 | 0 | 563 | 2016\|PR\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2016\|PR\|five_digit\|none |
+| 0 | 1 | 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 310 | 2016\|PR\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2016\|PR\|invalid\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|PR\|padded_four_digit\|none |
+| 0 | 0 | 0 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 0 | 0 | 9 | 2016\|PR\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 28 | 2016\|PR\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2016\|PW\|padded_four_digit\|single |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 91 | 2016\|RI\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 5 | 2016\|RI\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 581 | 2016\|RI\|five_digit\|single |
+| 0 | 2 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 4 | 2016\|RI\|invalid\|none |
+| 0 | 2 | 0 | 1 | 1 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 4 | 4 | 0 | 0 | 0 | 4 | 2016\|RI\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 18 | 2016\|RI\|zip_plus_four\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 621 | 2016\|SC\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 6 | 2016\|SC\|five_digit\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1420 | 2016\|SC\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|SC\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|SC\|padded_four_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 25 | 2016\|SC\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 47 | 2016\|SC\|zip_plus_four\|single |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 371 | 2016\|SD\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 6 | 2016\|SD\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 630 | 2016\|SD\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|SD\|invalid\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 22 | 2016\|SD\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|SD\|zip_plus_four\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 35 | 2016\|SD\|zip_plus_four\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 1857 | 2016\|TN\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 23 | 2016\|TN\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3422 | 2016\|TN\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|TN\|invalid\|none |
+| 0 | 4 | 0 | 1 | 2 | 0 | 1 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 71 | 2016\|TN\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|TN\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 181 | 2016\|TN\|zip_plus_four\|single |
+| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 0 | 0 | 3854 | 2016\|TX\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 5 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 90 | 2016\|TX\|five_digit\|none |
+| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 13153 | 2016\|TX\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2016\|TX\|invalid\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2016\|TX\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2016\|TX\|padded_four_digit\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 158 | 2016\|TX\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2016\|TX\|zip_plus_four\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 590 | 2016\|TX\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 56 | 2016\|UT\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 7 | 2016\|UT\|five_digit\|none |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 739 | 2016\|UT\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2016\|UT\|invalid\|none |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2016\|UT\|zip_plus_four\|multiple |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 41 | 2016\|UT\|zip_plus_four\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 2653 | 2016\|VA\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 37 | 2016\|VA\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3302 | 2016\|VA\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|VA\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|VA\|padded_four_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 5 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 72 | 2016\|VA\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 103 | 2016\|VA\|zip_plus_four\|single |
+| 0 | 0 | 0 | 2 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2016\|VI\|five_digit\|none |
+| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 17 | 2016\|VI\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2016\|VI\|invalid\|none |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 2 | 2 | 2 | 2 | 2 | 2016\|VI\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 43 | 2016\|VT\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 7 | 2016\|VT\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 453 | 2016\|VT\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2016\|VT\|invalid\|none |
+| 0 | 5 | 0 | 1 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 7 | 7 | 7 | 0 | 7 | 0 | 7 | 2016\|VT\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 143 | 2016\|WA\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 16 | 2016\|WA\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1978 | 2016\|WA\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|WA\|invalid\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 9 | 2016\|WA\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 144 | 2016\|WA\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1948 | 2016\|WI\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 31 | 2016\|WI\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4413 | 2016\|WI\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|WI\|invalid\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 65 | 2016\|WI\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2016\|WI\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 0 | 0 | 1 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 157 | 2016\|WI\|zip_plus_four\|single |
+| 0 | 3 | 0 | 4 | 1 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 313 | 2016\|WV\|five_digit\|multiple |
+| 0 | 1 | 0 | 6 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 16 | 2016\|WV\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 946 | 2016\|WV\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|WV\|invalid\|none |
+| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 0 | 0 | 12 | 2016\|WV\|zip_plus_four\|multiple |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 25 | 2016\|WV\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 20 | 2016\|WY\|five_digit\|multiple |
+| 0 | 1 | 0 | 6 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 14 | 2016\|WY\|five_digit\|none |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 254 | 2016\|WY\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2016\|WY\|invalid\|none |
+| 0 | 2 | 0 | 2 | 3 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 7 | 7 | 7 | 0 | 7 | 0 | 7 | 2016\|WY\|zip_plus_four\|single |
+| 0 | 2 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2016\|al\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 9 | 2016\|fl\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2016\|ga\|five_digit\|multiple |
+| 0 | 4 | 0 | 0 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 6 | 6 | 6 | 0 | 6 | 0 | 6 | 2016\|ga\|five_digit\|single |
+| 0 | 2 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2016\|nc\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2016\|ny\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2016\|ny\|five_digit\|single |
+| 0 | 3 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2016\|tn\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2016\|tx\|five_digit\|multiple |
+| 0 | 1 | 0 | 0 | 2 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2016\|tx\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2017\|AA\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2017\|AA\|five_digit\|none |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2017\|AA\|five_digit\|single |
+| 0 | 3 | 0 | 4 | 1 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 10 | 2017\|AK\|five_digit\|multiple |
+| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 119 | 2017\|AK\|five_digit\|none |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1077 | 2017\|AK\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2017\|AK\|zip_plus_four\|none |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 19 | 2017\|AK\|zip_plus_four\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1012 | 2017\|AL\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 30 | 2017\|AL\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2612 | 2017\|AL\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2017\|AL\|invalid\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 4 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 83 | 2017\|AL\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 1 | 2017\|AL\|zip_plus_four\|none |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 201 | 2017\|AL\|zip_plus_four\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 710 | 2017\|AR\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 23 | 2017\|AR\|five_digit\|none |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1338 | 2017\|AR\|five_digit\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 46 | 2017\|AR\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2017\|AR\|zip_plus_four\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 87 | 2017\|AR\|zip_plus_four\|single |
+| 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 5 | 0 | 0 | 0 | 0 | 5 | 2017\|AS\|five_digit\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 0 | 1 | 0 | 1 | 2017\|AS\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 96 | 2017\|AZ\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 56 | 2017\|AZ\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3936 | 2017\|AZ\|five_digit\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 17 | 2017\|AZ\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 5 | 2017\|AZ\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 324 | 2017\|AZ\|zip_plus_four\|single |
+| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2017\|Al\|five_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 2567 | 2017\|CA\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 173 | 2017\|CA\|five_digit\|none |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 25450 | 2017\|CA\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 0 | 4 | 0 | 4 | 2017\|CA\|padded_four_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 118 | 2017\|CA\|zip_plus_four\|multiple |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 13 | 2017\|CA\|zip_plus_four\|none |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1788 | 2017\|CA\|zip_plus_four\|single |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 1978 | 2017\|CO\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 24 | 2017\|CO\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 0 | 0 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2529 | 2017\|CO\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2017\|CO\|padded_four_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 98 | 2017\|CO\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 1 | 2017\|CO\|zip_plus_four\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 172 | 2017\|CO\|zip_plus_four\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 171 | 2017\|CT\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 27 | 2017\|CT\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4016 | 2017\|CT\|five_digit\|single |
+| 0 | 5 | 0 | 2 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 0 | 0 | 30 | 2017\|CT\|invalid\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 10 | 2017\|CT\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 2 | 2017\|CT\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 178 | 2017\|CT\|zip_plus_four\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2017\|Ca\|five_digit\|multiple |
+| 0 | 4 | 0 | 2 | 0 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 6 | 6 | 6 | 0 | 6 | 0 | 6 | 2017\|Ca\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2017\|DC\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 341 | 2017\|DC\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2017\|DC\|zip_plus_four\|none |
+| 0 | 2 | 0 | 1 | 5 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 39 | 2017\|DC\|zip_plus_four\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 4 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 40 | 2017\|DE\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2017\|DE\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 607 | 2017\|DE\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2017\|DE\|padded_four_digit\|none |
+| 0 | 2 | 0 | 0 | 1 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 3 | 3 | 0 | 0 | 0 | 3 | 2017\|DE\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2017\|DE\|zip_plus_four\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 54 | 2017\|DE\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1095 | 2017\|FL\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 67 | 2017\|FL\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 11193 | 2017\|FL\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2017\|FL\|padded_four_digit\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2017\|FL\|padded_four_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 126 | 2017\|FL\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 2 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 7 | 2017\|FL\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1190 | 2017\|FL\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2017\|Fl\|five_digit\|multiple |
+| 0 | 5 | 0 | 1 | 0 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 6 | 6 | 6 | 0 | 6 | 0 | 6 | 2017\|Fl\|five_digit\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 3050 | 2017\|GA\|five_digit\|multiple |
+| 0 | 1 | 0 | 1 | 5 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 38 | 2017\|GA\|five_digit\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4199 | 2017\|GA\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2017\|GA\|padded_four_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 225 | 2017\|GA\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 8 | 2017\|GA\|zip_plus_four\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 298 | 2017\|GA\|zip_plus_four\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2017\|GU\|five_digit\|none |
+| 0 | 0 | 0 | 6 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 21 | 2017\|GU\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 2 | 2 | 2 | 2 | 2 | 2017\|GU\|zip_plus_four\|single |
+| 0 | 1 | 0 | 0 | 2 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 3 | 3 | 0 | 0 | 0 | 3 | 2017\|Ga\|five_digit\|multiple |
+| 0 | 2 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 5 | 2017\|HI\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 929 | 2017\|HI\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2017\|HI\|padded_four_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 57 | 2017\|HI\|zip_plus_four\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1036 | 2017\|IA\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 18 | 2017\|IA\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2579 | 2017\|IA\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 65 | 2017\|IA\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 155 | 2017\|IA\|zip_plus_four\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 414 | 2017\|ID\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 11 | 2017\|ID\|five_digit\|none |
+| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 889 | 2017\|ID\|five_digit\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 23 | 2017\|ID\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 74 | 2017\|ID\|zip_plus_four\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 2446 | 2017\|IL\|five_digit\|multiple |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 38 | 2017\|IL\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8639 | 2017\|IL\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 140 | 2017\|IL\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2017\|IL\|zip_plus_four\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 627 | 2017\|IL\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 2 | 0 | 1 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 1733 | 2017\|IN\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 42 | 2017\|IN\|five_digit\|none |
+| 0 | 3 | 0 | 1 | 3 | 0 | 1 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4288 | 2017\|IN\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 110 | 2017\|IN\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2017\|IN\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 266 | 2017\|IN\|zip_plus_four\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2017\|Id\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2017\|Il\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2017\|In\|five_digit\|multiple |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 512 | 2017\|KS\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 19 | 2017\|KS\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2019 | 2017\|KS\|five_digit\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 24 | 2017\|KS\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2017\|KS\|zip_plus_four\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 127 | 2017\|KS\|zip_plus_four\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 1572 | 2017\|KY\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 33 | 2017\|KY\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2436 | 2017\|KY\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2017\|KY\|invalid\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 100 | 2017\|KY\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2017\|KY\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 127 | 2017\|KY\|zip_plus_four\|single |
+| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 600 | 2017\|LA\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 41 | 2017\|LA\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2533 | 2017\|LA\|five_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 51 | 2017\|LA\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2017\|LA\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 189 | 2017\|LA\|zip_plus_four\|single |
+| 0 | 3 | 0 | 0 | 5 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 23 | 2017\|La\|five_digit\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 15 | 2017\|La\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 385 | 2017\|MA\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 38 | 2017\|MA\|five_digit\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3951 | 2017\|MA\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 0 | 48 | 2017\|MA\|invalid\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 24 | 2017\|MA\|zip_plus_four\|multiple |
+| 0 | 2 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 5 | 2017\|MA\|zip_plus_four\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 281 | 2017\|MA\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 644 | 2017\|MD\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 11 | 2017\|MD\|five_digit\|none |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2250 | 2017\|MD\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2017\|MD\|padded_four_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 4 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 69 | 2017\|MD\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2017\|MD\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 245 | 2017\|MD\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 11 | 2017\|ME\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 3 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 7 | 2017\|ME\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1096 | 2017\|ME\|five_digit\|single |
+| 0 | 4 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 7 | 0 | 0 | 0 | 0 | 7 | 2017\|ME\|invalid\|none |
+| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2 | 2 | 0 | 0 | 0 | 2 | 2017\|ME\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 64 | 2017\|ME\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2017\|MH\|five_digit\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 1555 | 2017\|MI\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 39 | 2017\|MI\|five_digit\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5761 | 2017\|MI\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2017\|MI\|padded_four_digit\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 129 | 2017\|MI\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 7 | 2017\|MI\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 384 | 2017\|MI\|zip_plus_four\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 2801 | 2017\|MN\|five_digit\|multiple |
+| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 39 | 2017\|MN\|five_digit\|none |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 6090 | 2017\|MN\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 117 | 2017\|MN\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2017\|MN\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 265 | 2017\|MN\|zip_plus_four\|single |
+| 0 | 1 | 0 | 2 | 4 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 8 | 8 | 0 | 0 | 0 | 1304 | 2017\|MO\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 35 | 2017\|MO\|five_digit\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3662 | 2017\|MO\|five_digit\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 87 | 2017\|MO\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2017\|MO\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 268 | 2017\|MO\|zip_plus_four\|single |
+| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 11 | 2017\|MP\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 1 | 2017\|MP\|zip_plus_four\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 773 | 2017\|MS\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 24 | 2017\|MS\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 0 | 0 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1102 | 2017\|MS\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2017\|MS\|padded_four_digit\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 69 | 2017\|MS\|zip_plus_four\|multiple |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 87 | 2017\|MS\|zip_plus_four\|single |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 73 | 2017\|MT\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2017\|MT\|five_digit\|none |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 665 | 2017\|MT\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 0 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 6 | 6 | 0 | 0 | 0 | 6 | 2017\|MT\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 56 | 2017\|MT\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 2017\|Mi\|five_digit\|multiple |
+| 0 | 2 | 0 | 0 | 1 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2017\|Mi\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2017\|Mo\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 3415 | 2017\|NC\|five_digit\|multiple |
+| 0 | 1 | 0 | 5 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 73 | 2017\|NC\|five_digit\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5345 | 2017\|NC\|five_digit\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 170 | 2017\|NC\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2017\|NC\|zip_plus_four\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 297 | 2017\|NC\|zip_plus_four\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 123 | 2017\|ND\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 3 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 5 | 2017\|ND\|five_digit\|none |
+| 0 | 3 | 0 | 4 | 1 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 839 | 2017\|ND\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 9 | 2017\|ND\|zip_plus_four\|multiple |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 44 | 2017\|ND\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 474 | 2017\|NE\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 14 | 2017\|NE\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1245 | 2017\|NE\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 28 | 2017\|NE\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2017\|NE\|zip_plus_four\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 7 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 76 | 2017\|NE\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 98 | 2017\|NH\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 3 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 10 | 2017\|NH\|five_digit\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1213 | 2017\|NH\|five_digit\|single |
+| 0 | 3 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 7 | 0 | 0 | 0 | 0 | 7 | 2017\|NH\|invalid\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 10 | 2017\|NH\|zip_plus_four\|multiple |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 78 | 2017\|NH\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 784 | 2017\|NJ\|five_digit\|multiple |
+| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 29 | 2017\|NJ\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3729 | 2017\|NJ\|five_digit\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 0 | 0 | 52 | 2017\|NJ\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2017\|NJ\|padded_four_digit\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 1 | 2017\|NJ\|padded_four_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 58 | 2017\|NJ\|zip_plus_four\|multiple |
+| 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 2 | 2017\|NJ\|zip_plus_four\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 268 | 2017\|NJ\|zip_plus_four\|single |
+| 0 | 2 | 0 | 1 | 5 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 0 | 0 | 52 | 2017\|NM\|five_digit\|multiple |
+| 0 | 3 | 0 | 1 | 3 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 0 | 0 | 17 | 2017\|NM\|five_digit\|none |
+| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1068 | 2017\|NM\|five_digit\|single |
+| 0 | 4 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 4 | 4 | 0 | 0 | 0 | 4 | 2017\|NM\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 77 | 2017\|NM\|zip_plus_four\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 4 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 153 | 2017\|NV\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 14 | 2017\|NV\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1861 | 2017\|NV\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2017\|NV\|padded_four_digit\|single |
+| 0 | 3 | 0 | 2 | 0 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 5 | 5 | 0 | 0 | 0 | 5 | 2017\|NV\|zip_plus_four\|multiple |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 131 | 2017\|NV\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 1494 | 2017\|NY\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 80 | 2017\|NY\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8790 | 2017\|NY\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2017\|NY\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2017\|NY\|padded_four_digit\|none |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 9 | 2017\|NY\|padded_four_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 149 | 2017\|NY\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 5 | 2017\|NY\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 0 | 0 | 1 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 857 | 2017\|NY\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 1 | 0 | 1 | 3 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 3197 | 2017\|OH\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 5 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 80 | 2017\|OH\|five_digit\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8636 | 2017\|OH\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2017\|OH\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2017\|OH\|padded_four_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 162 | 2017\|OH\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2017\|OH\|zip_plus_four\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 414 | 2017\|OH\|zip_plus_four\|single |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 875 | 2017\|OK\|five_digit\|multiple |
+| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 19 | 2017\|OK\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1808 | 2017\|OK\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2017\|OK\|padded_four_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 61 | 2017\|OK\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2017\|OK\|zip_plus_four\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 133 | 2017\|OK\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 717 | 2017\|OR\|five_digit\|multiple |
+| 0 | 1 | 0 | 5 | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 17 | 2017\|OR\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2920 | 2017\|OR\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 46 | 2017\|OR\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2017\|OR\|zip_plus_four\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 209 | 2017\|OR\|zip_plus_four\|single |
+| 0 | 1 | 0 | 1 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2 | 2 | 0 | 0 | 0 | 2 | 2017\|Oh\|five_digit\|multiple |
+| 0 | 2 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2017\|Oh\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 2017\|Ok\|five_digit\|multiple |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 2420 | 2017\|PA\|five_digit\|multiple |
+| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 91 | 2017\|PA\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8620 | 2017\|PA\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2017\|PA\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2017\|PA\|padded_four_digit\|none |
+| 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 0 | 4 | 0 | 4 | 2017\|PA\|padded_four_digit\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 160 | 2017\|PA\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 11 | 2017\|PA\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 570 | 2017\|PA\|zip_plus_four\|single |
+| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 0 | 0 | 483 | 2017\|PR\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 0 | 0 | 12 | 2017\|PR\|five_digit\|none |
+| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 464 | 2017\|PR\|five_digit\|single |
+| 0 | 0 | 0 | 7 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 0 | 0 | 14 | 2017\|PR\|invalid\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2017\|PR\|padded_four_digit\|none |
+| 0 | 0 | 0 | 7 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 0 | 0 | 13 | 2017\|PR\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 6 | 1 | 1 | 1 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 66 | 2017\|PR\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2017\|PW\|padded_four_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2017\|Pa\|five_digit\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 93 | 2017\|RI\|five_digit\|multiple |
+| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 2 | 2017\|RI\|five_digit\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 675 | 2017\|RI\|five_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 0 | 0 | 8 | 2017\|RI\|invalid\|none |
+| 0 | 2 | 0 | 0 | 2 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 4 | 4 | 0 | 0 | 0 | 4 | 2017\|RI\|zip_plus_four\|multiple |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 51 | 2017\|RI\|zip_plus_four\|single |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 1021 | 2017\|SC\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 14 | 2017\|SC\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2440 | 2017\|SC\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2017\|SC\|padded_four_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 83 | 2017\|SC\|zip_plus_four\|multiple |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 148 | 2017\|SC\|zip_plus_four\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 349 | 2017\|SD\|five_digit\|multiple |
+| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 2 | 2017\|SD\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 1 | 0 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 596 | 2017\|SD\|five_digit\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 24 | 2017\|SD\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2017\|SD\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 0 | 0 | 1 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 33 | 2017\|SD\|zip_plus_four\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 1808 | 2017\|TN\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 26 | 2017\|TN\|five_digit\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3409 | 2017\|TN\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 111 | 2017\|TN\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2017\|TN\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 195 | 2017\|TN\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 3926 | 2017\|TX\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 96 | 2017\|TX\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 13688 | 2017\|TX\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2017\|TX\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2017\|TX\|padded_four_digit\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 276 | 2017\|TX\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 10 | 2017\|TX\|zip_plus_four\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 972 | 2017\|TX\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2017\|Tx\|five_digit\|single |
+| 0 | 3 | 0 | 2 | 2 | 0 | 1 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 102 | 2017\|UT\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 12 | 2017\|UT\|five_digit\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1281 | 2017\|UT\|five_digit\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 10 | 2017\|UT\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 117 | 2017\|UT\|zip_plus_four\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 2734 | 2017\|VA\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 37 | 2017\|VA\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3376 | 2017\|VA\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 155 | 2017\|VA\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 2 | 2017\|VA\|zip_plus_four\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 248 | 2017\|VA\|zip_plus_four\|single |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 0 | 0 | 8 | 2017\|VI\|five_digit\|none |
+| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 25 | 2017\|VI\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2017\|VI\|invalid\|none |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 2 | 2 | 2 | 2 | 2 | 2017\|VI\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 60 | 2017\|VT\|five_digit\|multiple |
+| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 12 | 2017\|VT\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 1 | 0 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 562 | 2017\|VT\|five_digit\|single |
+| 0 | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 2 | 2017\|VT\|invalid\|none |
+| 0 | 4 | 0 | 0 | 1 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 5 | 5 | 0 | 0 | 0 | 5 | 2017\|VT\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 33 | 2017\|VT\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 201 | 2017\|WA\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 27 | 2017\|WA\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3065 | 2017\|WA\|five_digit\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 29 | 2017\|WA\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2017\|WA\|zip_plus_four\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 329 | 2017\|WA\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 2 | 0 | 1 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 1953 | 2017\|WI\|five_digit\|multiple |
+| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 39 | 2017\|WI\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 1 | 0 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4301 | 2017\|WI\|five_digit\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 102 | 2017\|WI\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2017\|WI\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 253 | 2017\|WI\|zip_plus_four\|single |
+| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 0 | 0 | 306 | 2017\|WV\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 10 | 2017\|WV\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 906 | 2017\|WV\|five_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 22 | 2017\|WV\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2017\|WV\|zip_plus_four\|none |
+| 0 | 4 | 0 | 4 | 0 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 71 | 2017\|WV\|zip_plus_four\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 23 | 2017\|WY\|five_digit\|multiple |
+| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 8 | 2017\|WY\|five_digit\|none |
+| 0 | 3 | 0 | 4 | 1 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 299 | 2017\|WY\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2017\|WY\|zip_plus_four\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 20 | 2017\|WY\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2017\|Wa\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2017\|al\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8 | 2017\|fl\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2017\|ga\|five_digit\|multiple |
+| 0 | 4 | 0 | 0 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 6 | 6 | 6 | 0 | 6 | 0 | 6 | 2017\|ga\|five_digit\|single |
+| 0 | 2 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2017\|nc\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2017\|ny\|five_digit\|multiple |
+| 0 | 2 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2017\|tn\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2017\|tx\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2018\|AA\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 0 | 4 | 0 | 4 | 2018\|AA\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2018\|AA\|zip_plus_four\|none |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2018\|AE\|five_digit\|none |
+| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 0 | 4 | 0 | 4 | 2018\|AE\|five_digit\|single |
+| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2018\|AE\|padded_four_digit\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2018\|AE\|padded_four_digit\|single |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 12 | 2018\|AK\|five_digit\|multiple |
+| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 115 | 2018\|AK\|five_digit\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1119 | 2018\|AK\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|AK\|invalid\|none |
+| 0 | 0 | 0 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 5 | 2018\|AK\|zip_plus_four\|none |
+| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 29 | 2018\|AK\|zip_plus_four\|single |
+| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1066 | 2018\|AL\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 22 | 2018\|AL\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2753 | 2018\|AL\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2018\|AL\|invalid\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 74 | 2018\|AL\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 1 | 2018\|AL\|zip_plus_four\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 179 | 2018\|AL\|zip_plus_four\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2018\|AP\|five_digit\|none |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 860 | 2018\|AR\|five_digit\|multiple |
+| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 31 | 2018\|AR\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1606 | 2018\|AR\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|AR\|invalid\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 45 | 2018\|AR\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|AR\|zip_plus_four\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 93 | 2018\|AR\|zip_plus_four\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|AS\|five_digit\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 0 | 1 | 0 | 1 | 2018\|AS\|five_digit\|single |
+| 0 | 2 | 0 | 0 | 6 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 0 | 0 | 118 | 2018\|AZ\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 69 | 2018\|AZ\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5049 | 2018\|AZ\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|AZ\|invalid\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 15 | 2018\|AZ\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 279 | 2018\|AZ\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2018\|Al\|five_digit\|multiple |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 2590 | 2018\|CA\|five_digit\|multiple |
+| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 179 | 2018\|CA\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 28193 | 2018\|CA\|five_digit\|single |
+| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2018\|CA\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2018\|CA\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 0 | 4 | 0 | 4 | 2018\|CA\|padded_four_digit\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 101 | 2018\|CA\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 11 | 2018\|CA\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1654 | 2018\|CA\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 2155 | 2018\|CO\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 26 | 2018\|CO\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2713 | 2018\|CO\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|CO\|invalid\|none |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2018\|CO\|padded_four_digit\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 115 | 2018\|CO\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|CO\|zip_plus_four\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 177 | 2018\|CO\|zip_plus_four\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 160 | 2018\|CT\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 29 | 2018\|CT\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4345 | 2018\|CT\|five_digit\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 0 | 0 | 26 | 2018\|CT\|invalid\|none |
+| 0 | 6 | 0 | 0 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 7 | 7 | 0 | 0 | 0 | 7 | 2018\|CT\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 4 | 0 | 0 | 0 | 0 | 4 | 2018\|CT\|zip_plus_four\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 157 | 2018\|CT\|zip_plus_four\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2018\|Ca\|five_digit\|multiple |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 12 | 2018\|Ca\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|DC\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 513 | 2018\|DC\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|DC\|invalid\|none |
+| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2018\|DC\|padded_four_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 39 | 2018\|DC\|zip_plus_four\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 46 | 2018\|DE\|five_digit\|multiple |
+| 0 | 1 | 0 | 1 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 6 | 2018\|DE\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 693 | 2018\|DE\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|DE\|invalid\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2018\|DE\|padded_four_digit\|none |
+| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2 | 2 | 0 | 0 | 0 | 2 | 2018\|DE\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|DE\|zip_plus_four\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 42 | 2018\|DE\|zip_plus_four\|single |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 1211 | 2018\|FL\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 5 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 84 | 2018\|FL\|five_digit\|none |
+| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 12609 | 2018\|FL\|five_digit\|single |
+| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2018\|FL\|invalid\|none |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|FL\|padded_four_digit\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2018\|FL\|padded_four_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 113 | 2018\|FL\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2018\|FL\|zip_plus_four\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1153 | 2018\|FL\|zip_plus_four\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2018\|FM\|five_digit\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2018\|FM\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 5 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 10 | 2018\|Fl\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2018\|Fl\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 185 | 2018\|Fl\|five_digit\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 3447 | 2018\|GA\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 36 | 2018\|GA\|five_digit\|none |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4555 | 2018\|GA\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|GA\|invalid\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 210 | 2018\|GA\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 6 | 2018\|GA\|zip_plus_four\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 274 | 2018\|GA\|zip_plus_four\|single |
+| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 0 | 0 | 0 | 36 | 2018\|GU\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2018\|GU\|five_digit\|none |
+| 0 | 0 | 0 | 7 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 31 | 2018\|GU\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 1 | 2018\|GU\|zip_plus_four\|single |
+| 0 | 2 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2018\|Ga\|five_digit\|single |
+| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 8 | 2018\|HI\|five_digit\|none |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2073 | 2018\|HI\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2018\|HI\|invalid\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 46 | 2018\|HI\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 3 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 1176 | 2018\|IA\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 22 | 2018\|IA\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2822 | 2018\|IA\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|IA\|invalid\|none |
+| 0 | 4 | 0 | 2 | 1 | 0 | 1 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 73 | 2018\|IA\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 163 | 2018\|IA\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 414 | 2018\|ID\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 9 | 2018\|ID\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 965 | 2018\|ID\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|ID\|invalid\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 26 | 2018\|ID\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2018\|ID\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 62 | 2018\|ID\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 2686 | 2018\|IL\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 38 | 2018\|IL\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 9707 | 2018\|IL\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|IL\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2018\|IL\|padded_four_digit\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 118 | 2018\|IL\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 7 | 2018\|IL\|zip_plus_four\|none |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 624 | 2018\|IL\|zip_plus_four\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1984 | 2018\|IN\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 47 | 2018\|IN\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4892 | 2018\|IN\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|IN\|invalid\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 107 | 2018\|IN\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 5 | 2018\|IN\|zip_plus_four\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 272 | 2018\|IN\|zip_plus_four\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2018\|Id\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2018\|In\|five_digit\|multiple |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 587 | 2018\|KS\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 18 | 2018\|KS\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2203 | 2018\|KS\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|KS\|invalid\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 30 | 2018\|KS\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 126 | 2018\|KS\|zip_plus_four\|single |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 1532 | 2018\|KY\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 27 | 2018\|KY\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2375 | 2018\|KY\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2018\|KY\|invalid\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 74 | 2018\|KY\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 1 | 0 | 0 | 1 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 116 | 2018\|KY\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 710 | 2018\|LA\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 40 | 2018\|LA\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2826 | 2018\|LA\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|LA\|invalid\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 41 | 2018\|LA\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2018\|LA\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 161 | 2018\|LA\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 403 | 2018\|MA\|five_digit\|multiple |
+| 0 | 2 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 48 | 2018\|MA\|five_digit\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4526 | 2018\|MA\|five_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 0 | 0 | 43 | 2018\|MA\|invalid\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 19 | 2018\|MA\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2018\|MA\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 255 | 2018\|MA\|zip_plus_four\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 758 | 2018\|MD\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 15 | 2018\|MD\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2619 | 2018\|MD\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|MD\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2018\|MD\|padded_four_digit\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 69 | 2018\|MD\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2018\|MD\|zip_plus_four\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 210 | 2018\|MD\|zip_plus_four\|single |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 16 | 2018\|ME\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 3 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 8 | 2018\|ME\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1321 | 2018\|ME\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2018\|ME\|invalid\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 69 | 2018\|ME\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2018\|MH\|five_digit\|multiple |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 1893 | 2018\|MI\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 34 | 2018\|MI\|five_digit\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 6402 | 2018\|MI\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|MI\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2018\|MI\|padded_four_digit\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2018\|MI\|padded_four_digit\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 138 | 2018\|MI\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 5 | 2018\|MI\|zip_plus_four\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 406 | 2018\|MI\|zip_plus_four\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 2842 | 2018\|MN\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 39 | 2018\|MN\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 6001 | 2018\|MN\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2018\|MN\|invalid\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 149 | 2018\|MN\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2018\|MN\|zip_plus_four\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 329 | 2018\|MN\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 1 | 0 | 1 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1521 | 2018\|MO\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 43 | 2018\|MO\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4039 | 2018\|MO\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|MO\|invalid\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 83 | 2018\|MO\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 3 | 2018\|MO\|zip_plus_four\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 216 | 2018\|MO\|zip_plus_four\|single |
+| 0 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 7 | 7 | 7 | 7 | 7 | 7 | 2018\|MP\|five_digit\|single |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 912 | 2018\|MS\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 30 | 2018\|MS\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1196 | 2018\|MS\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|MS\|invalid\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 66 | 2018\|MS\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 76 | 2018\|MS\|zip_plus_four\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 85 | 2018\|MT\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|MT\|five_digit\|none |
+| 0 | 2 | 0 | 1 | 5 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 666 | 2018\|MT\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2018\|MT\|invalid\|none |
+| 0 | 5 | 0 | 1 | 0 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 6 | 6 | 0 | 0 | 0 | 6 | 2018\|MT\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 1 | 2018\|MT\|zip_plus_four\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 55 | 2018\|MT\|zip_plus_four\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2018\|Ma\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2 | 2 | 0 | 0 | 0 | 2 | 2018\|Mi\|five_digit\|multiple |
+| 0 | 2 | 0 | 0 | 1 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2018\|Mi\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 3751 | 2018\|NC\|five_digit\|multiple |
+| 0 | 2 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 84 | 2018\|NC\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 6129 | 2018\|NC\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2018\|NC\|invalid\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 185 | 2018\|NC\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 8 | 2018\|NC\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 303 | 2018\|NC\|zip_plus_four\|single |
+| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 106 | 2018\|ND\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 6 | 2018\|ND\|five_digit\|none |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 807 | 2018\|ND\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|ND\|invalid\|none |
+| 0 | 4 | 0 | 0 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 6 | 6 | 0 | 0 | 0 | 6 | 2018\|ND\|zip_plus_four\|multiple |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 47 | 2018\|ND\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 537 | 2018\|NE\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 11 | 2018\|NE\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1365 | 2018\|NE\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|NE\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2018\|NE\|padded_four_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 26 | 2018\|NE\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 1 | 2018\|NE\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 90 | 2018\|NE\|zip_plus_four\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 115 | 2018\|NH\|five_digit\|multiple |
+| 0 | 1 | 0 | 1 | 5 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 9 | 2018\|NH\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1343 | 2018\|NH\|five_digit\|single |
+| 0 | 1 | 0 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 5 | 2018\|NH\|invalid\|none |
+| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 9 | 2018\|NH\|zip_plus_four\|multiple |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 65 | 2018\|NH\|zip_plus_four\|single |
+| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 920 | 2018\|NJ\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 25 | 2018\|NJ\|five_digit\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4396 | 2018\|NJ\|five_digit\|single |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 34 | 2018\|NJ\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2018\|NJ\|padded_four_digit\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 1 | 2018\|NJ\|padded_four_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 47 | 2018\|NJ\|zip_plus_four\|multiple |
+| 0 | 2 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 3 | 0 | 0 | 0 | 0 | 3 | 2018\|NJ\|zip_plus_four\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 256 | 2018\|NJ\|zip_plus_four\|single |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 51 | 2018\|NM\|five_digit\|multiple |
+| 0 | 1 | 0 | 4 | 2 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 18 | 2018\|NM\|five_digit\|none |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1199 | 2018\|NM\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|NM\|invalid\|none |
+| 0 | 6 | 0 | 0 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 6 | 6 | 0 | 0 | 0 | 6 | 2018\|NM\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|NM\|zip_plus_four\|none |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 82 | 2018\|NM\|zip_plus_four\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 177 | 2018\|NV\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 14 | 2018\|NV\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2193 | 2018\|NV\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|NV\|invalid\|none |
+| 0 | 3 | 0 | 1 | 0 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 4 | 4 | 0 | 0 | 0 | 4 | 2018\|NV\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 1 | 0 | 0 | 1 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 125 | 2018\|NV\|zip_plus_four\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 4 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 1629 | 2018\|NY\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 100 | 2018\|NY\|five_digit\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 9581 | 2018\|NY\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2018\|NY\|invalid\|none |
+| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2018\|NY\|padded_four_digit\|none |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8 | 2018\|NY\|padded_four_digit\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 134 | 2018\|NY\|zip_plus_four\|multiple |
+| 0 | 3 | 0 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 0 | 0 | 10 | 2018\|NY\|zip_plus_four\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 775 | 2018\|NY\|zip_plus_four\|single |
+| 0 | 1 | 0 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2018\|Ne\|five_digit\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 3647 | 2018\|OH\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 81 | 2018\|OH\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8753 | 2018\|OH\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2018\|OH\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2018\|OH\|padded_four_digit\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 170 | 2018\|OH\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 6 | 2018\|OH\|zip_plus_four\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 413 | 2018\|OH\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 1 | 0 | 1 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 871 | 2018\|OK\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 26 | 2018\|OK\|five_digit\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1996 | 2018\|OK\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|OK\|invalid\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 60 | 2018\|OK\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2018\|OK\|zip_plus_four\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 128 | 2018\|OK\|zip_plus_four\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 4 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 902 | 2018\|OR\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 31 | 2018\|OR\|five_digit\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3696 | 2018\|OR\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|OR\|invalid\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 50 | 2018\|OR\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2018\|OR\|zip_plus_four\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 222 | 2018\|OR\|zip_plus_four\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2018\|Oh\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 2018\|Ok\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2018\|Ok\|five_digit\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 2669 | 2018\|PA\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 114 | 2018\|PA\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 9464 | 2018\|PA\|five_digit\|single |
+| 0 | 1 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 3 | 2018\|PA\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2018\|PA\|padded_four_digit\|multiple |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 164 | 2018\|PA\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 13 | 2018\|PA\|zip_plus_four\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 551 | 2018\|PA\|zip_plus_four\|single |
+| 0 | 0 | 0 | 6 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 0 | 0 | 737 | 2018\|PR\|five_digit\|multiple |
+| 0 | 0 | 0 | 7 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 0 | 0 | 8 | 2018\|PR\|five_digit\|none |
+| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 585 | 2018\|PR\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 2 | 1 | 1 | 0 | 0 | 0 | 0 | 3 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2018\|PR\|invalid\|none |
+| 0 | 2 | 0 | 3 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 0 | 0 | 21 | 2018\|PR\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 82 | 2018\|PR\|zip_plus_four\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2018\|PW\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2018\|Pa\|five_digit\|none |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2018\|Pa\|five_digit\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 111 | 2018\|RI\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2018\|RI\|five_digit\|none |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 690 | 2018\|RI\|five_digit\|single |
+| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 0 | 0 | 8 | 2018\|RI\|invalid\|none |
+| 0 | 3 | 0 | 0 | 1 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 4 | 4 | 0 | 0 | 0 | 4 | 2018\|RI\|zip_plus_four\|multiple |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 44 | 2018\|RI\|zip_plus_four\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 1303 | 2018\|SC\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 18 | 2018\|SC\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2979 | 2018\|SC\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|SC\|invalid\|none |
+| 0 | 5 | 0 | 2 | 0 | 0 | 1 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 82 | 2018\|SC\|zip_plus_four\|multiple |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 148 | 2018\|SC\|zip_plus_four\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 347 | 2018\|SD\|five_digit\|multiple |
+| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|SD\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 656 | 2018\|SD\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2018\|SD\|invalid\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 25 | 2018\|SD\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2018\|SD\|zip_plus_four\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 38 | 2018\|SD\|zip_plus_four\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 1961 | 2018\|TN\|five_digit\|multiple |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 0 | 0 | 31 | 2018\|TN\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3805 | 2018\|TN\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|TN\|invalid\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 154 | 2018\|TN\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|TN\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 251 | 2018\|TN\|zip_plus_four\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 4607 | 2018\|TX\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 82 | 2018\|TX\|five_digit\|none |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 15900 | 2018\|TX\|five_digit\|single |
+| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2018\|TX\|invalid\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2018\|TX\|padded_four_digit\|multiple |
+| 0 | 2 | 0 | 1 | 5 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 0 | 0 | 322 | 2018\|TX\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 10 | 2018\|TX\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1044 | 2018\|TX\|zip_plus_four\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 175 | 2018\|UT\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 19 | 2018\|UT\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1814 | 2018\|UT\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|UT\|invalid\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 10 | 2018\|UT\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2018\|UT\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 0 | 0 | 1 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 136 | 2018\|UT\|zip_plus_four\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 3061 | 2018\|VA\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 31 | 2018\|VA\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3850 | 2018\|VA\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|VA\|invalid\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 148 | 2018\|VA\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 225 | 2018\|VA\|zip_plus_four\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|VI\|five_digit\|none |
+| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 29 | 2018\|VI\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 3 | 0 | 1 | 0 | 0 | 0 | 0 | 5 | 0 | 5 | 0 | 0 | 0 | 0 | 5 | 2018\|VI\|invalid\|none |
+| 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 2 | 2 | 2 | 2 | 2 | 2018\|VI\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 58 | 2018\|VT\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 6 | 2018\|VT\|five_digit\|none |
+| 0 | 4 | 0 | 2 | 1 | 0 | 1 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 502 | 2018\|VT\|five_digit\|single |
+| 0 | 1 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 3 | 2018\|VT\|invalid\|none |
+| 0 | 3 | 0 | 0 | 2 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 5 | 5 | 0 | 0 | 0 | 5 | 2018\|VT\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2018\|VT\|zip_plus_four\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 31 | 2018\|VT\|zip_plus_four\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 249 | 2018\|WA\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 29 | 2018\|WA\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3973 | 2018\|WA\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|WA\|invalid\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 35 | 2018\|WA\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 4 | 0 | 0 | 0 | 0 | 4 | 2018\|WA\|zip_plus_four\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 377 | 2018\|WA\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 2236 | 2018\|WI\|five_digit\|multiple |
+| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 34 | 2018\|WI\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4903 | 2018\|WI\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|WI\|invalid\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 117 | 2018\|WI\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2018\|WI\|zip_plus_four\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 271 | 2018\|WI\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 284 | 2018\|WV\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 18 | 2018\|WV\|five_digit\|none |
+| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 886 | 2018\|WV\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|WV\|invalid\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 23 | 2018\|WV\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2018\|WV\|zip_plus_four\|none |
+| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 70 | 2018\|WV\|zip_plus_four\|single |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 0 | 0 | 37 | 2018\|WY\|five_digit\|multiple |
+| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 11 | 2018\|WY\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 380 | 2018\|WY\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2018\|WY\|invalid\|none |
+| 0 | 3 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 3 | 3 | 0 | 0 | 0 | 3 | 2018\|WY\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 27 | 2018\|WY\|zip_plus_four\|single |
+| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2018\|Wa\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2018\|al\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8 | 2018\|fl\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2018\|ga\|five_digit\|multiple |
+| 0 | 4 | 0 | 0 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 6 | 6 | 6 | 0 | 6 | 0 | 6 | 2018\|ga\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2018\|ky\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2018\|nc\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2018\|pa\|five_digit\|single |
+| 0 | 2 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2018\|tn\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2019\|AA\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2019\|AA\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2019\|AA\|invalid\|none |
+| 0 | 1 | 0 | 5 | 2 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 8 | 8 | 0 | 0 | 0 | 15 | 2019\|AK\|five_digit\|multiple |
+| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 119 | 2019\|AK\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1128 | 2019\|AK\|five_digit\|single |
+| 0 | 1 | 0 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 7 | 2019\|AK\|zip_plus_four\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 32 | 2019\|AK\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 1135 | 2019\|AL\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 31 | 2019\|AL\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2796 | 2019\|AL\|five_digit\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 81 | 2019\|AL\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 2 | 2019\|AL\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 233 | 2019\|AL\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2019\|AP\|five_digit\|single |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 852 | 2019\|AR\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 26 | 2019\|AR\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1547 | 2019\|AR\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 60 | 2019\|AR\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2019\|AR\|zip_plus_four\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 104 | 2019\|AR\|zip_plus_four\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2019\|AS\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 122 | 2019\|AZ\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 61 | 2019\|AZ\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4896 | 2019\|AZ\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2019\|AZ\|padded_four_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 12 | 2019\|AZ\|zip_plus_four\|multiple |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 298 | 2019\|AZ\|zip_plus_four\|single |
+| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2019\|Az\|five_digit\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 2513 | 2019\|CA\|five_digit\|multiple |
+| 0 | 2 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 151 | 2019\|CA\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 26090 | 2019\|CA\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 0 | 4 | 0 | 4 | 2019\|CA\|padded_four_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 125 | 2019\|CA\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 9 | 2019\|CA\|zip_plus_four\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1892 | 2019\|CA\|zip_plus_four\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 2144 | 2019\|CO\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 31 | 2019\|CO\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3007 | 2019\|CO\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2019\|CO\|padded_four_digit\|none |
+| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2019\|CO\|padded_four_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 111 | 2019\|CO\|zip_plus_four\|multiple |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 182 | 2019\|CO\|zip_plus_four\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 137 | 2019\|CT\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 27 | 2019\|CT\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4198 | 2019\|CT\|five_digit\|single |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 0 | 0 | 15 | 2019\|CT\|invalid\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 11 | 2019\|CT\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 3 | 2019\|CT\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 209 | 2019\|CT\|zip_plus_four\|single |
+| 0 | 4 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 4 | 4 | 4 | 0 | 4 | 0 | 4 | 2019\|Ca\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2019\|DC\|five_digit\|none |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 431 | 2019\|DC\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2019\|DC\|padded_four_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2019\|DC\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 44 | 2019\|DC\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 1 | 0 | 1 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 38 | 2019\|DE\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 4 | 0 | 0 | 0 | 0 | 4 | 2019\|DE\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 0 | 0 | 1 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 645 | 2019\|DE\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2019\|DE\|padded_four_digit\|none |
+| 0 | 3 | 0 | 0 | 0 | 0 | 0 | 2 | 3 | 0 | 0 | 0 | 3 | 3 | 3 | 0 | 0 | 0 | 3 | 2019\|DE\|zip_plus_four\|multiple |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 57 | 2019\|DE\|zip_plus_four\|single |
+| 0 | 5 | 0 | 0 | 2 | 0 | 1 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1272 | 2019\|FL\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 83 | 2019\|FL\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 12749 | 2019\|FL\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2019\|FL\|padded_four_digit\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 134 | 2019\|FL\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2019\|FL\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1298 | 2019\|FL\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2019\|FM\|five_digit\|multiple |
+| 0 | 1 | 0 | 0 | 2 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2019\|Fl\|five_digit\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 3366 | 2019\|GA\|five_digit\|multiple |
+| 0 | 3 | 0 | 0 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 0 | 0 | 36 | 2019\|GA\|five_digit\|none |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4499 | 2019\|GA\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2019\|GA\|padded_four_digit\|single |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 249 | 2019\|GA\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2019\|GA\|zip_plus_four\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 349 | 2019\|GA\|zip_plus_four\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2019\|GU\|five_digit\|none |
+| 0 | 0 | 0 | 6 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 35 | 2019\|GU\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2019\|GU\|zip_plus_four\|none |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 3 | 3 | 3 | 3 | 3 | 3 | 2019\|GU\|zip_plus_four\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2019\|Ga\|five_digit\|single |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 10 | 2019\|HI\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1047 | 2019\|HI\|five_digit\|single |
+| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 83 | 2019\|HI\|zip_plus_four\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 1203 | 2019\|IA\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 20 | 2019\|IA\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2928 | 2019\|IA\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2019\|IA\|padded_four_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 61 | 2019\|IA\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 1 | 2019\|IA\|zip_plus_four\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 168 | 2019\|IA\|zip_plus_four\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 440 | 2019\|ID\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 5 | 2019\|ID\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1031 | 2019\|ID\|five_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 28 | 2019\|ID\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 87 | 2019\|ID\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 2695 | 2019\|IL\|five_digit\|multiple |
+| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 45 | 2019\|IL\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 9629 | 2019\|IL\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 169 | 2019\|IL\|zip_plus_four\|multiple |
+| 0 | 3 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 5 | 2019\|IL\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 715 | 2019\|IL\|zip_plus_four\|single |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 2081 | 2019\|IN\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 57 | 2019\|IN\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4984 | 2019\|IN\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2019\|IN\|padded_four_digit\|multiple |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 134 | 2019\|IN\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2019\|IN\|zip_plus_four\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 337 | 2019\|IN\|zip_plus_four\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2019\|In\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 577 | 2019\|KS\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 5 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 14 | 2019\|KS\|five_digit\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2235 | 2019\|KS\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2019\|KS\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2019\|KS\|padded_four_digit\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 45 | 2019\|KS\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 163 | 2019\|KS\|zip_plus_four\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 1609 | 2019\|KY\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 35 | 2019\|KY\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2491 | 2019\|KY\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 97 | 2019\|KY\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 154 | 2019\|KY\|zip_plus_four\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 693 | 2019\|LA\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 44 | 2019\|LA\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 0 | 0 | 1 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2870 | 2019\|LA\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2019\|LA\|padded_four_digit\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 51 | 2019\|LA\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2019\|LA\|zip_plus_four\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 196 | 2019\|LA\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 441 | 2019\|MA\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 58 | 2019\|MA\|five_digit\|none |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4521 | 2019\|MA\|five_digit\|single |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 0 | 0 | 32 | 2019\|MA\|invalid\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 37 | 2019\|MA\|zip_plus_four\|multiple |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 363 | 2019\|MA\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 775 | 2019\|MD\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 3 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 5 | 2019\|MD\|five_digit\|none |
+| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2705 | 2019\|MD\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2019\|MD\|padded_four_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 75 | 2019\|MD\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2019\|MD\|zip_plus_four\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 276 | 2019\|MD\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 12 | 2019\|ME\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 5 | 2019\|ME\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1402 | 2019\|ME\|five_digit\|single |
+| 0 | 2 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 5 | 2019\|ME\|invalid\|none |
+| 0 | 1 | 0 | 1 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2 | 2 | 0 | 0 | 0 | 2 | 2019\|ME\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2019\|ME\|zip_plus_four\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 81 | 2019\|ME\|zip_plus_four\|single |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2019\|MH\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2019\|MH\|padded_four_digit\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 1943 | 2019\|MI\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 26 | 2019\|MI\|five_digit\|none |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 6309 | 2019\|MI\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2019\|MI\|padded_four_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 136 | 2019\|MI\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 6 | 2019\|MI\|zip_plus_four\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 447 | 2019\|MI\|zip_plus_four\|single |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 2732 | 2019\|MN\|five_digit\|multiple |
+| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 32 | 2019\|MN\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 6110 | 2019\|MN\|five_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 162 | 2019\|MN\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 335 | 2019\|MN\|zip_plus_four\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 1406 | 2019\|MO\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 32 | 2019\|MO\|five_digit\|none |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3956 | 2019\|MO\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 103 | 2019\|MO\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2019\|MO\|zip_plus_four\|none |
+| 0 | 3 | 0 | 1 | 3 | 0 | 1 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 290 | 2019\|MO\|zip_plus_four\|single |
+| 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 7 | 8 | 7 | 11 | 2019\|MP\|five_digit\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 978 | 2019\|MS\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 28 | 2019\|MS\|five_digit\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1260 | 2019\|MS\|five_digit\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 74 | 2019\|MS\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2019\|MS\|zip_plus_four\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 84 | 2019\|MS\|zip_plus_four\|single |
+| 0 | 4 | 0 | 2 | 1 | 0 | 1 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 94 | 2019\|MT\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2019\|MT\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 689 | 2019\|MT\|five_digit\|single |
+| 0 | 4 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 4 | 4 | 0 | 0 | 0 | 4 | 2019\|MT\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2019\|MT\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 0 | 0 | 1 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 72 | 2019\|MT\|zip_plus_four\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2019\|Mi\|five_digit\|multiple |
+| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2019\|Mi\|five_digit\|single |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 3704 | 2019\|NC\|five_digit\|multiple |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 84 | 2019\|NC\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5760 | 2019\|NC\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 226 | 2019\|NC\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2019\|NC\|zip_plus_four\|none |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 369 | 2019\|NC\|zip_plus_four\|single |
+| 0 | 1 | 0 | 5 | 2 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 8 | 8 | 0 | 0 | 0 | 125 | 2019\|ND\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 7 | 2019\|ND\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 869 | 2019\|ND\|five_digit\|single |
+| 0 | 4 | 0 | 0 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 6 | 6 | 0 | 0 | 0 | 6 | 2019\|ND\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 44 | 2019\|ND\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 566 | 2019\|NE\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 5 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 8 | 2019\|NE\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1307 | 2019\|NE\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 2019\|NE\|padded_four_digit\|multiple |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 30 | 2019\|NE\|zip_plus_four\|multiple |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 90 | 2019\|NE\|zip_plus_four\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 112 | 2019\|NH\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 5 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 10 | 2019\|NH\|five_digit\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1406 | 2019\|NH\|five_digit\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 0 | 0 | 8 | 2019\|NH\|invalid\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 12 | 2019\|NH\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 89 | 2019\|NH\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 914 | 2019\|NJ\|five_digit\|multiple |
+| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 28 | 2019\|NJ\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4226 | 2019\|NJ\|five_digit\|single |
+| 0 | 2 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 72 | 2019\|NJ\|invalid\|none |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2019\|NJ\|padded_four_digit\|none |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2 | 2019\|NJ\|padded_four_digit\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 72 | 2019\|NJ\|zip_plus_four\|multiple |
+| 0 | 4 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 0 | 5 | 2019\|NJ\|zip_plus_four\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 385 | 2019\|NJ\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 57 | 2019\|NM\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 3 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 14 | 2019\|NM\|five_digit\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1198 | 2019\|NM\|five_digit\|single |
+| 0 | 1 | 0 | 4 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 5 | 5 | 0 | 0 | 0 | 5 | 2019\|NM\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2019\|NM\|zip_plus_four\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 93 | 2019\|NM\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 185 | 2019\|NV\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 15 | 2019\|NV\|five_digit\|none |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2150 | 2019\|NV\|five_digit\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 10 | 2019\|NV\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 122 | 2019\|NV\|zip_plus_four\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 1621 | 2019\|NY\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 3 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 107 | 2019\|NY\|five_digit\|none |
+| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 9471 | 2019\|NY\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2019\|NY\|padded_four_digit\|none |
+| 0 | 0 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 6 | 6 | 0 | 6 | 0 | 6 | 2019\|NY\|padded_four_digit\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 148 | 2019\|NY\|zip_plus_four\|multiple |
+| 0 | 2 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 6 | 2019\|NY\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 908 | 2019\|NY\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 3744 | 2019\|OH\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 72 | 2019\|OH\|five_digit\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8840 | 2019\|OH\|five_digit\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 210 | 2019\|OH\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2019\|OH\|zip_plus_four\|none |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 535 | 2019\|OH\|zip_plus_four\|single |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 953 | 2019\|OK\|five_digit\|multiple |
+| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 18 | 2019\|OK\|five_digit\|none |
+| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1945 | 2019\|OK\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 68 | 2019\|OK\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2019\|OK\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 145 | 2019\|OK\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 945 | 2019\|OR\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 26 | 2019\|OR\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3687 | 2019\|OR\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2019\|OR\|padded_four_digit\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 55 | 2019\|OR\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 5 | 2019\|OR\|zip_plus_four\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 231 | 2019\|OR\|zip_plus_four\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2019\|Oh\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2019\|Ok\|five_digit\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 2719 | 2019\|PA\|five_digit\|multiple |
+| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 106 | 2019\|PA\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 9359 | 2019\|PA\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2019\|PA\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2019\|PA\|padded_four_digit\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 169 | 2019\|PA\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 7 | 2019\|PA\|zip_plus_four\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 655 | 2019\|PA\|zip_plus_four\|single |
+| 0 | 0 | 0 | 5 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 0 | 0 | 560 | 2019\|PR\|five_digit\|multiple |
+| 0 | 0 | 0 | 7 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 0 | 0 | 8 | 2019\|PR\|five_digit\|none |
+| 0 | 0 | 0 | 6 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 590 | 2019\|PR\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 2 | 1 | 2 | 0 | 0 | 0 | 0 | 5 | 0 | 5 | 0 | 0 | 0 | 0 | 5 | 2019\|PR\|invalid\|none |
+| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 0 | 0 | 30 | 2019\|PR\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 7 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 72 | 2019\|PR\|zip_plus_four\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2019\|PW\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2019\|Pa\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2019\|Pa\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 111 | 2019\|RI\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2019\|RI\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 728 | 2019\|RI\|five_digit\|single |
+| 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 2 | 2019\|RI\|invalid\|none |
+| 0 | 3 | 0 | 4 | 1 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 9 | 2019\|RI\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 54 | 2019\|RI\|zip_plus_four\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 5 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 1321 | 2019\|SC\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 21 | 2019\|SC\|five_digit\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2988 | 2019\|SC\|five_digit\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 80 | 2019\|SC\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 193 | 2019\|SC\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 359 | 2019\|SD\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 3 | 2019\|SD\|five_digit\|none |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 662 | 2019\|SD\|five_digit\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 29 | 2019\|SD\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 2 | 2019\|SD\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 41 | 2019\|SD\|zip_plus_four\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1996 | 2019\|TN\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 29 | 2019\|TN\|five_digit\|none |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3713 | 2019\|TN\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2019\|TN\|padded_four_digit\|multiple |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 166 | 2019\|TN\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2019\|TN\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 304 | 2019\|TN\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 4 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 4724 | 2019\|TX\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 101 | 2019\|TX\|five_digit\|none |
+| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 15822 | 2019\|TX\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2019\|TX\|padded_four_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 4 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 323 | 2019\|TX\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 8 | 2019\|TX\|zip_plus_four\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1103 | 2019\|TX\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2019\|Tx\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2019\|Tx\|five_digit\|single |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 196 | 2019\|UT\|five_digit\|multiple |
+| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 12 | 2019\|UT\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1889 | 2019\|UT\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2019\|UT\|padded_four_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 14 | 2019\|UT\|zip_plus_four\|multiple |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 135 | 2019\|UT\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 4 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 2974 | 2019\|VA\|five_digit\|multiple |
+| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 36 | 2019\|VA\|five_digit\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3776 | 2019\|VA\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 202 | 2019\|VA\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 3 | 2019\|VA\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 281 | 2019\|VA\|zip_plus_four\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2019\|VI\|five_digit\|none |
+| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 28 | 2019\|VI\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2019\|VI\|invalid\|none |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 2 | 2 | 2 | 2 | 2 | 2019\|VI\|zip_plus_four\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 59 | 2019\|VT\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 5 | 2019\|VT\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 617 | 2019\|VT\|five_digit\|single |
+| 0 | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 2 | 2019\|VT\|invalid\|none |
+| 0 | 5 | 0 | 1 | 0 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 6 | 6 | 0 | 0 | 0 | 6 | 2019\|VT\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 33 | 2019\|VT\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 397 | 2019\|WA\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 47 | 2019\|WA\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5426 | 2019\|WA\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2019\|WA\|missing\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 30 | 2019\|WA\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2019\|WA\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 454 | 2019\|WA\|zip_plus_four\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 2205 | 2019\|WI\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 45 | 2019\|WI\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4759 | 2019\|WI\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2019\|WI\|padded_four_digit\|multiple |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 120 | 2019\|WI\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2019\|WI\|zip_plus_four\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 280 | 2019\|WI\|zip_plus_four\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 336 | 2019\|WV\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 12 | 2019\|WV\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 963 | 2019\|WV\|five_digit\|single |
+| 0 | 4 | 0 | 4 | 0 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 31 | 2019\|WV\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 70 | 2019\|WV\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 37 | 2019\|WY\|five_digit\|multiple |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 0 | 0 | 43 | 2019\|WY\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 420 | 2019\|WY\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2019\|WY\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 23 | 2019\|WY\|zip_plus_four\|single |
+| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2019\|Wa\|five_digit\|single |
+| 0 | 2 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2019\|fl\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2019\|nc\|zip_plus_four\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2019\|ny\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 2 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2019\|ny\|zip_plus_four\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2019\|oh\|five_digit\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2019\|oh\|zip_plus_four\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2019\|pa\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2019\|va\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2020\|AA\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2020\|AA\|five_digit\|single |
+| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 0 | 0 | 17 | 2020\|AK\|five_digit\|multiple |
+| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 106 | 2020\|AK\|five_digit\|none |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1158 | 2020\|AK\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|AK\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2020\|AK\|padded_four_digit\|single |
+| 0 | 1 | 0 | 1 | 1 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2020\|AK\|zip_plus_four\|single |
+| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 0 | 0 | 1187 | 2020\|AL\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 24 | 2020\|AL\|five_digit\|none |
+| 0 | 4 | 0 | 3 | 0 | 0 | 1 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2968 | 2020\|AL\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|AL\|invalid\|none |
+| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 0 | 0 | 26 | 2020\|AL\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 94 | 2020\|AL\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2020\|AP\|five_digit\|single |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 897 | 2020\|AR\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 22 | 2020\|AR\|five_digit\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1556 | 2020\|AR\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|AR\|invalid\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 21 | 2020\|AR\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|AR\|zip_plus_four\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 40 | 2020\|AR\|zip_plus_four\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|AS\|five_digit\|none |
+| 0 | 3 | 0 | 0 | 5 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 147 | 2020\|AZ\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 71 | 2020\|AZ\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5142 | 2020\|AZ\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|AZ\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2020\|AZ\|padded_four_digit\|single |
+| 0 | 2 | 0 | 0 | 2 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 4 | 4 | 0 | 0 | 0 | 4 | 2020\|AZ\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 146 | 2020\|AZ\|zip_plus_four\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2020\|Ak\|five_digit\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 2598 | 2020\|CA\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 163 | 2020\|CA\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 28073 | 2020\|CA\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2020\|CA\|invalid\|none |
+| 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 5 | 5 | 0 | 5 | 0 | 5 | 2020\|CA\|padded_four_digit\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 63 | 2020\|CA\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|CA\|zip_plus_four\|none |
+| 0 | 3 | 0 | 0 | 5 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1114 | 2020\|CA\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 2167 | 2020\|CO\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 31 | 2020\|CO\|five_digit\|none |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2710 | 2020\|CO\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|CO\|invalid\|none |
+| 0 | 0 | 0 | 1 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 5 | 5 | 0 | 5 | 0 | 5 | 2020\|CO\|padded_four_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 49 | 2020\|CO\|zip_plus_four\|multiple |
+| 0 | 4 | 0 | 0 | 3 | 0 | 1 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 78 | 2020\|CO\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 142 | 2020\|CT\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 27 | 2020\|CT\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4323 | 2020\|CT\|five_digit\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 0 | 0 | 38 | 2020\|CT\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2020\|CT\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|CT\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 46 | 2020\|CT\|zip_plus_four\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2020\|Ca\|five_digit\|multiple |
+| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2020\|Ca\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2020\|DC\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 1 | 0 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 477 | 2020\|DC\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|DC\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2020\|DC\|padded_four_digit\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 14 | 2020\|DC\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 40 | 2020\|DE\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 2 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 6 | 2020\|DE\|five_digit\|none |
+| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 670 | 2020\|DE\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|DE\|invalid\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|DE\|padded_four_digit\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2020\|DE\|padded_four_digit\|single |
+| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2 | 2 | 0 | 0 | 0 | 2 | 2020\|DE\|zip_plus_four\|multiple |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 24 | 2020\|DE\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 1364 | 2020\|FL\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 87 | 2020\|FL\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 13199 | 2020\|FL\|five_digit\|single |
+| 0 | 1 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 5 | 2020\|FL\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2020\|FL\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|FL\|padded_four_digit\|none |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2020\|FL\|padded_four_digit\|single |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 67 | 2020\|FL\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|FL\|zip_plus_four\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 750 | 2020\|FL\|zip_plus_four\|single |
+| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2020\|Fl\|five_digit\|single |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 3679 | 2020\|GA\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 43 | 2020\|GA\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4954 | 2020\|GA\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|GA\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2020\|GA\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|GA\|padded_four_digit\|none |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2020\|GA\|padded_four_digit\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 95 | 2020\|GA\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 147 | 2020\|GA\|zip_plus_four\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2020\|GU\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 5 | 0 | 0 | 0 | 0 | 5 | 2020\|GU\|five_digit\|none |
+| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 33 | 2020\|GU\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 1 | 2020\|GU\|zip_plus_four\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2020\|Ga\|five_digit\|multiple |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2020\|Ga\|five_digit\|single |
+| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 12 | 2020\|HI\|five_digit\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1045 | 2020\|HI\|five_digit\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 31 | 2020\|HI\|zip_plus_four\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1148 | 2020\|IA\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 24 | 2020\|IA\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3017 | 2020\|IA\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|IA\|invalid\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 26 | 2020\|IA\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 45 | 2020\|IA\|zip_plus_four\|single |
+| 0 | 3 | 0 | 0 | 5 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 407 | 2020\|ID\|five_digit\|multiple |
+| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 12 | 2020\|ID\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1069 | 2020\|ID\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|ID\|invalid\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 25 | 2020\|ID\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|ID\|zip_plus_four\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 47 | 2020\|ID\|zip_plus_four\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 2823 | 2020\|IL\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 51 | 2020\|IL\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 9890 | 2020\|IL\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|IL\|invalid\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2020\|IL\|padded_four_digit\|single |
+| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 75 | 2020\|IL\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|IL\|zip_plus_four\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 402 | 2020\|IL\|zip_plus_four\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 2066 | 2020\|IN\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 52 | 2020\|IN\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5123 | 2020\|IN\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|IN\|invalid\|none |
+| 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 5 | 5 | 0 | 5 | 0 | 5 | 2020\|IN\|padded_four_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 57 | 2020\|IN\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 1 | 0 | 1 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 142 | 2020\|IN\|zip_plus_four\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2020\|Il\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2020\|In\|five_digit\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 620 | 2020\|KS\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 17 | 2020\|KS\|five_digit\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2392 | 2020\|KS\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|KS\|invalid\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 13 | 2020\|KS\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|KS\|zip_plus_four\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 73 | 2020\|KS\|zip_plus_four\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 1738 | 2020\|KY\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 40 | 2020\|KY\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2651 | 2020\|KY\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|KY\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2020\|KY\|padded_four_digit\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 43 | 2020\|KY\|zip_plus_four\|multiple |
+| 0 | 7 | 0 | 0 | 0 | 0 | 1 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 46 | 2020\|KY\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 770 | 2020\|LA\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 38 | 2020\|LA\|five_digit\|none |
+| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2986 | 2020\|LA\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|LA\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2020\|LA\|padded_four_digit\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 14 | 2020\|LA\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 72 | 2020\|LA\|zip_plus_four\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 511 | 2020\|MA\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 44 | 2020\|MA\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5160 | 2020\|MA\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 0 | 98 | 2020\|MA\|invalid\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 8 | 2020\|MA\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|MA\|zip_plus_four\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 55 | 2020\|MA\|zip_plus_four\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 852 | 2020\|MD\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 5 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 10 | 2020\|MD\|five_digit\|none |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3398 | 2020\|MD\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|MD\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2020\|MD\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 6 | 6 | 0 | 6 | 0 | 6 | 2020\|MD\|padded_four_digit\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 28 | 2020\|MD\|zip_plus_four\|multiple |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 103 | 2020\|MD\|zip_plus_four\|single |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 17 | 2020\|ME\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 11 | 2020\|ME\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1333 | 2020\|ME\|five_digit\|single |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 0 | 0 | 15 | 2020\|ME\|invalid\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 13 | 2020\|ME\|zip_plus_four\|single |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2020\|MH\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2020\|MH\|padded_four_digit\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 2070 | 2020\|MI\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 37 | 2020\|MI\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 6645 | 2020\|MI\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2020\|MI\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|MI\|padded_four_digit\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2020\|MI\|padded_four_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 53 | 2020\|MI\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|MI\|zip_plus_four\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 171 | 2020\|MI\|zip_plus_four\|single |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 2950 | 2020\|MN\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 42 | 2020\|MN\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 6454 | 2020\|MN\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2020\|MN\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|MN\|padded_four_digit\|none |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 2 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 70 | 2020\|MN\|zip_plus_four\|multiple |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 164 | 2020\|MN\|zip_plus_four\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 1537 | 2020\|MO\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 45 | 2020\|MO\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4066 | 2020\|MO\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|MO\|invalid\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 26 | 2020\|MO\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|MO\|zip_plus_four\|none |
+| 0 | 5 | 0 | 1 | 1 | 0 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 118 | 2020\|MO\|zip_plus_four\|single |
+| 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 7 | 8 | 7 | 10 | 2020\|MP\|five_digit\|single |
+| 0 | 6 | 0 | 1 | 0 | 0 | 1 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 979 | 2020\|MS\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 28 | 2020\|MS\|five_digit\|none |
+| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1287 | 2020\|MS\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|MS\|invalid\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 31 | 2020\|MS\|zip_plus_four\|multiple |
+| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 31 | 2020\|MS\|zip_plus_four\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 84 | 2020\|MT\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2020\|MT\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 721 | 2020\|MT\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|MT\|invalid\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2020\|MT\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 30 | 2020\|MT\|zip_plus_four\|single |
+| 0 | 2 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2020\|Ma\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2020\|Mi\|five_digit\|multiple |
+| 0 | 5 | 0 | 2 | 0 | 0 | 1 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 3926 | 2020\|NC\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 93 | 2020\|NC\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 6100 | 2020\|NC\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2020\|NC\|invalid\|none |
+| 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 0 | 4 | 0 | 4 | 2020\|NC\|padded_four_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 72 | 2020\|NC\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|NC\|zip_plus_four\|none |
+| 0 | 6 | 0 | 0 | 1 | 0 | 1 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 150 | 2020\|NC\|zip_plus_four\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 126 | 2020\|ND\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 5 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 7 | 2020\|ND\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 909 | 2020\|ND\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|ND\|invalid\|none |
+| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2 | 2 | 0 | 0 | 0 | 2 | 2020\|ND\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 28 | 2020\|ND\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 613 | 2020\|NE\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 13 | 2020\|NE\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1429 | 2020\|NE\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|NE\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2020\|NE\|padded_four_digit\|multiple |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 11 | 2020\|NE\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 36 | 2020\|NE\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 121 | 2020\|NH\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 9 | 2020\|NH\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1449 | 2020\|NH\|five_digit\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 0 | 21 | 2020\|NH\|invalid\|none |
+| 0 | 2 | 0 | 1 | 1 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 4 | 4 | 0 | 0 | 0 | 4 | 2020\|NH\|zip_plus_four\|multiple |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 16 | 2020\|NH\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 994 | 2020\|NJ\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 36 | 2020\|NJ\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4847 | 2020\|NJ\|five_digit\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 0 | 0 | 104 | 2020\|NJ\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|NJ\|padded_four_digit\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 1 | 2020\|NJ\|padded_four_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 9 | 2020\|NJ\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 78 | 2020\|NJ\|zip_plus_four\|single |
+| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 51 | 2020\|NM\|five_digit\|multiple |
+| 0 | 1 | 0 | 5 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 17 | 2020\|NM\|five_digit\|none |
+| 0 | 3 | 0 | 5 | 0 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1230 | 2020\|NM\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|NM\|invalid\|none |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2020\|NM\|zip_plus_four\|multiple |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 26 | 2020\|NM\|zip_plus_four\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 193 | 2020\|NV\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 17 | 2020\|NV\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2309 | 2020\|NV\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|NV\|invalid\|none |
+| 0 | 4 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 4 | 4 | 0 | 0 | 0 | 4 | 2020\|NV\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 63 | 2020\|NV\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 1642 | 2020\|NY\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 96 | 2020\|NY\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 10252 | 2020\|NY\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|NY\|invalid\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2020\|NY\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2020\|NY\|padded_four_digit\|none |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 9 | 2020\|NY\|padded_four_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 47 | 2020\|NY\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|NY\|zip_plus_four\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 299 | 2020\|NY\|zip_plus_four\|single |
+| 0 | 1 | 0 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2020\|Ne\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 3767 | 2020\|OH\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 88 | 2020\|OH\|five_digit\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8988 | 2020\|OH\|five_digit\|single |
+| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2020\|OH\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2020\|OH\|padded_four_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 4 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 76 | 2020\|OH\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|OH\|zip_plus_four\|none |
+| 0 | 6 | 0 | 0 | 1 | 0 | 1 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 201 | 2020\|OH\|zip_plus_four\|single |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 1006 | 2020\|OK\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 3 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 25 | 2020\|OK\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1996 | 2020\|OK\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|OK\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|OK\|padded_four_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 29 | 2020\|OK\|zip_plus_four\|multiple |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 60 | 2020\|OK\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 927 | 2020\|OR\|five_digit\|multiple |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 25 | 2020\|OR\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3613 | 2020\|OR\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|OR\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|OR\|padded_four_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 23 | 2020\|OR\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2020\|OR\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 114 | 2020\|OR\|zip_plus_four\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2020\|Oh\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2020\|Ok\|five_digit\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 3 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 2928 | 2020\|PA\|five_digit\|multiple |
+| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 107 | 2020\|PA\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 10031 | 2020\|PA\|five_digit\|single |
+| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2020\|PA\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2020\|PA\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|PA\|padded_four_digit\|none |
+| 0 | 0 | 0 | 1 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 5 | 5 | 0 | 5 | 0 | 5 | 2020\|PA\|padded_four_digit\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 59 | 2020\|PA\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 3 | 2020\|PA\|zip_plus_four\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 211 | 2020\|PA\|zip_plus_four\|single |
+| 0 | 0 | 0 | 7 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 0 | 0 | 657 | 2020\|PR\|five_digit\|multiple |
+| 0 | 0 | 0 | 7 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 0 | 0 | 9 | 2020\|PR\|five_digit\|none |
+| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 652 | 2020\|PR\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 1 | 2 | 0 | 0 | 0 | 0 | 3 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2020\|PR\|invalid\|none |
+| 0 | 0 | 0 | 6 | 1 | 1 | 1 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 0 | 0 | 24 | 2020\|PR\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 64 | 2020\|PR\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2020\|PW\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2020\|PW\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|Pa\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 118 | 2020\|RI\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 6 | 2020\|RI\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 746 | 2020\|RI\|five_digit\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 0 | 0 | 10 | 2020\|RI\|invalid\|none |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 2020\|RI\|zip_plus_four\|multiple |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 12 | 2020\|RI\|zip_plus_four\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 1417 | 2020\|SC\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 20 | 2020\|SC\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3143 | 2020\|SC\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|SC\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2020\|SC\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2020\|SC\|padded_four_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 27 | 2020\|SC\|zip_plus_four\|multiple |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 57 | 2020\|SC\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 349 | 2020\|SD\|five_digit\|multiple |
+| 0 | 1 | 0 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 7 | 2020\|SD\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 689 | 2020\|SD\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|SD\|invalid\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 14 | 2020\|SD\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|SD\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 21 | 2020\|SD\|zip_plus_four\|single |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 2143 | 2020\|TN\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 28 | 2020\|TN\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4065 | 2020\|TN\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|TN\|invalid\|none |
+| 0 | 6 | 0 | 0 | 1 | 0 | 1 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 68 | 2020\|TN\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|TN\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 148 | 2020\|TN\|zip_plus_four\|single |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 4793 | 2020\|TX\|five_digit\|multiple |
+| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 98 | 2020\|TX\|five_digit\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 16077 | 2020\|TX\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2020\|TX\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2020\|TX\|padded_four_digit\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 140 | 2020\|TX\|zip_plus_four\|multiple |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 514 | 2020\|TX\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 182 | 2020\|UT\|five_digit\|multiple |
+| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 14 | 2020\|UT\|five_digit\|none |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1981 | 2020\|UT\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|UT\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|UT\|padded_four_digit\|none |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2020\|UT\|padded_four_digit\|single |
+| 0 | 2 | 0 | 0 | 1 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 3 | 3 | 0 | 0 | 0 | 3 | 2020\|UT\|zip_plus_four\|multiple |
+| 0 | 3 | 0 | 2 | 2 | 0 | 1 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 61 | 2020\|UT\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 3130 | 2020\|VA\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 32 | 2020\|VA\|five_digit\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3929 | 2020\|VA\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2020\|VA\|invalid\|none |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2020\|VA\|padded_four_digit\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 85 | 2020\|VA\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 103 | 2020\|VA\|zip_plus_four\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|VI\|five_digit\|none |
+| 0 | 1 | 0 | 5 | 1 | 2 | 1 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 31 | 2020\|VI\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 0 | 0 | 8 | 2020\|VI\|invalid\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 64 | 2020\|VT\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 8 | 2020\|VT\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 586 | 2020\|VT\|five_digit\|single |
+| 0 | 3 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 5 | 2020\|VT\|invalid\|none |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2020\|VT\|zip_plus_four\|multiple |
+| 0 | 4 | 0 | 1 | 0 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 5 | 5 | 5 | 0 | 5 | 0 | 5 | 2020\|VT\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 396 | 2020\|WA\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 48 | 2020\|WA\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5530 | 2020\|WA\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|WA\|invalid\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 16 | 2020\|WA\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|WA\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 265 | 2020\|WA\|zip_plus_four\|single |
+| 0 | 3 | 0 | 4 | 1 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 2305 | 2020\|WI\|five_digit\|multiple |
+| 0 | 2 | 0 | 0 | 5 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 55 | 2020\|WI\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5064 | 2020\|WI\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|WI\|invalid\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 4 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 44 | 2020\|WI\|zip_plus_four\|multiple |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 154 | 2020\|WI\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 334 | 2020\|WV\|five_digit\|multiple |
+| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 12 | 2020\|WV\|five_digit\|none |
+| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 991 | 2020\|WV\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2020\|WV\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2020\|WV\|padded_four_digit\|multiple |
+| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 11 | 2020\|WV\|zip_plus_four\|multiple |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 21 | 2020\|WV\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 1 | 0 | 1 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 42 | 2020\|WY\|five_digit\|multiple |
+| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 17 | 2020\|WY\|five_digit\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 444 | 2020\|WY\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2020\|WY\|invalid\|none |
+| 0 | 3 | 0 | 4 | 0 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 7 | 7 | 7 | 0 | 7 | 0 | 7 | 2020\|WY\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2020\|Wi\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2020\|wv\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|AA\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2021\|AE\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2021\|AE\|padded_four_digit\|none |
+| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 0 | 0 | 17 | 2021\|AK\|five_digit\|multiple |
+| 0 | 3 | 0 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 0 | 0 | 112 | 2021\|AK\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1277 | 2021\|AK\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2021\|AK\|invalid\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 10 | 2021\|AK\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 1242 | 2021\|AL\|five_digit\|multiple |
+| 0 | 2 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 33 | 2021\|AL\|five_digit\|none |
+| 0 | 4 | 0 | 3 | 0 | 0 | 1 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3104 | 2021\|AL\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|AL\|invalid\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 4 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 93 | 2021\|AL\|zip_plus_four\|multiple |
+| 0 | 2 | 0 | 6 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 231 | 2021\|AL\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2021\|AP\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2021\|AP\|invalid\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 943 | 2021\|AR\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 29 | 2021\|AR\|five_digit\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1685 | 2021\|AR\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|AR\|invalid\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 68 | 2021\|AR\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2021\|AR\|zip_plus_four\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 109 | 2021\|AR\|zip_plus_four\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2021\|AS\|five_digit\|none |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 154 | 2021\|AZ\|five_digit\|multiple |
+| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 57 | 2021\|AZ\|five_digit\|none |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5098 | 2021\|AZ\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2021\|AZ\|invalid\|none |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 9 | 2021\|AZ\|zip_plus_four\|multiple |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 318 | 2021\|AZ\|zip_plus_four\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|Ak\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|Al\|five_digit\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 2576 | 2021\|CA\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 191 | 2021\|CA\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 27725 | 2021\|CA\|five_digit\|single |
+| 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 5 | 2021\|CA\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2021\|CA\|padded_four_digit\|none |
+| 0 | 0 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 6 | 6 | 0 | 6 | 0 | 6 | 2021\|CA\|padded_four_digit\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 124 | 2021\|CA\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|CA\|zip_plus_four\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1576 | 2021\|CA\|zip_plus_four\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 2338 | 2021\|CO\|five_digit\|multiple |
+| 0 | 3 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 0 | 0 | 27 | 2021\|CO\|five_digit\|none |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2894 | 2021\|CO\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|CO\|invalid\|none |
+| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2021\|CO\|padded_four_digit\|single |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 112 | 2021\|CO\|zip_plus_four\|multiple |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 153 | 2021\|CO\|zip_plus_four\|single |
+| 0 | 0 | 0 | 1 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 2021\|CT\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 22 | 2021\|CT\|five_digit\|none |
+| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 15 | 2021\|CT\|five_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 0 | 0 | 87 | 2021\|CT\|invalid\|none |
+| 0 | 3 | 0 | 0 | 5 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 164 | 2021\|CT\|padded_four_digit\|multiple |
+| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 34 | 2021\|CT\|padded_four_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4252 | 2021\|CT\|padded_four_digit\|single |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|CT\|zip_plus_four\|none |
+| 0 | 1 | 0 | 1 | 1 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2021\|Ca\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2021\|DC\|five_digit\|none |
+| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1257 | 2021\|DC\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|DC\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|DC\|padded_four_digit\|single |
+| 0 | 1 | 0 | 7 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 99 | 2021\|DC\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 55 | 2021\|DE\|five_digit\|multiple |
+| 0 | 1 | 0 | 4 | 2 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 8 | 2021\|DE\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 704 | 2021\|DE\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|DE\|invalid\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2021\|DE\|padded_four_digit\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|DE\|padded_four_digit\|single |
+| 0 | 1 | 0 | 1 | 1 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 3 | 3 | 0 | 0 | 0 | 3 | 2021\|DE\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 60 | 2021\|DE\|zip_plus_four\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 1483 | 2021\|FL\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 81 | 2021\|FL\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 13531 | 2021\|FL\|five_digit\|single |
+| 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 5 | 2021\|FL\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2021\|FL\|padded_four_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 122 | 2021\|FL\|zip_plus_four\|multiple |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1425 | 2021\|FL\|zip_plus_four\|single |
+| 0 | 3 | 0 | 1 | 3 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 7 | 7 | 0 | 0 | 0 | 7 | 2021\|Fl\|five_digit\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 52 | 2021\|Fl\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2 | 2 | 0 | 0 | 0 | 2 | 2021\|Fl\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 17 | 2021\|Fl\|zip_plus_four\|single |
+| 0 | 3 | 0 | 4 | 1 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 3956 | 2021\|GA\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 52 | 2021\|GA\|five_digit\|none |
+| 0 | 3 | 0 | 0 | 5 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5030 | 2021\|GA\|five_digit\|single |
+| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2021\|GA\|invalid\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 290 | 2021\|GA\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 425 | 2021\|GA\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2021\|GU\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 5 | 0 | 0 | 0 | 0 | 5 | 2021\|GU\|five_digit\|none |
+| 0 | 0 | 0 | 6 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 52 | 2021\|GU\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2021\|Ga\|five_digit\|multiple |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|Ga\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2021\|HI\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 10 | 2021\|HI\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1018 | 2021\|HI\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|HI\|invalid\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 38 | 2021\|HI\|zip_plus_four\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 1178 | 2021\|IA\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 18 | 2021\|IA\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3047 | 2021\|IA\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|IA\|invalid\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 50 | 2021\|IA\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 124 | 2021\|IA\|zip_plus_four\|single |
+| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 0 | 0 | 473 | 2021\|ID\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 12 | 2021\|ID\|five_digit\|none |
+| 0 | 2 | 0 | 0 | 6 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1761 | 2021\|ID\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|ID\|invalid\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 36 | 2021\|ID\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 86 | 2021\|ID\|zip_plus_four\|single |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 0 | 0 | 3095 | 2021\|IL\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 49 | 2021\|IL\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 10580 | 2021\|IL\|five_digit\|single |
+| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2021\|IL\|invalid\|none |
+| 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|IL\|padded_four_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 4 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 138 | 2021\|IL\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|IL\|zip_plus_four\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 695 | 2021\|IL\|zip_plus_four\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 2125 | 2021\|IN\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 3 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 54 | 2021\|IN\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5228 | 2021\|IN\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2021\|IN\|invalid\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 108 | 2021\|IN\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2021\|IN\|zip_plus_four\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 338 | 2021\|IN\|zip_plus_four\|single |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2021\|Il\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|In\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 663 | 2021\|KS\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 12 | 2021\|KS\|five_digit\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2481 | 2021\|KS\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|KS\|invalid\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 31 | 2021\|KS\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 146 | 2021\|KS\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 1910 | 2021\|KY\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 49 | 2021\|KY\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3076 | 2021\|KY\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|KY\|invalid\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 91 | 2021\|KY\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2021\|KY\|zip_plus_four\|none |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 164 | 2021\|KY\|zip_plus_four\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 896 | 2021\|LA\|five_digit\|multiple |
+| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 41 | 2021\|LA\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3109 | 2021\|LA\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|LA\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|LA\|padded_four_digit\|single |
+| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 75 | 2021\|LA\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|LA\|zip_plus_four\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 236 | 2021\|LA\|zip_plus_four\|single |
+| 0 | 0 | 0 | 3 | 3 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 2021\|MA\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 38 | 2021\|MA\|five_digit\|none |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 23 | 2021\|MA\|five_digit\|single |
+| 0 | 5 | 0 | 2 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 0 | 0 | 149 | 2021\|MA\|invalid\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 507 | 2021\|MA\|padded_four_digit\|multiple |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 0 | 0 | 50 | 2021\|MA\|padded_four_digit\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5323 | 2021\|MA\|padded_four_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|MA\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 901 | 2021\|MD\|five_digit\|multiple |
+| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 16 | 2021\|MD\|five_digit\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3329 | 2021\|MD\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|MD\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|MD\|padded_four_digit\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 78 | 2021\|MD\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 241 | 2021\|MD\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2021\|ME\|five_digit\|none |
+| 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 0 | 4 | 0 | 4 | 2021\|ME\|five_digit\|single |
+| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 35 | 2021\|ME\|invalid\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 14 | 2021\|ME\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 1 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 5 | 2021\|ME\|padded_four_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1417 | 2021\|ME\|padded_four_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|MH\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|MH\|padded_four_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 2252 | 2021\|MI\|five_digit\|multiple |
+| 0 | 1 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 32 | 2021\|MI\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 7155 | 2021\|MI\|five_digit\|single |
+| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2021\|MI\|invalid\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 124 | 2021\|MI\|zip_plus_four\|multiple |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 537 | 2021\|MI\|zip_plus_four\|single |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 2981 | 2021\|MN\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 38 | 2021\|MN\|five_digit\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 6370 | 2021\|MN\|five_digit\|single |
+| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2021\|MN\|invalid\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 132 | 2021\|MN\|zip_plus_four\|multiple |
+| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 298 | 2021\|MN\|zip_plus_four\|single |
+| 0 | 5 | 0 | 0 | 2 | 0 | 1 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1467 | 2021\|MO\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 37 | 2021\|MO\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4115 | 2021\|MO\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|MO\|invalid\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 94 | 2021\|MO\|zip_plus_four\|multiple |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 247 | 2021\|MO\|zip_plus_four\|single |
+| 0 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 7 | 7 | 7 | 7 | 7 | 7 | 2021\|MP\|five_digit\|single |
+| 0 | 2 | 0 | 5 | 1 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 0 | 0 | 1089 | 2021\|MS\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 27 | 2021\|MS\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1416 | 2021\|MS\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2021\|MS\|invalid\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 87 | 2021\|MS\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 111 | 2021\|MS\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 105 | 2021\|MT\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 8 | 2021\|MT\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 798 | 2021\|MT\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|MT\|invalid\|none |
+| 0 | 2 | 0 | 1 | 2 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 5 | 5 | 0 | 0 | 0 | 5 | 2021\|MT\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2021\|MT\|zip_plus_four\|none |
+| 0 | 4 | 0 | 4 | 0 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 75 | 2021\|MT\|zip_plus_four\|single |
+| 0 | 6 | 0 | 0 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 6 | 6 | 6 | 0 | 6 | 0 | 6 | 2021\|Ma\|padded_four_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2021\|Mi\|five_digit\|multiple |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2021\|Ms\|five_digit\|multiple |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 4089 | 2021\|NC\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 106 | 2021\|NC\|five_digit\|none |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 6343 | 2021\|NC\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|NC\|invalid\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 277 | 2021\|NC\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2021\|NC\|zip_plus_four\|none |
+| 0 | 3 | 0 | 0 | 5 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 445 | 2021\|NC\|zip_plus_four\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 130 | 2021\|ND\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 3 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 6 | 2021\|ND\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 1 | 0 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 922 | 2021\|ND\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2021\|ND\|invalid\|none |
+| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2 | 2 | 0 | 0 | 0 | 2 | 2021\|ND\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 42 | 2021\|ND\|zip_plus_four\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 666 | 2021\|NE\|five_digit\|multiple |
+| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 11 | 2021\|NE\|five_digit\|none |
+| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1511 | 2021\|NE\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|NE\|invalid\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 28 | 2021\|NE\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 84 | 2021\|NE\|zip_plus_four\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 2021\|NH\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2021\|NH\|five_digit\|none |
+| 0 | 0 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 6 | 6 | 0 | 6 | 0 | 6 | 2021\|NH\|five_digit\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 0 | 0 | 44 | 2021\|NH\|invalid\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 129 | 2021\|NH\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 9 | 2021\|NH\|padded_four_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1487 | 2021\|NH\|padded_four_digit\|single |
+| 0 | 0 | 0 | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 2021\|NJ\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 5 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 15 | 2021\|NJ\|five_digit\|none |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 34 | 2021\|NJ\|five_digit\|single |
+| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 0 | 0 | 184 | 2021\|NJ\|invalid\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1050 | 2021\|NJ\|padded_four_digit\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 35 | 2021\|NJ\|padded_four_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5180 | 2021\|NJ\|padded_four_digit\|single |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 64 | 2021\|NM\|five_digit\|multiple |
+| 0 | 1 | 0 | 4 | 2 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 16 | 2021\|NM\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1339 | 2021\|NM\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2021\|NM\|invalid\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|NM\|padded_four_digit\|single |
+| 0 | 2 | 0 | 2 | 3 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 7 | 7 | 0 | 0 | 0 | 7 | 2021\|NM\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 106 | 2021\|NM\|zip_plus_four\|single |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 198 | 2021\|NV\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 19 | 2021\|NV\|five_digit\|none |
+| 0 | 3 | 0 | 0 | 3 | 0 | 2 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3091 | 2021\|NV\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|NV\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|NV\|padded_four_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 12 | 2021\|NV\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 128 | 2021\|NV\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1678 | 2021\|NY\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 3 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 92 | 2021\|NY\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 10389 | 2021\|NY\|five_digit\|single |
+| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2021\|NY\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2021\|NY\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|NY\|padded_four_digit\|none |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 12 | 2021\|NY\|padded_four_digit\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 135 | 2021\|NY\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|NY\|zip_plus_four\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 696 | 2021\|NY\|zip_plus_four\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2021\|Ne\|five_digit\|multiple |
+| 0 | 3 | 0 | 1 | 0 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 4 | 4 | 4 | 0 | 4 | 0 | 4 | 2021\|Ne\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 3832 | 2021\|OH\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 113 | 2021\|OH\|five_digit\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 9320 | 2021\|OH\|five_digit\|single |
+| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2021\|OH\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|OH\|padded_four_digit\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 204 | 2021\|OH\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|OH\|zip_plus_four\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 591 | 2021\|OH\|zip_plus_four\|single |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 1039 | 2021\|OK\|five_digit\|multiple |
+| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 32 | 2021\|OK\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2133 | 2021\|OK\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|OK\|invalid\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 64 | 2021\|OK\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 158 | 2021\|OK\|zip_plus_four\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 937 | 2021\|OR\|five_digit\|multiple |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 22 | 2021\|OR\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3904 | 2021\|OR\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|OR\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2021\|OR\|padded_four_digit\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|OR\|padded_four_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 46 | 2021\|OR\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2021\|OR\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 185 | 2021\|OR\|zip_plus_four\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2021\|Ok\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2021\|Or\|five_digit\|multiple |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 3031 | 2021\|PA\|five_digit\|multiple |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 0 | 0 | 105 | 2021\|PA\|five_digit\|none |
+| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 10010 | 2021\|PA\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2021\|PA\|invalid\|none |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 2021\|PA\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2021\|PA\|padded_four_digit\|none |
+| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2021\|PA\|padded_four_digit\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 124 | 2021\|PA\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 3 | 2021\|PA\|zip_plus_four\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 622 | 2021\|PA\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2021\|PR\|five_digit\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|PR\|five_digit\|single |
+| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 0 | 0 | 1400 | 2021\|PR\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2021\|PW\|five_digit\|multiple |
+| 0 | 2 | 0 | 1 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2021\|Pa\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2021\|RI\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2021\|RI\|five_digit\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|RI\|five_digit\|single |
+| 0 | 4 | 0 | 1 | 2 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 0 | 0 | 23 | 2021\|RI\|invalid\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 121 | 2021\|RI\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 6 | 2021\|RI\|padded_four_digit\|none |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 834 | 2021\|RI\|padded_four_digit\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 2 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1436 | 2021\|SC\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 24 | 2021\|SC\|five_digit\|none |
+| 0 | 4 | 0 | 2 | 1 | 0 | 1 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3207 | 2021\|SC\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|SC\|invalid\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 87 | 2021\|SC\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2021\|SC\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 259 | 2021\|SC\|zip_plus_four\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 4 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 349 | 2021\|SD\|five_digit\|multiple |
+| 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 3 | 2021\|SD\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 686 | 2021\|SD\|five_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 25 | 2021\|SD\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2021\|SD\|zip_plus_four\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 40 | 2021\|SD\|zip_plus_four\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 2393 | 2021\|TN\|five_digit\|multiple |
+| 0 | 1 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 21 | 2021\|TN\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4229 | 2021\|TN\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|TN\|invalid\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 141 | 2021\|TN\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 300 | 2021\|TN\|zip_plus_four\|single |
+| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 0 | 0 | 5359 | 2021\|TX\|five_digit\|multiple |
+| 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 96 | 2021\|TX\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 17645 | 2021\|TX\|five_digit\|single |
+| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2021\|TX\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2021\|TX\|padded_four_digit\|multiple |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 287 | 2021\|TX\|zip_plus_four\|multiple |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1204 | 2021\|TX\|zip_plus_four\|single |
+| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2021\|Tx\|five_digit\|single |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 206 | 2021\|UT\|five_digit\|multiple |
+| 0 | 1 | 0 | 5 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 26 | 2021\|UT\|five_digit\|none |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2780 | 2021\|UT\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|UT\|invalid\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 13 | 2021\|UT\|zip_plus_four\|multiple |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 139 | 2021\|UT\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 3162 | 2021\|VA\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 25 | 2021\|VA\|five_digit\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4202 | 2021\|VA\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2021\|VA\|invalid\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 227 | 2021\|VA\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 259 | 2021\|VA\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|VI\|five_digit\|single |
+| 0 | 1 | 0 | 6 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 0 | 0 | 51 | 2021\|VI\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|VI\|padded_four_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2021\|VT\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|VT\|five_digit\|none |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2021\|VT\|five_digit\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 0 | 0 | 8 | 2021\|VT\|invalid\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 62 | 2021\|VT\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 8 | 2021\|VT\|padded_four_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 559 | 2021\|VT\|padded_four_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2021\|Va\|five_digit\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 434 | 2021\|WA\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 51 | 2021\|WA\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5617 | 2021\|WA\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|WA\|invalid\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2021\|WA\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|WA\|padded_four_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 24 | 2021\|WA\|zip_plus_four\|multiple |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 345 | 2021\|WA\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 2485 | 2021\|WI\|five_digit\|multiple |
+| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 50 | 2021\|WI\|five_digit\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5208 | 2021\|WI\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|WI\|invalid\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 78 | 2021\|WI\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|WI\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 256 | 2021\|WI\|zip_plus_four\|single |
+| 0 | 3 | 0 | 5 | 0 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 344 | 2021\|WV\|five_digit\|multiple |
+| 0 | 2 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 25 | 2021\|WV\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1036 | 2021\|WV\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2021\|WV\|invalid\|none |
+| 0 | 4 | 0 | 4 | 0 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 23 | 2021\|WV\|zip_plus_four\|multiple |
+| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 81 | 2021\|WV\|zip_plus_four\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 38 | 2021\|WY\|five_digit\|multiple |
+| 0 | 3 | 0 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 0 | 0 | 19 | 2021\|WY\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 434 | 2021\|WY\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2021\|WY\|invalid\|none |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2021\|WY\|zip_plus_four\|multiple |
+| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 30 | 2021\|WY\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|Wi\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|ga\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|ky\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|mn\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 134 | 2021\|nv\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2021\|ny\|five_digit\|multiple |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2021\|tx\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2022\|AA\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|AA\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|AE\|five_digit\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 17 | 2022\|AK\|five_digit\|multiple |
+| 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 116 | 2022\|AK\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1252 | 2022\|AK\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2022\|AK\|invalid\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 17 | 2022\|AK\|zip_plus_four\|single |
+| 0 | 4 | 0 | 4 | 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 1396 | 2022\|AL\|five_digit\|multiple |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 35 | 2022\|AL\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3488 | 2022\|AL\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2022\|AL\|invalid\|none |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 46 | 2022\|AL\|zip_plus_four\|multiple |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 108 | 2022\|AL\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2022\|AP\|five_digit\|none |
+| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2022\|AP\|five_digit\|single |
+| 0 | 0 | 0 | 6 | 1 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 12 | 2022\|AP\|invalid\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 1054 | 2022\|AR\|five_digit\|multiple |
+| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 23 | 2022\|AR\|five_digit\|none |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2020 | 2022\|AR\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2022\|AR\|invalid\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 35 | 2022\|AR\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 46 | 2022\|AR\|zip_plus_four\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2022\|AS\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 202 | 2022\|AZ\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 70 | 2022\|AZ\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 6549 | 2022\|AZ\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2022\|AZ\|invalid\|none |
+| 0 | 3 | 0 | 0 | 1 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 4 | 4 | 0 | 0 | 0 | 4 | 2022\|AZ\|zip_plus_four\|multiple |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 190 | 2022\|AZ\|zip_plus_four\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|Ak\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2022\|Al\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|Al\|five_digit\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 2871 | 2022\|CA\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 229 | 2022\|CA\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 31571 | 2022\|CA\|five_digit\|single |
+| 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 6 | 2022\|CA\|invalid\|none |
+| 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 5 | 5 | 0 | 5 | 0 | 5 | 2022\|CA\|padded_four_digit\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 85 | 2022\|CA\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2022\|CA\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1278 | 2022\|CA\|zip_plus_four\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 5 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 2754 | 2022\|CO\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 30 | 2022\|CO\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 2 | 0 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3377 | 2022\|CO\|five_digit\|single |
+| 0 | 1 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 4 | 0 | 0 | 0 | 0 | 4 | 2022\|CO\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|CO\|padded_four_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 80 | 2022\|CO\|zip_plus_four\|multiple |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 93 | 2022\|CO\|zip_plus_four\|single |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 2022\|CT\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 43 | 2022\|CT\|five_digit\|none |
+| 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 5 | 5 | 0 | 5 | 0 | 5 | 2022\|CT\|five_digit\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 0 | 109 | 2022\|CT\|invalid\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 172 | 2022\|CT\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 26 | 2022\|CT\|padded_four_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4551 | 2022\|CT\|padded_four_digit\|single |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2022\|CT\|zip_plus_four\|none |
+| 0 | 2 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 0 | 0 | 2 | 2022\|Ca\|five_digit\|multiple |
+| 0 | 1 | 0 | 0 | 1 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2022\|Ca\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2022\|Co\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 2022\|DC\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2022\|DC\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 733 | 2022\|DC\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2022\|DC\|invalid\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|DC\|padded_four_digit\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 19 | 2022\|DC\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 1 | 0 | 1 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 74 | 2022\|DE\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 2 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2022\|DE\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 883 | 2022\|DE\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2022\|DE\|invalid\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2022\|DE\|padded_four_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 21 | 2022\|DE\|zip_plus_four\|single |
+| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 0 | 0 | 1752 | 2022\|FL\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 6 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 79 | 2022\|FL\|five_digit\|none |
+| 0 | 3 | 0 | 1 | 3 | 0 | 1 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 16127 | 2022\|FL\|five_digit\|single |
+| 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 5 | 2022\|FL\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|FL\|padded_four_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 73 | 2022\|FL\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 838 | 2022\|FL\|zip_plus_four\|single |
+| 0 | 1 | 0 | 1 | 3 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 5 | 5 | 0 | 0 | 0 | 5 | 2022\|Fl\|five_digit\|multiple |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 45 | 2022\|Fl\|five_digit\|single |
+| 0 | 5 | 0 | 1 | 1 | 0 | 1 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 4442 | 2022\|GA\|five_digit\|multiple |
+| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 52 | 2022\|GA\|five_digit\|none |
+| 0 | 3 | 0 | 0 | 5 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5634 | 2022\|GA\|five_digit\|single |
+| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2022\|GA\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2022\|GA\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|GA\|padded_four_digit\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 117 | 2022\|GA\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 195 | 2022\|GA\|zip_plus_four\|single |
+| 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 5 | 0 | 0 | 0 | 0 | 5 | 2022\|GU\|five_digit\|none |
+| 0 | 1 | 0 | 5 | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 52 | 2022\|GU\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 1 | 2022\|GU\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2022\|Ga\|five_digit\|none |
+| 0 | 2 | 0 | 0 | 1 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2022\|Ga\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 2022\|HI\|five_digit\|multiple |
+| 0 | 1 | 0 | 5 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 8 | 2022\|HI\|five_digit\|none |
+| 0 | 3 | 0 | 4 | 1 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1309 | 2022\|HI\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2022\|HI\|invalid\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2022\|HI\|padded_four_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 43 | 2022\|HI\|zip_plus_four\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 1418 | 2022\|IA\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 21 | 2022\|IA\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3712 | 2022\|IA\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2022\|IA\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2022\|IA\|padded_four_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 30 | 2022\|IA\|zip_plus_four\|multiple |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 70 | 2022\|IA\|zip_plus_four\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 548 | 2022\|ID\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 17 | 2022\|ID\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 2 | 0 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1370 | 2022\|ID\|five_digit\|single |
+| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2022\|ID\|invalid\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 19 | 2022\|ID\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 49 | 2022\|ID\|zip_plus_four\|single |
+| 0 | 3 | 0 | 4 | 1 | 0 | 0 | 2 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 3281 | 2022\|IL\|five_digit\|multiple |
+| 0 | 2 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 51 | 2022\|IL\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 11455 | 2022\|IL\|five_digit\|single |
+| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2022\|IL\|invalid\|none |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2022\|IL\|padded_four_digit\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 73 | 2022\|IL\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2022\|IL\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 373 | 2022\|IL\|zip_plus_four\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 2415 | 2022\|IN\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 52 | 2022\|IN\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5778 | 2022\|IN\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2022\|IN\|invalid\|none |
+| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 71 | 2022\|IN\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2022\|IN\|zip_plus_four\|none |
+| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 170 | 2022\|IN\|zip_plus_four\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|Il\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 692 | 2022\|KS\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 18 | 2022\|KS\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2635 | 2022\|KS\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2022\|KS\|invalid\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 18 | 2022\|KS\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 84 | 2022\|KS\|zip_plus_four\|single |
+| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 2145 | 2022\|KY\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 43 | 2022\|KY\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3534 | 2022\|KY\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2022\|KY\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|KY\|padded_four_digit\|single |
+| 0 | 4 | 0 | 2 | 1 | 0 | 1 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 44 | 2022\|KY\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 87 | 2022\|KY\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 0 | 0 | 1 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 897 | 2022\|LA\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 44 | 2022\|LA\|five_digit\|none |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3266 | 2022\|LA\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2022\|LA\|invalid\|none |
+| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 19 | 2022\|LA\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 1 | 2022\|LA\|zip_plus_four\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 77 | 2022\|LA\|zip_plus_four\|single |
+| 0 | 2 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2022\|La\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 2022\|MA\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 46 | 2022\|MA\|five_digit\|none |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 21 | 2022\|MA\|five_digit\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 0 | 183 | 2022\|MA\|invalid\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 596 | 2022\|MA\|padded_four_digit\|multiple |
+| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 51 | 2022\|MA\|padded_four_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5958 | 2022\|MA\|padded_four_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|MA\|zip_plus_four\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 1117 | 2022\|MD\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 15 | 2022\|MD\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3989 | 2022\|MD\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2022\|MD\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2022\|MD\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2022\|MD\|padded_four_digit\|single |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 41 | 2022\|MD\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 1 | 1 | 0 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 139 | 2022\|MD\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 2022\|ME\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2022\|ME\|five_digit\|none |
+| 0 | 0 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 6 | 6 | 0 | 6 | 0 | 6 | 2022\|ME\|five_digit\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 0 | 0 | 31 | 2022\|ME\|invalid\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 19 | 2022\|ME\|padded_four_digit\|multiple |
+| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 9 | 2022\|ME\|padded_four_digit\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1751 | 2022\|ME\|padded_four_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|MH\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2022\|MH\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|MH\|padded_four_digit\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 2766 | 2022\|MI\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 34 | 2022\|MI\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8504 | 2022\|MI\|five_digit\|single |
+| 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 5 | 2022\|MI\|invalid\|none |
+| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2022\|MI\|padded_four_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 88 | 2022\|MI\|zip_plus_four\|multiple |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 338 | 2022\|MI\|zip_plus_four\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 3515 | 2022\|MN\|five_digit\|multiple |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 0 | 0 | 37 | 2022\|MN\|five_digit\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 7479 | 2022\|MN\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2022\|MN\|invalid\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 154 | 2022\|MN\|zip_plus_four\|multiple |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 304 | 2022\|MN\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 1662 | 2022\|MO\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 40 | 2022\|MO\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 1 | 0 | 1 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4604 | 2022\|MO\|five_digit\|single |
+| 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 6 | 2022\|MO\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|MO\|padded_four_digit\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 48 | 2022\|MO\|zip_plus_four\|multiple |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 140 | 2022\|MO\|zip_plus_four\|single |
+| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 10 | 2022\|MP\|five_digit\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 1181 | 2022\|MS\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 3 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 31 | 2022\|MS\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1527 | 2022\|MS\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2022\|MS\|invalid\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 29 | 2022\|MS\|zip_plus_four\|multiple |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 33 | 2022\|MS\|zip_plus_four\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 112 | 2022\|MT\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 12 | 2022\|MT\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 897 | 2022\|MT\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2022\|MT\|invalid\|none |
+| 0 | 2 | 0 | 2 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 4 | 4 | 0 | 0 | 0 | 4 | 2022\|MT\|zip_plus_four\|multiple |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 38 | 2022\|MT\|zip_plus_four\|single |
+| 0 | 6 | 0 | 0 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 6 | 6 | 6 | 0 | 6 | 0 | 6 | 2022\|Ma\|padded_four_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2022\|Mi\|five_digit\|multiple |
+| 0 | 2 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2022\|Mi\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2022\|Ms\|five_digit\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 4798 | 2022\|NC\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 115 | 2022\|NC\|five_digit\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 7323 | 2022\|NC\|five_digit\|single |
+| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2022\|NC\|invalid\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 150 | 2022\|NC\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2022\|NC\|zip_plus_four\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 235 | 2022\|NC\|zip_plus_four\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 140 | 2022\|ND\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 3 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 7 | 2022\|ND\|five_digit\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1057 | 2022\|ND\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2022\|ND\|invalid\|none |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 2022\|ND\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 26 | 2022\|ND\|zip_plus_four\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 747 | 2022\|NE\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 14 | 2022\|NE\|five_digit\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1581 | 2022\|NE\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2022\|NE\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2022\|NE\|padded_four_digit\|multiple |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 23 | 2022\|NE\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 38 | 2022\|NE\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2022\|NH\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2022\|NH\|five_digit\|none |
+| 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 0 | 4 | 0 | 4 | 2022\|NH\|five_digit\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 0 | 41 | 2022\|NH\|invalid\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 130 | 2022\|NH\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 10 | 2022\|NH\|padded_four_digit\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1740 | 2022\|NH\|padded_four_digit\|single |
+| 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 2022\|NJ\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 89 | 2022\|NJ\|five_digit\|none |
+| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 33 | 2022\|NJ\|five_digit\|single |
+| 0 | 4 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 0 | 0 | 198 | 2022\|NJ\|invalid\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 1170 | 2022\|NJ\|padded_four_digit\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 34 | 2022\|NJ\|padded_four_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5706 | 2022\|NJ\|padded_four_digit\|single |
+| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 0 | 0 | 77 | 2022\|NM\|five_digit\|multiple |
+| 0 | 3 | 0 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 0 | 0 | 12 | 2022\|NM\|five_digit\|none |
+| 0 | 2 | 0 | 1 | 5 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1518 | 2022\|NM\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2022\|NM\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|NM\|padded_four_digit\|single |
+| 0 | 1 | 0 | 2 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 3 | 3 | 0 | 0 | 0 | 3 | 2022\|NM\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 39 | 2022\|NM\|zip_plus_four\|single |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 230 | 2022\|NV\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 13 | 2022\|NV\|five_digit\|none |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2818 | 2022\|NV\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2022\|NV\|invalid\|none |
+| 0 | 4 | 0 | 2 | 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 6 | 6 | 0 | 0 | 0 | 6 | 2022\|NV\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2022\|NV\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 72 | 2022\|NV\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1898 | 2022\|NY\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 6 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 115 | 2022\|NY\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 12283 | 2022\|NY\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2022\|NY\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2022\|NY\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8 | 2022\|NY\|padded_four_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 72 | 2022\|NY\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 2 | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2022\|NY\|zip_plus_four\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 420 | 2022\|NY\|zip_plus_four\|single |
+| 0 | 1 | 0 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2022\|Ne\|five_digit\|single |
+| 0 | 6 | 0 | 1 | 0 | 0 | 1 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 4276 | 2022\|OH\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 107 | 2022\|OH\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 10366 | 2022\|OH\|five_digit\|single |
+| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2022\|OH\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|OH\|padded_four_digit\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 123 | 2022\|OH\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2022\|OH\|zip_plus_four\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 298 | 2022\|OH\|zip_plus_four\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 1116 | 2022\|OK\|five_digit\|multiple |
+| 0 | 2 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 35 | 2022\|OK\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2311 | 2022\|OK\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2022\|OK\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2022\|OK\|padded_four_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 41 | 2022\|OK\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 74 | 2022\|OK\|zip_plus_four\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 1107 | 2022\|OR\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 22 | 2022\|OR\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4469 | 2022\|OR\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2022\|OR\|invalid\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 27 | 2022\|OR\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 126 | 2022\|OR\|zip_plus_four\|single |
+| 0 | 1 | 0 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2022\|Ok\|five_digit\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 3345 | 2022\|PA\|five_digit\|multiple |
+| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 105 | 2022\|PA\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 11173 | 2022\|PA\|five_digit\|single |
+| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2022\|PA\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2022\|PA\|padded_four_digit\|none |
+| 0 | 0 | 0 | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 5 | 5 | 0 | 5 | 0 | 5 | 2022\|PA\|padded_four_digit\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 78 | 2022\|PA\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 5 | 2022\|PA\|zip_plus_four\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 354 | 2022\|PA\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|PR\|five_digit\|single |
+| 0 | 0 | 0 | 7 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 0 | 0 | 1332 | 2022\|PR\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|PR\|padded_four_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2022\|PW\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|PW\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2022\|PW\|invalid\|none |
+| 0 | 1 | 0 | 2 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2022\|Pa\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2022\|RI\|five_digit\|none |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2022\|RI\|five_digit\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 0 | 0 | 17 | 2022\|RI\|invalid\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 129 | 2022\|RI\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 7 | 2022\|RI\|padded_four_digit\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 827 | 2022\|RI\|padded_four_digit\|single |
+| 0 | 6 | 0 | 0 | 1 | 0 | 1 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 1576 | 2022\|SC\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 26 | 2022\|SC\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3551 | 2022\|SC\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2022\|SC\|invalid\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 45 | 2022\|SC\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 121 | 2022\|SC\|zip_plus_four\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 429 | 2022\|SD\|five_digit\|multiple |
+| 0 | 1 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 7 | 2022\|SD\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 796 | 2022\|SD\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2022\|SD\|invalid\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 12 | 2022\|SD\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2022\|SD\|zip_plus_four\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 24 | 2022\|SD\|zip_plus_four\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 2644 | 2022\|TN\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 28 | 2022\|TN\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4687 | 2022\|TN\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2022\|TN\|invalid\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 66 | 2022\|TN\|zip_plus_four\|multiple |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 147 | 2022\|TN\|zip_plus_four\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 6027 | 2022\|TX\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 104 | 2022\|TX\|five_digit\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 19538 | 2022\|TX\|five_digit\|single |
+| 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 5 | 2022\|TX\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|TX\|padded_four_digit\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 138 | 2022\|TX\|zip_plus_four\|multiple |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 604 | 2022\|TX\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2022\|Tx\|five_digit\|single |
+| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 0 | 0 | 259 | 2022\|UT\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 19 | 2022\|UT\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2687 | 2022\|UT\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2022\|UT\|invalid\|none |
+| 0 | 3 | 0 | 0 | 1 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 4 | 4 | 0 | 0 | 0 | 4 | 2022\|UT\|zip_plus_four\|multiple |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 70 | 2022\|UT\|zip_plus_four\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 3530 | 2022\|VA\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 36 | 2022\|VA\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4780 | 2022\|VA\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2022\|VA\|invalid\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 5 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 119 | 2022\|VA\|zip_plus_four\|multiple |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 1 | 2022\|VA\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 157 | 2022\|VA\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2022\|VI\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 3 | 3 | 0 | 3 | 0 | 3 | 2022\|VI\|five_digit\|single |
+| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 0 | 0 | 46 | 2022\|VI\|invalid\|none |
+| 0 | 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 6 | 2022\|VT\|five_digit\|none |
+| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2022\|VT\|five_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 0 | 0 | 13 | 2022\|VT\|invalid\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 62 | 2022\|VT\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 8 | 2022\|VT\|padded_four_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 645 | 2022\|VT\|padded_four_digit\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 474 | 2022\|WA\|five_digit\|multiple |
+| 0 | 2 | 0 | 0 | 4 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 51 | 2022\|WA\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 6563 | 2022\|WA\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2022\|WA\|invalid\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2022\|WA\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|WA\|padded_four_digit\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 17 | 2022\|WA\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2022\|WA\|zip_plus_four\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 276 | 2022\|WA\|zip_plus_four\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 2604 | 2022\|WI\|five_digit\|multiple |
+| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 52 | 2022\|WI\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5587 | 2022\|WI\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2022\|WI\|invalid\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 53 | 2022\|WI\|zip_plus_four\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2022\|WI\|zip_plus_four\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 135 | 2022\|WI\|zip_plus_four\|single |
+| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 2 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 361 | 2022\|WV\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 27 | 2022\|WV\|five_digit\|none |
+| 0 | 3 | 0 | 2 | 2 | 0 | 1 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1191 | 2022\|WV\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2022\|WV\|invalid\|none |
+| 0 | 3 | 0 | 5 | 0 | 0 | 0 | 2 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 11 | 2022\|WV\|zip_plus_four\|multiple |
+| 0 | 3 | 0 | 4 | 1 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 35 | 2022\|WV\|zip_plus_four\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 48 | 2022\|WY\|five_digit\|multiple |
+| 0 | 1 | 0 | 6 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 21 | 2022\|WY\|five_digit\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 517 | 2022\|WY\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2022\|WY\|invalid\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2022\|WY\|zip_plus_four\|multiple |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 12 | 2022\|WY\|zip_plus_four\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|Wi\|five_digit\|single |
+| 0 | 1 | 0 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2022\|ca\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|fl\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|ga\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|ky\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2022\|ny\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|oh\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|tx\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2022\|wv\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2023\|AA\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2023\|AA\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2023\|AE\|five_digit\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2023\|AE\|five_digit\|single |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 18 | 2023\|AK\|five_digit\|multiple |
+| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 155 | 2023\|AK\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1595 | 2023\|AK\|five_digit\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 0 | 0 | 22 | 2023\|AK\|invalid\|none |
+| 0 | 2 | 0 | 5 | 0 | 0 | 1 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 0 | 0 | 1542 | 2023\|AL\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 21 | 2023\|AL\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3796 | 2023\|AL\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 0 | 0 | 253 | 2023\|AL\|invalid\|none |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 0 | 2 | 2023\|AP\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 0 | 4 | 0 | 4 | 2023\|AP\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 1146 | 2023\|AR\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 27 | 2023\|AR\|five_digit\|none |
+| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2177 | 2023\|AR\|five_digit\|single |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 0 | 0 | 149 | 2023\|AR\|invalid\|none |
+| 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2023\|AS\|five_digit\|none |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 2 | 0 | 2 | 0 | 2 | 2023\|AS\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 239 | 2023\|AZ\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 78 | 2023\|AZ\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 7435 | 2023\|AZ\|five_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 0 | 0 | 261 | 2023\|AZ\|invalid\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 3327 | 2023\|CA\|five_digit\|multiple |
+| 0 | 1 | 0 | 5 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 241 | 2023\|CA\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 35783 | 2023\|CA\|five_digit\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 0 | 1552 | 2023\|CA\|invalid\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 3099 | 2023\|CO\|five_digit\|multiple |
+| 0 | 2 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 38 | 2023\|CO\|five_digit\|none |
+| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3839 | 2023\|CO\|five_digit\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 0 | 0 | 215 | 2023\|CO\|invalid\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 195 | 2023\|CT\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 47 | 2023\|CT\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 1 | 0 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5064 | 2023\|CT\|five_digit\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 0 | 134 | 2023\|CT\|invalid\|none |
+| 0 | 0 | 0 | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 5 | 2 | 0 | 0 | 5 | 2023\|DC\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2023\|DC\|five_digit\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 793 | 2023\|DC\|five_digit\|single |
+| 0 | 6 | 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 0 | 0 | 40 | 2023\|DC\|invalid\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 5 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 81 | 2023\|DE\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 7 | 2023\|DE\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1075 | 2023\|DE\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 0 | 41 | 2023\|DE\|invalid\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1965 | 2023\|FL\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 129 | 2023\|FL\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 1 | 0 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 18065 | 2023\|FL\|five_digit\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 0 | 0 | 1282 | 2023\|FL\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2023\|FM\|five_digit\|multiple |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 4907 | 2023\|GA\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 55 | 2023\|GA\|five_digit\|none |
+| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 6266 | 2023\|GA\|five_digit\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 0 | 427 | 2023\|GA\|invalid\|none |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 2023\|GU\|five_digit\|multiple |
+| 0 | 0 | 0 | 7 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 0 | 0 | 8 | 2023\|GU\|five_digit\|none |
+| 0 | 1 | 0 | 6 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 7 | 8 | 7 | 68 | 2023\|GU\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2023\|GU\|invalid\|none |
+| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 13 | 2023\|HI\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1536 | 2023\|HI\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 0 | 0 | 45 | 2023\|HI\|invalid\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1580 | 2023\|IA\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 21 | 2023\|IA\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4073 | 2023\|IA\|five_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 0 | 0 | 131 | 2023\|IA\|invalid\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 665 | 2023\|ID\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 23 | 2023\|ID\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1617 | 2023\|ID\|five_digit\|single |
+| 0 | 5 | 0 | 1 | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 0 | 0 | 85 | 2023\|ID\|invalid\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 3632 | 2023\|IL\|five_digit\|multiple |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 0 | 51 | 2023\|IL\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 12719 | 2023\|IL\|five_digit\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 0 | 0 | 606 | 2023\|IL\|invalid\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 2704 | 2023\|IN\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 59 | 2023\|IN\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 6410 | 2023\|IN\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 0 | 0 | 405 | 2023\|IN\|invalid\|none |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 814 | 2023\|KS\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 15 | 2023\|KS\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3156 | 2023\|KS\|five_digit\|single |
+| 0 | 5 | 0 | 0 | 2 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 0 | 0 | 142 | 2023\|KS\|invalid\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 2383 | 2023\|KY\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 47 | 2023\|KY\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3862 | 2023\|KY\|five_digit\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 0 | 0 | 208 | 2023\|KY\|invalid\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 1006 | 2023\|LA\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 45 | 2023\|LA\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3669 | 2023\|LA\|five_digit\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 0 | 137 | 2023\|LA\|invalid\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 694 | 2023\|MA\|five_digit\|multiple |
+| 0 | 1 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 87 | 2023\|MA\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 7026 | 2023\|MA\|five_digit\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 0 | 0 | 233 | 2023\|MA\|invalid\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 1218 | 2023\|MD\|five_digit\|multiple |
+| 0 | 2 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 17 | 2023\|MD\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4419 | 2023\|MD\|five_digit\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 0 | 202 | 2023\|MD\|invalid\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 20 | 2023\|ME\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 17 | 2023\|ME\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1882 | 2023\|ME\|five_digit\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 0 | 0 | 49 | 2023\|ME\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2023\|MH\|five_digit\|multiple |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 3129 | 2023\|MI\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 6 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 49 | 2023\|MI\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 9610 | 2023\|MI\|five_digit\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 0 | 0 | 613 | 2023\|MI\|invalid\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 3895 | 2023\|MN\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 39 | 2023\|MN\|five_digit\|none |
+| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8427 | 2023\|MN\|five_digit\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 0 | 0 | 404 | 2023\|MN\|invalid\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1883 | 2023\|MO\|five_digit\|multiple |
+| 0 | 1 | 0 | 5 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 37 | 2023\|MO\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5188 | 2023\|MO\|five_digit\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 0 | 0 | 270 | 2023\|MO\|invalid\|none |
+| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 6 | 8 | 6 | 13 | 2023\|MP\|five_digit\|single |
+| 0 | 4 | 0 | 2 | 1 | 0 | 1 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 1272 | 2023\|MS\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 34 | 2023\|MS\|five_digit\|none |
+| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1629 | 2023\|MS\|five_digit\|single |
+| 0 | 3 | 0 | 1 | 3 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 0 | 0 | 89 | 2023\|MS\|invalid\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 158 | 2023\|MT\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 12 | 2023\|MT\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1091 | 2023\|MT\|five_digit\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 0 | 0 | 42 | 2023\|MT\|invalid\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 5354 | 2023\|NC\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 115 | 2023\|NC\|five_digit\|none |
+| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8021 | 2023\|NC\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 0 | 0 | 478 | 2023\|NC\|invalid\|none |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 2 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 177 | 2023\|ND\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 3 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 6 | 2023\|ND\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1190 | 2023\|ND\|five_digit\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 0 | 42 | 2023\|ND\|invalid\|none |
+| 0 | 1 | 0 | 0 | 7 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 8 | 8 | 0 | 0 | 0 | 874 | 2023\|NE\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 14 | 2023\|NE\|five_digit\|none |
+| 0 | 3 | 0 | 4 | 1 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1864 | 2023\|NE\|five_digit\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 0 | 99 | 2023\|NE\|invalid\|none |
+| 0 | 3 | 0 | 2 | 2 | 0 | 1 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 148 | 2023\|NH\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 13 | 2023\|NH\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1871 | 2023\|NH\|five_digit\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 0 | 59 | 2023\|NH\|invalid\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 1450 | 2023\|NJ\|five_digit\|multiple |
+| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 80 | 2023\|NJ\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 7202 | 2023\|NJ\|five_digit\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 0 | 244 | 2023\|NJ\|invalid\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 83 | 2023\|NM\|five_digit\|multiple |
+| 0 | 2 | 0 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 23 | 2023\|NM\|five_digit\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1746 | 2023\|NM\|five_digit\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 0 | 0 | 57 | 2023\|NM\|invalid\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 2 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 275 | 2023\|NV\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 22 | 2023\|NV\|five_digit\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3341 | 2023\|NV\|five_digit\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 0 | 0 | 111 | 2023\|NV\|invalid\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 2135 | 2023\|NY\|five_digit\|multiple |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 114 | 2023\|NY\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 13720 | 2023\|NY\|five_digit\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 0 | 546 | 2023\|NY\|invalid\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 4902 | 2023\|OH\|five_digit\|multiple |
+| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 111 | 2023\|OH\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 11479 | 2023\|OH\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 0 | 616 | 2023\|OH\|invalid\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 1292 | 2023\|OK\|five_digit\|multiple |
+| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 40 | 2023\|OK\|five_digit\|none |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2649 | 2023\|OK\|five_digit\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 0 | 164 | 2023\|OK\|invalid\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 1315 | 2023\|OR\|five_digit\|multiple |
+| 0 | 1 | 0 | 0 | 6 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 39 | 2023\|OR\|five_digit\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5276 | 2023\|OR\|five_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 0 | 0 | 188 | 2023\|OR\|invalid\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 3766 | 2023\|PA\|five_digit\|multiple |
+| 0 | 3 | 0 | 2 | 2 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 0 | 0 | 108 | 2023\|PA\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 12615 | 2023\|PA\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 0 | 0 | 620 | 2023\|PA\|invalid\|none |
+| 0 | 1 | 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 0 | 0 | 721 | 2023\|PR\|five_digit\|multiple |
+| 0 | 0 | 0 | 7 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 0 | 0 | 13 | 2023\|PR\|five_digit\|none |
+| 0 | 0 | 0 | 7 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 7 | 8 | 7 | 800 | 2023\|PR\|five_digit\|single |
+| 0 | 0 | 0 | 5 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 0 | 0 | 36 | 2023\|PR\|invalid\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 1 | 1 | 2023\|PW\|five_digit\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 167 | 2023\|RI\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 14 | 2023\|RI\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1011 | 2023\|RI\|five_digit\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 0 | 0 | 38 | 2023\|RI\|invalid\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1824 | 2023\|SC\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 25 | 2023\|SC\|five_digit\|none |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4115 | 2023\|SC\|five_digit\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 0 | 0 | 228 | 2023\|SC\|invalid\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 519 | 2023\|SD\|five_digit\|multiple |
+| 0 | 1 | 0 | 1 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 6 | 2023\|SD\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 976 | 2023\|SD\|five_digit\|single |
+| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 0 | 0 | 60 | 2023\|SD\|invalid\|none |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 0 | 0 | 2904 | 2023\|TN\|five_digit\|multiple |
+| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 31 | 2023\|TN\|five_digit\|none |
+| 0 | 2 | 0 | 2 | 3 | 0 | 1 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5228 | 2023\|TN\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 0 | 0 | 310 | 2023\|TN\|invalid\|none |
+| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 6883 | 2023\|TX\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 113 | 2023\|TX\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 21576 | 2023\|TX\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 0 | 1205 | 2023\|TX\|invalid\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 267 | 2023\|UT\|five_digit\|multiple |
+| 0 | 0 | 0 | 6 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 26 | 2023\|UT\|five_digit\|none |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3097 | 2023\|UT\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 0 | 0 | 118 | 2023\|UT\|invalid\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 4046 | 2023\|VA\|five_digit\|multiple |
+| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 62 | 2023\|VA\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5516 | 2023\|VA\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 0 | 384 | 2023\|VA\|invalid\|none |
+| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 2023\|VI\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2023\|VI\|five_digit\|none |
+| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 54 | 2023\|VI\|five_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2023\|VI\|invalid\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 71 | 2023\|VT\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 11 | 2023\|VT\|five_digit\|none |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 719 | 2023\|VT\|five_digit\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 8 | 0 | 0 | 0 | 0 | 18 | 2023\|VT\|invalid\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 603 | 2023\|WA\|five_digit\|multiple |
+| 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 70 | 2023\|WA\|five_digit\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 7938 | 2023\|WA\|five_digit\|single |
+| 0 | 4 | 0 | 1 | 2 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 4 | 8 | 0 | 0 | 0 | 0 | 338 | 2023\|WA\|invalid\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 2835 | 2023\|WI\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 60 | 2023\|WI\|five_digit\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 6324 | 2023\|WI\|five_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 0 | 0 | 300 | 2023\|WI\|invalid\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 408 | 2023\|WV\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 30 | 2023\|WV\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1315 | 2023\|WV\|five_digit\|single |
+| 0 | 3 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 0 | 0 | 93 | 2023\|WV\|invalid\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 52 | 2023\|WY\|five_digit\|multiple |
+| 0 | 1 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 23 | 2023\|WY\|five_digit\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 671 | 2023\|WY\|five_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 8 | 0 | 0 | 0 | 0 | 24 | 2023\|WY\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2024\|AA\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2024\|AA\|five_digit\|none |
+| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2024\|AA\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2024\|AE\|five_digit\|none |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 2 | 2 | 1 | 2 | 1 | 2 | 2024\|AE\|five_digit\|single |
+| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 8 | 8 | 0 | 0 | 0 | 21 | 2024\|AK\|five_digit\|multiple |
+| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 118 | 2024\|AK\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1628 | 2024\|AK\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 1 | 2024\|AK\|invalid\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 1643 | 2024\|AL\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 39 | 2024\|AL\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4161 | 2024\|AL\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2024\|AL\|padded_four_digit\|single |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2024\|AP\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2024\|AP\|invalid\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 1246 | 2024\|AR\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 26 | 2024\|AR\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2279 | 2024\|AR\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2024\|AS\|five_digit\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 0 | 1 | 0 | 1 | 2024\|AS\|five_digit\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 237 | 2024\|AZ\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 81 | 2024\|AZ\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 7750 | 2024\|AZ\|five_digit\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 7 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 3330 | 2024\|CA\|five_digit\|multiple |
+| 0 | 1 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 226 | 2024\|CA\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 36887 | 2024\|CA\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2024\|CA\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2024\|CA\|padded_four_digit\|none |
+| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 0 | 4 | 0 | 4 | 2024\|CA\|padded_four_digit\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 3166 | 2024\|CO\|five_digit\|multiple |
+| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 41 | 2024\|CO\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4033 | 2024\|CO\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2024\|CO\|padded_four_digit\|single |
+| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 2024\|CT\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 15 | 2024\|CT\|five_digit\|none |
+| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8 | 2024\|CT\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2024\|CT\|invalid\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 202 | 2024\|CT\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 24 | 2024\|CT\|padded_four_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5176 | 2024\|CT\|padded_four_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2024\|DC\|five_digit\|multiple |
+| 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 8 | 2024\|DC\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 840 | 2024\|DC\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2024\|DC\|padded_four_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 92 | 2024\|DE\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 7 | 2024\|DE\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1074 | 2024\|DE\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2024\|DE\|padded_four_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 2135 | 2024\|FL\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 122 | 2024\|FL\|five_digit\|none |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 19395 | 2024\|FL\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2024\|FL\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2024\|FL\|padded_four_digit\|none |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2024\|FL\|padded_four_digit\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 5331 | 2024\|GA\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 57 | 2024\|GA\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 6572 | 2024\|GA\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2024\|GA\|padded_four_digit\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2024\|GA\|padded_four_digit\|single |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 2024\|GU\|five_digit\|multiple |
+| 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 6 | 0 | 0 | 0 | 0 | 6 | 2024\|GU\|five_digit\|none |
+| 0 | 1 | 0 | 6 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 71 | 2024\|GU\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 2024\|HI\|five_digit\|multiple |
+| 0 | 1 | 0 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 7 | 2024\|HI\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1687 | 2024\|HI\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 1639 | 2024\|IA\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 24 | 2024\|IA\|five_digit\|none |
+| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4183 | 2024\|IA\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2024\|IA\|padded_four_digit\|none |
+| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 739 | 2024\|ID\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 19 | 2024\|ID\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1686 | 2024\|ID\|five_digit\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 3694 | 2024\|IL\|five_digit\|multiple |
+| 0 | 2 | 0 | 3 | 2 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 50 | 2024\|IL\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 13084 | 2024\|IL\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2024\|IL\|invalid\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 2929 | 2024\|IN\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 65 | 2024\|IN\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 7050 | 2024\|IN\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2024\|IN\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2024\|IN\|padded_four_digit\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 834 | 2024\|KS\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 15 | 2024\|KS\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3323 | 2024\|KS\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2024\|KS\|padded_four_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 2464 | 2024\|KY\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 37 | 2024\|KY\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4047 | 2024\|KY\|five_digit\|single |
+| 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 2 | 2024\|KY\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2024\|KY\|padded_four_digit\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1098 | 2024\|LA\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 39 | 2024\|LA\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3957 | 2024\|LA\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2024\|LA\|padded_four_digit\|single |
+| 0 | 0 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 2024\|MA\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 15 | 2024\|MA\|five_digit\|none |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 34 | 2024\|MA\|five_digit\|single |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 698 | 2024\|MA\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 56 | 2024\|MA\|padded_four_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 7232 | 2024\|MA\|padded_four_digit\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 1239 | 2024\|MD\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 21 | 2024\|MD\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4549 | 2024\|MD\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2024\|MD\|padded_four_digit\|none |
+| 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 0 | 4 | 0 | 4 | 2024\|MD\|padded_four_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2024\|ME\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2024\|ME\|five_digit\|none |
+| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8 | 2024\|ME\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2024\|ME\|invalid\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 22 | 2024\|ME\|padded_four_digit\|multiple |
+| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 13 | 2024\|ME\|padded_four_digit\|none |
+| 0 | 5 | 0 | 0 | 2 | 0 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1947 | 2024\|ME\|padded_four_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2024\|MH\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2024\|MH\|padded_four_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 3282 | 2024\|MI\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 47 | 2024\|MI\|five_digit\|none |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 10596 | 2024\|MI\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2024\|MI\|invalid\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 3963 | 2024\|MN\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 50 | 2024\|MN\|five_digit\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8457 | 2024\|MN\|five_digit\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 2094 | 2024\|MO\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 38 | 2024\|MO\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5781 | 2024\|MO\|five_digit\|single |
+| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 15 | 2024\|MP\|five_digit\|single |
+| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1399 | 2024\|MS\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 3 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 34 | 2024\|MS\|five_digit\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1813 | 2024\|MS\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2024\|MS\|padded_four_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 166 | 2024\|MT\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 12 | 2024\|MT\|five_digit\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1136 | 2024\|MT\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2024\|MT\|padded_four_digit\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 5632 | 2024\|NC\|five_digit\|multiple |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 110 | 2024\|NC\|five_digit\|none |
+| 0 | 3 | 0 | 3 | 2 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8598 | 2024\|NC\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2024\|NC\|padded_four_digit\|single |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 177 | 2024\|ND\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 7 | 2024\|ND\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1204 | 2024\|ND\|five_digit\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 902 | 2024\|NE\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 11 | 2024\|NE\|five_digit\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2038 | 2024\|NE\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2024\|NE\|padded_four_digit\|single |
+| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 2024\|NH\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2024\|NH\|five_digit\|none |
+| 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 4 | 4 | 0 | 4 | 0 | 4 | 2024\|NH\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2024\|NH\|invalid\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 166 | 2024\|NH\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 10 | 2024\|NH\|padded_four_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1853 | 2024\|NH\|padded_four_digit\|single |
+| 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 2024\|NJ\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 26 | 2024\|NJ\|five_digit\|none |
+| 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 27 | 2024\|NJ\|five_digit\|single |
+| 0 | 1 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 3 | 2024\|NJ\|invalid\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 5 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 1515 | 2024\|NJ\|padded_four_digit\|multiple |
+| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 53 | 2024\|NJ\|padded_four_digit\|none |
+| 0 | 5 | 0 | 2 | 0 | 0 | 1 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 7097 | 2024\|NJ\|padded_four_digit\|single |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 90 | 2024\|NM\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 23 | 2024\|NM\|five_digit\|none |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1853 | 2024\|NM\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2024\|NM\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2024\|NM\|padded_four_digit\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 279 | 2024\|NV\|five_digit\|multiple |
+| 0 | 1 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 27 | 2024\|NV\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3562 | 2024\|NV\|five_digit\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 2256 | 2024\|NY\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 120 | 2024\|NY\|five_digit\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 14222 | 2024\|NY\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2024\|NY\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2024\|NY\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2024\|NY\|padded_four_digit\|none |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8 | 2024\|NY\|padded_four_digit\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 4962 | 2024\|OH\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 129 | 2024\|OH\|five_digit\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 11721 | 2024\|OH\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2024\|OH\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2024\|OH\|padded_four_digit\|none |
+| 0 | 0 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2024\|OH\|padded_four_digit\|single |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 2 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 1380 | 2024\|OK\|five_digit\|multiple |
+| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 35 | 2024\|OK\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2760 | 2024\|OK\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2024\|OK\|padded_four_digit\|none |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2024\|OK\|padded_four_digit\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1394 | 2024\|OR\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 28 | 2024\|OR\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5447 | 2024\|OR\|five_digit\|single |
+| 0 | 0 | 0 | 7 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 8 | 2024\|OR\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2024\|OR\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2024\|OR\|padded_four_digit\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 3747 | 2024\|PA\|five_digit\|multiple |
+| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 112 | 2024\|PA\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 13154 | 2024\|PA\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2024\|PA\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2024\|PA\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2024\|PA\|padded_four_digit\|none |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 13 | 2024\|PA\|padded_four_digit\|single |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 2024\|PR\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2024\|PR\|five_digit\|none |
+| 0 | 0 | 0 | 3 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 5 | 5 | 0 | 5 | 0 | 5 | 2024\|PR\|five_digit\|single |
+| 0 | 1 | 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 0 | 0 | 1573 | 2024\|PR\|invalid\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2024\|PW\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2024\|PW\|invalid\|none |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2024\|RI\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 2024\|RI\|five_digit\|none |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2024\|RI\|five_digit\|single |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 170 | 2024\|RI\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 8 | 2024\|RI\|padded_four_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1064 | 2024\|RI\|padded_four_digit\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 2023 | 2024\|SC\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 28 | 2024\|SC\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4462 | 2024\|SC\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2024\|SC\|padded_four_digit\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 536 | 2024\|SD\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 10 | 2024\|SD\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 983 | 2024\|SD\|five_digit\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 3181 | 2024\|TN\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 27 | 2024\|TN\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5574 | 2024\|TN\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2024\|TN\|padded_four_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 7274 | 2024\|TX\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 134 | 2024\|TX\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 23690 | 2024\|TX\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2024\|TX\|padded_four_digit\|none |
+| 0 | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 7 | 7 | 0 | 7 | 0 | 7 | 2024\|TX\|padded_four_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 283 | 2024\|UT\|five_digit\|multiple |
+| 0 | 2 | 0 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 25 | 2024\|UT\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3231 | 2024\|UT\|five_digit\|single |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 4299 | 2024\|VA\|five_digit\|multiple |
+| 0 | 1 | 0 | 1 | 5 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 63 | 2024\|VA\|five_digit\|none |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5610 | 2024\|VA\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 3 | 3 | 0 | 3 | 0 | 3 | 2024\|VA\|padded_four_digit\|single |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 2024\|VI\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 2 | 0 | 2 | 0 | 2 | 2024\|VI\|five_digit\|single |
+| 0 | 0 | 0 | 7 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 0 | 0 | 51 | 2024\|VI\|invalid\|none |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2024\|VT\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 2024\|VT\|five_digit\|none |
+| 0 | 0 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 6 | 6 | 0 | 6 | 0 | 6 | 2024\|VT\|five_digit\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 80 | 2024\|VT\|padded_four_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 8 | 2024\|VT\|padded_four_digit\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 738 | 2024\|VT\|padded_four_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 615 | 2024\|WA\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 59 | 2024\|WA\|five_digit\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8139 | 2024\|WA\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2024\|WA\|invalid\|none |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2024\|WA\|padded_four_digit\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 2923 | 2024\|WI\|five_digit\|multiple |
+| 0 | 3 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 0 | 0 | 55 | 2024\|WI\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 6623 | 2024\|WI\|five_digit\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 477 | 2024\|WV\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 33 | 2024\|WV\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1427 | 2024\|WV\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2024\|WV\|padded_four_digit\|single |
+| 0 | 3 | 0 | 0 | 5 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 54 | 2024\|WY\|five_digit\|multiple |
+| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 24 | 2024\|WY\|five_digit\|none |
+| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 702 | 2024\|WY\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2025\|AA\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 0 | 2 | 0 | 2 | 2025\|AA\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2025\|AE\|five_digit\|single |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 14 | 2025\|AK\|five_digit\|multiple |
+| 0 | 2 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 131 | 2025\|AK\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1672 | 2025\|AK\|five_digit\|single |
+| 0 | 2 | 0 | 4 | 2 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 8 | 8 | 0 | 0 | 0 | 1633 | 2025\|AL\|five_digit\|multiple |
+| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 33 | 2025\|AL\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4034 | 2025\|AL\|five_digit\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1219 | 2025\|AR\|five_digit\|multiple |
+| 0 | 1 | 0 | 5 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 31 | 2025\|AR\|five_digit\|none |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2259 | 2025\|AR\|five_digit\|single |
+| 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 6 | 0 | 0 | 0 | 0 | 6 | 2025\|AS\|five_digit\|none |
+| 0 | 0 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 3 | 3 | 0 | 3 | 0 | 3 | 2025\|AS\|five_digit\|single |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 236 | 2025\|AZ\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 64 | 2025\|AZ\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8164 | 2025\|AZ\|five_digit\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 3417 | 2025\|CA\|five_digit\|multiple |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 241 | 2025\|CA\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 40221 | 2025\|CA\|five_digit\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 3202 | 2025\|CO\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 36 | 2025\|CO\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3974 | 2025\|CO\|five_digit\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 183 | 2025\|CT\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 44 | 2025\|CT\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5093 | 2025\|CT\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 | 2 | 2025\|DC\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2025\|DC\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 1 | 0 | 1 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 880 | 2025\|DC\|five_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 81 | 2025\|DE\|five_digit\|multiple |
+| 0 | 2 | 0 | 1 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 7 | 0 | 0 | 0 | 0 | 7 | 2025\|DE\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1099 | 2025\|DE\|five_digit\|single |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 2092 | 2025\|FL\|five_digit\|multiple |
+| 0 | 0 | 0 | 0 | 7 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 131 | 2025\|FL\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 19031 | 2025\|FL\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 0 | 1 | 2025\|FM\|five_digit\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 5219 | 2025\|GA\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 50 | 2025\|GA\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 6606 | 2025\|GA\|five_digit\|single |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2025\|GU\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 6 | 0 | 6 | 0 | 0 | 0 | 0 | 6 | 2025\|GU\|five_digit\|none |
+| 0 | 0 | 0 | 5 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 82 | 2025\|GU\|five_digit\|single |
+| 0 | 1 | 0 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 6 | 2025\|HI\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2124 | 2025\|HI\|five_digit\|single |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 0 | 0 | 0 | 8 | 8 | 8 | 0 | 0 | 0 | 1619 | 2025\|IA\|five_digit\|multiple |
+| 0 | 1 | 0 | 6 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 17 | 2025\|IA\|five_digit\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4328 | 2025\|IA\|five_digit\|single |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 773 | 2025\|ID\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 18 | 2025\|ID\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1715 | 2025\|ID\|five_digit\|single |
+| 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 3795 | 2025\|IL\|five_digit\|multiple |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 51 | 2025\|IL\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 13221 | 2025\|IL\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 2846 | 2025\|IN\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 61 | 2025\|IN\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 6848 | 2025\|IN\|five_digit\|single |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 783 | 2025\|KS\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 17 | 2025\|KS\|five_digit\|none |
+| 0 | 3 | 0 | 0 | 5 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3154 | 2025\|KS\|five_digit\|single |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 2391 | 2025\|KY\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 23 | 2025\|KY\|five_digit\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3973 | 2025\|KY\|five_digit\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 1027 | 2025\|LA\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 34 | 2025\|LA\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3915 | 2025\|LA\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 654 | 2025\|MA\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 70 | 2025\|MA\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 6569 | 2025\|MA\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 1173 | 2025\|MD\|five_digit\|multiple |
+| 0 | 1 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 31 | 2025\|MD\|five_digit\|none |
+| 0 | 5 | 0 | 3 | 0 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4472 | 2025\|MD\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 19 | 2025\|ME\|five_digit\|multiple |
+| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 16 | 2025\|ME\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1951 | 2025\|ME\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 2025\|MH\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 2025\|MH\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 3207 | 2025\|MI\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 48 | 2025\|MI\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 10446 | 2025\|MI\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 4075 | 2025\|MN\|five_digit\|multiple |
+| 0 | 2 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 48 | 2025\|MN\|five_digit\|none |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8791 | 2025\|MN\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 2008 | 2025\|MO\|five_digit\|multiple |
+| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 33 | 2025\|MO\|five_digit\|none |
+| 0 | 2 | 0 | 1 | 5 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5565 | 2025\|MO\|five_digit\|single |
+| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 14 | 2025\|MP\|five_digit\|single |
+| 0 | 5 | 0 | 2 | 0 | 0 | 1 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1324 | 2025\|MS\|five_digit\|multiple |
+| 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 24 | 2025\|MS\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1658 | 2025\|MS\|five_digit\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 166 | 2025\|MT\|five_digit\|multiple |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 10 | 2025\|MT\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1125 | 2025\|MT\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 5636 | 2025\|NC\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 99 | 2025\|NC\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8490 | 2025\|NC\|five_digit\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 176 | 2025\|ND\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 5 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 8 | 2025\|ND\|five_digit\|none |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 2 | 2 | 2 | 2 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1246 | 2025\|ND\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 881 | 2025\|NE\|five_digit\|multiple |
+| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 12 | 2025\|NE\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1965 | 2025\|NE\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 155 | 2025\|NH\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 18 | 2025\|NH\|five_digit\|none |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1809 | 2025\|NH\|five_digit\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 1393 | 2025\|NJ\|five_digit\|multiple |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 89 | 2025\|NJ\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 6635 | 2025\|NJ\|five_digit\|single |
+| 0 | 1 | 0 | 3 | 4 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 8 | 8 | 0 | 0 | 0 | 107 | 2025\|NM\|five_digit\|multiple |
+| 0 | 2 | 0 | 3 | 2 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 18 | 2025\|NM\|five_digit\|none |
+| 0 | 3 | 0 | 1 | 4 | 0 | 0 | 3 | 3 | 3 | 3 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1874 | 2025\|NM\|five_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 259 | 2025\|NV\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 21 | 2025\|NV\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3606 | 2025\|NV\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 2171 | 2025\|NY\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 2 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 114 | 2025\|NY\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 14211 | 2025\|NY\|five_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 5036 | 2025\|OH\|five_digit\|multiple |
+| 0 | 0 | 0 | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 128 | 2025\|OH\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 11858 | 2025\|OH\|five_digit\|single |
+| 0 | 3 | 0 | 2 | 3 | 0 | 0 | 3 | 3 | 0 | 0 | 0 | 3 | 8 | 8 | 0 | 0 | 0 | 1332 | 2025\|OK\|five_digit\|multiple |
+| 0 | 2 | 0 | 1 | 4 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 35 | 2025\|OK\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 2547 | 2025\|OK\|five_digit\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 5 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 1348 | 2025\|OR\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 39 | 2025\|OR\|five_digit\|none |
+| 0 | 7 | 0 | 1 | 0 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5350 | 2025\|OR\|five_digit\|single |
+| 0 | 5 | 0 | 0 | 3 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 3620 | 2025\|PA\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 124 | 2025\|PA\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 12539 | 2025\|PA\|five_digit\|single |
+| 0 | 0 | 0 | 5 | 2 | 2 | 1 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 0 | 0 | 779 | 2025\|PR\|five_digit\|multiple |
+| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 0 | 0 | 0 | 0 | 18 | 2025\|PR\|five_digit\|none |
+| 0 | 0 | 0 | 7 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 965 | 2025\|PR\|five_digit\|single |
+| 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 2 | 2025\|PW\|five_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 167 | 2025\|RI\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 12 | 2025\|RI\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1024 | 2025\|RI\|five_digit\|single |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 6 | 7 | 0 | 0 | 0 | 7 | 8 | 8 | 0 | 0 | 0 | 1936 | 2025\|SC\|five_digit\|multiple |
+| 0 | 0 | 0 | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 19 | 2025\|SC\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 4359 | 2025\|SC\|five_digit\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 550 | 2025\|SD\|five_digit\|multiple |
+| 0 | 1 | 0 | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 10 | 2025\|SD\|five_digit\|none |
+| 0 | 4 | 0 | 2 | 1 | 0 | 1 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 933 | 2025\|SD\|five_digit\|single |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 3147 | 2025\|TN\|five_digit\|multiple |
+| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 30 | 2025\|TN\|five_digit\|none |
+| 0 | 6 | 0 | 0 | 2 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5505 | 2025\|TN\|five_digit\|single |
+| 0 | 4 | 0 | 1 | 3 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 7998 | 2025\|TX\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 108 | 2025\|TX\|five_digit\|none |
+| 0 | 4 | 0 | 1 | 2 | 0 | 1 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 24471 | 2025\|TX\|five_digit\|single |
+| 0 | 5 | 0 | 0 | 2 | 0 | 1 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 302 | 2025\|UT\|five_digit\|multiple |
+| 0 | 1 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 19 | 2025\|UT\|five_digit\|none |
+| 0 | 4 | 0 | 3 | 1 | 0 | 0 | 4 | 4 | 4 | 4 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 3308 | 2025\|UT\|five_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 4 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 4216 | 2025\|VA\|five_digit\|multiple |
+| 0 | 2 | 0 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 62 | 2025\|VA\|five_digit\|none |
+| 0 | 5 | 0 | 2 | 1 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 5634 | 2025\|VA\|five_digit\|single |
+| 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 2025\|VI\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 3 | 0 | 0 | 0 | 0 | 3 | 2025\|VI\|five_digit\|none |
+| 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 8 | 8 | 8 | 8 | 8 | 61 | 2025\|VI\|five_digit\|single |
+| 0 | 6 | 0 | 1 | 1 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 78 | 2025\|VT\|five_digit\|multiple |
+| 0 | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 14 | 2025\|VT\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 707 | 2025\|VT\|five_digit\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 4 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 643 | 2025\|WA\|five_digit\|multiple |
+| 0 | 0 | 0 | 2 | 5 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 72 | 2025\|WA\|five_digit\|none |
+| 0 | 7 | 0 | 0 | 1 | 0 | 0 | 7 | 7 | 7 | 7 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 8664 | 2025\|WA\|five_digit\|single |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 0 | 0 | 0 | 5 | 8 | 8 | 0 | 0 | 0 | 2871 | 2025\|WI\|five_digit\|multiple |
+| 0 | 1 | 0 | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 8 | 0 | 0 | 0 | 0 | 57 | 2025\|WI\|five_digit\|none |
+| 0 | 8 | 0 | 0 | 0 | 0 | 0 | 8 | 8 | 8 | 8 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 6618 | 2025\|WI\|five_digit\|single |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 0 | 0 | 0 | 6 | 8 | 8 | 0 | 0 | 0 | 444 | 2025\|WV\|five_digit\|multiple |
+| 0 | 2 | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 8 | 0 | 0 | 0 | 0 | 23 | 2025\|WV\|five_digit\|none |
+| 0 | 6 | 0 | 2 | 0 | 0 | 0 | 6 | 6 | 6 | 6 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 1351 | 2025\|WV\|five_digit\|single |
+| 0 | 4 | 0 | 2 | 2 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | 4 | 8 | 8 | 0 | 0 | 0 | 47 | 2025\|WY\|five_digit\|multiple |
+| 0 | 3 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 8 | 0 | 0 | 0 | 0 | 21 | 2025\|WY\|five_digit\|none |
+| 0 | 5 | 0 | 1 | 2 | 0 | 0 | 5 | 5 | 5 | 5 | 0 | 8 | 8 | 8 | 0 | 8 | 0 | 644 | 2025\|WY\|five_digit\|single |
 
 ## Provenance audits and source layout
 
@@ -4073,7 +4253,7 @@ Official sources: [OSHA ITA](https://www.osha.gov/itadata), [HUD USPS crosswalk]
 
 Census response acquisition timestamps, hashes and catalogs above pin cached bytes. Mutable Public_AR_Current address ranges may change between batches or resumed acquisitions; catalog caching pins request options, not a frozen address-source snapshot. All three batches belong to the same verified request run. Offline replay reproduces the cached comparison, not a claim that a fresh service call would return identical matches.
 
-The reproducible report column `n_proposed_assignable` retains its original measurement name; after owner approval it reports the adopted rule's assignable sample rows. No measurement algorithm or cached input changed.
+The reproducible report column `n_proposed_assignable` retains its original measurement name; after owner approval it reports the adopted rule's assignable sample rows. Owner D8 corrected returned-county scope gates, measured under a new code hash/run; cached source bytes and adopted A1–A4 are unchanged.
 
 ## Adopted amendments — owner, 2026-10-13
 

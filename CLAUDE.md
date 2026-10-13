@@ -69,8 +69,13 @@ fallback also requires uniquely matched EIN/name/address tuples. County assignme
 uses an exact cached Census ACS2025 geography match first, then a compatible HUD
 single-positive-BUS county (reviewed quarter 2025Q4); dominant-share selection is
 diagnostic only. Preserve ambiguity, scope and incompatible-vintage flags, including
-legacy CT counties. Sample comparisons are not county accuracy, a county hierarchy
-or full-table target construction. The original run records code/dependency hashes
+legacy CT counties. Check the chosen returned county against territory prefixes
+60/66/69/72/74/78 for assignment and both returned counties for comparison,
+in addition to delivered-state exclusions; retain separate method scope counts.
+The scope correction is measured in `v1_v3_20261013_scopefix` using verified
+original response bytes and receipt metadata from `v1_v3_20261013`.
+Sample comparisons are not county accuracy, a county hierarchy
+or full-table target construction. Each run records its own code/dependency hashes
 and all cached batches; fresh acquisition can differ under mutable Current data.
 
 **Test seams.** Tests and Behave steps patch the module-level `IpumsApiClient` (autospec) and `DOTENV_PATH` with `patch.object`, so both must remain module globals looked up at call time. OSHA tests patch `make_client` with a `partial` that injects an `httpx.MockTransport`; fake responses must use `stream=httpx.ByteStream(...)`, because a `content=` body is preloaded and leaves `num_bytes_downloaded` at 0. OSHA summary tests serve the recorded ITA page `tests/fixtures/osha/itadata.html` and bodies from `tests/ita_fixtures.year_file`, one per published file format; `write_release` places and records a raw summary file. The `cli_runner` fixture in `tests/conftest.py` removes `IPUMS_API_KEY` from the environment. The root `.env` holds a real key: a new test that does not patch both `DOTENV_PATH` and `IpumsApiClient` can load it and make live IPUMS requests. Every command test must also pass `--data-dir` (the `data_directory` fixture): `--data-dir` defaults to the real `data/` tree through a Typer default bound at import, so patching `paths.DATA_DIR` cannot redirect it, and a stray test would write fake extracts into `data/raw` and append fake entries to the append-only manifest.

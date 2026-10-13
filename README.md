@@ -116,7 +116,12 @@ fallback/reconstructed-EIN flags. Establishment IDs are candidates in every year
 confirmation requires unique IDs, the same usable unreconstructed EIN and complete
 normalized address. County assignment uses an exact cached Census match in ACS2025
 first, then a compatible HUD county only when exactly one has positive business
-share (reviewed reference: 2025Q4). Ambiguous, unmatched, scope and vintage results
+share (reviewed reference: 2025Q4). Assignment checks the chosen returned county
+and excludes territory prefixes 60/66/69/72/74/78 as well as excluded delivered
+states; comparison checks both returned counties. Scope diagnostics remain
+separate from coverage. The corrected evidence run is `v1_v3_20261013_scopefix`,
+replaying the original cached responses with their original receipts.
+Ambiguous, unmatched, scope and vintage results
 remain flagged. The finding reports raw and weighted sample evidence, not county
 accuracy or a full-table assignment; targets and full production assignment remain
 planned.
