@@ -123,18 +123,18 @@ placements:
       Objective: Every Form 300A summary file from 2016 on is acquired and stacked into one harmonized establishment-year table.
       Spec: R2.1, R2.3, R2.4, R2.9, R1.1, R9.1, V10 (ITA)
       Gap closed: R1.1; R2.1; R2.3; R2.4; R2.9; V10 (ITA); `osha` command drift
-      Consumes: Stage 1 manifest writer and derived location; `osha:63` `make_client`, `osha:78` `.part` download, `osha:108` `decode_line`
+      Consumes: Stage 1 manifest writer and derived location; `osha` helpers `make_client`, `download` (the `.part` rename) and `decode_line`, and the convert-once and recorded-file traps (plan 1, Handoff; Resolved at resume, 2026-10-12)
       Produces: stacked 300A Parquet keyed on `year_filing_for` with R2.4 columns, harmonized size codes and `naics_year`, R2.9 flags; current-year through-date in the manifest
-      Exit: every year 2016–2025 appears with its raw file hashed in the manifest; size code `2` never co-occurs with `21`/`22` after harmonization; flagged rows are retained, not dropped; rows per year are compared with OSHA's published submission counts and the gaps recorded; spec amendment adds `osha` to R9.1 and records case detail as acquired, feeding no target
+      Exit: every year 2016–2025 appears with its raw file hashed in the manifest; size code `2` never co-occurs with `21`/`22` after harmonization; flagged rows are retained, not dropped; rows per year are compared with OSHA's published submission counts and the gaps recorded; a re-acquired current-year file is recorded as a new entry, leaving the earlier file and its entry unchanged (plan 1, Handoff; Resolved at resume, 2026-10-12); spec amendment adds `osha` to R9.1 and records case detail as acquired, feeding no target
       ROUTING: writing-plans
 
 - [ ] Stage 3: ITA verification
       Objective: Settle the three open ITA facts by measurement before any ITA target is built.
       Spec: V1, V2, V3; R2.6, R2.7, R2.8
       Gap closed: V1, V2, V3 (the open markers on R2.6, R2.7, R2.8)
-      Consumes: Stage 1 manifest writer; Stage 2 stacked table
-      Produces: recorded decisions on R2.6 cleaning rules, R2.7 link key, R2.8 county-assignment method; official NAICS title files (2012, 2017, 2022) acquired under the manifest for V1
-      Exit: a committed finding reports V1's per-year shares, V2's ID-persistence and address-match shares, and V3's match rates and county agreement; spec amendments replace the three open markers with the adopted rules
+      Consumes: Stage 1 manifest writer, and `manifest.entry_for`, which does not re-hash the file it cites (plan 1, Handoff; Resolved at resume, 2026-10-12); Stage 2 stacked table
+      Produces: recorded decisions on R2.6 cleaning rules, R2.7 link key, R2.8 county-assignment method; official NAICS title files (2012, 2017, 2022) acquired under the manifest for V1; the manifest audit of `specs/deferred_items.md` section `1-raw-provenance`, item "Manifest audit" (plan 1, Handoff; Resolved at resume, 2026-10-12)
+      Exit: a committed finding reports V1's per-year shares, V2's ID-persistence and address-match shares, and V3's match rates and county agreement; spec amendments replace the three open markers with the adopted rules; the "Manifest audit" item's Done-when holds and the item is ticked
       ROUTING: writing-plans
 
 - [ ] Stage 4: Code tables and ITA NAICS mapping
@@ -168,9 +168,9 @@ placements:
       Objective: The five delivered IPUMS extracts are verified before any ACS or CPS transformation reads them.
       Spec: V4, V5, V6, V7, V10 (ACS, CPS); R3.2, R3.5, R4.5, R4.9, R4.11; Design provenance (XA, XC)
       Gap closed: V4; V5; V6; V7; V10 (ACS, CPS); the open markers on R3.2, R3.5, R4.5, R4.9, R4.11
-      Consumes: Stage 1 manifest and derived Parquet
-      Produces: written finding with sample IDs, accepted names, weight-storage rule, INDLY scheme verdict, and totals gaps; the 2022 Census industry code list acquired under the manifest; script corrections if any
-      Exit: finding committed; the five open markers carry verified markers citing it; XA and XC standing no longer reads dry-run only; ACS state employment and CPS monthly employment gaps against published levels are recorded, not tuned away
+      Consumes: Stage 1 manifest and derived Parquet, with the derived layout, proxied backfill entries, `.part` interrupted deliveries, and the caution against reading the legacy `extract.json` `version` (plan 1, Handoff; `specs/deferred_items.md` section `1-raw-provenance`, item "Legacy `extract.json` version"; Resolved at resume, 2026-10-12)
+      Produces: written finding with sample IDs, accepted names, weight-storage rule, INDLY scheme verdict, and totals gaps; the 2022 Census industry code list acquired under the manifest; script corrections if any; ACS and CPS convert-if-absent per `specs/deferred_items.md` section `1-raw-provenance`, item "ACS and CPS convert-if-absent" (plan 1, Handoff; Resolved at resume, 2026-10-12)
+      Exit: finding committed; the five open markers carry verified markers citing it; XA and XC standing cites the finding (plan 1 already recorded the 2026-10-12 submissions; owner, at resume, 2026-10-12); ACS state employment and CPS monthly employment gaps against published levels are recorded, not tuned away; the "ACS and CPS convert-if-absent" item's Done-when holds and the item is ticked
       ROUTING: writing-plans
 
 - [ ] Stage 8: ACS codes and area allocation
