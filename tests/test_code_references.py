@@ -360,3 +360,26 @@ def test_destination_appearing_at_publication_is_never_overwritten(
     assert destination.read_bytes() == b'concurrent original'
     assert not paths.manifest_path(tmp_path).exists()
     assert not partial.exists()
+
+
+def test_competing_staging_file_survives_exclusive_creation_refusal(
+    tmp_path, registry, monkeypatch
+):
+    file = original(tmp_path)
+    destination = cr.reference_path(tmp_path, registry['naics_2022'])
+    partial = destination.with_name(destination.name + '.part')
+    original_open = Path.open
+    competing_bytes = b'other importer owns this staging file'
+
+    def competing_open(path, mode='r', *args, **kwargs):
+        if path == partial and mode == 'xb':
+            with original_open(path, 'wb') as competitor:
+                competitor.write(competing_bytes)
+        return original_open(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr(Path, 'open', competing_open)
+    with pytest.raises(FileExistsError):
+        cr.import_reference(tmp_path, 'naics_2022', file, registry=registry)
+    assert partial.read_bytes() == competing_bytes
+    assert not destination.exists()
+    assert not paths.manifest_path(tmp_path).exists()

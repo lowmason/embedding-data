@@ -182,8 +182,9 @@ def publish_original(data_dir, reference, original, *, imported):
     partial = destination.with_name(destination.name + '.part')
     if partial.exists():
         raise ValueError('interrupted reference already exists')
+    output = partial.open('xb')
     try:
-        with partial.open('xb') as output, original.open('rb') as source:
+        with output, original.open('rb') as source:
             shutil.copyfileobj(source, output)
         if manifest.sha256_file(partial) != citation.sha256:
             raise ValueError('SHA-256 changed while copying original')
