@@ -68,6 +68,47 @@ Use the root `.env`, even if another `.env` exists under `src/embedding_data/`.
 Both commands load the root file with `python-dotenv`; an exported
 `IPUMS_API_KEY` takes precedence.
 
+## ITA verification commands
+
+Audit the raw manifest without changing files:
+
+```sh
+uv run embedding-data audit --data-dir data
+```
+
+`audit` is read-only and exits 1 on a discrepancy. The manifest's `entry_for`
+verifies file bytes against recorded hashes; `recorded_entry_for` only looks up
+records for restoration and existence diagnostics.
+
+Run the separate verification module with an explicit data directory:
+
+```sh
+uv run python -m embedding_data.ita_verification_run references --data-dir data
+uv run python -m embedding_data.ita_verification_run import-hud /path/ZIP-COUNTY.xlsx 2025Q4 --data-dir data
+uv run python -m embedding_data.ita_verification_run sample data/raw/references/hud/2025Q4/ZIP-COUNTY.xlsx run-1 --data-dir data
+uv run python -m embedding_data.ita_verification_run geocode run-1 --data-dir data
+uv run python -m embedding_data.ita_verification_run measure run-1 --data-dir data
+```
+
+`references` and `geocode` acquire public data. `import-hud` copies a manually
+downloaded official HUD ZIP-to-county workbook into immutable raw references;
+its `retrieved_at` is the local import time, flagged as a proxy, rather than the
+original browser download time. `sample` and `measure` run offline. `sample`
+rebuilds the source table once using the Stage 2 source/hash contract and records
+raw provenance, sample/table/request hashes, dependency versions, and code hashes.
+`measure` never rebuilds the table or recontacts Census; changed sample, table,
+or request bytes fail, as do changed code or dependencies.
+
+Each run lives in `derived/osha/verification/<run_id>/`, containing
+`sample.parquet`, headerless batch `requests/*.csv`, `inputs.json`,
+`geocoding.json`, `reports.json`, V1 and quality Parquets by year, V2 JSON,
+V3 strata Parquet, and `finding.md`. Census catalogs and batch responses remain
+under `raw/references/`, covered by the raw manifest. Current Census address data
+can change between batches or resumed acquisitions; recorded catalogs identify
+request options rather than a frozen address-source snapshot. Reports are
+measurements, not target tables; fixture results do not establish benchmarks or
+adopt verification decisions.
+
 ## ACS extracts
 
 | Name | IPUMS sample IDs | Use |
