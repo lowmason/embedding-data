@@ -5,13 +5,14 @@ to the manifest's directory (data/raw), so the manifest survives moving the
 project. Raw files are immutable, so a path is recorded once: a second entry for
 the same path is refused rather than superseding the first. `proxies` names the
 fields whose values were reconstructed after retrieval rather than recorded at it.
+`through_date` is the submission through-date an OSHA ITA summary file's name carries.
 '''
 
 import hashlib
 import json
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 @dataclass(frozen=True)
@@ -27,6 +28,7 @@ class ManifestEntry:
     extract_number: int | None = None
     samples: tuple[str, ...] = ()
     proxies: tuple[str, ...] = ()
+    through_date: str | None = None
 
 
 def sha256_file(file: Path) -> str:
@@ -46,6 +48,7 @@ def describe_file(
     extract_number: int | None = None,
     samples: Iterable[str] = (),
     proxies: Iterable[str] = (),
+    through_date: date | None = None,
 ) -> ManifestEntry:
     '''Hash one raw file and pair it with where, when, and how it was retrieved.'''
     if retrieved_at.tzinfo is None:
@@ -62,6 +65,7 @@ def describe_file(
         extract_number=extract_number,
         samples=tuple(samples),
         proxies=tuple(proxies),
+        through_date=None if through_date is None else through_date.isoformat(),
     )
 
 

@@ -1,5 +1,5 @@
 import json
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -133,3 +133,30 @@ def test_entry_for_finds_a_raw_file_by_location(raw_file, data_directory):
     assert manifest.entry_for(manifest_path, raw_file) == entry
     with pytest.raises(KeyError, match='usa_00002.xml'):
         manifest.entry_for(manifest_path, raw_file.with_name('usa_00002.xml'))
+
+
+def test_through_date_is_recorded_as_an_iso_date(raw_file, data_directory):
+    manifest_path = paths.manifest_path(data_directory)
+    entry = describe(raw_file, data_directory, through_date=date(2026, 8, 31))
+
+    manifest.append_entries(manifest_path, [entry])
+
+    assert json.loads(manifest_path.read_text())['through_date'] == '2026-08-31'
+    assert manifest.read_manifest(manifest_path) == [entry]
+
+
+def test_a_line_recorded_before_through_date_existed_still_reads(data_directory):
+    manifest_path = paths.manifest_path(data_directory)
+    manifest_path.parent.mkdir(parents=True)
+    stage_1_line = {
+        'path': 'osha/case_detail_data_dictionary_2026.pdf', 'sha256': ABC_SHA256,
+        'size': 3, 'retrieved_at': '2026-10-12T15:28:00+00:00', 'client': 'httpx',
+        'client_version': '0.28.1', 'source_url': 'https://www.osha.gov/x.pdf',
+        'collection': None, 'extract_number': None, 'samples': [], 'proxies': [],
+    }
+    manifest_path.write_text(json.dumps(stage_1_line) + '\n')
+
+    [entry] = manifest.read_manifest(manifest_path)
+
+    assert entry.path == 'osha/case_detail_data_dictionary_2026.pdf'
+    assert entry.through_date is None

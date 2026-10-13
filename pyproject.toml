@@ -79,3 +79,8 @@ allow_multiline_lambdas = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m 'not network'"
+markers = [
+    "network: fetches a live osha.gov page; deselected by default, run with -m network",
+]
+filterwarnings = ["error::pytest.PytestUnknownMarkWarning"]

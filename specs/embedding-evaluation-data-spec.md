@@ -151,7 +151,9 @@ and the `uv.lock` client version, each flagged as a proxy. *(owner, plan 1,
 **R2.1** Acquire every Form 300A summary file from 2016 through the current year
 from the ITA data page. The current-year file grows while submissions continue —
 the 2025 file covers submissions through 2026-08-31 — so record its through-date
-and re-acquire until OSHA moves it to the historical list. *(verified; ITA)*
+and re-acquire until OSHA moves it to the historical list. *(verified; ITA)* The
+2025 case-detail file (Forms 300 and 301) is also acquired and converted; it feeds
+no target. *(owner, plan 2, 2026-10-12)*
 
 **R2.2** **ITA is a program-selected subset, not a frame.** Filing is required
 of establishments with 250 or more employees outside the partially exempt
@@ -163,9 +165,23 @@ representative of all establishments. *(verified; ITA)*
 
 **R2.3** Stack all years into one establishment-year table keyed on
 `year_filing_for`, harmonizing three dictionary changes introduced with the 2023
-data: `establishment_id`, added to link summary and case-detail files; the split
-of size code `2` into `21` and `22`; and NAICS codes that may be 2012, 2017, or
-2022 vintage, identified by `naics_year`. *(verified; ITA)*
+data: `establishment_id`, documented from then on as the link between summary and
+case-detail files; the split of size code `2` into `21` and `22`; and NAICS codes
+that may be 2012, 2017, or 2022 vintage, identified by `naics_year`. *(verified;
+ITA)* The delivered files differ from that account. `establishment_id` is present
+in every year from 2016; the 2016–2023 dictionary defines it per user account, and
+OSHA assigns a new one when a profile is re-created. The 2023 and later files still
+carry code `2` for some establishments, so a harmonized size class merges `21` and
+`22` into `2` beside the native code, and `2` is never split. Files before 2023
+carry no `naics_year`; the dictionary states that data through 2022 use 2012 NAICS,
+so those rows take 2012, marked as supplied by the dictionary. *(owner, plan 2,
+2026-10-12)* A delivered `naics_year` other than 2012, 2017, or 2022 (blank
+beside a code in the 2023 file; `0` in the 2024 and 2025 files, and `2025` on
+three 2025 rows) is stored as null and marked by `flag_naics_year_unknown`; the
+code and the row are kept. An `establishment_type` with no digit in it becomes
+null, and `total_hours_worked` written in scientific notation is read as the
+whole number it spells; every other non-integer value fails the build.
+*(owner, plan 2, 2026-10-12)*
 
 **R2.4** Retain `establishment_name`, `establishment_id`, `ein`, `company_name`,
 `street_address`, `city`, `state`, `zip_code`, `naics_code`, `naics_year`,
@@ -484,7 +500,8 @@ Ingestion streams each CSV to Parquet with polars, keeping alphanumeric code
 columns as strings. Transformations are lazy polars with method-style
 expressions. Each extract runs as a command of the package's console entry point
 (`uv run embedding-data acs`, `uv run embedding-data cps`), with dependencies
-declared in `pyproject.toml`. *(implemented; XA, XC)*
+declared in `pyproject.toml`. *(implemented; XA, XC)* ITA acquisition runs the same
+way, as `uv run embedding-data osha`. *(owner, plan 2, 2026-10-12)*
 
 **R9.2** Every transformation is deterministic and runs offline from raw files.
 Tests use fixtures, with no network and no credentials. *(added at synthesis)*
