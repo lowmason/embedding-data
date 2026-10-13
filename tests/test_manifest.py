@@ -173,3 +173,22 @@ def test_entry_for_verifies_present_bytes(raw_file, data_directory):
     assert manifest.recorded_entry_for(file, raw_file) == entry
     with pytest.raises(FileNotFoundError):
         manifest.entry_for(file, raw_file)
+
+
+def test_recorded_entry_for_rejects_duplicate_matching_records(raw_file, data_directory):
+    file = paths.manifest_path(data_directory)
+    entry = describe(raw_file, data_directory)
+    manifest.append_entries(file, [entry])
+    file.write_text(file.read_text() * 2)
+    with pytest.raises(ValueError, match='recorded more than once'):
+        manifest.recorded_entry_for(file, raw_file)
+
+
+def test_entry_for_rejects_correct_hash_with_wrong_recorded_size(raw_file, data_directory):
+    file = paths.manifest_path(data_directory)
+    manifest.append_entries(file, [describe(raw_file, data_directory)])
+    record = json.loads(file.read_text())
+    record['size'] = 4
+    file.write_text(json.dumps(record) + '\n')
+    with pytest.raises(ValueError, match='size differs'):
+        manifest.entry_for(file, raw_file)

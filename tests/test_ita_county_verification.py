@@ -168,3 +168,52 @@ def test_normalized_territory_state_is_excluded(state):
     assert result['n_proposed_assignable'] == 0
     assert result['n_joint_single_comparable'] == 0
     assert result['n_joint_dominant_comparable'] == 0
+
+@pytest.mark.parametrize(
+    'territory_county', ['60010', '66010', '69085', '72001', '74050', '78010']
+)
+@pytest.mark.parametrize('state', [None, 'NJ'])
+@pytest.mark.parametrize('method', ['census', 'hud'])
+def test_returned_territory_county_cannot_supply_assignment(territory_county, state, method):
+    sample = county.stratified_sample(rows([{'state': state}]), county.zip_candidates(hud_rows()))
+    sample = sample.with_columns(
+        zip_single_county=pl.lit(territory_county),
+        zip_dominant_county=pl.lit(territory_county),
+    )
+    geocodes = sample.select('row_key').with_columns(
+        geocode_status=pl.lit('Match' if method == 'census' else 'No_Match'),
+        match_type=pl.lit('Exact' if method == 'census' else None, dtype=pl.String),
+        county_geoid=pl.lit(territory_county if method == 'census' else None, dtype=pl.String),
+    )
+    strata, result = county.county_report(sample, geocodes)
+    assert result['n_proposed_assignable'] == 0
+    assert result['n_joint_single_comparable'] == 0
+    assert result['n_joint_dominant_comparable'] == 0
+    assert result['n_out_of_scope'] == 0
+    assert result['n_geocode_out_of_scope'] == (method == 'census')
+    assert result['n_zip_single_out_of_scope'] == 1
+    assert result['n_zip_dominant_out_of_scope'] == 1
+    assert result['n_geocode_exact'] == (method == 'census')
+    assert result['n_zip_covered'] == result['n_zip_single_compatible'] == 1
+    assert result['n_sample'] == result['n_population'] == 1
+    assert strata['population_n'].sum() == 1
+    assert sample['state'].to_list() == [state]
+
+@pytest.mark.parametrize('census_county,hud_county,assignable', [
+    ('25025', '72001', 1), ('72001', '25025', 0),
+])
+def test_comparison_checks_both_methods_and_assignment_checks_chosen_method(
+    census_county, hud_county, assignable
+):
+    sample = county.stratified_sample(rows([{}]), county.zip_candidates(hud_rows()))
+    sample = sample.with_columns(
+        zip_single_county=pl.lit(hud_county), zip_dominant_county=pl.lit(hud_county)
+    )
+    geocodes = sample.select('row_key').with_columns(
+        geocode_status=pl.lit('Match'), match_type=pl.lit('Exact'),
+        county_geoid=pl.lit(census_county),
+    )
+    _, result = county.county_report(sample, geocodes)
+    assert result['n_proposed_assignable'] == assignable
+    assert result['n_joint_single_comparable'] == 0
+    assert result['n_joint_dominant_comparable'] == 0

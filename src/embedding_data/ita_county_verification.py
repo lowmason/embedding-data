@@ -13,6 +13,7 @@ from embedding_data.ita_verification import with_keys
 
 SAMPLE_SALT = 'embedding-data:V3:2026-10-13:v1'
 OUT_OF_SCOPE_STATES = ('PR', 'VI', 'GU', 'AS', 'MP', 'UM')
+OUT_OF_SCOPE_COUNTY_PREFIXES = ('60', '66', '69', '72', '74', '78')
 
 def zip_candidates(frame: pl.DataFrame) -> pl.DataFrame:
     positive = frame.lazy().filter(pl.col('bus_ratio').gt(0))
@@ -116,6 +117,15 @@ def county_report(sample: pl.DataFrame, geocodes: pl.DataFrame) -> tuple[pl.Data
     compared = (
         sample.lazy().join(geocodes.lazy(), on='row_key', validate='1:1').with_columns(
             flag_out_of_scope=pl.col('state_key').str.to_uppercase().is_in(OUT_OF_SCOPE_STATES),
+            **{
+                flag: pl.col(column).str.slice(0, 2).is_in(OUT_OF_SCOPE_COUNTY_PREFIXES)
+                .fill_null(False)
+                for flag, column in {
+                    'flag_geocode_out_of_scope': 'county_geoid',
+                    'flag_zip_single_out_of_scope': 'zip_single_county',
+                    'flag_zip_dominant_out_of_scope': 'zip_dominant_county',
+                }.items()
+            },
             flag_geocode_legacy_ct=pl.col('county_geoid').str.starts_with('090').fill_null(False),
             geocode_non_exact=pl.col('geocode_status').eq('Match').and_(
                 pl.col('match_type').ne('Exact')
@@ -133,12 +143,20 @@ def county_report(sample: pl.DataFrame, geocodes: pl.DataFrame) -> tuple[pl.Data
         ).with_columns(
             joint_dominant_comparable=pl.col('geocode_exact').and_(
                 pl.col('zip_dominant_county').is_not_null()
-            ).and_(pl.col('flag_zip_legacy_ct').not_()).and_(pl.col('flag_out_of_scope').not_()),
+            ).and_(pl.col('flag_zip_legacy_ct').not_()).and_(pl.col('flag_out_of_scope').not_())
+            .and_(pl.col('flag_geocode_out_of_scope').not_())
+            .and_(pl.col('flag_zip_dominant_out_of_scope').not_()),
             joint_single_comparable=pl.col('geocode_exact').and_(pl.col('zip_single_compatible'))
-            .and_(pl.col('flag_out_of_scope').not_()),
-            proposed_assignable=pl.col('geocode_exact').or_(pl.col('zip_single_compatible')).and_(
-                pl.col('flag_out_of_scope').not_()
-            ),
+            .and_(pl.col('flag_out_of_scope').not_())
+            .and_(pl.col('flag_geocode_out_of_scope').not_())
+            .and_(pl.col('flag_zip_single_out_of_scope').not_()),
+            proposed_assignable=pl.when(pl.col('geocode_exact')).then(
+                pl.col('flag_geocode_out_of_scope').not_()
+            ).otherwise(
+                pl.col('zip_single_compatible').and_(
+                    pl.col('flag_zip_single_out_of_scope').not_()
+                )
+            ).and_(pl.col('flag_out_of_scope').not_()),
         ).with_columns(
             joint_dominant_agree=pl.col('joint_dominant_comparable').and_(
                 pl.col('county_geoid').eq(pl.col('zip_dominant_county'))
@@ -163,6 +181,9 @@ def county_report(sample: pl.DataFrame, geocodes: pl.DataFrame) -> tuple[pl.Data
         'n_geocode_legacy_ct': 'flag_geocode_legacy_ct',
         'n_ct_incomparable': 'flag_zip_legacy_ct',
         'n_out_of_scope': 'flag_out_of_scope',
+        'n_geocode_out_of_scope': 'flag_geocode_out_of_scope',
+        'n_zip_single_out_of_scope': 'flag_zip_single_out_of_scope',
+        'n_zip_dominant_out_of_scope': 'flag_zip_dominant_out_of_scope',
     }
     strata = (
         compared.group_by('stratum').agg(
