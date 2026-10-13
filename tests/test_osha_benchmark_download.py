@@ -1,5 +1,6 @@
 import datetime
 import hashlib
+import shlex
 from functools import partial
 from importlib.metadata import version
 from pathlib import Path
@@ -64,10 +65,10 @@ def no_requests(request):
 
 @pytest.fixture
 def run_cli(cli_app, cli_runner, data_directory):
-    def invoke_cli(handler=osha_server):
+    def invoke_cli(handler=osha_server, data_dir=None):
         client_factory = partial(osha.make_client, transport=httpx.MockTransport(handler))
         with patch.object(osha, 'make_client', client_factory):
-            return cli_runner.invoke(cli_app, ['--data-dir', str(data_directory)])
+            return cli_runner.invoke(cli_app, ['--data-dir', str(data_dir or data_directory)])
 
     return invoke_cli
 
@@ -171,6 +172,24 @@ def test_unrecorded_existing_raw_files_are_reported_but_not_recorded(run_cli, da
     assert manifest.read_manifest(paths.manifest_path(data_directory)) == []
 
 
+def test_the_suggested_backfill_command_quotes_the_data_root(run_cli, tmp_path):
+    data_dir = tmp_path / 'my data'
+    raw = data_dir / 'raw/osha'
+    raw.mkdir(parents=True)
+    (raw / CSV_NAME).write_bytes(CSV_BYTES)
+    (raw / DICTIONARY_NAME).write_bytes(PDF_BYTES)
+
+    result = run_cli(no_requests, data_dir=data_dir)
+
+    assert result.exit_code == 0, result.output
+    warnings = result.stderr.splitlines()
+    assert len(warnings) == 2
+    for line in warnings:
+        command = line.partition('to record it, run ')[2]
+        assert command.startswith(osha.BACKFILL_COMMAND)
+        assert shlex.split(command)[-2:] == ['--data-dir', str(data_dir)]
+
+
 def test_only_the_existing_raw_file_missing_from_the_manifest_is_reported(
     run_cli, data_directory,
 ):
@@ -208,6 +227,37 @@ def test_recorded_raw_files_are_not_reported(run_cli, data_directory):
     assert 'exists, keeping it as delivered' in second.stdout
     assert second.stderr == ''
     assert 'raw_backfill' not in second.output
+
+
+def test_a_missing_raw_file_with_a_record_is_not_downloaded_again(run_cli, data_directory):
+    raw = data_directory / 'raw/osha'
+    raw.mkdir(parents=True)
+    csv_path = raw / CSV_NAME
+    csv_path.write_bytes(CSV_BYTES)
+    manifest_path = paths.manifest_path(data_directory)
+    recorded = manifest.describe_file(
+        csv_path,
+        manifest_path.parent,
+        retrieved_at=datetime.datetime.now(datetime.UTC),
+        client='httpx',
+        client_version=version('httpx'),
+        source_url=osha.CSV_URL,
+    )
+    manifest.append_entries(manifest_path, [recorded])
+    before = manifest_path.read_bytes()
+    csv_path.unlink()
+
+    # The dictionary is absent and unrecorded too, yet nothing is requested.
+    result = run_cli(no_requests)
+
+    assert result.exit_code == 1, result.output
+    assert isinstance(result.exception, SystemExit), result.exception
+    assert CSV_NAME in result.stderr
+    assert f'{recorded.sha256[:12]}...' in result.stderr
+    assert 'will not re-download' in result.stderr
+    assert list(raw.iterdir()) == []
+    assert manifest_path.read_bytes() == before
+    assert not (data_directory / 'derived').exists()
 
 
 def test_a_second_run_neither_downloads_nor_reconverts(run_cli, data_directory):

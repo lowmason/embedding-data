@@ -6,10 +6,12 @@ Usage:
 
 Raw files go to data/raw/osha, and each download is recorded in
 data/raw/manifest.jsonl with its URL, retrieval time, SHA-256, and httpx version.
-A file that already exists there is kept as delivered and not downloaded again;
-the CSV's name carries its submission through-date, so a later OSHA release
-arrives under a new name. The Parquet goes to data/derived/osha and is built only
-when absent; delete it to rebuild. --data-dir moves the whole data root.
+A file that already exists there is kept as delivered and not downloaded again,
+and one that is absent but still recorded fails the run before any request, so
+the original is restored rather than replaced. The CSV's name carries its
+submission through-date, so a later OSHA release arrives under a new name. The
+Parquet goes to data/derived/osha and is built only when absent; delete it to
+rebuild. --data-dir moves the whole data root.
 
 These are case-detail records (one row per injury or illness, Forms 300 and 301),
 not the Form 300A establishment summaries the benchmark specification requires.
@@ -23,6 +25,7 @@ value that does not parse fails the conversion.
 '''
 
 import codecs
+import shlex
 from datetime import UTC, datetime
 from importlib.metadata import version
 from pathlib import Path, PurePosixPath
@@ -84,6 +87,19 @@ def is_recorded(manifest_path: Path, raw_file: Path) -> bool:
     '''Whether the manifest has an entry for raw_file.'''
     path = raw_file.relative_to(manifest_path.parent).as_posix()
     return any(entry.path == path for entry in manifest.read_manifest(manifest_path))
+
+
+def refuse_replacement(manifest_path: Path, raw_file: Path) -> None:
+    '''Exit before any request: a replacement download could differ from the recorded hash.'''
+    recorded = manifest.entry_for(manifest_path, raw_file)
+    typer.echo(
+        f'{raw_file.name}: error: the raw file is missing but recorded in {manifest_path} '
+        f'with SHA-256 {recorded.sha256[:12]}...; restore the original file (its hash must '
+        'match) rather than downloading a replacement. This command will not re-download '
+        'over an existing record.',
+        err=True,
+    )
+    raise typer.Exit(code=1)
 
 
 def download(client: httpx.Client, url: str, destination: Path) -> None:
@@ -155,15 +171,19 @@ def main(
     raw = paths.raw_dir(data_dir, 'osha')
     raw.mkdir(parents=True, exist_ok=True)
     manifest_path = paths.manifest_path(data_dir)
+    destinations = {url: raw / file_name(url) for url in (DICTIONARY_URL, CSV_URL)}
+    for destination in destinations.values():
+        if not destination.exists() and is_recorded(manifest_path, destination):
+            refuse_replacement(manifest_path, destination)
     with make_client() as client:
-        for url in (DICTIONARY_URL, CSV_URL):
-            destination = raw / file_name(url)
+        for url, destination in destinations.items():
             if destination.exists():
                 typer.echo(f'{destination.name}: exists, keeping it as delivered')
                 if not is_recorded(manifest_path, destination):
                     typer.echo(
                         f'{destination.name}: warning: not recorded in {manifest_path}; to '
-                        f'record it, run {BACKFILL_COMMAND} --data-dir {data_dir}',
+                        f'record it, run {BACKFILL_COMMAND} '
+                        f'--data-dir {shlex.quote(str(data_dir))}',
                         err=True,
                     )
                 continue

@@ -84,10 +84,13 @@ def append_entries(manifest_path: Path, entries: Iterable[ManifestEntry]) -> Non
     if not entries:
         return
     recorded = {entry.path for entry in read_manifest(manifest_path)}
+    appending = set()
     for entry in entries:
         if entry.path in recorded:
             raise ValueError(f'{entry.path} is already recorded in {manifest_path}')
-        recorded.add(entry.path)
+        if entry.path in appending:
+            raise ValueError(f'{entry.path} is repeated in this append')
+        appending.add(entry.path)
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     with manifest_path.open('a') as stream:
         stream.writelines(json.dumps(asdict(entry)) + '\n' for entry in entries)

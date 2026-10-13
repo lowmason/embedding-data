@@ -119,7 +119,7 @@ def test_a_duplicate_within_one_append_writes_nothing(raw_file, data_directory):
     manifest_path = paths.manifest_path(data_directory)
     entry = describe(raw_file, data_directory)
 
-    with pytest.raises(ValueError, match='already recorded'):
+    with pytest.raises(ValueError, match='usa_00001.xml is repeated in this append'):
         manifest.append_entries(manifest_path, [entry, entry])
 
     assert not manifest_path.exists()

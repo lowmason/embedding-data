@@ -166,7 +166,10 @@ uv run embedding-data osha --data-dir /tmp/osha-data
 ```
 
 A raw file that already exists is kept as delivered and not downloaded again,
-and one missing from the manifest is reported on stderr, not recorded.
+and one missing from the manifest is reported on stderr, not recorded. A raw
+file that is absent but still recorded in the manifest is not downloaded again
+either: the command exits with an error, before any request, so the original
+can be restored.
 The Parquet is built only when it is absent; delete it to rebuild.
 Downloads are written to a `.part` file and renamed only when complete.
 osha.gov refuses non-browser user agents with HTTP 403, so the command sends a
