@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-Builds aggregate evaluation targets for industry (NAICS), occupation (SOC), and geography embeddings from three sources: OSHA ITA Form 300A summaries, ACS via IPUMS USA, and CPS via IPUMS CPS. `specs/embedding-evaluation-data-spec.md` is the source of truth. So far the IPUMS extract scripts (define → submit → download → CSV-to-Parquet), the OSHA Form 300A summary acquisition with its stacked establishment-year table, and an OSHA case-detail download (download → CSV-to-Parquet) exist; every raw file is recorded in an append-only manifest (`data/raw/manifest.jsonl`); code parsing, geography allocation, targets, and output manifests are planned, not built.
+Builds aggregate evaluation targets for industry (NAICS), occupation (SOC), and geography embeddings from three sources: OSHA ITA Form 300A summaries, ACS via IPUMS USA, and CPS via IPUMS CPS. `specs/embedding-evaluation-data-spec.md` is the source of truth. So far the IPUMS extract scripts (define → submit → download → CSV-to-Parquet), the OSHA Form 300A summary acquisition with its stacked establishment-year table, and an OSHA case-detail download (download → CSV-to-Parquet) exist; every raw file is recorded in an append-only manifest (`data/raw/manifest.jsonl`); canonical NAICS/SOC graphs, NAICS concordances, ITA candidate mapping and filing-universe diagnostics are built. Geography allocation, ACS/CPS code parsers, targets and the shared target writer remain planned.
 
 ## Commands
 
@@ -77,6 +77,41 @@ original response bytes and receipt metadata from `v1_v3_20261013`.
 Sample comparisons are not county accuracy, a county hierarchy
 or full-table target construction. Each run records its own code/dependency hashes
 and all cached batches; fresh acquisition can differ under mutable Current data.
+
+**Canonical classification and ITA bundle (Stage 4).** `codes acquire` verifies
+cached references and acquires missing official originals; missing BLS downloads
+require `BLS_CONTACT_EMAIL`. `codes import-reference KIND FILE` imports exact
+public original bytes with a registered official identity and proxy import time.
+Use `uv run --offline --locked embedding-data codes build NEW_RUN_ID --data-dir
+/Users/lowell/Projects/embedding-data/data` for the offline build; always supply
+the intended root, especially in a worktree. Restricted workspaces use
+`UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache`. Never call `osha`,
+`build_summary_table` or verification `sample` to prepare a codes build: it reads
+and checks the existing source against selected raw releases without rewriting it.
+Existing run or `.part` names fail and earlier bundles remain immutable.
+
+The [actual V11 finding](specs/findings/v11-ita-naics-mapping.md) records
+`stage4_v11_20261013_r2`, `codes-ita-v1`, all 3,206,055 rows, all original columns
+and verified row order. This selected run remeasures reviewed code `ccd138f`
+after the CLI workbook-error diagnostic fix; the earlier `stage4_v11_20261013`
+bundle remains byte-identical. Classification forests have child-to-parent `hierarchy`
+edges and no invented root; their single-parent validator is classification-specific.
+Sorted candidate lists retain every official possibility. Known-vintage mismatches
+remain unresolved with empty candidates; unknown-vintage unions retain uncertainty
+and never populate canonical scalar/node IDs. Singleton crosswalks remain flagged.
+Filing flags are nullable under disagreement; bridged legacy-label and reference
+ambiguity flags persist independently of a determinate result. The published
+exemption labels `5173` and `5181` use the bounded official 2002-to-2007 bridge;
+2007 `517110` retains mixed membership. Nominal filing cycles cannot resolve late
+submission timing. These diagnostics do not judge whether a submission was improper.
+
+The bundle contains twelve Parquet tables plus `inputs.json`, `report.json` and
+`outputs.json`; the last hashes the other fourteen files and excludes itself.
+The finding records its detached checksum. Raw originals/source/code/lock hashes,
+dependency versions, schemas and aggregates support later provenance; this is not
+the R7 target writer. Source summary and Stage 3 file hashes must remain unchanged.
+Geography, ACS/CPS parsing, targets and headline-inclusion decisions retain their
+later-stage scope and the source spec's Core principle and stricter V11 contract.
 
 **Test seams.** Tests and Behave steps patch the module-level `IpumsApiClient` (autospec) and `DOTENV_PATH` with `patch.object`, so both must remain module globals looked up at call time. OSHA tests patch `make_client` with a `partial` that injects an `httpx.MockTransport`; fake responses must use `stream=httpx.ByteStream(...)`, because a `content=` body is preloaded and leaves `num_bytes_downloaded` at 0. OSHA summary tests serve the recorded ITA page `tests/fixtures/osha/itadata.html` and bodies from `tests/ita_fixtures.year_file`, one per published file format; `write_release` places and records a raw summary file. The `cli_runner` fixture in `tests/conftest.py` removes `IPUMS_API_KEY` from the environment. The root `.env` holds a real key: a new test that does not patch both `DOTENV_PATH` and `IpumsApiClient` can load it and make live IPUMS requests. Every command test must also pass `--data-dir` (the `data_directory` fixture): `--data-dir` defaults to the real `data/` tree through a Typer default bound at import, so patching `paths.DATA_DIR` cannot redirect it, and a stray test would write fake extracts into `data/raw` and append fake entries to the append-only manifest.
 

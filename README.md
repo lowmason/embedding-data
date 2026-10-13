@@ -17,14 +17,67 @@ commands of the `embedding-data` Typer CLI. The `osha` command acquires
 every OSHA ITA Form 300A summary file from 2016 on and stacks them into one
 establishment-year table, and downloads the case-detail CSV and its dictionary.
 
-Classification concordances, geography allocation,
-person-month linkage, aggregate targets, and output manifests are planned. Raw
-downloads are already recorded in `data/raw/manifest.jsonl`.
+The `codes` command builds NAICS 2022 and SOC 2018 classification graphs, full
+NAICS concordances, candidate mappings and filing-universe diagnostics in a
+separate immutable ITA bundle. The [measured V11 finding](specs/findings/v11-ita-naics-mapping.md)
+records the full-data run and its unresolved source codes. Geography allocation,
+ACS/CPS code parsers, person-month linkage, aggregate targets and the shared
+target writer remain planned. Raw downloads are recorded in
+`data/raw/manifest.jsonl`.
 The OSHA case-detail files are acquired but feed no target; the specification's
 establishment data are the Form 300A summaries.
 
 The extract workflows have been checked with offline definitions and synthetic
 fixtures. Live IPUMS sample and variable acceptance remains to be verified.
+
+## Classification references and canonical ITA bundles
+
+Use the three registered commands with an explicit data root:
+
+```bash
+uv run --locked embedding-data codes acquire --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --locked embedding-data codes import-reference soc_2018 /path/to/soc_structure_2018.xlsx --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked embedding-data codes build NEW_RUN_ID --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked embedding-data audit --data-dir /Users/lowell/Projects/embedding-data/data
+```
+
+`acquire` verifies cached originals and downloads only missing references. Missing
+BLS originals require `BLS_CONTACT_EMAIL` for the contact-bearing User-Agent.
+If Census/BLS/GovInfo blocks access, save the complete official original from its
+public download and use `import-reference KIND FILE`; preserve its bytes rather
+than resaving a workbook or importing a challenge page. Imports record the official
+URL, hash and local import time, flagged as a retrieval-time proxy. Reference
+identities and expected counts are registered in `code_references.REGISTRY`.
+
+`build` runs offline from manifested originals and the existing Stage 2 summary.
+It refuses stale source/raw parity, malformed codes, corrupt or incomplete
+references, and an occupied final or `.part` run name. Choose a fresh ID; never
+replace an earlier bundle. Publication under `data/derived/codes/NEW_RUN_ID/`
+follows validation in staging. Failed staging remains available for investigation.
+Neither the source summary nor Stage 3 verification artifacts are rewritten.
+In a restricted workspace prefix commands with
+`UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache`; `--offline` prevents uv
+resolution downloads and is appropriate once dependencies and originals exist.
+
+The measured `stage4_v11_20261013_r2` bundle uses schema `codes-ita-v1` and retains
+all 3,206,055 source rows and original columns, in source order. It remeasures
+reviewed code `ccd138f` after a CLI workbook-error diagnostic fix; the earlier
+`stage4_v11_20261013` bundle remains byte-identical. Its 69,035
+unresolved rows remain explicit; 373 unknown-vintage rows have supported
+candidate unions, which never assert a canonical scalar even when singleton.
+Crosswalk flags persist for singleton mappings. Nullable filing flags retain
+candidate disagreement; rule-reference ambiguity and legacy-label provenance
+remain independent of the final outcome. Filing periods use the nominal year-plus-one
+cycle because actual submission dates are unavailable. These diagnostics describe
+the filing universe and do not establish that an observed filing was improper.
+
+`inputs.json` pins raw/source/code/lock provenance and dependency versions;
+`report.json` provides aggregate diagnostics and exact schemas; `outputs.json`
+checksums all twelve Parquet tables and both other JSON files, excluding itself.
+The [finding](specs/findings/v11-ita-naics-mapping.md) lists every filename,
+checksum, mapping state and limitation. Relatedness remains observed: no targets
+are inferred from classification edges, and this ITA source exception does not
+relax ACS/CPS parsing or later headline-target inclusion requirements.
 
 ## Data sources
 
