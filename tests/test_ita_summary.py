@@ -1,3 +1,4 @@
+import hashlib
 import io
 import re
 import zipfile
@@ -509,6 +510,25 @@ def test_a_failed_build_keeps_the_previous_table(data_directory):
     ):
         ita_summary.build_summary_table(data_directory)
 
+    assert table.read_bytes() == before
+    assert sorted(path.name for path in table.parent.iterdir()) == [ita_summary.TABLE_NAME]
+
+
+def test_a_raw_file_changed_since_it_was_recorded_fails_the_build(data_directory):
+    release = write_release(data_directory, 2025)
+    recorded = hashlib.sha256(release.read_bytes()).hexdigest()
+    table = ita_summary.build_summary_table(data_directory)
+    before = table.read_bytes()
+    release.write_bytes(year_file(2025, [record(2025, id='7')]))
+    changed = hashlib.sha256(release.read_bytes()).hexdigest()
+
+    with pytest.raises(ValueError) as failure:
+        ita_summary.build_summary_table(data_directory)
+
+    message = str(failure.value)
+    assert message.startswith(f'{source_file(2025)}: ')
+    assert f'SHA-256 {changed[:12]}... differs' in message
+    assert f'{recorded[:12]}... recorded in' in message
     assert table.read_bytes() == before
     assert sorted(path.name for path in table.parent.iterdir()) == [ita_summary.TABLE_NAME]
 

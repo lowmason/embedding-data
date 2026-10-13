@@ -28,7 +28,8 @@ persists across years is spec V2's question. A file these rules do not cover fai
 build: a zip without exactly one CSV, a missing column, a row filed for another year, a
 NAICS code that is not six digits, or an undocumented size code. Records are flagged,
 never dropped (R2.9). Injury and illness counts, submission timestamps, and change reasons
-stay in the raw files.
+stay in the raw files. Each row's source_file cites a manifest entry whose SHA-256 the
+build has verified against the raw file; a file that no longer matches fails the build.
 '''
 
 import tempfile
@@ -348,8 +349,9 @@ def build_summary_table(data_dir: Path) -> Path:
     '''Rebuild the stacked table from each year's latest recorded raw file; return its path.
 
     Unlike the case-detail Parquet, the table is rebuilt on every call, because a new
-    release replaces its year's rows. Each input must be in the manifest, and its manifest
-    path becomes source_file. The table is written to a .part file, renamed on success.
+    release replaces its year's rows. Each input must be in the manifest with the SHA-256
+    it has now, and its manifest path becomes source_file. The table is written to a .part
+    file, renamed on success.
     '''
     manifest_path = paths.manifest_path(data_dir)
     derived = paths.derived_dir(data_dir, 'osha')
@@ -359,9 +361,16 @@ def build_summary_table(data_dir: Path) -> Path:
     with tempfile.TemporaryDirectory(dir=derived) as work:
         frames = []
         for year, raw_file in summary_files(data_dir).items():
-            source_file = manifest.entry_for(manifest_path, raw_file).path
+            entry = manifest.entry_for(manifest_path, raw_file)
+            sha256 = manifest.sha256_file(raw_file)
+            if sha256 != entry.sha256:
+                raise ValueError(
+                    f'{entry.path}: SHA-256 {sha256[:12]}... differs from the '
+                    f'{entry.sha256[:12]}... recorded in {manifest_path}; the raw file has '
+                    'changed since it was downloaded'
+                )
             utf8_path = Path(work) / f'{year}.csv'
-            frames.append(harmonize_file(raw_file, year, source_file, utf8_path))
+            frames.append(harmonize_file(raw_file, year, entry.path, utf8_path))
         try:
             (
                 add_flags(pl.concat(frames))
