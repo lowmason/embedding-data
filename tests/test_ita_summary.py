@@ -159,6 +159,7 @@ def test_implausible_records_are_flagged_not_dropped(tmp_path):
         (('100', '400100', '22'), (False, True, False)),   # 4,001
         (('100', '', '22'), (False, True, False)),         # hours missing
         (('0', '1000', '22'), (True, None, False)),        # zero employment: no ratio
+        (('-5', '1000', '22'), (True, None, False)),       # negative employment: flagged, no ratio
         (('', '1000', '22'), (True, None, False)),         # employment missing: no ratio
         (('10', '20000', '1'), (False, False, True)),      # fewer than 20 at peak
         (('100', '200000', ''), (False, False, None)),     # size missing
