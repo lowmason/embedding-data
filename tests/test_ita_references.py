@@ -88,3 +88,12 @@ def test_manual_hud_import_validates_and_records_import_time_proxy(tmp_path, mon
     with pytest.raises(ValueError, match='columns missing'):
         ita_references.import_hud(tmp_path, workbook, '2025Q3')
     assert paths.manifest_path(tmp_path).read_bytes() == before
+
+@pytest.mark.parametrize('missing_column', ['ZIP', 'COUNTY'])
+def test_hud_reader_rejects_missing_geographic_keys(tmp_path, monkeypatch, missing_column):
+    raw = pl.DataFrame(
+        {'ZIP': ['02134'], 'COUNTY': ['25025'], 'BUS_RATIO': ['1.0']}
+    ).with_columns(pl.lit(None, dtype=pl.String).alias(missing_column))
+    monkeypatch.setattr(pl, 'read_excel', lambda *args, **kwargs: raw)
+    with pytest.raises(ValueError, match='invalid or duplicate'):
+        ita_references.read_hud(tmp_path / 'fixture.xlsx')

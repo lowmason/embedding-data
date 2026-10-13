@@ -97,7 +97,7 @@ def read_hud(file: Path) -> pl.DataFrame:
             pl.col('county_geoid').str.contains(r'^[0-9]{5}$').not_()
         ).or_(pl.col('bus_ratio').is_null()).or_(pl.col('bus_ratio').is_finite().not_()).or_(
             pl.col('bus_ratio').is_between(0, 1).not_()
-        )
+        ).fill_null(True)
     )
     if invalid.height or result.is_empty() or result.select('zip_key',
                                                             'county_geoid').is_duplicated().any():
