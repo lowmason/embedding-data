@@ -13,6 +13,18 @@ RELATION_SCHEMA = {
 }
 
 
+def _degree_link_type(outgoing: pl.Expr, incoming: pl.Expr) -> pl.Expr:
+    return (
+        pl.when(outgoing.and_(incoming))
+        .then(pl.lit('m:m'))
+        .when(outgoing)
+        .then(pl.lit('1:m'))
+        .when(incoming)
+        .then(pl.lit('m:1'))
+        .otherwise(pl.lit('1:1'))
+    )
+
+
 def parse_concordance(raw, source_vintage, target_vintage, source_file):
     body = below_header(raw, (str(source_vintage), str(target_vintage), 'code'))
     source = column(body, str(source_vintage), 'code')
@@ -42,13 +54,7 @@ def parse_concordance(raw, source_vintage, target_vintage, source_file):
         source_vintage=pl.lit(source_vintage, dtype=pl.Int64),
         target_vintage=pl.lit(target_vintage, dtype=pl.Int64),
         source_file=pl.lit(source_file),
-        link_type=pl.when(outgoing.and_(incoming))
-        .then(pl.lit('m:m'))
-        .when(outgoing)
-        .then(pl.lit('1:m'))
-        .when(incoming)
-        .then(pl.lit('m:1'))
-        .otherwise(pl.lit('1:1')),
+        link_type=_degree_link_type(outgoing, incoming),
     ).select(list(RELATION_SCHEMA))
 
 
@@ -69,15 +75,7 @@ def validate_relationships(relations, structures):
     partition = ['source_vintage', 'target_vintage']
     outgoing = pl.col('target_code').n_unique().over([*partition, 'source_code']).gt(1)
     incoming = pl.col('source_code').n_unique().over([*partition, 'target_code']).gt(1)
-    expected = (
-        pl.when(outgoing.and_(incoming))
-        .then(pl.lit('m:m'))
-        .when(outgoing)
-        .then(pl.lit('1:m'))
-        .when(incoming)
-        .then(pl.lit('m:1'))
-        .otherwise(pl.lit('1:1'))
-    )
+    expected = _degree_link_type(outgoing, incoming)
     if relations.filter(pl.col('link_type').ne(expected)).height:
         raise ValueError('corrupt relationship degree classification')
     if set(relations.select('source_vintage', 'target_vintage').unique().iter_rows()) != set(
