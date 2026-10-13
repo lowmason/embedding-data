@@ -10,7 +10,7 @@ import httpx
 import polars as pl
 import pytest
 import typer
-from ita_fixtures import record, year_file
+from ita_fixtures import record, write_release, year_file, zipped
 from typer.main import get_command
 
 from embedding_data import ita_catalog, ita_summary, manifest, paths
@@ -466,6 +466,96 @@ def test_an_unrecorded_summary_file_is_refused_before_any_download(run_cli, data
     assert 'not recorded' in result.stderr
     assert requests == [ita_catalog.PAGE_URL]
     assert manifest.read_manifest(paths.manifest_path(data_directory)) == []
+
+
+def test_a_through_date_that_does_not_exist_is_refused_before_any_download(
+    run_cli, data_directory,
+):
+    assert run_cli(sets=('summary',)).exit_code == 0
+    manifest_path = paths.manifest_path(data_directory)
+    before = manifest_path.read_bytes()
+    listed = 'ITA_300A_Summary_Data_2023_through_12-31-2024.zip'
+    malformed = listed.replace('12-31-2024', '02-30-2024')
+    [historical] = [release for release in CATALOG.releases if release.year == 2023]
+    requests = []
+    handler = serve(
+        page=PAGE_HTML.replace(listed, malformed),
+        extra={historical.url.replace(listed, malformed): year_file(2023)},
+        requests=requests,
+    )
+
+    result = run_cli(handler, sets=('summary',))
+
+    assert result.exit_code == 1, result.output
+    assert isinstance(result.exception, SystemExit), result.exception
+    assert malformed in result.stderr
+    assert requests == [ita_catalog.PAGE_URL]
+    assert manifest_path.read_bytes() == before
+    assert not (summary_raw(data_directory) / '2023' / malformed).exists()
+
+
+@pytest.mark.parametrize(
+    ('year', 'on_disk', 'listed'),
+    [
+        (2022, 'ITA Data CY 2022.zip', 'ITA-data-cy2022.zip'),
+        (2024, 'ITA_300A_Summary_Data_2024_through_08-31-2025.csv', 'ITA-data-cy2024.zip'),
+        (
+            2024, 'ITA_300A_Summary_Data_2024_through_12-31-2025.csv',
+            'ITA_300A_Summary_Data_2024_through_12-31-2025.zip',
+        ),
+    ],
+    ids=['undated-beside-undated', 'undated-beside-dated', 'one-through-date-twice'],
+)
+def test_a_year_whose_release_the_build_could_not_choose_is_refused_before_any_download(
+    run_cli, data_directory, year, on_disk, listed,
+):
+    write_release(data_directory, year, name=on_disk)
+    manifest_path = paths.manifest_path(data_directory)
+    before = manifest_path.read_bytes()
+    [release] = [release for release in CATALOG.releases if release.year == year]
+    page_name = ita_catalog.file_name(release.url)
+    requests = []
+    handler = serve(
+        page=PAGE_HTML.replace(page_name, listed),
+        extra={release.url.replace(page_name, listed): year_file(year)},
+        requests=requests,
+    )
+
+    result = run_cli(handler, sets=('summary',))
+
+    assert result.exit_code == 1, result.output
+    assert isinstance(result.exception, SystemExit), result.exception
+    assert result.stderr.startswith(f'{year}: error: ')
+    assert on_disk in result.stderr
+    assert listed in result.stderr
+    assert requests == [ita_catalog.PAGE_URL]
+    assert manifest_path.read_bytes() == before
+    assert [path.name for path in (summary_raw(data_directory) / str(year)).iterdir()] == [
+        on_disk,
+    ]
+
+
+def test_a_later_dated_zip_beside_the_dated_csv_is_accepted(run_cli, data_directory):
+    # OSHA's transition: the current year's CSV moves to the historical list as a zip.
+    assert run_cli(sets=('summary',)).exit_code == 0
+    zip_name = 'ITA_300A_Summary_Data_2025_through_12-31-2026.zip'
+    zip_url = CURRENT.url.replace(CURRENT_NAME, zip_name)
+    newer = year_file(2025, [record(2025, id=str(n)) for n in range(2)])
+    requests = []
+    handler = serve(
+        page=PAGE_HTML.replace(CURRENT_NAME, zip_name),
+        extra={zip_url: zipped(zip_name.replace('.zip', '.csv'), newer)},
+        requests=requests,
+    )
+
+    result = run_cli(handler, sets=('summary',))
+
+    assert result.exit_code == 0, result.output
+    assert requests == [ita_catalog.PAGE_URL, zip_url]
+    table = pl.read_parquet(data_directory / 'derived/osha' / ita_summary.TABLE_NAME)
+    rows_2025 = table.filter(pl.col('year_filing_for') == 2025)
+    assert rows_2025.height == 2
+    assert rows_2025['source_file'].unique().to_list() == [f'osha/summary/2025/{zip_name}']
 
 
 def test_a_page_that_skips_a_year_is_refused(run_cli, data_directory):

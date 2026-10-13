@@ -8,6 +8,7 @@ renames the file as it grows, so a re-acquired release arrives under a new name.
 '''
 
 import re
+from collections import Counter
 from dataclasses import dataclass
 from datetime import date
 from html.parser import HTMLParser
@@ -76,26 +77,48 @@ def parse_catalog(html: str, base_url: str = PAGE_URL) -> Catalog:
 
 
 def file_name(url: str) -> str:
-    '''The file name at the end of url, percent-escapes decoded (ITA Data CY 2016.zip).'''
-    return unquote(PurePosixPath(urlsplit(url).path).name)
+    '''The file name at the end of url, percent-escapes decoded (ITA Data CY 2016.zip).
+
+    A name that is empty, . or .., or that decodes to hold a slash or backslash, is
+    refused, so no link can place a file outside the directory it is written to.
+    '''
+    name = unquote(PurePosixPath(urlsplit(url).path).name)
+    if name in ('', '.', '..') or '/' in name or '\\' in name:
+        raise ValueError(f'{url}: {name!r} is not a plain file name')
+    return name
 
 
 def through_date(name: str) -> date | None:
-    '''The submission through-date a summary file name carries, or None.'''
+    '''The submission through-date a summary file name carries, or None.
+
+    A through-date that is not a real date (through_02-30-2026) is refused, naming the file.
+    '''
     match = THROUGH_DATE.search(name)
     if match is None:
         return None
     month, day, year = (int(part) for part in match.groups())
-    return date(year, month, day)
+    try:
+        return date(year, month, day)
+    except ValueError as error:
+        raise ValueError(f'{name}: the through-date is not a real date ({error})') from None
 
 
 def check_complete(catalog: Catalog) -> None:
-    '''Refuse a catalog missing a year since 2016, or whose current file has no through-date.'''
-    years = {release.year for release in catalog.releases}
+    '''Refuse a catalog that cannot be acquired as listed, before anything is downloaded.
+
+    That is one that lists a year twice or misses one since 2016, names a through-date
+    that is not a real date, or whose current file has no through-date.
+    '''
+    years = Counter(release.year for release in catalog.releases)
+    repeated = sorted(year for year, count in years.items() if count > 1)
+    if repeated:
+        raise ValueError('more than one summary file listed for ' + ', '.join(map(str, repeated)))
     current = max(years)
     missing = [year for year in range(FIRST_YEAR, current + 1) if year not in years]
     if missing:
         raise ValueError('no summary file listed for ' + ', '.join(map(str, missing)))
-    current_names = [file_name(r.url) for r in catalog.releases if r.year == current]
-    if not any(through_date(name) for name in current_names):
-        raise ValueError(f'the {current} summary file names no through-date: {current_names}')
+    names = {release.year: file_name(release.url) for release in catalog.releases}
+    # Every year's name is read, so a malformed through-date fails here, not after a download.
+    dates = {year: through_date(name) for year, name in names.items()}
+    if dates[current] is None:
+        raise ValueError(f'the {current} summary file names no through-date: {names[current]}')

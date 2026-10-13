@@ -244,6 +244,7 @@ def test_scientific_notation_hours_are_expanded_exactly(tmp_path, written, hours
         '1E+99999999999999999999',   # an exponent too large for Int64
         ' 1.5E+3',                   # padded, as a plain number may not be either
         '1.5E+3 ',
+        '１.5E+3',                   # a full-width digit, which Rust's \d would match
     ],
 )
 def test_hours_that_spell_no_whole_number_an_int64_holds_fail(tmp_path, written):
@@ -303,6 +304,18 @@ def test_a_numeric_establishment_type_with_a_fraction_fails(tmp_path):
 def test_rows_no_rule_covers_fail_the_build(tmp_path, fields, message):
     with pytest.raises(ValueError, match=message):
         harmonized(tmp_path, 2024, year_file(2024, [record(2024, **fields)]))
+
+
+def test_a_naics_code_of_six_full_width_digits_is_not_six_digits(tmp_path):
+    # Rust's \d matches any Unicode digit; a NAICS code is six ASCII digits.
+    data = year_file(2024, [record(2024, naics_code='３３２３１２')])
+
+    with pytest.raises(ValueError) as failure:
+        harmonize_raw(tmp_path, 2024, data)
+
+    assert str(failure.value) == (
+        f'{source_file(2024)}: 1 rows with a NAICS code that is not six digits'
+    )
 
 
 def test_a_naics_vintage_no_rule_covers_is_nulled_and_flagged_not_failed(tmp_path):

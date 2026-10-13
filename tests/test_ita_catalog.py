@@ -1,3 +1,4 @@
+import re
 from datetime import date
 from pathlib import Path
 
@@ -35,6 +36,22 @@ def test_file_name_decodes_percent_escapes():
 
 
 @pytest.mark.parametrize(
+    'url',
+    [
+        FILES + '..%2F..%2Fx.zip',
+        FILES + '..%5Cx.zip',
+        FILES + '%2E%2E',
+        FILES + '%2E',
+        'https://www.osha.gov',
+    ],
+    ids=['slash', 'backslash', 'parent', 'current', 'empty'],
+)
+def test_a_file_name_that_could_leave_its_directory_is_refused(url):
+    with pytest.raises(ValueError, match=re.escape(url)):
+        ita_catalog.file_name(url)
+
+
+@pytest.mark.parametrize(
     ('name', 'expected'),
     [
         (CURRENT_NAME, date(2026, 8, 31)),
@@ -46,6 +63,18 @@ def test_file_name_decodes_percent_escapes():
 )
 def test_through_date_reads_the_date_a_file_name_carries(name, expected):
     assert ita_catalog.through_date(name) == expected
+
+
+@pytest.mark.parametrize(
+    'name',
+    [
+        'ITA_300A_Summary_Data_2025_through_02-30-2026.csv',
+        'ITA_300A_Summary_Data_2025_through_13-45-2026.csv',
+    ],
+)
+def test_a_through_date_that_does_not_exist_is_refused_naming_the_file(name):
+    with pytest.raises(ValueError, match=re.escape(name)):
+        ita_catalog.through_date(name)
 
 
 def test_a_page_without_summary_links_is_refused():
@@ -68,6 +97,22 @@ def test_a_current_year_without_a_through_date_is_refused():
     page = PAGE_HTML.replace(CURRENT_NAME, 'ITA_300A_Summary_Data_2025.csv')
 
     with pytest.raises(ValueError, match='the 2025 summary file names no through-date'):
+        ita_catalog.check_complete(ita_catalog.parse_catalog(page))
+
+
+def test_a_historical_through_date_that_does_not_exist_is_refused():
+    listed = 'ITA_300A_Summary_Data_2023_through_12-31-2024.zip'
+    malformed = listed.replace('12-31-2024', '02-30-2024')
+    page = PAGE_HTML.replace(listed, malformed)
+
+    with pytest.raises(ValueError, match=re.escape(malformed)):
+        ita_catalog.check_complete(ita_catalog.parse_catalog(page))
+
+
+def test_a_year_listed_twice_is_refused():
+    page = PAGE_HTML + '<a href="/sites/default/files/ITA-data-cy2023.zip">2023 Summary Data</a>'
+
+    with pytest.raises(ValueError, match='more than one summary file listed for 2023'):
         ita_catalog.check_complete(ita_catalog.parse_catalog(page))
 
 

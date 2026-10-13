@@ -119,6 +119,17 @@ def refuse_unrecorded(manifest_path: Path, raw_file: Path) -> None:
     raise typer.Exit(code=1)
 
 
+def refuse_ambiguous(year: int, error: ValueError) -> None:
+    '''Exit before any download: the table build could not choose the year's release.'''
+    typer.echo(
+        f'{year}: error: with the file the page lists, the table build would have no single '
+        f'release to use for {year}: {error}. Nothing is downloaded, because a recorded '
+        'download cannot be undone.',
+        err=True,
+    )
+    raise typer.Exit(code=1)
+
+
 def download(client: httpx.Client, url: str, destination: Path) -> None:
     '''Stream url to a .part file and rename it only once the body is complete.'''
     partial = destination.with_name(destination.name + '.part')
@@ -203,6 +214,13 @@ def acquire_summary(data_dir: Path) -> None:
                 refuse_replacement(manifest_path, destination)
             if destination.exists() and not recorded:
                 refuse_unrecorded(manifest_path, destination)
+        for release in catalog.releases:
+            destination = destinations[release.url]
+            names = ita_summary.release_names(destination.parent) | {destination.name}
+            try:
+                ita_summary.latest_release_name(names)
+            except ValueError as error:
+                refuse_ambiguous(release.year, error)
         for url, destination in destinations.items():
             if destination.exists():
                 typer.echo(f'{destination.name}: exists, keeping it as delivered')

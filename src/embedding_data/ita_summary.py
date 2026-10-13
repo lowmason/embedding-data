@@ -33,6 +33,7 @@ stay in the raw files.
 
 import tempfile
 import zipfile
+from collections.abc import Iterable
 from contextlib import ExitStack
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -58,8 +59,10 @@ NAICS_YEARS = [2012, 2017, 2022]
 # Digits and points, optionally signed or padded: an establishment_type that looks numeric.
 NUMERIC = r'^\s*[-+]?[\d.]+\s*$'
 # Scientific notation as a spreadsheet writes a long number (8.62847E+11), signed like a
-# plain number and, like one, not padded.
-SCIENTIFIC = r'^(?<sign>[-+]?)(?<whole>\d+)(?:\.(?<fraction>\d+))?[eE](?<exponent>[-+]?\d+)$'
+# plain number and, like one, not padded. [0-9], because Rust's \d matches any Unicode digit.
+SCIENTIFIC = (
+    r'^(?<sign>[-+]?)(?<whole>[0-9]+)(?:\.(?<fraction>[0-9]+))?[eE](?<exponent>[-+]?[0-9]+)$'
+)
 # Digits in the largest Int64; a whole number with more cannot be one.
 INT64_DIGITS = len(str(2**63 - 1))
 SIZE_CLASS = {1: 1, 2: 2, 21: 2, 22: 2, 3: 3}
@@ -232,7 +235,8 @@ def check_summary(lf: pl.LazyFrame, year: int, source_file: str) -> None:
     size = pl.col('size')
     counts = lf.select(
         other_year=pl.col('year_filing_for').ne_missing(year).sum(),
-        naics_code=pl.col('naics_code').str.contains(r'^\d{6}$').not_().sum(),
+        # [0-9], not \d, which in Rust's regex matches any Unicode digit.
+        naics_code=pl.col('naics_code').str.contains(r'^[0-9]{6}$').not_().sum(),
         size=(size.is_not_null() & size.is_in(list(SIZE_CLASS)).not_()).sum(),
     ).collect().row(0, named=True)
     problems = [f'{count:,} rows {labels[kind]}' for kind, count in counts.items() if count]
@@ -289,24 +293,43 @@ def summary_dir(data_dir: Path) -> Path:
     return paths.raw_dir(data_dir, 'osha') / 'summary'
 
 
-def latest_release(year_dir: Path) -> Path:
-    '''A year's only raw file, or the one whose name carries the latest through-date.
+def release_names(year_dir: Path) -> set[str]:
+    '''The names of the releases in a year's directory; none if it does not exist.
 
     Hidden files (a Finder .DS_Store) and interrupted .part downloads are not releases.
     '''
-    files = sorted(
-        path for path in year_dir.iterdir()
+    if not year_dir.is_dir():
+        return set()
+    return {
+        path.name for path in year_dir.iterdir()
         if path.is_file() and not path.name.startswith('.') and not path.name.endswith('.part')
-    )
-    if len(files) == 1:
-        return files[0]
-    dates = {through_date(path.name): path for path in files}
-    if not files or None in dates or len(dates) < len(files):
+    }
+
+
+def latest_release_name(names: Iterable[str]) -> str:
+    '''The only name, or the one carrying the latest through-date.
+
+    Raises ValueError when there is no name, or when the names cannot be ordered by date:
+    one has no through-date beside another, or two carry the same through-date.
+    '''
+    names = sorted(set(names))
+    if len(names) == 1:
+        return names[0]
+    dates = {through_date(name): name for name in names}
+    if not names or None in dates or len(dates) < len(names):
         raise ValueError(
-            f'{year_dir}: cannot choose one of {[path.name for path in files]}; each file '
-            'in a year needs a distinct through-date in its name'
+            f'cannot choose one of {names}; each file in a year needs a distinct '
+            'through-date in its name'
         )
     return dates[max(dates)]
+
+
+def latest_release(year_dir: Path) -> Path:
+    '''A year's only raw file, or the one whose name carries the latest through-date.'''
+    try:
+        return year_dir / latest_release_name(release_names(year_dir))
+    except ValueError as error:
+        raise ValueError(f'{year_dir}: {error}') from None
 
 
 def summary_files(data_dir: Path) -> dict[int, Path]:
