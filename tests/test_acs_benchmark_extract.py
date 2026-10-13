@@ -30,25 +30,28 @@ def tree(root):
     return {path: path.read_bytes() for path in sorted(root.rglob('*')) if path.is_file()}
 
 
+def write_delivery(extract, *, download_dir):
+    '''Fake IPUMS delivery: the data file and codebook, named for the extract number.'''
+    name = f'usa_{extract.extract_id:05d}'
+    with gzip.open(download_dir / f'{name}.csv.gz', 'wt') as csv_file:
+        csv_file.write(FIXTURE_CSV)
+    (download_dir / f'{name}.xml').write_text('<codeBook/>\n')
+
+
 @pytest.fixture
 def run_live(cli_runner, data_directory, dotenv_path):
     '''Run the ACS command for real against a fake IPUMS client that numbers the extract.'''
     dotenv_path.write_text('IPUMS_API_KEY=dotenv-test-key\n')
 
-    def invoke(arguments=(), *, extract_id=123):
-        def download_fixture(extract, *, download_dir):
-            name = f'usa_{extract.extract_id:05d}'
-            with gzip.open(download_dir / f'{name}.csv.gz', 'wt') as csv_file:
-                csv_file.write(FIXTURE_CSV)
-            (download_dir / f'{name}.xml').write_text('<codeBook/>\n')
-
+    def invoke(arguments=(), *, extract_id=123, download=write_delivery, wait=None):
         with (
             patch.object(benchmark, 'DOTENV_PATH', dotenv_path),
             patch.object(benchmark, 'IpumsApiClient', autospec=True) as client_factory,
         ):
             client = client_factory.return_value
             client.submit_extract.side_effect = lambda extract: setattr(extract, '_id', extract_id)
-            client.download_extract.side_effect = download_fixture
+            client.wait_for_extract.side_effect = wait
+            client.download_extract.side_effect = download
             result = cli_runner.invoke(
                 cli_app(), [*arguments, '--data-dir', str(data_directory)]
             )
@@ -202,6 +205,77 @@ def test_an_existing_extract_directory_is_never_overwritten(run_live, data_direc
     assert isinstance(second.exception, FileExistsError), second.output
     client_factory.return_value.download_extract.assert_not_called()
     assert tree(data_directory) == before
+
+
+def assert_not_delivered(data_directory):
+    '''A failed delivery leaves no extract directory, no record, and no Parquet.'''
+    assert not (data_directory / 'raw/acs/core/usa_00123').exists()
+    assert not paths.manifest_path(data_directory).exists()
+    assert not (data_directory / 'derived').exists()
+
+
+def test_a_failed_wait_leaves_no_delivery(run_live, data_directory):
+    result, _ = run_live(wait=RuntimeError('extract failed'))
+
+    assert isinstance(result.exception, RuntimeError), result.output
+    assert_not_delivered(data_directory)
+
+
+def test_a_dropped_download_leaves_its_partial_file_in_staging(run_live, data_directory):
+    def drop_connection(extract, *, download_dir):
+        (download_dir / 'usa_00123.csv.gz').write_bytes(b'\x1f\x8b truncated')
+        raise ConnectionError('connection dropped')
+
+    result, _ = run_live(download=drop_connection)
+
+    assert isinstance(result.exception, ConnectionError), result.output
+    assert_not_delivered(data_directory)
+    assert (data_directory / 'raw/acs/core/usa_00123.part/usa_00123.csv.gz').exists()
+
+
+def test_a_delivery_without_its_codebook_is_not_moved_into_place(run_live, data_directory):
+    def omit_codebook(extract, *, download_dir):
+        write_delivery(extract, download_dir=download_dir)
+        (download_dir / 'usa_00123.xml').unlink()
+
+    result, _ = run_live(download=omit_codebook)
+
+    assert isinstance(result.exception, FileNotFoundError), result.output
+    assert 'usa_00123.xml' in str(result.exception)
+    assert_not_delivered(data_directory)
+
+
+def test_only_the_three_expected_files_are_recorded(run_live, data_directory):
+    def deliver_with_finder_metadata(extract, *, download_dir):
+        write_delivery(extract, download_dir=download_dir)
+        (download_dir / '.DS_Store').write_bytes(b'\x00\x00\x00\x01Bud1')
+
+    result, _ = run_live(download=deliver_with_finder_metadata)
+
+    assert result.exit_code == 0, result.output
+    assert (data_directory / 'raw/acs/core/usa_00123/.DS_Store').exists()
+    entries = manifest.read_manifest(paths.manifest_path(data_directory))
+    assert [entry.path for entry in entries] == [
+        'acs/core/usa_00123/extract.json',
+        'acs/core/usa_00123/usa_00123.csv.gz',
+        'acs/core/usa_00123/usa_00123.xml',
+    ]
+
+
+def test_an_interrupted_delivery_of_the_same_extract_is_left_alone(run_live, data_directory):
+    staging = data_directory / 'raw/acs/core/usa_00123.part'
+    staging.mkdir(parents=True)
+    (staging / 'extract.json').write_text('{}\n')
+    before = tree(data_directory)
+
+    result, client_factory = run_live()
+
+    assert isinstance(result.exception, FileExistsError), result.output
+    assert 'usa_00123.part' in str(result.exception)
+    client_factory.return_value.wait_for_extract.assert_not_called()
+    client_factory.return_value.download_extract.assert_not_called()
+    assert tree(data_directory) == before
+    assert_not_delivered(data_directory)
 
 
 def test_the_api_key_reaches_no_file_and_no_output(run_live, data_directory):

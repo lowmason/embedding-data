@@ -2,9 +2,13 @@
 
 A dry run writes the definition under preview/. A real run gives every extract
 its own raw directory, raw/<source>/<set>/<collection>_<number>/, holding the
-submitted definition (extract.json) and the delivered .csv.gz and .xml, and
-records each file in the raw manifest. Extract numbers are never reused, so a
-re-run writes a new directory and never overwrites or reconverts an earlier one.
+submitted definition (extract.json) and the delivered .csv.gz and .xml. The
+download is staged in <set>/<name>.part/ and renamed to <set>/<name>/ only once
+all three files are there, so a .part directory is an interrupted delivery: not
+recorded, and not a delivery. Only those three files are recorded in the raw
+manifest; anything else in the directory is not. Extract numbers are never
+reused, so a re-run writes a new directory and never overwrites or reconverts an
+earlier one.
 '''
 
 import json
@@ -41,26 +45,43 @@ def deliver(
     source: str,
     set_name: str,
 ) -> Path:
-    '''Submit and download an extract into its own new raw directory, then record its files.'''
+    '''Submit an extract, stage its download, move it into its own raw directory, and record it.'''
     client.submit_extract(extract)
     typer.echo(f'{set_name}: submitted extract {extract.extract_id}, waiting')
     set_dir = paths.raw_dir(data_dir, source) / set_name
+    name = extract_name(extract.collection, extract.extract_id)
+    extract_dir = set_dir / name
+    staging = set_dir / f'{name}.part'
+    if extract_dir.exists():
+        raise FileExistsError(
+            f'{extract_dir} is an earlier delivery; raw files are never replaced'
+        )
+    if staging.exists():
+        raise FileExistsError(
+            f'{staging} is an interrupted delivery of this extract; not reusing it'
+        )
     set_dir.mkdir(parents=True, exist_ok=True)
-    extract_dir = set_dir / extract_name(extract.collection, extract.extract_id)
-    # An existing directory is an earlier delivery: fail rather than write into it.
-    extract_dir.mkdir()
+    staging.mkdir()
     definition = extract.build()
-    write_definition(definition, extract_dir / 'extract.json')
+    write_definition(definition, staging / 'extract.json')
     client.wait_for_extract(extract)
-    client.download_extract(extract, download_dir=extract_dir)
+    client.download_extract(extract, download_dir=staging)
     retrieved_at = datetime.now(UTC)
+
+    delivered = ['extract.json', f'{name}.csv.gz', f'{name}.xml']
+    for file_name in delivered:
+        if not (staging / file_name).exists():
+            raise FileNotFoundError(
+                f'{staging / file_name}: not delivered; {staging} is incomplete'
+            )
+    staging.rename(extract_dir)
 
     manifest_path = paths.manifest_path(data_dir)
     manifest.append_entries(
         manifest_path,
         [
             manifest.describe_file(
-                file,
+                extract_dir / file_name,
                 manifest_path.parent,
                 retrieved_at=retrieved_at,
                 client='ipumspy',
@@ -69,7 +90,7 @@ def deliver(
                 extract_number=extract.extract_id,
                 samples=definition['samples'],
             )
-            for file in sorted(extract_dir.iterdir())
+            for file_name in sorted(delivered)
         ],
     )
     return extract_dir

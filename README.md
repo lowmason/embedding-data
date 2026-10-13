@@ -203,8 +203,12 @@ Raw files are never edited, overwritten, or re-downloaded, and each path is
 recorded once. Files delivered before the manifest existed were moved into this
 layout by `uv run --locked python -m embedding_data.raw_backfill`. Their entries
 use the file modification time and the `uv.lock` client version, both flagged in
-`proxies`. Downloads are not resumable: re-running an IPUMS command submits a
-new extract.
+`proxies`. An IPUMS delivery is staged in `<set>/<name>.part/` and renamed to
+`<set>/<name>/` only when its `extract.json`, `.csv.gz` and `.xml` are all
+there, so a `.part` directory is an interrupted delivery: it is not recorded
+and is not a delivery. Only those three files are recorded; anything else in
+the directory is not. Downloads are not resumable: re-running an IPUMS command
+submits a new extract.
 
 The specification calls for aggregate Parquet targets covering staffing
 patterns, area mixes, worker profiles, job-change flows, commuting, migration,
