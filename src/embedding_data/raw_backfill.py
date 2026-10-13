@@ -36,6 +36,8 @@ PROXIES = ('retrieved_at', 'client_version')
 class Move:
     source: Path
     destination: Path
+    # A converted Parquet, rebuildable from raw files; any other move carries a raw file.
+    derived: bool = False
 
 
 def locked_version(lock_path: Path, package: str) -> str:
@@ -101,7 +103,8 @@ def plan_ipums_set(
         entries.append(replace(entry, path=move.destination.relative_to(raw_root).as_posix()))
     parquet = set_dir / f'{name}.parquet'
     if parquet.exists():
-        moves.append(Move(parquet, paths.derived_dir(data_dir, source) / set_name / parquet.name))
+        destination = paths.derived_dir(data_dir, source) / set_name / parquet.name
+        moves.append(Move(parquet, destination, derived=True))
     return moves, entries
 
 
@@ -112,7 +115,7 @@ def plan_osha(
     raw = paths.raw_dir(data_dir, 'osha')
     raw_root = paths.manifest_path(data_dir).parent
     moves = [
-        Move(parquet, paths.derived_dir(data_dir, 'osha') / parquet.name)
+        Move(parquet, paths.derived_dir(data_dir, 'osha') / parquet.name, derived=True)
         for parquet in sorted(raw.glob('*.parquet'))
     ]
     entries = []
@@ -131,6 +134,47 @@ def plan_osha(
                 )
             )
     return moves, entries
+
+
+def occupied(move: Move) -> FileExistsError:
+    '''Why move cannot go ahead and what to do; only a derived Parquet may be deleted.'''
+    if move.derived:
+        return FileExistsError(
+            f'{move.destination} already exists, for example because `osha` converted the raw '
+            f'CSV before this backfill ran. {move.source} is the legacy copy of a derived '
+            f'Parquet and can be rebuilt from raw files: delete {move.source} (or '
+            f'{move.destination}) and re-run. Nothing was moved.'
+        )
+    return FileExistsError(
+        f'{move.destination} already exists; not moving the raw file {move.source} onto it. '
+        'Raw files are never replaced: compare the two and resolve it by hand, then re-run. '
+        'Nothing was moved.'
+    )
+
+
+def check_plan(
+    moves: list[Move],
+    entries: list[manifest.ManifestEntry],
+    recorded: set[str],
+    manifest_path: Path,
+) -> None:
+    '''Refuse the whole plan before the first move if appending or any move would fail.'''
+    for entry in entries:
+        if entry.path in recorded:
+            raise ValueError(
+                f'{entry.path} is already recorded in {manifest_path}; nothing was moved'
+            )
+    sources = {}
+    for move in moves:
+        if move.destination in sources:
+            raise ValueError(
+                f'{move.destination} is the destination of both {sources[move.destination]} '
+                f'and {move.source}; nothing was moved'
+            )
+        sources[move.destination] = move.source
+    for move in moves:
+        if move.destination.exists():
+            raise occupied(move)
 
 
 def backfill(data_dir: Path, lock_path: Path) -> list[manifest.ManifestEntry]:
@@ -153,9 +197,7 @@ def backfill(data_dir: Path, lock_path: Path) -> list[manifest.ManifestEntry]:
     moves += osha_moves
     entries += osha_entries
 
-    for move in moves:
-        if move.destination.exists():
-            raise FileExistsError(f'{move.destination} exists; not moving {move.source} onto it')
+    check_plan(moves, entries, recorded, manifest_path)
     for move in moves:
         move.destination.parent.mkdir(parents=True, exist_ok=True)
         move.source.rename(move.destination)

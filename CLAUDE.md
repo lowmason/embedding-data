@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-Builds aggregate evaluation targets for industry (NAICS), occupation (SOC), and geography embeddings from three sources: OSHA ITA Form 300A summaries, ACS via IPUMS USA, and CPS via IPUMS CPS. `specs/embedding-evaluation-data-spec.md` is the source of truth. Only the IPUMS extract scripts (define → submit → download → CSV-to-Parquet) and an OSHA case-detail download (download → CSV-to-Parquet) exist so far; Every raw file is recorded in an append-only manifest (`data/raw/manifest.jsonl`); OSHA Form 300A ingestion, code parsing, geography allocation, targets, and output manifests are planned, not built.
+Builds aggregate evaluation targets for industry (NAICS), occupation (SOC), and geography embeddings from three sources: OSHA ITA Form 300A summaries, ACS via IPUMS USA, and CPS via IPUMS CPS. `specs/embedding-evaluation-data-spec.md` is the source of truth. Only the IPUMS extract scripts (define → submit → download → CSV-to-Parquet) and an OSHA case-detail download (download → CSV-to-Parquet) exist so far; every raw file is recorded in an append-only manifest (`data/raw/manifest.jsonl`); OSHA Form 300A ingestion, code parsing, geography allocation, targets, and output manifests are planned, not built.
 
 ## Commands
 

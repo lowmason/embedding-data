@@ -1,6 +1,7 @@
 import gzip
 import json
 import os
+from dataclasses import replace
 from datetime import UTC, datetime
 
 import pytest
@@ -191,6 +192,100 @@ def test_a_doubtful_legacy_set_stops_the_backfill_before_anything_moves(
 
     # cps/monthly is checked after acs/core, so an untouched tree proves nothing moved early.
     assert tree(data_dir) == before
+
+
+def snapshot(root):
+    '''Every file's bytes and every directory, so a refused run shows nothing moved or appeared.'''
+    directories = sorted(path.relative_to(root).as_posix() for path in root.rglob('*')
+                         if path.is_dir())
+    return tree(root), directories
+
+
+@pytest.mark.parametrize(
+    'destination',
+    ['derived/acs/core/usa_00001.parquet', f'derived/osha/{OSHA_PARQUET}'],
+    ids=['ipums-parquet', 'osha-parquet'],
+)
+def test_a_derived_parquet_already_in_place_stops_the_backfill_with_a_remedy(
+    legacy, destination,
+):
+    data_dir, lock_path = legacy
+    existing = data_dir / destination
+    existing.parent.mkdir(parents=True)
+    existing.write_bytes(b'PAR1 converted by a Stage 1 command')
+    legacy_copy = data_dir / 'raw' / destination.removeprefix('derived/')
+    before = snapshot(data_dir)
+
+    with pytest.raises(FileExistsError) as raised:
+        raw_backfill.backfill(data_dir, lock_path)
+
+    message = str(raised.value)
+    assert str(existing) in message
+    assert f'delete {legacy_copy} (or {existing}) and re-run' in message
+    assert snapshot(data_dir) == before
+    assert not paths.manifest_path(data_dir).exists()
+
+
+def test_a_raw_file_already_at_its_destination_is_never_replaced(legacy):
+    data_dir, lock_path = legacy
+    existing = data_dir / 'raw/acs/core/usa_00001/usa_00001.xml'
+    existing.parent.mkdir()
+    existing.write_text('<codeBook>another delivery</codeBook>\n')
+    before = snapshot(data_dir)
+
+    with pytest.raises(FileExistsError) as raised:
+        raw_backfill.backfill(data_dir, lock_path)
+
+    message = str(raised.value)
+    assert str(existing) in message
+    assert str(data_dir / 'raw/acs/core/usa_00001.xml') in message
+    assert 'resolve it by hand' in message
+    assert 'delete' not in message
+    assert snapshot(data_dir) == before
+
+
+def test_a_planned_path_already_recorded_stops_the_backfill_before_anything_moves(legacy):
+    data_dir, lock_path = legacy
+    path = 'cps/monthly/cps_00001/cps_00001.csv.gz'
+    manifest.append_entries(
+        paths.manifest_path(data_dir),
+        [
+            manifest.ManifestEntry(
+                path=path,
+                sha256='0' * 64,
+                size=1,
+                retrieved_at='2026-10-12T16:50:59+00:00',
+                client='ipumspy',
+                client_version='0.8.2',
+            )
+        ],
+    )
+    before = snapshot(data_dir)
+
+    with pytest.raises(ValueError, match=f'{path} is already recorded'):
+        raw_backfill.backfill(data_dir, lock_path)
+
+    assert snapshot(data_dir) == before
+
+
+def test_two_moves_to_one_destination_stop_the_backfill_before_anything_moves(
+    legacy, monkeypatch,
+):
+    data_dir, lock_path = legacy
+    taken = paths.derived_dir(data_dir, 'acs') / 'core' / 'usa_00001.parquet'
+    plan_osha = raw_backfill.plan_osha
+
+    def plan_osha_onto_the_acs_parquet(*args):
+        moves, entries = plan_osha(*args)
+        return [replace(move, destination=taken) for move in moves], entries
+
+    monkeypatch.setattr(raw_backfill, 'plan_osha', plan_osha_onto_the_acs_parquet)
+    before = snapshot(data_dir)
+
+    with pytest.raises(ValueError, match='is the destination of both'):
+        raw_backfill.backfill(data_dir, lock_path)
+
+    assert snapshot(data_dir) == before
 
 
 def test_the_command_reports_what_it_recorded(legacy, cli_runner):
