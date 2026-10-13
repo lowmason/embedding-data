@@ -177,17 +177,18 @@ specification's R2.4 columns plus OSHA's record `id`, the raw file it came from
   native code; `size_class` merges `21` and `22` back into `2`.
 - `naics_year`: files before 2023 lack it; OSHA's dictionary says those years use 2012
   NAICS, so they get 2012 with `naics_year_from_dictionary` set. A delivered vintage
-  other than 2012, 2017, or 2022 (the 2024 and 2025 files carry `0` and `2025`) becomes
-  null; the code is kept.
+  other than 2012, 2017, or 2022 (the 2024 file carries `0`, the 2025 file `0` and
+  `2025`) becomes null; the code is kept.
 - `flag_employment`, `flag_hours_per_employee` (outside 500–4,000 hours per average
   employee), and `flag_below_filing_size` (under 20 employees). Flagged rows are kept.
   `flag_naics_year_unknown` marks a NAICS code left without a vintage; it records
   provenance, not implausibility.
 
-Codes, names, addresses, ZIP codes, and EINs stay as delivered. A file the
-harmonization does not cover stops the build rather than being guessed at. After the
-build the command prints rows per year beside OSHA's published submission counts. A
-full first run downloads about 258 MB.
+Codes, names, addresses, ZIP codes, and EINs stay as delivered, except that a
+non-numeric `establishment_type` (one 2019 row holds an industry title) becomes null. A
+file the harmonization does not cover stops the build rather than being guessed at.
+After the build the command prints rows per year beside OSHA's published submission
+counts. A full first run downloads about 258 MB.
 
 ## OSHA case-detail download
 

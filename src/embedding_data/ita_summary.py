@@ -16,7 +16,7 @@ harmonized:
 - naics_year: delivered from the 2023 data on. Earlier files lack it, and the Summary Data
   Dictionary says data through 2022 use 2012 NAICS, so those rows take 2012 with
   naics_year_from_dictionary set. A delivered vintage other than 2012, 2017 or 2022 (the
-  2024 and 2025 files carry 0 and 2025) becomes null and its code is kept;
+  2024 file carries 0, the 2025 file 0 and 2025) becomes null and its code is kept;
   flag_naics_year_unknown marks every code left without a vintage.
 
 establishment_id is present in every year's file and is kept as delivered; whether it
