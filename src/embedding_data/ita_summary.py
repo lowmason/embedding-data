@@ -3,8 +3,11 @@
 Each year's raw file (a zip holding one CSV, or the current year's plain CSV) is transcoded
 to UTF-8, its headers are lowercased (2025 writes ID and establishment_ID), and the columns
 spec R2.4 retains are cast: codes and text stay strings, counts become Int64. The 2019 file
-writes every number with a zero fraction (452990.00), which is accepted; any other fraction
-fails. Two dictionary changes are harmonized:
+writes every number with a zero fraction (452990.00), which is accepted; any other value
+that is not a whole number fails the build with the file and column named. The one
+exception is establishment_type, where text (one 2019 row holds Executive and Legislative
+Offices) becomes null; a number there must still be whole. Two dictionary changes are
+harmonized:
 
 - size: code 2 (20-249 employees) was split into 21 (20-99) and 22 (100-249) with the 2023
   data, but the 2023 and later files still carry 2 for some establishments. size keeps the
@@ -12,14 +15,16 @@ fails. Two dictionary changes are harmonized:
   never split, because size is peak employment, not the annual average.
 - naics_year: delivered from the 2023 data on. Earlier files lack it, and the Summary Data
   Dictionary says data through 2022 use 2012 NAICS, so those rows take 2012 with
-  naics_year_from_dictionary set.
+  naics_year_from_dictionary set. A delivered vintage other than 2012, 2017 or 2022 (the
+  2024 and 2025 files carry 0 and 2025) becomes null and its code is kept;
+  flag_naics_year_unknown marks every code left without a vintage.
 
 establishment_id is present in every year's file and is kept as delivered; whether it
 persists across years is spec V2's question. A file these rules do not cover fails the
 build: a zip without exactly one CSV, a missing column, a row filed for another year, a
-NAICS code that is not six digits, or an undocumented size code or NAICS vintage. Records
-are flagged, never dropped (R2.9). Injury and illness counts, submission timestamps, and
-change reasons stay in the raw files.
+NAICS code that is not six digits, or an undocumented size code. Records are flagged,
+never dropped (R2.9). Injury and illness counts, submission timestamps, and change reasons
+stay in the raw files.
 '''
 
 import tempfile
@@ -46,6 +51,8 @@ REQUIRED_COLUMNS = [*INTEGER_COLUMNS, *TEXT_COLUMNS, 'naics_code']
 NAICS_YEAR_FROM = 2023
 DICTIONARY_NAICS_YEAR = 2012
 NAICS_YEARS = [2012, 2017, 2022]
+# Digits and points, optionally signed or padded: an establishment_type that looks numeric.
+NUMERIC = r'^\s*[-+]?[\d.]+\s*$'
 SIZE_CLASS = {1: 1, 2: 2, 21: 2, 22: 2, 3: 3}
 # Plausible annual hours worked per average employee, inclusive: about 10 to 77 hours a week.
 HOURS_PER_EMPLOYEE = (500, 4_000)
@@ -55,7 +62,8 @@ COLUMNS = [
     'street_address', 'city', 'state', 'zip_code', 'naics_code', 'naics_year',
     'naics_year_from_dictionary', 'industry_description', 'establishment_type', 'size',
     'size_class', 'annual_average_employees', 'total_hours_worked', 'flag_employment',
-    'flag_hours_per_employee', 'flag_below_filing_size', 'source_file',
+    'flag_hours_per_employee', 'flag_below_filing_size', 'flag_naics_year_unknown',
+    'source_file',
 ]
 
 
@@ -99,9 +107,24 @@ def transcode(raw_file: Path, utf8_path: Path) -> None:
         target.writelines(decode_line(line) for line in source)
 
 
-def whole_number(column: str) -> pl.Expr:
-    '''An Int64 column; a zero fraction (2019.00) is dropped and any other fraction fails.'''
-    return pl.col(column).str.replace(r'\.0+$', '').cast(pl.Int64)
+def whole_number(value: pl.Expr, *, strict: bool = True) -> pl.Expr:
+    '''value as Int64; a zero fraction (2019.00) is dropped and any other fraction fails.
+
+    With strict False, a value that does not cast becomes null instead of failing.
+    '''
+    return value.str.replace(r'\.0+$', '').cast(pl.Int64, strict=strict)
+
+
+def integer_value(column: str) -> pl.Expr:
+    '''The raw string an integer column is cast from; non-numeric establishment_type is null.
+
+    The text is masked out before the cast rather than skipped by a branch around it, so
+    the strict cast never sees it, whichever rows Polars evaluates a branch on.
+    '''
+    value = pl.col(column)
+    if column == 'establishment_type':
+        return pl.when(value.str.contains(NUMERIC)).then(value)
+    return value
 
 
 def harmonize(lf: pl.LazyFrame, year: int, source_file: str) -> pl.LazyFrame:
@@ -114,16 +137,17 @@ def harmonize(lf: pl.LazyFrame, year: int, source_file: str) -> pl.LazyFrame:
         raise ValueError(f'{source_file}: missing columns {missing}')
     naics_code = pl.col('naics_code').str.replace(r'\.0+$', '')
     if 'naics_year' in names:
-        naics_year = whole_number('naics_year')
+        delivered = whole_number(pl.col('naics_year'))
+        naics_year = pl.when(delivered.is_in(NAICS_YEARS)).then(delivered)
         from_dictionary = pl.lit(False)
     else:
         naics_year = pl.when(naics_code.is_not_null()).then(pl.lit(DICTIONARY_NAICS_YEAR))
         from_dictionary = naics_code.is_not_null()
-    size_class = whole_number('size').replace_strict(
+    size_class = whole_number(pl.col('size')).replace_strict(
         SIZE_CLASS, default=None, return_dtype=pl.Int64
     )
     return lf.select(
-        *(whole_number(column) for column in INTEGER_COLUMNS),
+        *(whole_number(integer_value(column)).alias(column) for column in INTEGER_COLUMNS),
         *TEXT_COLUMNS,
         naics_code.alias('naics_code'),
         naics_year.cast(pl.Int64).alias('naics_year'),
@@ -133,20 +157,37 @@ def harmonize(lf: pl.LazyFrame, year: int, source_file: str) -> pl.LazyFrame:
     )
 
 
+def check_integers(raw: pl.LazyFrame, source_file: str) -> None:
+    '''Fail on raw values an integer column cannot hold, naming each column and its count.'''
+    names = raw.collect_schema().names()
+    columns = INTEGER_COLUMNS + (['naics_year'] if 'naics_year' in names else [])
+    counts = raw.select(
+        (
+            integer_value(column).is_not_null()
+            & whole_number(integer_value(column), strict=False).is_null()
+        ).sum().alias(column)
+        for column in columns
+    ).collect().row(0, named=True)
+    problems = [
+        f'{count:,} rows whose {column} is not a whole number'
+        for column, count in counts.items() if count
+    ]
+    if problems:
+        raise ValueError(f'{source_file}: ' + '; '.join(problems))
+
+
 def check_summary(lf: pl.LazyFrame, year: int, source_file: str) -> None:
     '''Fail on rows no harmonization rule covers, naming each kind and its count.'''
     labels = {
         'other_year': f'filed for a year other than {year}',
         'naics_code': 'with a NAICS code that is not six digits',
         'size': 'with a size code the dictionary does not define',
-        'naics_year': 'with a NAICS vintage other than 2012, 2017 or 2022',
     }
-    size, naics_year = pl.col('size'), pl.col('naics_year')
+    size = pl.col('size')
     counts = lf.select(
         other_year=pl.col('year_filing_for').ne_missing(year).sum(),
         naics_code=pl.col('naics_code').str.contains(r'^\d{6}$').not_().sum(),
         size=(size.is_not_null() & size.is_in(list(SIZE_CLASS)).not_()).sum(),
-        naics_year=(naics_year.is_not_null() & naics_year.is_in(NAICS_YEARS).not_()).sum(),
     ).collect().row(0, named=True)
     problems = [f'{count:,} rows {labels[kind]}' for kind, count in counts.items() if count]
     if problems:
@@ -159,17 +200,20 @@ def harmonize_file(
     '''Transcode one raw summary file to utf8_path; return its checked, harmonized rows.
 
     The frame reads utf8_path lazily, so the caller keeps that file until the frame is
-    collected or sunk. check_summary reads only the columns it checks, so a bad value in
-    another integer column fails when the frame is collected or sunk.
+    collected or sunk. Every integer column is checked on its raw strings before
+    check_summary reads the cast ones, so a value that is not a whole number fails here,
+    naming the file, rather than when the frame is collected or sunk.
     '''
     transcode(raw_file, utf8_path)
-    lf = harmonize(pl.scan_csv(utf8_path, infer_schema=False), year, source_file)
+    raw = pl.scan_csv(utf8_path, infer_schema=False).rename(str.lower)
+    lf = harmonize(raw, year, source_file)
+    check_integers(raw, source_file)
     check_summary(lf, year, source_file)
     return lf
 
 
 def add_flags(lf: pl.LazyFrame) -> pl.LazyFrame:
-    '''Flag, never drop, the implausible records spec R2.9 names.
+    '''Flag, never drop, the implausible records spec R2.9 names, and codes of no vintage.
 
     flag_employment: annual average employment is missing, zero, or negative.
     flag_hours_per_employee: hours per average employee fall outside HOURS_PER_EMPLOYEE, or
@@ -177,16 +221,21 @@ def add_flags(lf: pl.LazyFrame) -> pl.LazyFrame:
     flag_below_filing_size: fewer than 20 employees at peak (size_class 1), outside the
         filing rule in every industry. Whether a larger establishment's industry places it
         outside the rule needs NAICS vintage concordances and is not evaluated here.
+    flag_naics_year_unknown: a NAICS code with no vintage, because the file delivered none
+        or one other than 2012, 2017 or 2022; never null. A provenance flag for the
+        vintage, not one of the R2.9 flags.
     '''
     employees, hours = pl.col('annual_average_employees'), pl.col('total_hours_worked')
     no_employment = employees.is_null() | (employees <= 0)
     implausible_hours = hours.is_null() | (hours / employees).is_between(
         *HOURS_PER_EMPLOYEE
     ).not_()
+    no_vintage = pl.col('naics_code').is_not_null() & pl.col('naics_year').is_null()
     return lf.with_columns(
         flag_employment=no_employment,
         flag_hours_per_employee=pl.when(no_employment).then(None).otherwise(implausible_hours),
         flag_below_filing_size=pl.col('size_class') == 1,
+        flag_naics_year_unknown=no_vintage,
     )
 
 

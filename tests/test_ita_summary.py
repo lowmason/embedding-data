@@ -1,4 +1,5 @@
 import io
+import re
 import zipfile
 
 import polars as pl
@@ -14,7 +15,6 @@ from ita_fixtures import (
     year_file,
     zipped,
 )
-from polars.exceptions import InvalidOperationError
 from polars.testing import assert_frame_equal
 
 from embedding_data import ita_summary
@@ -30,13 +30,21 @@ HARMONIZED_SCHEMA = {
 }
 
 
-def harmonized(tmp_path, year, data, name=None):
-    '''Write data as year's raw file under tmp_path and collect its harmonized rows.'''
+def source_file(year, name=None):
+    return f'osha/summary/{year}/{name or RELEASE_NAMES[year]}'
+
+
+def harmonize_raw(tmp_path, year, data, name=None):
+    '''Write data as year's raw file under tmp_path and return its harmonized, lazy rows.'''
     raw_file = tmp_path / (name or RELEASE_NAMES[year])
     raw_file.write_bytes(data)
-    source_file = f'osha/summary/{year}/{raw_file.name}'
     utf8_path = tmp_path / f'{year}.utf8.csv'
-    return ita_summary.harmonize_file(raw_file, year, source_file, utf8_path).collect()
+    return ita_summary.harmonize_file(raw_file, year, source_file(year, name), utf8_path)
+
+
+def harmonized(tmp_path, year, data, name=None):
+    '''Write data as year's raw file under tmp_path and collect its harmonized rows.'''
+    return harmonize_raw(tmp_path, year, data, name).collect()
 
 
 def expected_row(year, **changes):
@@ -50,7 +58,7 @@ def expected_row(year, **changes):
         'industry_description': 'Fabricated structural metal', 'naics_code': '332312',
         'naics_year': 2012 if year <= 2022 else 2022,
         'naics_year_from_dictionary': year <= 2022, 'size_class': 2,
-        'source_file': f'osha/summary/{year}/{RELEASE_NAMES[year]}',
+        'source_file': source_file(year),
     }
     row.update(changes)
     return row
@@ -97,11 +105,114 @@ def test_a_delivered_naics_year_is_kept_and_not_marked(tmp_path):
     ]
 
 
+def test_an_undefined_naics_vintage_becomes_null_and_its_row_is_kept(tmp_path):
+    # The 2024 and 2025 files carry vintages 0 and 2025 beside real six-digit codes.
+    records = [
+        record(2024, id='1', naics_code='485410', naics_year='0'),
+        record(2024, id='2', naics_year='2025'),
+        record(2024, id='3', naics_year='2017'),
+    ]
+
+    frame = harmonized(tmp_path, 2024, year_file(2024, records))
+
+    assert frame.select(
+        'id', 'naics_code', 'naics_year', 'naics_year_from_dictionary'
+    ).rows() == [
+        (1, '485410', None, False),
+        (2, '332312', None, False),
+        (3, '332312', 2017, False),
+    ]
+
+
+def test_a_naics_code_without_a_known_vintage_is_flagged(tmp_path):
+    records = [
+        record(2024, id='1', naics_year='0'),
+        record(2024, id='2', naics_year='2025'),
+        record(2024, id='3', naics_year=''),
+        record(2024, id='4', naics_year='2017'),
+        record(2024, id='5', naics_code='', naics_year=''),
+    ]
+    rows = pl.concat([
+        harmonized(tmp_path, 2024, year_file(2024, records)),
+        harmonized(tmp_path, 2022, year_file(2022)),
+    ])
+
+    flags = ita_summary.add_flags(rows.lazy()).select(
+        'id', 'naics_year', 'flag_naics_year_unknown'
+    ).collect()
+
+    assert flags.rows() == [
+        (1, None, True),
+        (2, None, True),
+        (3, None, True),       # a code delivered without its vintage
+        (4, 2017, False),
+        (5, None, False),      # no code, so no vintage to know
+        (20220, 2012, False),  # before 2023 the vintage comes from the dictionary
+    ]
+    assert flags.schema['flag_naics_year_unknown'] == pl.Boolean
+
+
+def not_a_whole_number(source, column):
+    '''The harmonize_file failure for one row whose column is not a whole number.'''
+    return rf'^{re.escape(source)}: 1 rows whose {column} is not a whole number$'
+
+
 def test_a_fraction_that_is_not_zero_fails(tmp_path):
     data = year_file(2019, [record(2019, annual_average_employees='23.50')])
 
-    with pytest.raises(InvalidOperationError):
-        harmonized(tmp_path, 2019, data)
+    with pytest.raises(
+        ValueError, match=not_a_whole_number(source_file(2019), 'annual_average_employees'),
+    ):
+        harmonize_raw(tmp_path, 2019, data)
+
+
+@pytest.mark.parametrize(
+    'column',
+    [
+        'id', 'establishment_id', 'establishment_type', 'size', 'annual_average_employees',
+        'total_hours_worked', 'year_filing_for', 'naics_year',
+    ],
+)
+def test_a_value_that_is_not_a_whole_number_fails_naming_the_file_and_column(
+    tmp_path, column,
+):
+    data = year_file(2024, [record(2024, **{column: '12.5'})])
+
+    with pytest.raises(ValueError, match=not_a_whole_number(source_file(2024), column)):
+        harmonize_raw(tmp_path, 2024, data)
+
+
+def test_each_column_that_is_not_a_whole_number_is_named_with_its_row_count(tmp_path):
+    records = [record(2024, id='1.5', size='2.5'), record(2024, id='2', size='3.5')]
+
+    with pytest.raises(ValueError) as failure:
+        harmonize_raw(tmp_path, 2024, year_file(2024, records))
+
+    assert str(failure.value) == (
+        f'{source_file(2024)}: 1 rows whose id is not a whole number;'
+        ' 2 rows whose size is not a whole number'
+    )
+
+
+def test_a_text_establishment_type_becomes_null_and_its_row_is_kept(tmp_path):
+    # One 2019 row carries an industry title where the establishment type code belongs.
+    records = [
+        record(2019, id='1', establishment_type='Executive and Legislative Offices'),
+        record(2019, id='2', establishment_type='2.00'),
+    ]
+
+    frame = harmonized(tmp_path, 2019, year_file(2019, records))
+
+    assert frame.select('id', 'establishment_type').rows() == [(1, None), (2, 2)]
+
+
+def test_a_numeric_establishment_type_with_a_fraction_fails(tmp_path):
+    data = year_file(2019, [record(2019, establishment_type='1.5')])
+
+    with pytest.raises(
+        ValueError, match=not_a_whole_number(source_file(2019), 'establishment_type'),
+    ):
+        harmonize_raw(tmp_path, 2019, data)
 
 
 @pytest.mark.parametrize(
@@ -110,13 +221,22 @@ def test_a_fraction_that_is_not_zero_fails(tmp_path):
         ({'year_filing_for': '2023'}, 'filed for a year other than 2024'),
         ({'naics_code': '33231'}, 'NAICS code that is not six digits'),
         ({'size': '4'}, 'size code the dictionary does not define'),
-        ({'naics_year': '2007'}, 'NAICS vintage other than 2012, 2017 or 2022'),
     ],
-    ids=['other-year', 'naics-code', 'size-code', 'naics-vintage'],
+    ids=['other-year', 'naics-code', 'size-code'],
 )
 def test_rows_no_rule_covers_fail_the_build(tmp_path, fields, message):
     with pytest.raises(ValueError, match=message):
         harmonized(tmp_path, 2024, year_file(2024, [record(2024, **fields)]))
+
+
+def test_a_naics_vintage_no_rule_covers_is_nulled_and_flagged_not_failed(tmp_path):
+    rows = harmonized(tmp_path, 2024, year_file(2024, [record(2024, naics_year='2007')]))
+
+    flagged = ita_summary.add_flags(rows.lazy()).collect()
+
+    assert flagged.select(
+        'naics_code', 'naics_year', 'naics_year_from_dictionary', 'flag_naics_year_unknown'
+    ).rows() == [('332312', None, False, True)]
 
 
 def test_a_missing_column_fails_the_build(tmp_path):
@@ -193,7 +313,7 @@ TABLE_SCHEMA = {
     'size_class': pl.Int64, 'annual_average_employees': pl.Int64,
     'total_hours_worked': pl.Int64, 'flag_employment': pl.Boolean,
     'flag_hours_per_employee': pl.Boolean, 'flag_below_filing_size': pl.Boolean,
-    'source_file': pl.String,
+    'flag_naics_year_unknown': pl.Boolean, 'source_file': pl.String,
 }
 NEXT_2025 = 'ITA_300A_Summary_Data_2025_through_11-30-2026.csv'
 
@@ -274,7 +394,10 @@ def test_a_failed_build_keeps_the_previous_table(data_directory):
     bad = year_file(2025, [record(2025, annual_average_employees='23.50')])
     write_release(data_directory, 2025, bad, NEXT_2025)
 
-    with pytest.raises(InvalidOperationError):
+    with pytest.raises(
+        ValueError,
+        match=not_a_whole_number(source_file(2025, NEXT_2025), 'annual_average_employees'),
+    ):
         ita_summary.build_summary_table(data_directory)
 
     assert table.read_bytes() == before
