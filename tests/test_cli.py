@@ -56,10 +56,10 @@ def test_osha_help_describes_case_detail_download(cli_runner):
     assert 'OSHA ITA case-detail' in result.output
 
 
-def test_cps_dry_run_reaches_cps_module(cli_runner, output_directory, dotenv_path):
+def test_cps_dry_run_reaches_cps_module(cli_runner, data_directory, dotenv_path):
     dotenv_path.write_text('IPUMS_API_KEY=dotenv-test-key\n')
     arguments = [
-        'cps', 'monthly', '--start', '2026-08', '--dry-run', '--out', str(output_directory),
+        'cps', 'monthly', '--start', '2026-08', '--dry-run', '--data-dir', str(data_directory),
     ]
     with (
         patch.object(cps_extract, 'DOTENV_PATH', dotenv_path),
@@ -71,23 +71,39 @@ def test_cps_dry_run_reaches_cps_module(cli_runner, output_directory, dotenv_pat
     assert result.exit_code == 0, result.output
     client_factory.assert_called_once_with('dotenv-test-key')
     client_factory.return_value.submit_extract.assert_not_called()
-    definition = json.loads((output_directory / 'monthly/extract.json').read_text())
+    definition = json.loads((data_directory / 'preview/cps/monthly/extract.json').read_text())
     assert list(definition['samples']) == ['cps2026_08b', 'cps2026_09s']
 
 
 def test_acs_dry_run_neither_reads_key_nor_creates_client(
-    cli_runner, output_directory, dotenv_path,
+    cli_runner, data_directory, dotenv_path,
 ):
     dotenv_path.write_text('IPUMS_API_KEY=dotenv-test-key\n')
     with (
         patch.object(acs_extract, 'DOTENV_PATH', dotenv_path),
         patch.object(acs_extract, 'IpumsApiClient', autospec=True) as client_factory,
     ):
-        result = cli_runner.invoke(cli.app, ['acs', '--dry-run', '--out', str(output_directory)])
+        result = cli_runner.invoke(
+            cli.app, ['acs', '--dry-run', '--data-dir', str(data_directory)]
+        )
 
         assert 'IPUMS_API_KEY' not in os.environ
 
     assert result.exit_code == 0, result.output
     client_factory.assert_not_called()
-    definition = json.loads((output_directory / 'core/extract.json').read_text())
+    definition = json.loads((data_directory / 'preview/acs/core/extract.json').read_text())
     assert set(definition['samples']) == {'us2023a', 'us2024a'}
+
+
+def test_cps_start_before_2025_exits_non_zero(cli_runner, data_directory, dotenv_path):
+    with (
+        patch.object(cps_extract, 'DOTENV_PATH', dotenv_path),
+        patch.object(cps_extract, 'IpumsApiClient', autospec=True) as client_factory,
+    ):
+        result = cli_runner.invoke(
+            cli.app, ['cps', '--start', '2024-12', '--data-dir', str(data_directory)]
+        )
+
+    assert result.exit_code != 0
+    assert '2024-12 is before 2025-01' in result.output
+    client_factory.assert_not_called()

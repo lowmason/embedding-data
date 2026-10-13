@@ -1,0 +1,246 @@
+# Embedding evaluation data — roadmap
+
+> For agentic workers: REQUIRED SKILL: derive-roadmap — resume via its
+> reconcile step; route each unticked stage per its ROUTING line; never plan
+> this document wholesale.
+
+Source spec: `specs/embedding-evaluation-data-spec.md`. Derived 2026-10-12
+against `main` at `af7bf21`, with pytest (44) and Behave (2) passing and five
+live IPUMS extracts on disk (`usa_00001`–`00003`, `cps_00001`–`00002`).
+
+## Gap analysis
+
+`acs` = `src/embedding_data/acs_benchmark_extract.py`, `cps` =
+`src/embedding_data/cps_benchmark_extract.py`, `osha` =
+`src/embedding_data/osha_benchmark_download.py`.
+
+| Req | Verdict | Evidence | Note |
+| --- | --- | --- | --- |
+| R1.1 | implemented-differently | `acs:44`, `cps:52`, `osha:38` | ACS, CPS acquired; ITA acquisition is 2025 case detail, not 300A → S2 |
+| R1.2 | implemented-as-specified | `acs:134`, `cps:166`, `cli.py:7`; key tests in `tests/test_acs_benchmark_extract.py`, `tests/test_cps_benchmark_extract.py` | |
+| R1.3 | out-of-repo | IPUMS account; extracts delivered | Satisfied; owner confirmed registration complete 2026-10-12 |
+| R1.4 | implemented-differently | raw `.csv.gz`/`.xml`/`extract.json` kept; `osha:148` | No manifest; re-run overwrites `extract.json` (`acs:148`, `cps:186`) and reconverts every `*.csv.gz` (`acs:158`, `cps:198`) → S1 |
+| R2.1 | missing | `osha:38` hardcodes one case-detail CSV | → S2 |
+| R2.2 | missing | no ITA targets | → S6 |
+| R2.3 | missing | none found | → S2 |
+| R2.4 | missing | case detail carries these fields per case, 2025 only | → S2 |
+| R2.5 | missing | none found | → S4 |
+| R2.6 | missing | none found | V1 → S3; build → S10 |
+| R2.7 | missing | none found | V2 → S3; build → S10 |
+| R2.8 | missing | none found | V3 → S3; reference → S5; assignment → S6 |
+| R2.9 | missing | none found | → S2 |
+| R3.1 | implemented-as-specified | `acs:44`; SAMPLE 202301, 202401 | DDI SAMPLE labels end at 2024: no 2025 ACS yet |
+| R3.2 | implemented-as-specified (acquisition) | SAMPLE 202403 "2020-2024, ACS 5-year"; MULTYEAR 2020–2024 | V4 unrecorded → S7; use rule → S13 |
+| R3.3 | implemented-as-specified (acquisition) | `usa_00002`, SAMPLE 202201 | Codes → S8; comparator target → S13 |
+| R3.4 | implemented-as-specified | US samples only, `acs:44` | |
+| R3.5 | implemented-as-specified | `acs:50`, `acs:89`, `acs:91`; every name delivered incl. 80 REPWTP | V5 unrecorded → S7 |
+| R3.6 | missing | EMPSTATD, CLASSWKRD delivered | → S9 |
+| R3.7 | missing | none found | → S9 |
+| R3.8 | missing | QIND, QOCC delivered | → S9 |
+| R3.9 | missing (string half implemented) | `acs:66` | Parser → S8 |
+| R3.10 | missing | none found | → S9 |
+| R3.11 | missing | none found | Crosswalks → S8; use → S9 |
+| R4.1 | implemented-as-specified | `cps:84`; `tests/test_cps_properties.py`; 20 samples 2025-01…2026-09, no 2025-10 | |
+| R4.2 | implemented-as-specified | `cps:49`; `cps2025_03s`, `cps2026_03s` | |
+| R4.3 | implemented-differently | `cps:147`, `cps:175` | `--start` admits pre-2025 months → S1; transition guard → S11 |
+| R4.4 | missing | none found | Aug–Sep 2026 months already delivered → S12 |
+| R4.5 | implemented-as-specified | `cps:52`; CLASSWLY, REGION, 160 REPWTP delivered | V5 unrecorded → S7 |
+| R4.6 | missing (padding half implemented) | `cps:74`, `cps:133` | Census-list mapping → S11, after V6 |
+| R4.7 | missing | none found | → S11 |
+| R4.8 | missing | none found | → S11 |
+| R4.9 | missing | none found | V6 → S7; build → S11 |
+| R4.10 | missing | none found | → S12 |
+| R4.11 | missing | none found | V7 → S7; build → S11, S12 |
+| R4.12 | missing (variables requested) | `cps:52` | → S12 |
+| R5.1 | missing | none found | ITA → S4; ACS → S8; CPS → S11 |
+| R5.2 | missing | none found | → S4 |
+| R5.3 | missing | none found | → S8 |
+| R5.4 | missing | none found | ITA vintages → S4; ACS 2022 comparator → S8 |
+| R6.1 | missing | none found | → S5 |
+| R6.2 | missing | none found | → S5 |
+| R6.3 | missing | none found | V8 → S8 |
+| R6.4 | missing | none found | → S5 |
+| R7.1 | missing | none found | → S6 |
+| R7.2 | missing | none found | All eight families; first in S6 |
+| R7.3 | missing | none found | Counts → S6; gate → S13 (V9) |
+| R7.4 | missing | none found | → S6 |
+| R8.1 | implemented-as-specified | `.gitignore:25` | |
+| R8.2 | missing | README links terms only | → S13 |
+| R8.3 | implemented-as-specified | permission; nothing to build | |
+| R8.4 | out-of-repo | `naics-embedder` owns training | Tuning split belongs to the successor evaluation-protocol spec |
+| R9.1 | implemented-as-specified | `cli.py`; `acs:95`, `cps:123` | Names `acs`, `cps` only; `osha` → S2 amendment |
+| R9.2 | implemented-as-specified | `tests/conftest.py`; suites pass offline | |
+| V1–V3 | missing | no 300A data | → S3 |
+| V4 | missing (evidence in hand) | `usa_00003.xml` SAMPLE labels | Unrecorded → S7 |
+| V5 | missing (evidence in hand) | delivered column sets | Unrecorded; `vintage` lacks flag `QMIGRAT1` (not a requested name) → S7 |
+| V6, V7 | missing | none found | → S7 |
+| V8 | missing | none found | → S8 |
+| V9 | missing | none found | → S13 |
+| V10 | missing | none found | ITA → S2; ACS, CPS → S7 |
+| V11 | missing | none found | ITA → S4; ACS → S8; CPS → S11 |
+| V12 | missing | none found | Seeded S6; extended per family stage; completed S13 |
+| — | in-code-but-not-in-spec | `osha` case-detail command | Kept; recorded in spec as acquired, feeding no target → S2 |
+| — | in-code-but-not-in-spec | Parquet written into `data/raw` (`acs:95`, `cps:123`, `osha:113`) | Moves out of `data/raw` → S1 |
+| — | in-code-but-not-in-spec | `cps --start` | Retained; R4.4 motivates later starts; floor per R4.3 → S1 |
+
+**Owner answers to the batched questions (2026-10-12).**
+
+- Order follows the spec's Rollout: the ITA vertical slice first, then ACS,
+  then CPS.
+- Case detail is kept and recorded in the spec as acquired, feeding no target.
+- The seven pre-manifest raw files are backfilled. Each entry gets its
+  SHA-256 and extract number. Retrieval time (file mtime) and client version
+  (`uv.lock`) are flagged as proxies.
+- Converted Parquet moves out of `data/raw`.
+
+**Order versus the spec.** The order follows the spec's Rollout by owner
+decision: an ITA vertical slice (S2–S6), then ACS (S7–S9), the remaining ITA
+targets (S10), CPS (S11–S12), and the V9 gate (S13). The Rollout's stated
+reason, registration blocking, no longer holds. Its rule that V4 and V5 run
+before any IPUMS download is trusted does hold, and that rule decides several
+placements:
+
+- ACS code parsing and PUMA allocation sit in S8, after S7. S4 and S5 carry
+  only what the ITA slice needs.
+- V6's answer can widen the CPS code mapping, so R4.6 sits in S11, after S7.
+- V3's choice decides which county reference S5 ingests.
+
+## Stages
+
+- [x] Stage 1: Raw provenance and safe re-runs
+      Objective: Every raw file has a manifest entry, and no command can overwrite or reconvert a delivered file.
+      Spec: R1.4, R1.2, R1.3, R4.3, Rollout
+      Gap closed: R1.4; R4.3 (sample floor); Parquet-in-raw drift; spec staleness on R1.3 and Rollout registration
+      Consumes: existing `acs`, `cps`, `osha` commands; raw files in `data/raw`
+      Produces: raw-manifest writer and reader (later output manifests cite raw inputs by its hashes); derived-Parquet location outside `data/raw`; per-extract output layout safe to re-run
+      Exit: manifest entries exist for all seven pre-existing raw files, with SHA-256 and extract number, and retrieval time and client version flagged as proxies; no Parquet remains under `data/raw`; a test shows a second run leaves an earlier `extract.json` and its data byte-identical; `cps --start 2024-12` exits non-zero; spec amendment records registration complete and the 2026-10-12 submissions
+      ROUTING: writing-plans
+
+      > Stage 1: COMPLETE (2026-10-12) — implemented by plan 1 (specs/plans/completed/1-raw-provenance.md). Its Handoff section names what Stages 2, 3, 4, 5, 6 and 7 consume.
+      > Next: resume the roadmap.
+
+- [ ] Stage 2: ITA 300A acquisition and stacked establishment table
+      Objective: Every Form 300A summary file from 2016 on is acquired and stacked into one harmonized establishment-year table.
+      Spec: R2.1, R2.3, R2.4, R2.9, R1.1, R9.1, V10 (ITA)
+      Gap closed: R1.1; R2.1; R2.3; R2.4; R2.9; V10 (ITA); `osha` command drift
+      Consumes: Stage 1 manifest writer and derived location; `osha:63` `make_client`, `osha:78` `.part` download, `osha:108` `decode_line`
+      Produces: stacked 300A Parquet keyed on `year_filing_for` with R2.4 columns, harmonized size codes and `naics_year`, R2.9 flags; current-year through-date in the manifest
+      Exit: every year 2016–2025 appears with its raw file hashed in the manifest; size code `2` never co-occurs with `21`/`22` after harmonization; flagged rows are retained, not dropped; rows per year are compared with OSHA's published submission counts and the gaps recorded; spec amendment adds `osha` to R9.1 and records case detail as acquired, feeding no target
+      ROUTING: writing-plans
+
+- [ ] Stage 3: ITA verification
+      Objective: Settle the three open ITA facts by measurement before any ITA target is built.
+      Spec: V1, V2, V3; R2.6, R2.7, R2.8
+      Gap closed: V1, V2, V3 (the open markers on R2.6, R2.7, R2.8)
+      Consumes: Stage 1 manifest writer; Stage 2 stacked table
+      Produces: recorded decisions on R2.6 cleaning rules, R2.7 link key, R2.8 county-assignment method; official NAICS title files (2012, 2017, 2022) acquired under the manifest for V1
+      Exit: a committed finding reports V1's per-year shares, V2's ID-persistence and address-match shares, and V3's match rates and county agreement; spec amendments replace the three open markers with the adopted rules
+      ROUTING: writing-plans
+
+- [ ] Stage 4: Code tables and ITA NAICS mapping
+      Objective: NAICS 2022 and SOC 2018 node and edge tables exist, and every ITA NAICS code maps to the 2022 vintage as a node or flagged candidate set.
+      Spec: R5.1, R5.2, R5.4, R2.5, V11 (ITA)
+      Gap closed: R5.1 (ITA); R5.2; R5.4 (ITA vintages); R2.5; V11 (ITA)
+      Consumes: Stage 1 manifest; Stage 2 table (`naics_code`, `naics_year`); Stage 3 NAICS title files
+      Produces: NAICS and SOC node and edge tables and their schema convention (reused by Stage 5); the candidate-set representation; 2012/2017→2022 concordance as flagged candidate sets; ITA records carrying native and canonical codes
+      Exit: V11 reports zero unmapped codes in the ITA table; a fixture with an unparseable code fails the build; no concordance relationship is resolved to one side; sectors 31–33, 44–45, and 48–49 are each one node
+      ROUTING: brainstorming
+
+- [ ] Stage 5: Geography hierarchy and county reference
+      Objective: Typed geography nodes and edges exist for both paths, together with the county-assignment reference Stage 3 chose.
+      Spec: R6.1, R6.2, R6.4, R2.8 (method)
+      Gap closed: R6.1; R6.2; R6.4
+      Consumes: Stage 1 manifest; Stage 3 R2.8 method decision; Stage 4 node and edge schema convention (plan Handoff)
+      Produces: county, state, division, region, and CBSA nodes with typed edges; the county-assignment reference named by Stage 3's decision
+      Exit: every county-equivalent nests in exactly one state, division, and region; multi-state CBSAs appear as cross-state edges; non-metro counties carry no CBSA edge; Connecticut planning regions are the county-equivalents; no Puerto Rico or island-area nodes
+      ROUTING: brainstorming
+
+- [ ] Stage 6: Target contract and ITA area-mix slice
+      Objective: One ITA year runs end to end into an area-mix target in the shared output schema, with its manifest.
+      Spec: R7.1, R7.2 (area mix, ITA), R7.3, R7.4, R2.2, R2.8, V12, Rollout
+      Gap closed: R7.1; R7.3 (counts reported); R7.4; R2.2; R2.8; R7.2 area mix (ITA); V12 (seeded)
+      Consumes: Stage 1 manifest; Stage 2 table; Stage 3 R2.8 decision; Stage 4 canonical NAICS; Stage 5 geography and county reference
+      Produces: target writer (long schema, flags, output manifest with raw hashes and code, crosswalk, and transformation versions); establishment county assignment; V12 offline contract-test harness that each later family stage extends
+      Exit: area-mix Parquet for one ITA year in the R7.4 schema, every row carrying `se_method`, `n_unweighted`, `n_weighted`, and the ITA universe statement; its manifest lists raw inputs by SHA-256; V12 passes for this family from fixtures, offline, without credentials; no target is labeled as passing a size gate
+      ROUTING: brainstorming
+
+- [ ] Stage 7: IPUMS extract verification
+      Objective: The five delivered IPUMS extracts are verified before any ACS or CPS transformation reads them.
+      Spec: V4, V5, V6, V7, V10 (ACS, CPS); R3.2, R3.5, R4.5, R4.9, R4.11; Design provenance (XA, XC)
+      Gap closed: V4; V5; V6; V7; V10 (ACS, CPS); the open markers on R3.2, R3.5, R4.5, R4.9, R4.11
+      Consumes: Stage 1 manifest and derived Parquet
+      Produces: written finding with sample IDs, accepted names, weight-storage rule, INDLY scheme verdict, and totals gaps; the 2022 Census industry code list acquired under the manifest; script corrections if any
+      Exit: finding committed; the five open markers carry verified markers citing it; XA and XC standing no longer reads dry-run only; ACS state employment and CPS monthly employment gaps against published levels are recorded, not tuned away
+      ROUTING: writing-plans
+
+- [ ] Stage 8: ACS codes and area allocation
+      Objective: Every ACS industry and occupation code parses to a node or candidate set, and every ACS microdata area allocates to counties by population weight.
+      Spec: R5.1, R5.3, R5.4 (ACS 2022 comparator), R3.9, R3.11, R6.3, V8, V11 (ACS)
+      Gap closed: R5.1 (ACS); R5.3; R5.4 (ACS comparator); R3.9; R3.11 (crosswalks); R6.3; V8; V11 (ACS)
+      Consumes: Stage 4 node tables, candidate-set representation, and concordance; Stage 5 county nodes; Stage 7 finding
+      Produces: INDNAICS and OCCSOC parser; ACS records (core, five-year, vintage) carrying native and canonical codes; residence, place-of-work, and migration PUMA→county factors; PUMA–MSA intersection weights
+      Exit: V11 reports zero unparseable codes in all three ACS extracts; OCCSOC `X` codes record their reason; every PUMA, PWPUMA00, and MIGPUMA1 value in the ACS core maps to counties with factors summing to 1; V8's finding is recorded
+      ROUTING: brainstorming
+
+- [ ] Stage 9: ACS targets
+      Objective: ACS staffing-pattern, area-mix, commuting, and migration targets are built in the shared schema.
+      Spec: R3.6, R3.7, R3.8, R3.10, R3.11, R7.2 (staffing pattern, area mix, commuting, migration — ACS rows)
+      Gap closed: R3.6; R3.7; R3.8; R3.10; R3.11 (use); R7.2 ACS rows except worker profile
+      Consumes: Stage 8 parser, canonical codes, and allocation factors; Stage 5 geography; Stage 6 target writer and V12 harness; Stage 7 weight-storage finding
+      Produces: ACS universe, pooling, replicate-SE, and allocation-flag helpers reused by Stage 12 and Stage 13
+      Exit: each family is built for the civilian headline universe and the private wage-and-salary universe, in headline and allocation-included variants, with replicate SEs; area mixes use workplace geography with work-from-home excluded; no metro is assigned from MET2023 alone; V12 covers each family
+      ROUTING: brainstorming
+
+- [ ] Stage 10: ITA establishment targets
+      Objective: ITA text–code pairs and co-ownership targets are built on cleaned descriptions and linked establishments.
+      Spec: R2.6, R2.7, R7.2 (text–code pairs, co-ownership)
+      Gap closed: R2.6; R2.7; R7.2 text–code pairs and co-ownership
+      Consumes: Stage 3 decisions (V1, V2); Stage 4 2022 code paths; Stage 6 target writer and V12 harness
+      Produces: establishment-link table across years; text–code pair table; co-ownership target
+      Exit: every pair keeps the original string, a normalized key, empty, placeholder, and copied-title flags, and the full 2022 code path; pairs are deduplicated on employer and normalized description; links use the Stage 3 key; V12 covers both families
+      ROUTING: brainstorming
+
+- [ ] Stage 11: CPS panel linkage and job-change flows
+      Objective: CPS codes map to NAICS and SOC, and job-change flows count only respondent-reported job changes.
+      Spec: R4.3, R4.6, R4.7, R4.8, R4.9, R4.11, R5.1, R7.2 (job-change flows), V11 (CPS)
+      Gap closed: R4.3 (transition guard); R4.6; R4.7; R4.8; R4.9; R4.11 (link weights, ASEC replicates, bootstrap); R5.1 (CPS); R7.2 job-change flows; V11 (CPS)
+      Consumes: Stage 4 node tables and candidate-set representation; Stage 6 target writer and V12 harness; Stage 7 V6 and V7 findings and Census industry list
+      Produces: CPS code mapping; linked person-month pairs; CPS weight and SE helpers reused by Stage 12
+      Exit: V11 reports zero unparseable CPS codes; monthly and ASEC job-change flows report the share of linked pairs with a usable flag; September–November 2025 links are flagged and excluded from month-to-month rates; a test shows no December 2024 to January 2025 pair can form; bootstrap SEs are labeled approximate; V12 covers the family
+      ROUTING: brainstorming
+
+- [ ] Stage 12: Worker profiles and CPS cross-sections
+      Objective: Worker profiles, the CPS staffing check, and CPS state-migration targets are built.
+      Spec: R4.4, R4.10, R4.11, R4.12, R7.2 (worker profile, staffing pattern CPS check, migration CPS rows)
+      Gap closed: R4.4; R4.10; R4.11 (cross-section and earner weights); R4.12; R7.2 worker profile, CPS staffing check, CPS migration
+      Consumes: Stage 9 ACS helpers; Stage 11 CPS mapping and weight helpers; Stage 6 target writer and V12 harness
+      Produces: profile tables using the feature-for-`unit_b` schema; ASEC state-to-state flows with the job-related subset
+      Exit: CPS earnings use EARNWEEK2 and HOURWAGE2 with the lowest topcode across analyzed months; ASEC flows carry replicate SEs; any CPS metro-level target refuses records outside the R4.4 rule (tested); V12 covers each family
+      ROUTING: brainstorming
+
+- [ ] Stage 13: Full build, size gate, and comparators
+      Objective: The first full build sets the headline cell-count gate and adds the five-year and vintage comparators.
+      Spec: V9, V12, R3.2, R3.3, R7.3, R8.2
+      Gap closed: V9; V12 (complete); R3.2 (use rule); R3.3 (comparator target); R7.3 (gate); R8.2
+      Consumes: every prior stage's targets and helpers (plan Handoffs); Stage 8 vintage-extract codes
+      Produces: the headline minimum count; the complete eight-family offline contract test
+      Exit: a recorded decision sets the V9 minimum from observed distributions; every five-year result sits beside its 2023–2024 counterpart; the 2022 vintage comparator is built; IPUMS citations appear in README and output manifests; V12 covers all eight families offline
+      ROUTING: brainstorming
+
+## Stage-spec stamp
+
+Each stage spec's Rollout note carries this line, and writing-plans copies it
+verbatim into the stage plan's header (for a writing-plans stage, the plan
+header carries it directly):
+
+> Roadmap: specs/embedding-evaluation-data-spec-roadmap.md, Stage N — on plan
+> completion, tick the stage and re-validate later stages against what shipped.
+
+## Completion
+
+Retire this roadmap only after a conformance audit of the accumulated system:
+re-run the gap rubric over every numbered requirement (R1.1–R9.2, V1–V12),
+with evidence per verdict (implementing stage and plan, `> Deviation:` notes,
+`specs/deferred_items.md` entries). Each unmet requirement either becomes a new
+stage, keeping this roadmap live, or is deferred consciously with a written why.
+Then move this file to `specs/completed/` beside the retired spec.

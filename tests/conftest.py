@@ -13,10 +13,10 @@ def cli_runner():
 
 
 @pytest.fixture
-def output_directory(tmp_path):
-    return tmp_path / 'downloads'
+def dotenv_path(tmp_path):
+    return tmp_path / '.env'
 
 
 @pytest.fixture
-def dotenv_path(tmp_path):
-    return tmp_path / '.env'
+def data_directory(tmp_path):
+    return tmp_path / 'data'
