@@ -8,6 +8,14 @@ Source spec: `specs/embedding-evaluation-data-spec.md`. Derived 2026-10-12
 against `main` at `af7bf21`, with pytest (44) and Behave (2) passing and five
 live IPUMS extracts on disk (`usa_00001`–`00003`, `cps_00001`–`00002`).
 
+Resumed 2026-10-13 after plan 4: Stages 5–13 reconciled against its
+[Handoff](plans/completed/4-code-tables-ita-naics-mapping.md#handoff-to-later-stages)
+and [V11 finding](findings/v11-ita-naics-mapping.md); partition retained.
+The explicitly selected Stage 4 bundle is
+`data/derived/codes/stage4_v11_20261013_r2/`, with `inputs.json`, `report.json`
+and detached `outputs.json`; consumer contracts below cite that Handoff
+(Resolved at resume, 2026-10-13).
+
 ## Gap analysis
 
 `acs` = `src/embedding_data/acs_benchmark_extract.py`, `cps` =
@@ -159,7 +167,7 @@ placements:
       Objective: Typed geography nodes and edges exist for both paths, together with the county-assignment reference Stage 3 chose.
       Spec: R6.1, R6.2, R6.4, R2.8 (method)
       Gap closed: R6.1; R6.2; R6.4
-      Consumes: Stage 1 manifest; Stage 3 adopted R2.8/R6 method and compatibility decisions, manifested 2025Q4 HUD workbook, `ita_references.import_hud`/`read_hud` and `ita_county_verification.zip_candidates` contracts, and common 2025 Census county frame (plan 3, Handoff; Resolved at resume, 2026-10-13); Stage 4 node and edge schema convention (plan Handoff)
+      Consumes: Stage 1 manifest; Stage 3 adopted R2.8/R6 method and compatibility decisions, manifested 2025Q4 HUD workbook, `ita_references.import_hud`/`read_hud` and `ita_county_verification.zip_candidates` contracts, and common 2025 Census county frame (plan 3, Handoff; Resolved at resume, 2026-10-13); selected Stage 4 bundle's typed node/edge and root-through-node path conventions, with `classification_tables.forest` single-parent validation confined to classification graphs (plan 4, [Handoff](plans/completed/4-code-tables-ita-naics-mapping.md#handoff-to-later-stages)) (Resolved at resume, 2026-10-13)
       Produces: county, state, division, region, and CBSA nodes with typed edges; full production geography and county-assignment references beyond Stage 3's verification inputs (plan 3, Handoff; Resolved at resume, 2026-10-13)
       Exit: every county-equivalent nests in exactly one state, division, and region; multi-state CBSAs appear as cross-state edges; non-metro counties carry no CBSA edge; Connecticut planning regions are the county-equivalents; no Puerto Rico or island-area nodes
       ROUTING: brainstorming
@@ -168,7 +176,7 @@ placements:
       Objective: One ITA year runs end to end into an area-mix target in the shared output schema, with its manifest.
       Spec: R7.1, R7.2 (area mix, ITA), R7.3, R7.4, R2.2, R2.8, V12, Rollout
       Gap closed: R7.1; R7.3 (counts reported); R7.4; R2.2; R2.8; R7.2 area mix (ITA); V12 (seeded)
-      Consumes: Stage 1 manifest; Stage 2 table. Each row cites its raw input by `source_file` through `manifest.entry_for`, and every `osha summary` run rebuilds the table. Flagged rows are kept, `size_class` is the one size scheme in every year, and the V10 (ITA) gaps are in `specs/findings/v10-ita-300a-totals.md` (plan 2, Handoff; Resolved at resume, 2026-10-13); Stage 3 adopted R2.8/R6/R7 decisions, verified-citation contract and `ita_verification_run` prepare/check/acquire/measure interfaces; frozen sample and request/response schemas, method-specific scope diagnostics and replay/input-hash limits for `v1_v3_20261013_scopefix` (plan 3, Handoff; Resolved at resume, 2026-10-13); Stage 4 canonical NAICS; Stage 5 geography and county reference
+      Consumes: Stage 1 manifest; Stage 2 upstream summary. Each row cites its raw input by `source_file` through `manifest.entry_for`, and every `osha summary` run rebuilds the table. Flagged rows are kept, `size_class` is the one size scheme in every year, and the V10 (ITA) gaps are in `specs/findings/v10-ita-300a-totals.md` (plan 2, Handoff; Resolved at resume, 2026-10-13); Stage 3 adopted R2.8/R6/R7 decisions, verified-citation contract and `ita_verification_run` prepare/check/acquire/measure interfaces; frozen sample and request/response schemas, method-specific scope diagnostics and replay/input-hash limits for `v1_v3_20261013_scopefix` (plan 3, Handoff; Resolved at resume, 2026-10-13); selected Stage 4 bundle's separate `ita_300a_canonical.parquet` and verified inventories, preserving source values/flags, nonnull sorted finest-candidate sets, unknown-vintage/mismatch unresolved states, singleton-crosswalk provenance, nullable filing decisions and independent filing-reference flags under V11's exact schema and nominal-cycle limits (plan 4, [Handoff](plans/completed/4-code-tables-ita-naics-mapping.md#handoff-to-later-stages)) (Resolved at resume, 2026-10-13); Stage 5 geography and county reference
       Produces: target writer (long schema, flags, output manifest with raw hashes and code, crosswalk, and transformation versions); full-table establishment county assignment beyond Stage 3's sample (plan 3, Handoff; Resolved at resume, 2026-10-13); V12 offline contract-test harness that each later family stage extends
       Exit: area-mix Parquet for one ITA year in the R7.4 schema, every row carrying `se_method`, `n_unweighted`, `n_weighted`, and the ITA universe statement; its manifest lists the `source_file` values it read, each with its SHA-256 (plan 2, Handoff; Resolved at resume, 2026-10-13); V12 passes for this family from fixtures, offline, without credentials; no target is labeled as passing a size gate
       ROUTING: brainstorming
@@ -186,7 +194,7 @@ placements:
       Objective: Every ACS industry and occupation code parses to a node or candidate set, and every ACS microdata area allocates to counties by population weight.
       Spec: R5.1, R5.3, R5.4 (ACS 2022 comparator), R3.9, R3.11, R6.3, V8, V11 (ACS)
       Gap closed: R5.1 (ACS); R5.3; R5.4 (ACS comparator); R3.9; R3.11 (crosswalks); R6.3; V8; V11 (ACS)
-      Consumes: Stage 4 node tables, candidate-set representation, and concordance; Stage 5 county nodes; Stage 7 finding
+      Consumes: selected Stage 4 bundle's canonical node/path tables, native/auxiliary NAICS nodes, complete four-bridge `naics_concordance.parquet`, and `naics_relationships.candidates` forward/reverse traversal with sorted finest candidates and no code-equality shortcut across vintages, weights or preferred side; its ITA source exception leaves ACS mixed-depth parsing and V11 completeness intact (plan 4, [Handoff](plans/completed/4-code-tables-ita-naics-mapping.md#handoff-to-later-stages)) (Resolved at resume, 2026-10-13); Stage 5 county nodes; Stage 7 finding
       Produces: INDNAICS and OCCSOC parser; ACS records (core, five-year, vintage) carrying native and canonical codes; residence, place-of-work, and migration PUMA→county factors; PUMA–MSA intersection weights
       Exit: V11 reports zero unparseable codes in all three ACS extracts; OCCSOC `X` codes record their reason; every PUMA, PWPUMA00, and MIGPUMA1 value in the ACS core maps to counties with factors summing to 1; V8's finding is recorded
       ROUTING: brainstorming
@@ -195,7 +203,7 @@ placements:
       Objective: ACS staffing-pattern, area-mix, commuting, and migration targets are built in the shared schema.
       Spec: R3.6, R3.7, R3.8, R3.10, R3.11, R7.2 (staffing pattern, area mix, commuting, migration — ACS rows)
       Gap closed: R3.6; R3.7; R3.8; R3.10; R3.11 (use); R7.2 ACS rows except worker profile
-      Consumes: Stage 8 parser, canonical codes, and allocation factors; Stage 5 geography; Stage 6 target writer and V12 harness; Stage 7 weight-storage finding
+      Consumes: Stage 8 parser, canonical codes, and allocation factors, preserving ambiguity, unknown-vintage and singleton-crosswalk provenance independently of candidate cardinality (plan 4, [Handoff](plans/completed/4-code-tables-ita-naics-mapping.md#handoff-to-later-stages)) (Resolved at resume, 2026-10-13); Stage 5 geography; Stage 6 target writer and V12 harness; Stage 7 weight-storage finding
       Produces: ACS universe, pooling, replicate-SE, and allocation-flag helpers reused by Stage 12 and Stage 13
       Exit: each family is built for the civilian headline universe and the private wage-and-salary universe, in headline and allocation-included variants, with replicate SEs; area mixes use workplace geography with work-from-home excluded; no metro is assigned from MET2023 alone; V12 covers each family
       ROUTING: brainstorming
@@ -204,16 +212,16 @@ placements:
       Objective: ITA text–code pairs and co-ownership targets are built on cleaned descriptions and linked establishments.
       Spec: R2.6, R2.7, R7.2 (text–code pairs, co-ownership)
       Gap closed: R2.6; R2.7; R7.2 text–code pairs and co-ownership
-      Consumes: Stage 2 table (`ein`, `company_name`); Stage 3 adopted R2.6/R2.7 decisions and `ita_verification` normalization/title/employer/linkage contracts; measured unknown-employer, padded-EIN, early-year coverage and duplicate/collision diagnostics, including missing-ID counts (plan 3, Handoff; Resolved at resume, 2026-10-13); Stage 4 2022 code paths; Stage 6 target writer and V12 harness
+      Consumes: Stage 2 table (`ein`, `company_name`); Stage 3 adopted R2.6/R2.7 decisions and `ita_verification` normalization/title/employer/linkage contracts; measured unknown-employer, padded-EIN, early-year coverage and duplicate/collision diagnostics, including missing-ID counts (plan 3, Handoff; Resolved at resume, 2026-10-13); selected Stage 4 bundle's canonical candidates and `code_paths` keyed by `node_id`, preserving singleton-crosswalk and independent filing-reference provenance; unresolved candidate unions/common ancestors remain possibilities, with unresolved text–code inclusion left to this stage's design (plan 4, [Handoff](plans/completed/4-code-tables-ita-naics-mapping.md#handoff-to-later-stages)) (Resolved at resume, 2026-10-13); Stage 6 target writer and V12 harness
       Produces: establishment-link table across years; text–code pair table; co-ownership target
-      Exit: every pair keeps the original string, a normalized key, empty, placeholder, and copied-title flags, and the full 2022 code path; pairs are deduplicated on employer and normalized description; links satisfy the adopted R2.7 confirmation and ambiguity rules measured in Stage 3 (plan 3, Handoff; Resolved at resume, 2026-10-13); V12 covers both families
+      Exit: every pair keeps the original string, a normalized key, empty, placeholder, and copied-title flags; full 2022 paths are carried for every supported candidate without asserting a scalar canonical code or full observed path for unresolved rows (plan 4, [Handoff](plans/completed/4-code-tables-ita-naics-mapping.md#handoff-to-later-stages)) (Resolved at resume, 2026-10-13); pairs are deduplicated on employer and normalized description; links satisfy the adopted R2.7 confirmation and ambiguity rules measured in Stage 3 (plan 3, Handoff; Resolved at resume, 2026-10-13); V12 covers both families
       ROUTING: brainstorming
 
 - [ ] Stage 11: CPS panel linkage and job-change flows
       Objective: CPS codes map to NAICS and SOC, and job-change flows count only respondent-reported job changes.
       Spec: R4.3, R4.6, R4.7, R4.8, R4.9, R4.11, R5.1, R7.2 (job-change flows), V11 (CPS)
       Gap closed: R4.3 (transition guard); R4.6; R4.7; R4.8; R4.9; R4.11 (link weights, ASEC replicates, bootstrap); R5.1 (CPS); R7.2 job-change flows; V11 (CPS)
-      Consumes: Stage 4 node tables and candidate-set representation; Stage 6 target writer and V12 harness; Stage 7 V6 and V7 findings and Census industry list
+      Consumes: selected Stage 4 bundle's canonical NAICS/SOC node schemas, root-to-leaf paths with workbook-derived SOC parentage, and complete relationship/candidate APIs; auxiliary 2002/2007 rule references admit no additional CPS source schemes (plan 4, [Handoff](plans/completed/4-code-tables-ita-naics-mapping.md#handoff-to-later-stages)) (Resolved at resume, 2026-10-13); Stage 6 target writer and V12 harness; Stage 7 V6 and V7 findings and Census industry list
       Produces: CPS code mapping; linked person-month pairs; CPS weight and SE helpers reused by Stage 12
       Exit: V11 reports zero unparseable CPS codes; monthly and ASEC job-change flows report the share of linked pairs with a usable flag; September–November 2025 links are flagged and excluded from month-to-month rates; a test shows no December 2024 to January 2025 pair can form; bootstrap SEs are labeled approximate; V12 covers the family
       ROUTING: brainstorming
@@ -222,7 +230,7 @@ placements:
       Objective: Worker profiles, the CPS staffing check, and CPS state-migration targets are built.
       Spec: R4.4, R4.10, R4.11, R4.12, R7.2 (worker profile, staffing pattern CPS check, migration CPS rows)
       Gap closed: R4.4; R4.10; R4.11 (cross-section and earner weights); R4.12; R7.2 worker profile, CPS staffing check, CPS migration
-      Consumes: Stage 9 ACS helpers; Stage 11 CPS mapping and weight helpers; Stage 6 target writer and V12 harness
+      Consumes: Stage 9 ACS helpers; Stage 11 CPS mapping and weight helpers, retaining dependent-coding, allocation and other source-imputation flags independently of candidate unanimity (plan 4, [Handoff](plans/completed/4-code-tables-ita-naics-mapping.md#handoff-to-later-stages)) (Resolved at resume, 2026-10-13); Stage 6 target writer and V12 harness
       Produces: profile tables using the feature-for-`unit_b` schema; ASEC state-to-state flows with the job-related subset
       Exit: CPS earnings use EARNWEEK2 and HOURWAGE2 with the lowest topcode across analyzed months; ASEC flows carry replicate SEs; any CPS metro-level target refuses records outside the R4.4 rule (tested); V12 covers each family
       ROUTING: brainstorming
@@ -231,7 +239,7 @@ placements:
       Objective: The first full build sets the headline cell-count gate and adds the five-year and vintage comparators.
       Spec: V9, V12, R3.2, R3.3, R7.3, R8.2
       Gap closed: V9; V12 (complete); R3.2 (use rule); R3.3 (comparator target); R7.3 (gate); R8.2
-      Consumes: every prior stage's targets and helpers (plan Handoffs); Stage 8 vintage-extract codes
+      Consumes: every prior stage's targets and helpers (plan Handoffs); Stage 8 vintage-extract codes; selected `codes-ita-v1` Stage 4 bundle's input/output inventories and verified source/reference/software provenance, including V11's extra CLI/commit hashes; detached output checksums and logical fresh-run determinism remain distinct, with the source summary's physical hash pinned (plan 4, [Handoff](plans/completed/4-code-tables-ita-naics-mapping.md#handoff-to-later-stages)) (Resolved at resume, 2026-10-13)
       Produces: the headline minimum count; the complete eight-family offline contract test
       Exit: a recorded decision sets the V9 minimum from observed distributions; every five-year result sits beside its 2023–2024 counterpart; the 2022 vintage comparator is built; IPUMS citations appear in README and output manifests; V12 covers all eight families offline
       ROUTING: brainstorming
