@@ -10,7 +10,7 @@ review are separate controller gates.
 ## Scope, interpretation and limitations
 
 This finding implements the ITA portion of [the source spec](../embedding-evaluation-data-spec.md)
-R2.5/R2.9/R5.1/R5.2/R5.4 and the [Stage 4 design](../code-tables-ita-naics-mapping.md).
+R2.5/R2.9/R5.1/R5.2/R5.4 and the [Stage 4 design](../completed/code-tables-ita-naics-mapping.md).
 The [source preflight](stage-4-ita-code-preflight.md) and
 [rule-reference preflight](stage-4-filing-rule-reference-preflight.md) explain the
 owner-adopted source exception and bounded legacy-label interpretation.

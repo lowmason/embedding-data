@@ -8,15 +8,15 @@
 
 **Tech Stack:** Python 3.14, Polars 2, fastexcel, httpx, Typer, pytest, Hypothesis; standard-library HTMLParser for GovInfo's preformatted rule editions. No dependency changes.
 
-**Spec:** [specs/code-tables-ita-naics-mapping.md](../code-tables-ita-naics-mapping.md), implementing the [source spec](../embedding-evaluation-data-spec.md) R5.1 (ITA), R5.2, R5.4 (ITA), R2.5, R2.9 (industry), V11 (ITA).
+**Spec:** [specs/completed/code-tables-ita-naics-mapping.md](../../completed/code-tables-ita-naics-mapping.md), implementing the [source spec](../../embedding-evaluation-data-spec.md) R5.1 (ITA), R5.2, R5.4 (ITA), R2.5, R2.9 (industry), V11 (ITA).
 
 > Roadmap: specs/embedding-evaluation-data-spec-roadmap.md, Stage 4 — on plan completion, tick the stage and re-validate later stages against what shipped.
 
-**Status: APPROVED (2026-10-13)** — the owner approved the exact Task 0 amendment and revised implementation plan; the eight spec replacements are applied. Implementation Tasks 1–8 remain to execute. Stage 4 remains unticked until full-data acceptance and final review satisfy its exit.
+**Status: COMPLETE (2026-10-13)** — executed via subagent-driven-development; nothing deferred. Task 0 was already committed at `ffaa576`; Tasks 1–8, measured acceptance, carried-item closure and final review are complete. Integration is a draft PR; resume the roadmap after merge.
 
 ## Reference-conflict resolution
 
-The real-original self-review found that the official exemption list contains `5173` and `5181`, which are absent from NAICS 2007. The [reference preflight](../findings/stage-4-filing-rule-reference-preflight.md) records original hashes, all-list membership comparisons, current OSHA authority, and the full official 2002→2007 relationships. The unamended design's strict expansion rejects that original. The proposal below preserves strict validation except for these two documented, explicitly interpreted legacy labels.
+The real-original self-review found that the official exemption list contains `5173` and `5181`, which are absent from NAICS 2007. The [reference preflight](../../findings/stage-4-filing-rule-reference-preflight.md) records original hashes, all-list membership comparisons, current OSHA authority, and the full official 2002→2007 relationships. The unamended design's strict expansion rejects that original. The proposal below preserves strict validation except for these two documented, explicitly interpreted legacy labels.
 
 Adopted by D2: retain those original labels, acquire the complete NAICS 2002 structure/bridge as auxiliary rule references, and preserve both possible exemption outcomes for partial legacy coverage or mixed-predecessor merges. In particular, 2007 `517110` must not become wholly exempt merely because one 2002 predecessor is inside legacy `5181`. Preserve definite whole-node exemptions from valid 2007 listed groups. Native ITA vintages and canonical systems remain as approved.
 
@@ -51,7 +51,7 @@ Source spec R9.2 also applies verbatim: "Every transformation is deterministic a
 
 Planned against `main` at `6f8c190`, with a clean working tree. The plan-ID reporter scanned branches, remote-tracking refs and worktrees: highest 3, next free 4, no collisions, no plan for this spec. Fresh baseline: 284 pytest passed/one network canary deselected; two Behave scenarios/ten steps passed; ruff and lock checks passed.
 
-Read plan 3's [Handoff](completed/3-ita-verification.md#handoff-to-later-stages), the stage design, preflight, source spec and deferred ledger. Reuse `manifest.entry_for` for verified citations, `ita_references.existing_reference` for immutable reference checks, `ita_summary.summary_files` for release selection, and `ita_summary.harmonize_file`/`add_flags` for **read-only** source validation. Never call `build_summary_table` from this stage.
+Read plan 3's [Handoff](3-ita-verification.md#handoff-to-later-stages), the stage design, preflight, source spec and deferred ledger. Reuse `manifest.entry_for` for verified citations, `ita_references.existing_reference` for immutable reference checks, `ita_summary.summary_files` for release selection, and `ita_summary.harmonize_file`/`add_flags` for **read-only** source validation. Never call `build_summary_table` from this stage.
 
 Planning inspected public originals only in temporary storage; it made no raw-manifest entry and changed no project data. These are source/layout observations, not completed Stage 4 output:
 
@@ -387,7 +387,7 @@ and document the mixed-predecessor limit. *(owner, plan 4, 2026-10-13)*
 
 **Interfaces:** `naics_tables(titles: pl.DataFrame, vintage: int) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]`; `soc_tables(raw: pl.DataFrame) -> tuple[...]`; `forest(nodes: pl.DataFrame, edges: pl.DataFrame) -> pl.DataFrame` returns paths after validation; `below_header(raw, needles) -> pl.DataFrame`; `column(body, *needles) -> str`. Structures use the exact node/edge schema in the design; paths have `node_id:String, path:List(String)`. All later references call these repository functions.
 
-- [ ] **Step 1: Add failing graph/parser tests and handwritten fixture helpers.** Start with this fixture and tests; the SOC test intentionally asserts a published overflow parent that prefix surgery cannot supply.
+- [x] **Step 1: Add failing graph/parser tests and handwritten fixture helpers.** Start with this fixture and tests; the SOC test intentionally asserts a published overflow parent that prefix surgery cannot supply.
 
 ```python
 # tests/code_fixtures.py
@@ -451,9 +451,9 @@ def test_duplicate_and_orphan_refused():
 
 Add parametrized failure frames for missing titles, invalid code syntax/ranges, two populated SOC code columns, missing SOC upper level, duplicate SOC codes, duplicate/unknown edge endpoints, contradictory immediate levels and a cycle. Include an ambiguous header frame with two code columns matching the same vintage. Expected errors are `ValueError` naming the defect; no silently deduplicated structures.
 
-- [ ] **Step 2: Verify red.** Run `uv run --locked pytest tests/test_classification_tables.py -q`; expect import failure for the absent repository module, not a fixture typo.
+- [x] **Step 2: Verify red.** Run `uv run --locked pytest tests/test_classification_tables.py -q`; expect import failure for the absent repository module, not a fixture typo.
 
-- [ ] **Step 3: Implement the graph and strict parser seams.** Put the following code in `classification_tables.py`. Keep production count pins in Task 4's reference reader, so tiny unit forests remain genuine inputs to these pure functions.
+- [x] **Step 3: Implement the graph and strict parser seams.** Put the following code in `classification_tables.py`. Keep production count pins in Task 4's reference reader, so tiny unit forests remain genuine inputs to these pure functions.
 
 ```python
 import re
@@ -597,16 +597,19 @@ def soc_tables(raw: pl.DataFrame):
 
 The generic forest validator deliberately validates classification single parentage only; Stage 5 reuses the **schemas**, not this restriction for cross-state CBSA edges. Add a SOC test where a valid column-level code occurs under a contradictory major group; don't invent a prefix parent when nesting is absent.
 
-- [ ] **Step 4: Verify green and original-layout reads.** Run focused tests, then the milestone. Read the small XLSX fixtures through `pl.read_excel(..., has_header=False, read_options={'dtypes': 'string'})`; assert the same expected graph as the in-memory raw sheets. The SOC overflow must remain parented by nesting.
-- [ ] **Step 5: Commit/checkpoint.** `git add src/embedding_data/classification_tables.py tests/test_classification_tables.py tests/code_fixtures.py tests/fixtures/codes` then `git commit -m 'feat(codes): add validated classification forests and paths'`.
+- [x] **Step 4: Verify green and original-layout reads.** Run focused tests, then the milestone. Read the small XLSX fixtures through `pl.read_excel(..., has_header=False, read_options={'dtypes': 'string'})`; assert the same expected graph as the in-memory raw sheets. The SOC overflow must remain parented by nesting.
+- [x] **Step 5: Commit/checkpoint.** `git add src/embedding_data/classification_tables.py tests/test_classification_tables.py tests/code_fixtures.py tests/fixtures/codes` then `git commit -m 'feat(codes): add validated classification forests and paths'`.
 
 ### Task 2: Complete direct relationships and reversible traversal
+
+> Deviation: the owner approved shared degree-classification extraction; `b720046` preserves the parser and validator’s different window partitions. The shipped chain includes auxiliary 2002 as required by D2, despite the old four-vintage interface sentence.
+
 
 **Files:** Create `src/embedding_data/naics_relationships.py`, `tests/test_naics_relationships.py`; extend `tests/code_fixtures.py`.
 
 **Interfaces:** `parse_concordance(raw, source_vintage, target_vintage, source_file) -> pl.DataFrame`; `validate_relationships(relations, structures) -> None`; `candidates(relations, source_vintage, source_code, target_vintage) -> list[str]`. `structures` is the concatenation of validated NAICS node tables for 2007/2012/2017/2022. Traversal moves monotonically along the adjacent-vintage chain, not through canonical 2022 and back.
 
-- [ ] **Step 1: Write the failing relationship tests.** Hand-authored fixture pairs:
+- [x] **Step 1: Write the failing relationship tests.** Hand-authored fixture pairs:
 
 ```python
 # Append to tests/code_fixtures.py
@@ -664,8 +667,8 @@ def test_two_hops_and_equal_codes_do_not_shortcut():
 
 Add a full 2×2 reshuffle expecting all `m:m`, a 1:1 recode, duplicated official pair rows expecting one distinct pair, and endpoint/missing-coverage failures against tiny structures. Reordering pair-sheet data rows must leave sorted logical outputs identical; include multiline title headers so a title's explanatory target-year text cannot select a code column.
 
-- [ ] **Step 2: Verify red.** `uv run --locked pytest tests/test_naics_relationships.py -q` fails for absent module.
-- [ ] **Step 3: Implement the complete pair relation and traversal.**
+- [x] **Step 2: Verify red.** `uv run --locked pytest tests/test_naics_relationships.py -q` fails for absent module.
+- [x] **Step 3: Implement the complete pair relation and traversal.**
 
 ```python
 import polars as pl
@@ -748,8 +751,8 @@ def candidates(relations, source_vintage, source_code, target_vintage):
 
 The validation boundary recalculates degree classifications within each vintage pair, so a corrupted stored relationship cannot claim 1:1. Its regression changes the first split row's `link_type` to `1:1` and expects `ValueError` matching `degree`.
 
-- [ ] **Step 4: Verify green.** Run the focused suite and milestone, including both-side complete coverage and shuffled-pair determinism.
-- [ ] **Step 5: Commit/checkpoint.** `git add src/embedding_data/naics_relationships.py tests/test_naics_relationships.py tests/code_fixtures.py` then `git commit -m 'feat(codes): preserve complete NAICS vintage relationships'`.
+- [x] **Step 4: Verify green.** Run the focused suite and milestone, including both-side complete coverage and shuffled-pair determinism.
+- [x] **Step 5: Commit/checkpoint.** `git add src/embedding_data/naics_relationships.py tests/test_naics_relationships.py tests/code_fixtures.py` then `git commit -m 'feat(codes): preserve complete NAICS vintage relationships'`.
 
 ### Task 3: Original filing lists and versioned expansion
 
@@ -757,7 +760,7 @@ The validation boundary recalculates degree classifications within each vintage 
 
 **Interfaces:** `parse_rule(text: str, rule_id: str) -> list[str]` returns original labels; `expand_rule(codes, rule_id, structures, source_file) -> pl.DataFrame` remains a strict native expansion; `rule_tables(listed, structures, relations, sources) -> dict[str, pl.DataFrame]` produces labels, definite memberships and complete membership possibilities under Task 0's D2-adopted schemas. `legacy_membership(whole, legacy_leaves, predecessors) -> dict[str, tuple[list[bool], bool]]` preserves all incoming paths. Task 6 extends this same module with evaluation.
 
-- [ ] **Step 1: Write parser tests before implementation.**
+- [x] **Step 1: Write parser tests before implementation.**
 
 ```python
 import polars as pl
@@ -812,8 +815,8 @@ def test_bounded_bridge_preserves_mixed_predecessors_and_whole_exemptions():
 
 Add expansion tests with the tiny Task 1 forest: `11` expands to both leaves; an absent listed node fails; multiple overlapping listed nodes cannot generate duplicate membership. Assert exact Date types and closed/open effective intervals. Include missing list row, invalid code-like row, missing title and page-break/continued-title fixtures.
 
-- [ ] **Step 2: Verify red.** `uv run --locked pytest tests/test_filing_rules.py -q` fails for absent module.
-- [ ] **Step 3: Implement original-text parsing and native-vintage expansion.**
+- [x] **Step 2: Verify red.** `uv run --locked pytest tests/test_filing_rules.py -q` fails for absent module.
+- [x] **Step 3: Implement original-text parsing and native-vintage expansion.**
 
 ```python
 import re
@@ -1005,16 +1008,19 @@ def validate_membership(membership, structures):
 
 The final-table dotted rows are individually validated; horizontal whitespace cannot consume a newline and disguise a missing title. Wrapped titles, published separators and `[[Page ...]]` markers remain outside the code rows. Production group counts stay pinned; the expected-count parameter is a pure parser fixture seam. `expand_rule` remains strict: only `rule_tables` can interpret the two allowlisted original exemption labels through validated 2002 ancestry. Every other unmatched label fails. Definite memberships are the `[True]` projection of the complete possibilities table; mixed membership never enters that projection.
 
-- [ ] **Step 4: Verify green and official-format boundary.** Run focused checks and milestone. The 2023 fixture includes an Appendix B distraction; its codes must never enter `designated_2017`. Periods use nominal submission dates (filing year plus one) and inclusive `effective_to`.
-- [ ] **Step 5: Commit/checkpoint.** `git add src/embedding_data/filing_rules.py tests/test_filing_rules.py tests/fixtures/codes` then `git commit -m 'feat(codes): parse versioned filing-industry appendices'`.
+- [x] **Step 4: Verify green and official-format boundary.** Run focused checks and milestone. The 2023 fixture includes an Appendix B distraction; its codes must never enter `designated_2017`. Periods use nominal submission dates (filing year plus one) and inclusive `effective_to`.
+- [x] **Step 5: Commit/checkpoint.** `git add src/embedding_data/filing_rules.py tests/test_filing_rules.py tests/fixtures/codes` then `git commit -m 'feat(codes): parse versioned filing-industry appendices'`.
 
 ### Task 4: Registered immutable reference acquisition and import
+
+> Deviation: `8f5d67d` adds staged-copy hash verification and atomic no-overwrite hard-link publication; `412a0d4` makes cleanup conditional on exclusive staging ownership. Both refinements have reproduced regression evidence and clean review.
+
 
 **Files:** Create `src/embedding_data/code_references.py`, `tests/test_code_references.py`. Existing Stage 3 readers remain unchanged.
 
 **Interfaces:** `Reference(kind, url, relative, family, vintage=None, target=None, expected=None)`; `REGISTRY: dict[str, Reference]`; `reference_path(data_dir, reference) -> Path`; `parse_naics_text(text, vintage) -> pl.DataFrame`; `parse_reference(file, reference) -> pl.DataFrame | list[str]`; `acquire(data_dir, *, registry=REGISTRY) -> list[Path]`; `import_reference(data_dir, kind, original, *, registry=REGISTRY) -> Path`; `read_references(data_dir, *, registry=REGISTRY) -> dict[str, pl.DataFrame]`. The injectable registry is a library fixture seam, never a CLI option or runtime skill dependency. The reader returns structures, SOC nodes, relations, original group counts, definite rules, original labels and complete membership possibilities.
 
-- [ ] **Step 1: Write failing acquisition/import tests.** Use a committed tiny actual XLSX matching Task 1's NAICS fixture and a fixture registry with explicit small counts. Include this immutable import test:
+- [x] **Step 1: Write failing acquisition/import tests.** Use a committed tiny actual XLSX matching Task 1's NAICS fixture and a fixture registry with explicit small counts. Include this immutable import test:
 
 ```python
 from dataclasses import replace
@@ -1042,8 +1048,8 @@ def test_import_is_original_bytes_and_verified_idempotent(tmp_path):
 
 Add a streamed `httpx.MockTransport` response carrying the actual workbook bytes. Call acquisition twice: one request, unchanged manifest/raw bytes on replay. Then independently test missing recorded original, existing unrecorded original, different valid import bytes under one identity, invalid HTML masquerading as XLSX, challenge HTML for a rule, interrupted `.part`, and an invalid second registered destination: batch preflight must issue zero HTTP requests. Set a temporary registry's BLS URL, remove `BLS_CONTACT_EMAIL`, and assert the missing SOC acquisition names manual import before any BLS request. Existing/imported SOC must read offline without that environment variable.
 
-- [ ] **Step 2: Verify red.** `uv run --locked pytest tests/test_code_references.py -q` fails for absent module.
-- [ ] **Step 3: Implement registry, validators and acquisition boundary.** Registry literals use the exact official URLs in Entry evidence. New paths: `naics/naics07.xls`, `naics/<original concordance filename>`, `soc/soc_structure_2018.xlsx`, and `filing-rules/<FR document ID>.htm`. Existing 2012/2017/2022 paths stay `naics/<TITLE_FILES basename>`.
+- [x] **Step 2: Verify red.** `uv run --locked pytest tests/test_code_references.py -q` fails for absent module.
+- [x] **Step 3: Implement registry, validators and acquisition boundary.** Registry literals use the exact official URLs in Entry evidence. New paths: `naics/naics07.xls`, `naics/<original concordance filename>`, `soc/soc_structure_2018.xlsx`, and `filing-rules/<FR document ID>.htm`. Existing 2012/2017/2022 paths stay `naics/<TITLE_FILES basename>`.
 
 ```python
 import os
@@ -1243,16 +1249,19 @@ def read_references(data_dir, *, registry=REGISTRY):
 
 Task 1's edges/paths can be regenerated from validated nodes during build; SOC edges require its original sheet nesting, so Task 7 re-reads the verified SOC original and calls `soc_tables`, rather than deriving SOC edges from sorted nodes. Add reader failures for all missing/changed originals and incomplete full bridges. `preflight` runs even if all originals exist, and valid cached reads cannot require contact or network.
 
-- [ ] **Step 4: Verify green.** Focused tests and milestone. Verify each parser through genuine fixture bytes and each malformed original leaves no published raw file/manifest entry.
-- [ ] **Step 5: Commit/checkpoint.** `git add src/embedding_data/code_references.py tests/test_code_references.py` then `git commit -m 'feat(codes): acquire and import immutable official references'`.
+- [x] **Step 4: Verify green.** Focused tests and milestone. Verify each parser through genuine fixture bytes and each malformed original leaves no published raw file/manifest entry.
+- [x] **Step 5: Commit/checkpoint.** `git add src/embedding_data/code_references.py tests/test_code_references.py` then `git commit -m 'feat(codes): acquire and import immutable official references'`.
 
 ### Task 5: Native lookup, uncertainty states and row-preserving join
+
+> Deviation: Task 2 already supplied the complete toy references, so no redundant fixture edit was made. The shipped lookup additionally verifies native forests, canonical paths and full relationships before state construction.
+
 
 **Files:** Create `src/embedding_data/ita_naics_mapping.py`, `tests/test_ita_naics_mapping.py`; extend `tests/code_fixtures.py` with the complete four-vintage toy relation.
 
 **Interfaces:** `build_lookup(keys, structures, relations, code_paths) -> pl.DataFrame`; `enrich(source: pl.LazyFrame, lookup: pl.DataFrame) -> pl.LazyFrame`. Keys have `naics_code:String, naics_year:Int64`. The lookup retains those keys, including nulls, and every mapping column in the design's exact order/dtype. Auxiliary 2002/2007 structures are not admitted source vintages; a nonnull ITA vintage outside 2012/2017/2022 still fails.
 
-- [ ] **Step 1: Write failing state, provenance and join tests.** Build toy structures with leaves `111111,111112` for 2007/2012/2017 and `111111,111112,111113` for 2022. The complete pairs are: 2007→2012 `A→A,B→B`; 2012→2017 `A→A,A→B,B→B`; 2017→2022 `A→A,B→B,B→C`, with A/B/C denoting the three literal leaf codes.
+- [x] **Step 1: Write failing state, provenance and join tests.** Build toy structures with leaves `111111,111112` for 2007/2012/2017 and `111111,111112,111113` for 2022. The complete pairs are: 2007→2012 `A→A,B→B`; 2012→2017 `A→A,A→B,B→B`; 2017→2022 `A→A,B→B,B→C`, with A/B/C denoting the three literal leaf codes.
 
 ```python
 import polars as pl
@@ -1296,8 +1305,8 @@ The `toy_references` fixture wraps Task 2's `toy_reference_tables`; expected can
 
 Add singleton historical recode, known mismatch valid in another vintage, unknown code supported in all three, candidates crossing sectors (null common ancestor), missing code with null vintage, and conflicting lookup duplicates. A property test permutes a source frame containing repeated identical rows and null-vintage keys; `enrich(...).select(source.columns)` must equal the input **in its current order**, with all multiplicities/flags unchanged. Unmatched lookup keys and reserved temporary-column collisions fail.
 
-- [ ] **Step 2: Verify red.** `uv run --locked pytest tests/test_ita_naics_mapping.py -q` fails for absent module.
-- [ ] **Step 3: Implement the unique lookup and join.**
+- [x] **Step 2: Verify red.** `uv run --locked pytest tests/test_ita_naics_mapping.py -q` fails for absent module.
+- [x] **Step 3: Implement the unique lookup and join.**
 
 ```python
 import re
@@ -1374,16 +1383,19 @@ def enrich(source, lookup):
 
 Before lookup construction, require Tasks 1/2's validated references; a missing canonical node/path or a supported code missing its bridge remains a build error. Add an exact corruption regression rather than catching `KeyError` and converting it to an unresolved source state.
 
-- [ ] **Step 4: Verify green.** Focused suite and milestone. Assert lists/flags never null, all candidates are canonical finest nodes, and unknown singleton never fills either canonical scalar column.
-- [ ] **Step 5: Commit/checkpoint.** `git add src/embedding_data/ita_naics_mapping.py tests/test_ita_naics_mapping.py tests/code_fixtures.py` then `git commit -m 'feat(ita): retain supported canonical candidates and uncertainty'`.
+- [x] **Step 4: Verify green.** Focused suite and milestone. Assert lists/flags never null, all candidates are canonical finest nodes, and unknown singleton never fills either canonical scalar column.
+- [x] **Step 5: Commit/checkpoint.** `git add src/embedding_data/ita_naics_mapping.py tests/test_ita_naics_mapping.py tests/code_fixtures.py` then `git commit -m 'feat(ita): retain supported canonical candidates and uncertainty'`.
 
 ### Task 6: Filing-rule diagnostics on supported interpretations
+
+> Deviation: boundary/correlation tests reuse complete five-vintage fixtures with an unrelated 2022 split retained. The controller repeated all required locked milestone commands because the initial report omitted `--locked`; all 427 tests and other checks passed.
+
 
 **Files:** Extend `src/embedding_data/filing_rules.py`, `tests/test_filing_rules.py`.
 
 **Interfaces:** `evaluate(year, code, vintage, size_class, structures, relations, rules) -> dict`; `build_filing_lookup(keys, structures, relations, rules) -> pl.DataFrame`; `add_filing_flags(source, lookup) -> pl.LazyFrame`. Here `rules` is the complete `MEMBERSHIP_SCHEMA` possibilities table, not the definite-members projection. Lookup keys are `year_filing_for:Int64, naics_code:String, naics_year:Int64, size_class:Int64`. Added columns: `filing_industry_status:String`, `flag_outside_filing_industry:Boolean` (nullable), `flag_outside_filing_rule:Boolean` (nullable), `flag_filing_rule_label_bridged:Boolean`, `flag_filing_reference_ambiguous:Boolean` (both nonnullable).
 
-- [ ] **Step 1: Write failing evaluator tests.** Use the complete toy relationship fixtures plus native rule memberships. Explicitly test this truth table; all sources/graphs are tiny validated tables.
+- [x] **Step 1: Write failing evaluator tests.** Use the complete toy relationship fixtures plus native rule memberships. Explicitly test this truth table; all sources/graphs are tiny validated tables.
 
 ```python
 @pytest.mark.parametrize('size,code,vintage,status,industry,overall', [
@@ -1423,8 +1435,8 @@ Add all-in/all-out/mixed evaluations, known singleton and unknown singleton, cla
 
 For the correlation regression, use 2012→2017 `111111→111112,111112→111111`, 2007→2012 identity pairs, and 2017→2022 identity pairs. Designated_2012 and exempt_2007 each contain only `111111`. An unknown-vintage `111111` in filing year 2022, size class 2, is **outside in every interpretation**: native 2012 is both designated/exempt; native 2017/2022 is neither. Pooling candidates across interpretations would invent a designated/nonexempt combination and incorrectly return null. Assert determinate true and preserve mapping's unknown/unresolved flags in the enriched table.
 
-- [ ] **Step 2: Verify red.** Run the focused evaluator tests; expect missing `evaluate`, not failed fixture coverage.
-- [ ] **Step 3: Implement direct-vintage conservative evaluation and unique join.** Append this to `filing_rules.py`:
+- [x] **Step 2: Verify red.** Run the focused evaluator tests; expect missing `evaluate`, not failed fixture coverage.
+- [x] **Step 3: Implement direct-vintage conservative evaluation and unique join.** Append this to `filing_rules.py`:
 
 ```python
 from itertools import product
@@ -1531,16 +1543,19 @@ def add_filing_flags(source, lookup):
 
 Rule validation runs once at lookup construction. Missing bridge coverage on any otherwise supported native code is detected globally before short-circuit statuses; Tasks 4/7 call `validate_relationships` first. Never fill nullable filing flags with false, and never overwrite `flag_below_filing_size` or any mapping flag.
 
-- [ ] **Step 4: Verify green.** Focused suite and milestone. Require explicit assertions on null dtypes, boundary years, the correlated unknown-vintage regression, untouched size flag and row multiplicity.
-- [ ] **Step 5: Commit/checkpoint.** `git add src/embedding_data/filing_rules.py tests/test_filing_rules.py` then `git commit -m 'feat(ita): evaluate filing industries only on candidate unanimity'`.
+- [x] **Step 4: Verify green.** Focused suite and milestone. Require explicit assertions on null dtypes, boundary years, the correlated unknown-vintage regression, untouched size flag and row multiplicity.
+- [x] **Step 5: Commit/checkpoint.** `git add src/embedding_data/filing_rules.py tests/test_filing_rules.py` then `git commit -m 'feat(ita): evaluate filing industries only on candidate unanimity'`.
 
 ### Task 7: Verified source parity, staged bundle and CLI
+
+> Deviation: final review reproduced an uncaught fastexcel workbook failure; `ccd138f` catches `FastExcelError` specifically and verifies clean exit 2 without publication through a real invalid-workbook CLI regression. Public interfaces and schemas remain unchanged.
+
 
 **Files:** Create `src/embedding_data/code_build.py`, `src/embedding_data/codes_cli.py`, `tests/test_code_build.py`, `tests/test_codes_cli.py`; modify `src/embedding_data/cli.py`; extend `tests/code_fixtures.py` with actual-original fixture construction.
 
 **Interfaces:** `check_source(data_dir: Path, work: Path) -> tuple[pl.LazyFrame, list[dict]]` verifies schema, selected raw inventory and full-row multiset parity without rewriting the source; `report(table: Path) -> dict` returns aggregate diagnostics; `build(data_dir: Path, run_id: str, *, registry=REGISTRY) -> Path` publishes the bundle. CLI commands use the public `codes_cli.app` and always pass explicit `data_dir`. No CLI registry override.
 
-- [ ] **Step 1: Write failing end-to-end tests with a real fixture tree.** Prepare the fixture originals once, using this dependency-free XLSX writer in `tests/code_fixtures.py`; commit the small XLSX files produced for Tasks 1/4. This writes reference fixtures only, never production inputs.
+- [x] **Step 1: Write failing end-to-end tests with a real fixture tree.** Prepare the fixture originals once, using this dependency-free XLSX writer in `tests/code_fixtures.py`; commit the small XLSX files produced for Tasks 1/4. This writes reference fixtures only, never production inputs.
 
 ```python
 from pathlib import Path
@@ -1673,8 +1688,8 @@ def test_bundle_retains_duplicates_source_bytes_and_logical_determinism(tmp_path
 
 Add build failures for changed source value with valid code, dropped duplicate, invented duplicate, removed source column, extra source column, wrong dtype, stale raw release selection, incompatible vintage, malformed source code, corrupted/missing reference, and occupied staging run. None publishes the final run. Inject a `sink_parquet` failure at the filesystem boundary and assert earlier run/source bytes survive; test unfinished staging is refused rather than silently reused. CLI integration uses `CliRunner` on top-level `cli.app`, explicit tmp `--data-dir`, and a fixture registry dependency injection. Block HTTP transport while calling `codes build`; actual parsers and transforms run. All success/failure commands must avoid credential reads and produce clean error messages.
 
-- [ ] **Step 2: Verify red.** Run `uv run --locked pytest tests/test_code_build.py tests/test_codes_cli.py -q`; expected absent module/group.
-- [ ] **Step 3: Implement source parity and aggregate reporting.** Production source validation reads raw files into a temporary directory under staging, then compares **full original-column multisets**, including duplicate counts. The input Parquet itself is never regenerated.
+- [x] **Step 2: Verify red.** Run `uv run --locked pytest tests/test_code_build.py tests/test_codes_cli.py -q`; expected absent module/group.
+- [x] **Step 3: Implement source parity and aggregate reporting.** Production source validation reads raw files into a temporary directory under staging, then compares **full original-column multisets**, including duplicate counts. The input Parquet itself is never regenerated.
 
 ```python
 # src/embedding_data/code_build.py
@@ -1781,7 +1796,7 @@ def validate_canonical(table, expected_schema):
 
 The library validates a root's selected release inventory and contiguous years, so tiny fixture roots exercise the same implementation. Task 8 additionally pins the actual production window to 2016–2025 and its measured counts. An empty inventory fails through `summary_files`; an interior missing year fails the contiguous-range check.
 
-- [ ] **Step 4: Implement staged publication and code/dependency provenance.** Append this orchestrator; keep raw full-row checks inside the lifetime of their temporary CSVs:
+- [x] **Step 4: Implement staged publication and code/dependency provenance.** Append this orchestrator; keep raw full-row checks inside the lifetime of their temporary CSVs:
 
 ```python
 def build(data_dir, run_id, *, registry=cr.REGISTRY):
@@ -1894,7 +1909,7 @@ def build(data_dir, run_id, *, registry=cr.REGISTRY):
 
 An unsuccessful staging directory remains incomplete and its name is refused on a rerun; use a new run ID after investigating. All temporary raw CSVs are removed on context exit. `outputs.json` checksums every produced Parquet and both JSON records; it excludes itself by construction. This extra checksum inventory makes the design's output-hash requirement concrete; describe it in the actual Handoff. The report records original/expanded rule counts and each table's actual schema/row count; the staged canonical file passes explicit mapping state/list/flag/null checks before publication.
 
-- [ ] **Step 5: Implement and register the CLI group.**
+- [x] **Step 5: Implement and register the CLI group.**
 
 ```python
 # src/embedding_data/codes_cli.py
@@ -1935,16 +1950,19 @@ def build(run_id: str, data_dir: Path = typer.Option(paths.DATA_DIR, '--data-dir
 
 In `cli.py`, add `codes_cli` to the existing import tuple and `app.add_typer(codes_cli.app, name='codes')` after the existing registrations. Existing extract commands stay direct registered commands; only the new multi-command group is mounted.
 
-- [ ] **Step 6: Verify green and publication invariants.** Run the focused suites and milestone. Assert all bundle filenames, exact schemas, every output checksum, full source order/multiplicity and frozen earlier run bytes. Check `codes --help`, all three command helps and clean failure exits. The offline fixture build must work with blank credentials and prohibited HTTP. Run twice with different run IDs and compare logical Parquet frames, not JSON run IDs or physical writer bytes.
-- [ ] **Step 7: Commit/checkpoint.** `git add src/embedding_data/code_build.py src/embedding_data/codes_cli.py src/embedding_data/cli.py tests/test_code_build.py tests/test_codes_cli.py tests/code_fixtures.py` then `git commit -m 'feat(codes): publish verified canonical ITA bundles offline'`.
+- [x] **Step 6: Verify green and publication invariants.** Run the focused suites and milestone. Assert all bundle filenames, exact schemas, every output checksum, full source order/multiplicity and frozen earlier run bytes. Check `codes --help`, all three command helps and clean failure exits. The offline fixture build must work with blank credentials and prohibited HTTP. Run twice with different run IDs and compare logical Parquet frames, not JSON run IDs or physical writer bytes.
+- [x] **Step 7: Commit/checkpoint.** `git add src/embedding_data/code_build.py src/embedding_data/codes_cli.py src/embedding_data/cli.py tests/test_code_build.py tests/test_codes_cli.py tests/code_fixtures.py` then `git commit -m 'feat(codes): publish verified canonical ITA bundles offline'`.
 
 ### Task 8: Full-data V11 evidence, final review and Stage 4 completion
+
+> Deviation: after the reviewed CLI correction, acceptance was repeated under fresh run `stage4_v11_20261013_r2` at `ccd138f`. The first run’s fifteen files remain byte-identical; reports and all canonical columns match logically across 33 slices despite different physical Parquet bytes. The measured finding and documentation were refreshed at `78f9300`.
+
 
 **Files:** Create `specs/findings/v11-ita-naics-mapping.md`; modify `README.md`, `CLAUDE.md`, this plan, `specs/deferred_items.md`, and the roadmap's Stage 4 checkbox/stamp at completion. Retire this stage spec and plan only after the completion gate. The source spec and roadmap remain live.
 
 **Interfaces:** Actual produced `inputs.json`, `report.json`, `outputs.json` and typed Parquet tables; no fixture/preflight substitute for measured V11. Aggregate committed evidence contains no establishment names, addresses, EINs or IPUMS microdata.
 
-- [ ] **Step 1: Prepare actual originals without altering Stage 2/3.** Read the actual raw manifest, verify the three existing title originals and the full-data source hash. Import verified cached public 2012→2017, 2017→2022 and SOC originals if downloads are blocked; use their recorded source SHA-256 values from Entry evidence and the skill cache manifest, never its CSVs. Acquire/import the 2007 workbook/bridge and the three complete GovInfo originals through the registered commands. If a server returns an access challenge, obtain the original from its public download/browser and use `codes import-reference KIND FILE`; do not archive the challenge as a valid original. Retain all recorded bytes/entries.
+- [x] **Step 1: Prepare actual originals without altering Stage 2/3.** Read the actual raw manifest, verify the three existing title originals and the full-data source hash. Import verified cached public 2012→2017, 2017→2022 and SOC originals if downloads are blocked; use their recorded source SHA-256 values from Entry evidence and the skill cache manifest, never its CSVs. Acquire/import the 2007 workbook/bridge and the three complete GovInfo originals through the registered commands. If a server returns an access challenge, obtain the original from its public download/browser and use `codes import-reference KIND FILE`; do not archive the challenge as a valid original. Retain all recorded bytes/entries.
 
 These are authorized public reference acquisitions necessary for Stage 4. No private data is transmitted. If a transport constraint or an unavailable original requires owner input, complete independent work first and surface the precise missing original and source. Do not mark the stage complete with missing references.
 
@@ -1959,7 +1977,7 @@ Before an optional cache import, compute its SHA-256 and compare with the exact 
 uv run --locked embedding-data codes import-reference soc_2018 /Users/lowell/.agents/skills/classification-codes/sources/soc_structure_2018.xlsx --data-dir /Users/lowell/Projects/embedding-data/data
 ```
 
-- [ ] **Step 2: Run actual offline acceptance under a fresh run ID.** Use `stage4_v11_20261013` when execution is on 2026-10-13; otherwise record the actual date and choose an unused matching ID. An occupied run/staging name is refused, not cleaned up or replaced automatically. Snapshot the source table and every Stage 3 verification file hash before this build and compare afterward; the snapshot can live outside the raw tree.
+- [x] **Step 2: Run actual offline acceptance under a fresh run ID.** Use `stage4_v11_20261013` when execution is on 2026-10-13; otherwise record the actual date and choose an unused matching ID. An occupied run/staging name is refused, not cleaned up or replaced automatically. Snapshot the source table and every Stage 3 verification file hash before this build and compare afterward; the snapshot can live outside the raw tree.
 
 ```bash
 uv run --locked embedding-data codes build stage4_v11_20261013 --data-dir /Users/lowell/Projects/embedding-data/data
@@ -2023,7 +2041,7 @@ print('Stage 4 full-data graph, schema, state, row accounting and checksum check
 
 The state counts are expectations from the pinned preflight, not values to force into output. On any discrepancy, reproduce and diagnose whether the references, selected releases, source transformation or implementation changed. New input releases require a newly recorded inventory and evidence rather than silently reusing these counts. Also verify row-by-row source order: scan source and canonical original columns in fixed 100,000-row slices and use `polars.testing.assert_frame_equal` for each slice, including the final short slice. This guards order as well as the build's multiset parity without loading both entire tables into memory.
 
-- [ ] **Step 3: Commit a measured V11 finding and user documentation.** The finding must state the actual run/schema version, execution commit, code/dependency/lock hashes, all cited raw/reference hashes and counts, source/output hashes, graph/coverage refusals, per-year mapping states, candidate-count distributions, crosswalk/ambiguity/unresolved diagnostics and filing outcomes including nulls. Explain known mismatch vs unknown support, the adopted ITA source exception, singleton flags and no imputation/allocation. State the nominal filing-cycle limitation for late submissions and that the flags diagnose filing universe rather than whether an observed submission was improper. Cite the original Census/BLS/GovInfo references and the stage/source spec.
+- [x] **Step 3: Commit a measured V11 finding and user documentation.** The finding must state the actual run/schema version, execution commit, code/dependency/lock hashes, all cited raw/reference hashes and counts, source/output hashes, graph/coverage refusals, per-year mapping states, candidate-count distributions, crosswalk/ambiguity/unresolved diagnostics and filing outcomes including nulls. Explain known mismatch vs unknown support, the adopted ITA source exception, singleton flags and no imputation/allocation. State the nominal filing-cycle limitation for late submissions and that the flags diagnose filing universe rather than whether an observed submission was improper. Cite the original Census/BLS/GovInfo references and the stage/source spec.
 
 Include exact columns/dtypes, all bundle filenames, and what `outputs.json` covers. Record the unchanged source/Stage 3 hashes and zero-discrepancy raw audit. README documents the three commands, contact/import fallback and immutable run IDs; CLAUDE.md updates planned-vs-built status and offline build guidance. Geography, targets, output target writer, ACS/CPS parsers and headline-inclusion rules remain their existing later-stage responsibilities. Preserve the source spec's Core principle and the stricter later-source V11 scope.
 
@@ -2032,11 +2050,11 @@ git add specs/findings/v11-ita-naics-mapping.md README.md CLAUDE.md
 git commit -m 'docs(ita): record full-data canonical mapping and filing evidence'
 ```
 
-- [ ] **Step 4: Review the whole branch before completion markup.** Use requesting-code-review and its current controller-specific recipe, with the plan and stage/source specs and `git merge-base main HEAD` as the base. Review uncommitted changes as well. Resolve every merged finding through receiving-code-review, rerun the affected checks/full-data measurement under a new run ID when code or dependencies change, and commit fixes. A missing official bridge, silently changed source, unmatched lookup, ambiguous selected vintage or unjustified determinate flag blocks Stage 4 completion.
+- [x] **Step 4: Review the whole branch before completion markup.** Use requesting-code-review and its current controller-specific recipe, with the plan and stage/source specs and `git merge-base main HEAD` as the base. Review uncommitted changes as well. Resolve every merged finding through receiving-code-review, rerun the affected checks/full-data measurement under a new run ID when code or dependencies change, and commit fixes. A missing official bridge, silently changed source, unmatched lookup, ambiguous selected vintage or unjustified determinate flag blocks Stage 4 completion.
 
-- [ ] **Step 5: Run the completion gate and close the carried industry item.** Use writing-plans' Plan Completion Protocol: resolve-before-defer, mark actual completed steps/deviations, then tick `specs/deferred_items.md` section `2-ita-300a-summaries`, item "Industry half of the R2.9 filing-rule flag" with `→ done in plan 4`. Its Done-when is evaluation with concordance candidate sets, verified by Tasks 6–8. Record the approved separate-output placement instead of claiming `ita_summary.add_flags` changed. Append only genuine remaining deferred items, with size and a concrete closure/revisit condition; no empty backlog section.
+- [x] **Step 5: Run the completion gate and close the carried industry item.** Use writing-plans' Plan Completion Protocol: resolve-before-defer, mark actual completed steps/deviations, then tick `specs/deferred_items.md` section `2-ita-300a-summaries`, item "Industry half of the R2.9 filing-rule flag" with `→ done in plan 4`. Its Done-when is evaluation with concordance candidate sets, verified by Tasks 6–8. Record the approved separate-output placement instead of claiming `ita_summary.add_flags` changed. Append only genuine remaining deferred items, with size and a concrete closure/revisit condition; no empty backlog section.
 
-- [ ] **Step 6: Record what actually shipped and tick/stamp only Stage 4.** Add `## Handoff to later stages` to this plan based on the implementation ledger, deviations and actual finding. Re-validate **every** unticked stage, recording the result; use the consumer checklist below. Changed paths/schema/interface names, parser refusals, checksum boundaries, nullable flags, unknown-vintage candidate limits, and any introduced-then-reverted interface each get a factual bullet. Do not present this plan's proposed contracts as shipped.
+- [x] **Step 6: Record what actually shipped and tick/stamp only Stage 4.** Add `## Handoff to later stages` to this plan based on the implementation ledger, deviations and actual finding. Re-validate **every** unticked stage, recording the result; use the consumer checklist below. Changed paths/schema/interface names, parser refusals, checksum boundaries, nullable flags, unknown-vintage candidate limits, and any introduced-then-reverted interface each get a factual bullet. Do not present this plan's proposed contracts as shipped.
 
 | Unticked stage | Completion-time check against actual output |
 | --- | --- |
@@ -2061,7 +2079,7 @@ Under Stage 4 in `specs/embedding-evaluation-data-spec-roadmap.md`, change `[ ]`
 
 The date token above is the protocol's stamp template; fill it from the actual completion date, never the planning date by default. Cite later stages' spec refs rather than restating their requirements. Do not tick Stage 4 unless the actual V11 finding, graph/reference checks, row accounting, industry-item closure and final review all hold.
 
-- [ ] **Step 7: Backlog health, retirement and deliberate integration.** Run `uv run --no-project --python 3.13 python /Users/lowell/.agents/skills/writing-plans/scripts/deferred_stats.py` from the repo root and report its summary (open count, closure rate, aged tail). If its size/age trigger fires, present the skill's read-only triage proposal; disposition remains the owner's choice and does not block completion.
+- [x] **Step 7: Backlog health, retirement and deliberate integration.** Run `uv run --no-project --python 3.13 python /Users/lowell/.agents/skills/writing-plans/scripts/deferred_stats.py` from the repo root and report its summary (open count, closure rate, aged tail). If its size/age trigger fires, present the skill's read-only triage proposal; disposition remains the owner's choice and does not block completion.
 
 Retire this plan to `specs/plans/completed/4-code-tables-ita-naics-mapping.md`. Retire the stage spec to `specs/completed/code-tables-ita-naics-mapping.md`, marked complete, **only after** checking no other live plan implements it. Fix relative links for their new depth, including links in the preflight and roadmap Stage 4 design reference that point to the retiring stage spec. The umbrella source spec/roadmap stay live. Commit completion/retirement specs atomically according to writing-plans (`chore(specs): retire plan 4` for retirement).
 
@@ -2087,6 +2105,9 @@ Planning verification: the original strict expansion failed on the two documente
 
 ## Execution handoff
 
+> Historical approved starting handoff, retained as the audit trail. Execution is complete; use the actual-shipped Handoff below for roadmap reconciliation.
+
+
 Task 0's eight approved spec replacements and D2 adoption record are applied
 and committed; its replace/with blocks remain an audit trail and must not be
 reapplied. Start implementation at **Task 1**, in an isolated worktree after
@@ -2099,3 +2120,42 @@ against this saved plan. Recommended execution: subagent-driven-development
 for each task's explicit files/interfaces. Use executing-plans if the owner
 chooses inline execution. The approved plan is the complete handoff; no
 additional planning-session context or reapproval of D2 is needed.
+
+
+## Execution completion evidence
+
+Approved checkpoint `ffaa576` was verified before execution; Task 0’s replacements were not reapplied. Isolation prerequisite `453b0fa` added `.worktrees/` to the ignore rules. Reviewed task checkpoints were `f27e8ac`, `14befd6`, `49b131c`, `412a0d4`, `ec74d70`, `6508d43`, and `fdfeaa1`; the owner-directed Task 2 refinement is `b720046`. Each task has RED/GREEN, milestone and spec/quality review evidence in the execution ledger. Runtime model aliases were adapted to the available standard/capable models; no workflow gate was skipped.
+
+The whole-branch review found one Important CLI exception issue. Its reproduced regression and fix are `ccd138f`; scoped final re-review approved the code with no remaining findings. Refreshed V11/documentation review approved `78f9300`, with no new findings. The Codex CLI second opinion was skipped under requesting-code-review’s controller-is-Codex rule, not represented as a completed second review. No review finding, skipped step or new item is deferred.
+
+The actual [V11 finding](../../findings/v11-ita-naics-mapping.md) records selected run `stage4_v11_20261013_r2`, schema `codes-ita-v1`, execution commit `ccd138fcf8606085cf3d13821bf01f86ab35f7f2`, all 23 raw citations, implementation/CLI/dependency/lock hashes, exact schemas and every output hash. Acceptance retains 3,206,055 rows across 2016–2025, including 69,035 unresolved rows. It verifies complete graphs/relationships, all 213 original labels, 3,297 rule-native membership rows and sole mixed leaf 2007 `517110`.
+
+Source `ita_300a_summary.parquet` SHA-256 remains `6335cda7adb40a41c4a11d57d22048999449ac8d078a2ec0291f0198cd9136a8`. All 24 Stage 3 files and all fifteen files of the first Stage 4 run are unchanged. Full raw/source multiset parity, 33 bounded source-order slices, input/output hashes, zero-discrepancy raw audits and zero-HTTP cached acquisition passed. The controller independently reran full acceptance for both measurements. Fresh milestone after the code fix: 476 pytest passed, one network canary deselected; two Behave scenarios/ten steps, ruff and locked dependencies passed.
+
+The carried industry filing-rule item is closed by the separate canonical output, not by changing `ita_summary.add_flags`. The source summary and all Stage 3 modules/artifacts remain intact. The completion gate had no unresolved owner questions or leftover findings. No other live plan implements this stage spec. Plan/spec retirement, local-link validation and the Stage 4 stamp belong to the atomic retirement commit. Integration is a draft PR; the owned worktree is removed after the branch is durable, following the owner’s cleanup instruction.
+
+## Handoff to later stages
+
+Revalidated **every remaining stage (5–13)** on 2026-10-13 against the actual selected bundle and measured [V11 finding](../../findings/v11-ita-naics-mapping.md), under the [source spec](../../embedding-evaluation-data-spec.md). The actual root is `/Users/lowell/Projects/embedding-data/data`; selected bundle is `derived/codes/stage4_v11_20261013_r2/`. Existing or `.part` run IDs are refused. The first `stage4_v11_20261013/` run is retained, not replaced. No later stage was planned or executed here. Later roadmap-entry amendments belong to the subsequent derive-roadmap resume; this Handoff is completion evidence only.
+
+The bundle contains twelve Parquets: `naics_nodes`, `naics_edges`, `soc_nodes`, `soc_edges`, `naics_native_nodes`, `naics_concordance`, `code_paths`, `filing_rules`, `filing_rule_labels`, `filing_rule_membership`, `ita_naics_lookup`, and `ita_300a_canonical`. It also contains `inputs.json`, `report.json` and `outputs.json`. The detached inventory hashes/sizes all twelve Parquets and the first two JSON records, excluding itself. The finding records its own hash, execution commit and the extra CLI hashes outside the build’s transformation-module inventory. There is no run-selection alias or automatic latest-run resolver. Consumers must select an explicit verified bundle.
+
+- **Stage 5 — compatible, consumes shared graph convention.** Under R5.2/R6, shipped node schema is `node_id:String, system:String, vintage:Int64, level:String, code:String, title:String`; identifiers are `system:vintage:level:code`. Edge schema is `child_id:String, parent_id:String, edge_type:String`, direction child to parent. Classification edges use `hierarchy`; roots have no parent and no invented common root. `code_paths.parquet` is `node_id:String, path:List(String)`, root through node. `classification_tables.forest` enforces classification single parentage only: geography must reuse the typed schema without applying that restriction to cross-state CBSA relationships. Native/auxiliary NAICS tables are complete for 2002/2007/2012/2017/2022; canonical is 2022, SOC 2018. Stage 3’s county/reference decisions remain valid; full production geography remains Stage 5.
+
+- **Stage 6 — compatible dependency, needs factual consumer amendment at resume.** Under R2.5/R2.9/R7, consume the selected separate canonical table and its inventories rather than assuming the Stage 2 summary was enriched. Canonical schema is every Stage 2 column in original order plus the exact nine mapping and five filing columns documented in V11. Native values, order, duplicates and original flags are retained. `naics_matching_vintages:List(Int64)` and `naics_2022_candidates:List(String)` are nonnull; candidates are sorted distinct finest codes. Empty lists assert no mapping. Unknown vintages stay null/unresolved even for singleton unions and never fill `naics_2022_code` or `naics_2022_node_id`; known mismatches remain empty/unresolved. Singleton historical crosswalks remain flagged. Filing industry/combined flags are nullable; size class 1 has null industry result and true combined outside result, preserving the original size flag. `flag_filing_rule_label_bridged` and `flag_filing_reference_ambiguous` are nonnullable provenance independent of final unanimity, and false when no membership is evaluated. County assignment, target writer and headline inclusion remain this stage’s responsibilities. All raw/source/output citations are verified; nominal filing year plus one cannot resolve late submission dates.
+
+- **Stage 7 — compatible, no dependency or scope change.** R1/R3/R4 verification and `manifest_audit.audit`/`manifest.entry_for` contracts remain unchanged. Ten new registered public originals are appended with local import-time retrieval proxies; all thirteen required originals replay offline with zero HTTP calls, and whole-tree raw audits have zero discrepancies. This checks provenance existence/bytes, not IPUMS extract contents, weight storage, delivery semantics or V4–V7. No IPUMS extract was verified or transformed here.
+
+- **Stage 8 — compatible dependency, needs factual consumer amendment at resume.** Under R5.1/R5.3/R5.4/R6.3, consume canonical node/path tables, complete direct four-bridge `naics_concordance.parquet`, native/auxiliary structure nodes and the sorted finest-candidate convention. Relationship schema is `source_vintage:Int64, target_vintage:Int64, source_code:String, target_code:String, link_type:String, source_file:String`; complete endpoint coverage and degree-derived 1:1/1:m/m:1/m:m are validated. `naics_relationships.candidates` traverses every adjacent path forward/reverse; equality never shortcuts a vintage relationship. No weights or preferred sides are supplied. ITA’s six-ASCII-digit parser and explicitly unresolved source exception do not relax ACS mixed-depth parsing or its zero-unparseable V11 exit. ACS parsers and allocations remain Stage 8.
+
+- **Stage 9 — compatible, no dependency or scope change.** Stage 8 remains its parser/allocation dependency under R3/R7. Candidate ambiguity, unknown vintage and singleton crosswalk provenance must not be cleared merely because a candidate list has one element. This stage shipped no ACS transformation, allocation factor, target or headline-inclusion decision; the source Core principle remains binding.
+
+- **Stage 10 — compatible dependency, needs factual consumer amendment at resume.** Under R2.6/R2.7/R7.2, canonical path retrieval is by `code_paths.node_id` for every supported candidate. Unresolved rows assert neither a scalar canonical code nor a full observed path; unknown candidate unions and deepest common ancestors are conditional possibilities, not corrected observations. Singleton historical mappings remain crosswalked. The two rule-reference provenance flags persist independently of final filing result. Stage 3’s normalization, employer fallback, reconstructed-EIN, unique-ID and ambiguity contracts remain valid; its source table/artifacts were preserved. Inclusion of unresolved text–code rows needs the later target design, not a fabricated path here.
+
+- **Stage 11 — compatible dependency, needs factual consumer amendment at resume.** Under R4/R5/R7, consume actual canonical NAICS/SOC schemas, full root-to-leaf path convention and reusable complete relationship/candidate APIs. SOC parents follow original workbook nesting, including overflow broad groups; numeric prefix surgery is refused. All 1,447 SOC nodes/867 detailed codes and 2,125 NAICS nodes/1,012 finest codes are present. CPS Census-list parsing, V6 transition interpretation and panel/flow construction remain this stage’s work after Stage 7 verification. Auxiliary 2002/2007 rule references are not new admitted ITA native vintages or CPS source schemes.
+
+- **Stage 12 — compatible, no dependency or scope change.** Stage 11 remains the occupation/industry mapping dependency under R4/R7, alongside Stage 9 helpers. Candidate unanimity never clears CPS dependent-coding, allocation or other source-imputation flags. No CPS cross-section, profile or migration target shipped here.
+
+- **Stage 13 — compatible, no dependency or scope change.** Under R7/R8 and V9/V12, later output manifests can cite `codes-ita-v1` bundle inputs/outputs, verified original/source hashes, reference definitions, implementation/dependency/lock versions and the measured finding’s extra CLI/commit provenance. Output checksums are detached and logical determinism differs from physical Parquet-byte identity between fresh runs. The source summary’s physical hash is intentionally pinned. No target, sample-size gate, comparator, embedder training data or evaluation decision shipped in Stage 4.
+
+No public interface was introduced then removed or renamed. Private reference validation and degree-expression helpers strengthen existing contracts. Parser refusals include malformed/ambiguous originals, missing titles/parents, duplicates, incompatible source schema/vintage, malformed nonmissing ITA syntax, incomplete bridge/member coverage, changed/unrecorded/missing originals, unmatched lookup keys and occupied/incomplete run names. None becomes an invented unresolved reference result. All current stage exits remain in force; factual downstream Consumes/path/uncertainty amendments are the next derive-roadmap reconciliation, and any split/add/drop/reorder remains an owner scope decision.

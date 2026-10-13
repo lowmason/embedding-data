@@ -8,7 +8,7 @@ entry, source Parquet, or Stage 3 verification run was changed.
 
 ## Conflict with the approved design
 
-The [stage design](../code-tables-ita-naics-mapping.md#filing-rule-evaluation)
+The [stage design](../completed/code-tables-ita-naics-mapping.md#filing-rule-evaluation)
 binds the partially exempt list to NAICS 2007, requires every listed node to
 exist in that vintage, and treats a missing supported reference relationship
 as a build error. The complete official 2014 rule appendix contains 82 listed
@@ -97,7 +97,7 @@ and bring the exact interpretation back for approval. This authorization
 does not adopt the interpretation or permit production implementation.
 
 The exact proposed amendment is
-[Task 0 of Plan 4](../plans/4-code-tables-ita-naics-mapping.md#task-0-apply-the-exact-approved-bounded-bridge-amendment).
+[Task 0 of Plan 4](../plans/completed/4-code-tables-ita-naics-mapping.md#task-0-apply-the-exact-approved-bounded-bridge-amendment).
 It preserves every original label, admits only the two documented legacy
 exceptions, and requires complete official structures and relationships.
 The entire exemption list retains its nominal 2007 vintage; neither the

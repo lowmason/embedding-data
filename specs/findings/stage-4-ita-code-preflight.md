@@ -78,7 +78,7 @@ their own later verification. The owner subsequently approved shared typed
 node/edge tables, a reusable mapping lookup and separate ITA output, flagged
 candidate unions for unknown vintages, unresolved known-vintage mismatches, and
 filing-rule results only on unanimity. The written
-[Stage 4 design](../code-tables-ita-naics-mapping.md) defines those contracts.
+[Stage 4 design](../completed/code-tables-ita-naics-mapping.md) defines those contracts.
 Stage 4 remains unticked, and no implementation has shipped.
 
 R2.9 additionally needs a 2007-vintage reference bridge. OSHA explicitly says

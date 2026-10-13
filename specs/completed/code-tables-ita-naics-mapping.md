@@ -1,10 +1,12 @@
 # Code tables and ITA NAICS mapping
 
+**Status: COMPLETE (2026-10-13)** — implemented and verified by [Plan 4](../plans/completed/4-code-tables-ita-naics-mapping.md); actual run and limitations in [V11](../findings/v11-ita-naics-mapping.md).
+
 ## Scope and decisions
 
-Stage 4 of [the roadmap](embedding-evaluation-data-spec-roadmap.md) implements
+Stage 4 of [the roadmap](../embedding-evaluation-data-spec-roadmap.md) implements
 R5.1 (ITA), R5.2, R5.4 (ITA vintages), R2.5, R2.9's industry flag, and V11
-(ITA) in [the source spec](embedding-evaluation-data-spec.md). It produces the
+(ITA) in [the source spec](../embedding-evaluation-data-spec.md). It produces the
 canonical classification graphs, reusable NAICS mapping references, and an
 enriched establishment-year table. Geography, ACS/CPS parsers, target builders,
 and the shared target writer remain in their existing later stages.
@@ -18,7 +20,7 @@ The owner approved this design on 2026-10-13:
 - Retain all source codes, vintages, and rows; flag unresolved source defects.
 - Assert a filing-rule result only when all supported possibilities agree.
 
-The [preflight finding](findings/stage-4-ita-code-preflight.md) verified all ten
+The [preflight finding](../findings/stage-4-ita-code-preflight.md) verified all ten
 raw releases and raw/derived aggregate parity. It found 66,365 rows absent from
 their recorded vintage and 2,670 rows with unknown vintage. Of these disjoint
 groups, 9,173 and 2,297 rows respectively have codes absent from all three
@@ -73,7 +75,7 @@ exceptions through the complete official 2002-to-2007 relation, under the
 possibility-set contract below. This is a conservative reference
 interpretation for R2.9, not an assertion of OSHA's intended treatment of a
 merged industry's individual establishments. See the
-[reference preflight](findings/stage-4-filing-rule-reference-preflight.md). *(owner, plan 4, 2026-10-13)*
+[reference preflight](../findings/stage-4-filing-rule-reference-preflight.md). *(owner, plan 4, 2026-10-13)*
 
 Archive original bytes under `raw/references/`, with official source URLs,
 SHA-256, acquisition/import time, and client version in the raw manifest.

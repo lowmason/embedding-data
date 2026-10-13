@@ -74,13 +74,16 @@
       have two blank lines there.
 
 ## 2-ita-300a-summaries — 2026-10-13
-- [ ] Industry half of the R2.9 filing-rule flag (plan D2, P8): `flag_below_filing_size`
+- [x] Industry half of the R2.9 filing-rule flag (plan D2, P8): `flag_below_filing_size`
       covers the size half only. The rule's industry lists (29 CFR 1904 Subpart E App. A and
       Subpart B App. A) use fixed NAICS vintages and no concordance exists yet, so prefix
       matching now would mis-flag establishments. See
       specs/plans/completed/2-ita-300a-summaries.md (P8); touches `add_flags` in
       `src/embedding_data/ita_summary.py`. Size: plan. Done when: R2.9's industry half is
-      evaluated with concordance candidate sets. Target: Stage 4.
+      evaluated with concordance candidate sets. Target: Stage 4. → done in plan 4.
+      Delivered separately by `filing_rules` in `ita_300a_canonical.parquet`, with
+      candidate unanimity and independent legacy/reference provenance flags;
+      `ita_summary.add_flags` and Stage 2 source bytes remain unchanged.
 - [ ] Same-name replacement at the source (plan P11): OSHA re-posted the 2016-2020 zips on
       2025-11-25 and the 2023 and 2024 zips on 2026-05-20 with `_v2` members, under unchanged
       names. A path has one manifest entry forever, so `osha summary`
