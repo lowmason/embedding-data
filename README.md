@@ -109,6 +109,18 @@ request options rather than a frozen address-source snapshot. Reports are
 measurements, not target tables; fixture results do not establish benchmarks or
 adopt verification decisions.
 
+The owner adopted the actual [V1–V3 finding](specs/findings/v1-v3-ita-verification.md)
+on 2026-10-13. Matching preserves delivered text and uses NFKC, Unicode casefold
+and collapsed whitespace, with exact placeholder/title flags and explicit employer
+fallback/reconstructed-EIN flags. Establishment IDs are candidates in every year;
+confirmation requires unique IDs, the same usable unreconstructed EIN and complete
+normalized address. County assignment uses an exact cached Census match in ACS2025
+first, then a compatible HUD county only when exactly one has positive business
+share (reviewed reference: 2025Q4). Ambiguous, unmatched, scope and vintage results
+remain flagged. The finding reports raw and weighted sample evidence, not county
+accuracy or a full-table assignment; targets and full production assignment remain
+planned.
+
 ## ACS extracts
 
 | Name | IPUMS sample IDs | Use |

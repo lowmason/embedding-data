@@ -64,6 +64,30 @@ checks, not Stage 3 implementation or full-data investigation results.
   adoption checkpoint remains required before adopting measured rules or
   applying verified markers. Applied in: Tasks 1–6 and the execution handoff.
 
+- **D3** (owner, execution prerequisite, 2026-10-13): selected
+  `data/raw/hud/ZIP-COUNTY_122025.xlsx`, quarter 2025Q4. The earlier ZIP-TRACT
+  workbook is not the ZIP-county prerequisite and is not used. The actual
+  ZIP-COUNTY header is GEOID, accepted only with its validated original filename;
+  eight recognized short out-of-scope zero-BUS geographies are retained and flagged.
+  Applied in: Task 2 compatibility follow-up and Task 6 input acquisition.
+- **D4** (owner, Task 3 review checkpoint, 2026-10-13): approved evaluating
+  address tuple multiplicity on all exact-distinct yearly rows before eligible-ID
+  filtering; approved excluding null IDs from cohort/link confirmation and reporting
+  original missing-ID row counts. Applied in: Task 3 fix round 1.
+- **D5** (owner, Task 4 review checkpoint, 2026-10-13): approved explicit
+  `<missing-state>` sampling strata while retaining delivered fields, and normalized
+  state keys for scope exclusions. Applied in: Task 4 fix round 1.
+- **D6** (owner, Task 5 review checkpoint, 2026-10-13): approved exact request-ID
+  validation before publishing/manifests for Census responses, with invalid-response
+  retry and cached no-network acquisition regressions. Applied in: Task 5 fix round 1.
+- **D7** (owner, Task 6 measured evidence checkpoint, 2026-10-13): approved
+  A1–A4 as proposed after reviewing the complete actual V1–V3 finding. Adopted
+  the R2.3 introductory correction, R2.6 normalization/title/employer rules,
+  R2.7 conservative all-year candidate-ID linkage, and R2.8 exact Census
+  ACS2025 geography first with compatible single-positive-BUS HUD fallback.
+  Applied in: source spec R2.3/R2.6–R2.8, finding, README and CLAUDE. No
+  replacement default or software change required; measurement provenance retained.
+
 The defaults below are approved for execution; measurement-dependent
 decisions are adopted only at Task 6's evidence checkpoint.
 
