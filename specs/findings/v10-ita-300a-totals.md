@@ -52,9 +52,10 @@ The command's totals lines, verbatim:
 ## Published counts
 
 - 2023: exactly 385,488 establishments as of 2024-05-31 (OSHA 2023 Work-Related Injury
-  and Illness Summary). The 2023 file runs through 2024-12-31 and was re-posted on
-  2026-05-20 with a `_v2` member, so more rows than the count is expected. The table holds
-  394,234 rows, 8,746 more.
+  and Illness Summary). The 2023 file runs through 2024-12-31, and the plan records a
+  re-posting on 2026-05-20 with a `_v2` member (the zip's CSV is named `_v2.csv`; the date
+  was not checked), so more rows than the count is expected. The table holds 394,234 rows,
+  8,746 more.
 - 2024: "over 390,000" (OSHA 2024 Work-Related Injury and Illness Summary), with no as-of
   date. The file runs through 2025-12-31. The table holds 398,620 rows, 8,620 more than the
   lower bound, so the true gap is at most that.
@@ -72,7 +73,8 @@ The command's totals lines, verbatim:
 The fixtures were built from the first ~900 rows of each file. The live build stopped on
 structure twice (plan Task 7 Step 3), and the owner decided how each case is handled (plan
 decisions D8–D11, implemented in Tasks 7a and 7b). The build has no filter step, and the
-2024 and 2025 table counts equal their CSVs' row counts (398,620 and 400,288).
+2024 and 2025 table counts equal the row counts a diagnostic read from their CSVs (398,620
+and 400,288).
 
 | File | Rows | Delivered value | Stored as |
 | --- | --- | --- | --- |
@@ -133,7 +135,8 @@ no nulls.
 - **Flags.** The counts are in the table. `flag_hours_per_employee` is null exactly where
   `flag_employment` is set: the two counts are equal in all ten years, from 448 rows in
   2017 to 4,517 in 2025. Flagged rows are kept. Some stored hours are implausible. The
-  largest `total_hours_worked` is 16,831,620,723,179 (2019, id 1059547, 7 employees), and
+  largest `total_hours_worked` is 16,831,620,723,179 (2019, id 1059547, 7 employees, as read
+  from the built table), and
   the largest in 2024 is 862,847,000,000 (the scientific-notation row, 133 employees).
   Both rows have `flag_hours_per_employee` set.
 
@@ -142,10 +145,11 @@ no nulls.
 - **Stage 3 (V2 `establishment_id` persistence; the pre-2023 link on `ein`).**
   `establishment_id` is non-null on every row of every year, 2016 to 2025. Within a year it
   repeats on 2 rows in 2016 and 2017, 5,300 in 2018, 12 in 2020, 4,084 in 2021 and 6 in
-  2023. V2 matches 2023 establishments to 2024 and 2025 on `ein` and address, and `ein` is
-  null on 10.3% of 2023 rows, 10.9% of 2024 and 11.5% of 2025. R2.7 links the earlier years
-  on `ein` plus name and address, and `ein` is null on 99.3% to 100.0% of 2016–2018 rows
-  and 17.9% of 2019 rows. Record `id` repeats within 2021 (4,082 rows).
+  2023. V2 checks whether a 2023 `establishment_id` reappears in 2024 and 2025 with the
+  same `ein` and address, and `ein` is null on 10.3% of 2023 rows, 10.9% of 2024 and 11.5%
+  of 2025. R2.7 links the earlier years on `ein` plus name and address, and `ein` is null
+  on 99.3% to 100.0% of 2016–2018 rows and 17.9% of 2019 rows. Record `id` repeats within
+  2021 (4,082 rows).
 - **Stage 4 (`naics_year` mix; the deferred industry half of the filing-rule flag).**
   Before 2023 every row's vintage is the dictionary's 2012 (214,978 to 346,799 rows a
   year). From 2023 each file mixes vintages. 2022 is the majority label (90.9%, 55.8% and
