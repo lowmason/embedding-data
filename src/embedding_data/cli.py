@@ -2,7 +2,12 @@
 
 import typer
 
-from embedding_data import acs_benchmark_extract, cps_benchmark_extract, osha_benchmark_download
+from embedding_data import (
+    acs_benchmark_extract,
+    cps_benchmark_extract,
+    manifest_audit,
+    osha_benchmark_download,
+)
 
 app = typer.Typer(add_completion=False, pretty_exceptions_show_locals=False)
 
@@ -19,3 +24,5 @@ app.command('cps', help=cps_benchmark_extract.__doc__.splitlines()[0])(cps_bench
 app.command('osha', help=osha_benchmark_download.__doc__.splitlines()[0])(
     osha_benchmark_download.main
 )
+
+app.command('audit', help=manifest_audit.__doc__.splitlines()[0])(manifest_audit.main)

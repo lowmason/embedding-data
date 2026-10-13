@@ -40,6 +40,44 @@ Pre-commit runs the pre-commit-hooks file checks, `ruff-check --fix`, and the fu
 
 **Credentials.** Both modules load the root `.env` (`DOTENV_PATH`) with python-dotenv; an exported `IPUMS_API_KEY` takes precedence. ACS loads it only without `--dry-run`, because its definitions need no catalog. `--data-dir` defaults to `data/` under the project root (`paths.DATA_DIR`).
 
+**ITA audit and verification.** `uv run embedding-data audit --data-dir data` is
+read-only and exits 1 on a discrepancy. `manifest.entry_for` verifies file hashes;
+`recorded_entry_for` only looks up recorded provenance for restoration/existence
+diagnostics. The separate `uv run python -m embedding_data.ita_verification_run`
+command group takes `--data-dir`: `references` and `geocode` acquire public data;
+`import-hud WORKBOOK QUARTER` imports an official HUD ZIP-to-county workbook;
+`sample HUD RUN_ID` and `measure RUN_ID` are offline. `sample` rebuilds the source
+table once under the Stage 2 source/hash contract, freezes the deterministic
+sample and headerless batch requests, and records input/code hashes and dependency
+versions. `measure` never rebuilds the table or recontacts Census; changed
+sample/table/request bytes fail. Runs write measurement reports, not target
+tables, under `derived/osha/verification/<run_id>/`; raw references and Census
+responses remain immutable under `raw/references/` and are manifest-covered.
+HUD `retrieved_at` is local import time and is flagged as a proxy, not the original
+browser download time. Census Current catalogs identify request options but do
+not freeze address-source data across batches or resumed acquisition. Software
+completion and fixture reports do not adopt V1–V3 decisions.
+
+**Adopted ITA rules (owner, 2026-10-13).** The actual
+[V1–V3 finding](specs/findings/v1-v3-ita-verification.md) settles R2.6–R2.8.
+Keep delivered strings; keys use NFKC, casefold and collapsed whitespace, with
+exact placeholder and official 2012/2017/2022 title flags. Employer fallback and
+reconstructed EIN remain explicit; blank employers never form a shared group.
+Use establishment IDs as all-year candidates; confirm only unique-ID links with
+the same usable unreconstructed EIN and complete normalized full address. Changed-ID
+fallback also requires uniquely matched EIN/name/address tuples. County assignment
+uses an exact cached Census ACS2025 geography match first, then a compatible HUD
+single-positive-BUS county (reviewed quarter 2025Q4); dominant-share selection is
+diagnostic only. Preserve ambiguity, scope and incompatible-vintage flags, including
+legacy CT counties. Check the chosen returned county against territory prefixes
+60/66/69/72/74/78 for assignment and both returned counties for comparison,
+in addition to delivered-state exclusions; retain separate method scope counts.
+The scope correction is measured in `v1_v3_20261013_scopefix` using verified
+original response bytes and receipt metadata from `v1_v3_20261013`.
+Sample comparisons are not county accuracy, a county hierarchy
+or full-table target construction. Each run records its own code/dependency hashes
+and all cached batches; fresh acquisition can differ under mutable Current data.
+
 **Test seams.** Tests and Behave steps patch the module-level `IpumsApiClient` (autospec) and `DOTENV_PATH` with `patch.object`, so both must remain module globals looked up at call time. OSHA tests patch `make_client` with a `partial` that injects an `httpx.MockTransport`; fake responses must use `stream=httpx.ByteStream(...)`, because a `content=` body is preloaded and leaves `num_bytes_downloaded` at 0. OSHA summary tests serve the recorded ITA page `tests/fixtures/osha/itadata.html` and bodies from `tests/ita_fixtures.year_file`, one per published file format; `write_release` places and records a raw summary file. The `cli_runner` fixture in `tests/conftest.py` removes `IPUMS_API_KEY` from the environment. The root `.env` holds a real key: a new test that does not patch both `DOTENV_PATH` and `IpumsApiClient` can load it and make live IPUMS requests. Every command test must also pass `--data-dir` (the `data_directory` fixture): `--data-dir` defaults to the real `data/` tree through a Typer default bound at import, so patching `paths.DATA_DIR` cannot redirect it, and a stray test would write fake extracts into `data/raw` and append fake entries to the append-only manifest.
 
 ## Spec rules

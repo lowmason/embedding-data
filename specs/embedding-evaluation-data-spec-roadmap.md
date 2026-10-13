@@ -131,22 +131,25 @@ placements:
       > Stage 2: COMPLETE (2026-10-13) — implemented by plan 2 (specs/plans/completed/2-ita-300a-summaries.md). Its Handoff section names what Stages 3, 4, 6 and 10 consume.
       > Next: resume the roadmap.
 
-- [ ] Stage 3: ITA verification
+- [x] Stage 3: ITA verification
       Objective: Settle the three open ITA facts by measurement before any ITA target is built.
-      Spec: V1, V2, V3; R2.6, R2.7, R2.8
+      Spec: V1, V2, V3; R2.6, R2.7, R2.8; R2.3 (the "2023 data" wording; plan 2, Handoff; Resolved at resume, 2026-10-13)
       Gap closed: V1, V2, V3 (the open markers on R2.6, R2.7, R2.8)
-      Consumes: Stage 1 manifest writer, and `manifest.entry_for`, which does not re-hash the file it cites (plan 1, Handoff; Resolved at resume, 2026-10-12); Stage 2 stacked table
-      Produces: recorded decisions on R2.6 cleaning rules, R2.7 link key, R2.8 county-assignment method; official NAICS title files (2012, 2017, 2022) acquired under the manifest for V1; the manifest audit of `specs/deferred_items.md` section `1-raw-provenance`, item "Manifest audit" (plan 1, Handoff; Resolved at resume, 2026-10-12)
+      Consumes: Stage 1 manifest writer, and `manifest.entry_for`, which does not re-hash the file it cites (plan 1, Handoff; Resolved at resume, 2026-10-12); Stage 2 stacked table `data/derived/osha/ita_300a_summary.parquet` (`ita_summary.COLUMNS`; each row's `source_file` resolves through `manifest.entry_for`). For V2 and R2.7: `establishment_id` is present from 2016 and defined per user account, `ein` is almost all null in 2016–2018, 2021's shared record `id`s were not examined, and the "2023 data" wording of R2.3 and R2.7 predates these facts. For V1 and V3: descriptions, ZIPs and EINs are stored as delivered, and their defects were seen only in sampled rows (plan 2, Handoff; `specs/findings/v10-ita-300a-totals.md`; Resolved at resume, 2026-10-13)
+      Produces: recorded decisions on R2.6 cleaning rules, R2.7 link key, R2.8 county-assignment method; official NAICS title files (2012, 2017, 2022) acquired under the manifest for V1; the manifest audit of `specs/deferred_items.md` section `1-raw-provenance`, item "Manifest audit" (plan 1, Handoff; Resolved at resume, 2026-10-12), which `build_summary_table`'s own hash check covers for the summary inputs only (plan 2, Handoff; Resolved at resume, 2026-10-13)
       Exit: a committed finding reports V1's per-year shares, V2's ID-persistence and address-match shares, and V3's match rates and county agreement; spec amendments replace the three open markers with the adopted rules; the "Manifest audit" item's Done-when holds and the item is ticked
       ROUTING: writing-plans
 
+      > Stage 3: COMPLETE (2026-10-13) — implemented by plan 3 (specs/plans/completed/3-ita-verification.md). Its [Handoff section](plans/completed/3-ita-verification.md#handoff-to-later-stages) names what Stages 4, 5, 6, 7 and 10 consume.
+      > Next: resume the roadmap.
+
 - [ ] Stage 4: Code tables and ITA NAICS mapping
       Objective: NAICS 2022 and SOC 2018 node and edge tables exist, and every ITA NAICS code maps to the 2022 vintage as a node or flagged candidate set.
-      Spec: R5.1, R5.2, R5.4, R2.5, V11 (ITA)
-      Gap closed: R5.1 (ITA); R5.2; R5.4 (ITA vintages); R2.5; V11 (ITA)
-      Consumes: Stage 1 manifest; Stage 2 table (`naics_code`, `naics_year`); Stage 3 NAICS title files
-      Produces: NAICS and SOC node and edge tables and their schema convention (reused by Stage 5); the candidate-set representation; 2012/2017→2022 concordance as flagged candidate sets; ITA records carrying native and canonical codes
-      Exit: V11 reports zero unmapped codes in the ITA table; a fixture with an unparseable code fails the build; no concordance relationship is resolved to one side; sectors 31–33, 44–45, and 48–49 are each one node
+      Spec: R5.1, R5.2, R5.4, R2.5, R2.9 (industry half), V11 (ITA)
+      Gap closed: R5.1 (ITA); R5.2; R5.4 (ITA vintages); R2.5; R2.9 (industry half); V11 (ITA)
+      Consumes: Stage 1 manifest; Stage 2 table (`naics_code`, `naics_year`). Pre-2023 vintages are the dictionary's 2012, marked `naics_year_from_dictionary`. From 2023, coded rows with no usable vintage have a null `naics_year` and are flagged `flag_naics_year_unknown`, and 2012 codes persist in the 2024 and 2025 files. Plan 2's P8 records the filing rule's appendix versions (plan 2, Handoff; `specs/findings/v10-ita-300a-totals.md`; Resolved at resume, 2026-10-13); Stage 3 NAICS title files
+      Produces: NAICS and SOC node and edge tables and their schema convention (reused by Stage 5); the candidate-set representation; 2012/2017→2022 concordance as flagged candidate sets; ITA records carrying native and canonical codes; R2.9's industry half per `specs/deferred_items.md` section `2-ita-300a-summaries`, item "Industry half of the R2.9 filing-rule flag" (plan 2, Handoff; Resolved at resume, 2026-10-13)
+      Exit: V11 reports zero unmapped codes in the ITA table, counting the rows flagged `flag_naics_year_unknown` (plan 2, Handoff; Resolved at resume, 2026-10-13); a fixture with an unparseable code fails the build; no concordance relationship is resolved to one side; sectors 31–33, 44–45, and 48–49 are each one node; the "Industry half of the R2.9 filing-rule flag" item's Done-when holds and the item is ticked
       ROUTING: brainstorming
 
 - [ ] Stage 5: Geography hierarchy and county reference
@@ -162,9 +165,9 @@ placements:
       Objective: One ITA year runs end to end into an area-mix target in the shared output schema, with its manifest.
       Spec: R7.1, R7.2 (area mix, ITA), R7.3, R7.4, R2.2, R2.8, V12, Rollout
       Gap closed: R7.1; R7.3 (counts reported); R7.4; R2.2; R2.8; R7.2 area mix (ITA); V12 (seeded)
-      Consumes: Stage 1 manifest; Stage 2 table; Stage 3 R2.8 decision; Stage 4 canonical NAICS; Stage 5 geography and county reference
+      Consumes: Stage 1 manifest; Stage 2 table. Each row cites its raw input by `source_file` through `manifest.entry_for`, and every `osha summary` run rebuilds the table. Flagged rows are kept, `size_class` is the one size scheme in every year, and the V10 (ITA) gaps are in `specs/findings/v10-ita-300a-totals.md` (plan 2, Handoff; Resolved at resume, 2026-10-13); Stage 3 R2.8 decision; Stage 4 canonical NAICS; Stage 5 geography and county reference
       Produces: target writer (long schema, flags, output manifest with raw hashes and code, crosswalk, and transformation versions); establishment county assignment; V12 offline contract-test harness that each later family stage extends
-      Exit: area-mix Parquet for one ITA year in the R7.4 schema, every row carrying `se_method`, `n_unweighted`, `n_weighted`, and the ITA universe statement; its manifest lists raw inputs by SHA-256; V12 passes for this family from fixtures, offline, without credentials; no target is labeled as passing a size gate
+      Exit: area-mix Parquet for one ITA year in the R7.4 schema, every row carrying `se_method`, `n_unweighted`, `n_weighted`, and the ITA universe statement; its manifest lists the `source_file` values it read, each with its SHA-256 (plan 2, Handoff; Resolved at resume, 2026-10-13); V12 passes for this family from fixtures, offline, without credentials; no target is labeled as passing a size gate
       ROUTING: brainstorming
 
 - [ ] Stage 7: IPUMS extract verification
@@ -198,7 +201,7 @@ placements:
       Objective: ITA text–code pairs and co-ownership targets are built on cleaned descriptions and linked establishments.
       Spec: R2.6, R2.7, R7.2 (text–code pairs, co-ownership)
       Gap closed: R2.6; R2.7; R7.2 text–code pairs and co-ownership
-      Consumes: Stage 3 decisions (V1, V2); Stage 4 2022 code paths; Stage 6 target writer and V12 harness
+      Consumes: Stage 2 table (`ein`, `company_name`), which R2.6 deduplication and R7.2 co-ownership read. The `ein` null shares are in `specs/findings/v10-ita-300a-totals.md`; `company_name`'s were not measured (plan 2, Handoff; Resolved at resume, 2026-10-13); Stage 3 decisions (V1, V2); Stage 4 2022 code paths; Stage 6 target writer and V12 harness
       Produces: establishment-link table across years; text–code pair table; co-ownership target
       Exit: every pair keeps the original string, a normalized key, empty, placeholder, and copied-title flags, and the full 2022 code path; pairs are deduplicated on employer and normalized description; links use the Stage 3 key; V12 covers both families
       ROUTING: brainstorming

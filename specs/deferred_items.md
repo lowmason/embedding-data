@@ -11,7 +11,7 @@
       specs/plans/completed/1-raw-provenance.md. Size: quick-fix. Done when: both modules write
       Parquet through a `.part` rename and a re-run converts any delivered `.csv.gz` that lacks
       its Parquet without submitting a new extract. Target: Stage 7.
-- [ ] Manifest audit (final review recommendation): nothing checks that every file under
+- [x] Manifest audit (final review recommendation) → done in plan 3: nothing checks that every file under
       `data/raw` has an entry or that each entry's hash still matches its file, and
       `manifest.entry_for` (`src/embedding_data/manifest.py`) returns an entry without
       re-hashing the file it cites. Several failure paths (a crash between the staging rename

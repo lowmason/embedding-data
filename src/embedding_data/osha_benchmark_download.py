@@ -103,7 +103,7 @@ def is_recorded(manifest_path: Path, raw_file: Path) -> bool:
 
 def refuse_replacement(manifest_path: Path, raw_file: Path) -> None:
     '''Exit before any download: a replacement could differ from the recorded hash.'''
-    recorded = manifest.entry_for(manifest_path, raw_file)
+    recorded = manifest.recorded_entry_for(manifest_path, raw_file)
     typer.echo(
         f'{raw_file.name}: error: the raw file is missing but recorded in {manifest_path} '
         f'with SHA-256 {recorded.sha256[:12]}...; restore the original file (its hash must '

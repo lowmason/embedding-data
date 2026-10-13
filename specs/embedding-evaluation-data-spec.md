@@ -164,11 +164,14 @@ counts. Every ITA target states this universe, and none is described as
 representative of all establishments. *(verified; ITA)*
 
 **R2.3** Stack all years into one establishment-year table keyed on
-`year_filing_for`, harmonizing three dictionary changes introduced with the 2023
-data: `establishment_id`, documented from then on as the link between summary and
-case-detail files; the split of size code `2` into `21` and `22`; and NAICS codes
-that may be 2012, 2017, or 2022 vintage, identified by `naics_year`. *(verified;
-ITA)* The delivered files differ from that account. `establishment_id` is present
+`year_filing_for`, harmonizing delivered-format and dictionary changes:
+`establishment_id`, present from 2016 and documented as the summary-to-case
+link from the 2023 data; the split of size code `2` into `21` and `22` from
+the 2023 data; and NAICS codes that may be 2012, 2017, or 2022 vintage from
+the 2023 data, identified by `naics_year`. *(verified; ITA;
+specs/findings/v1-v3-ita-verification.md — owner, plan 3, 2026-10-13)*
+
+The delivered files differ from that account. `establishment_id` is present
 in every year from 2016; the 2016–2023 dictionary defines it per user account, and
 OSHA assigns a new one when a profile is re-created. The 2023 and later files still
 carry code `2` for some establishments, so a harmonized size class merges `21` and
@@ -204,22 +207,53 @@ copied title is not independent text. Deduplicate on employer (`ein`, else
 multi-unit filers can stamp one description on every establishment. Expect
 descriptions coarser than their codes — one posted 300A pairs "Healthcare" with
 621610 — so every pair carries the full 2022 code path (R5.2) and can be scored
-at each level. *(chosen; D)* What the field actually contains — how often it is
-empty, copied, or repeated within an employer — is *(open — resolved by
-verification, not argument, discharged by V1)*.
+at each level. *(chosen; D)* V1 measured the field's content by year; its results
+and denominators are
+recorded in `specs/findings/v1-v3-ita-verification.md`. The matching key
+uses NFKC, Unicode casefold and collapsed/trimmed whitespace, preserving
+punctuation and the original delivered string. Empty keys and exact
+placeholder keys `n/a`, `na`, `none`, `unknown`, `not applicable`,
+`not specified`, `-`, `--`, and `.` are flagged. Identity to any official
+2012, 2017 or 2022 NAICS title at levels 2–6 is flagged as copied text;
+native-vintage identity is also reported, with unknown vintage kept
+unknown. Suspected mojibake is flagged rather than automatically repaired.
+Employer grouping uses a usable EIN, else a non-empty normalized company
+name, with name fallback and reconstructed EIN marked separately; blank
+employer fields never form a shared employer. Unknown-employer rows
+retain that flag and do not participate in employer deduplication.
+*(verified; specs/findings/v1-v3-ita-verification.md — owner, plan 3,
+2026-10-13)*
 
-**R2.7** Link establishments across years. From the 2023 data,
-`establishment_id` is the candidate key; earlier years link on `ein` plus
-normalized name and address. `ein` with `company_name` also reconstructs
-multi-unit firm structure for R7.2. Whether `establishment_id` persists across
-years for the same establishment is *(open — resolved by verification, not
-argument, discharged by V2)*.
+**R2.7** Link establishments across years using `establishment_id` as a
+candidate in every delivered year. A confirmed link requires a unique ID
+in each year, the same usable unreconstructed EIN, and the same normalized
+full address. Exact duplicate rows collapse for linkage only; competing
+same-ID records remain ambiguous. A changed-ID fallback requires a unique
+match on usable unreconstructed EIN plus normalized establishment name
+and full address in both years. Missing or reconstructed EINs, incomplete
+addresses and conflicting keys are reported separately as weaker or
+unresolved evidence, not counted as confirmed links. The required
+2023→2024 and 2023→2025 persistence/address comparisons and earlier-year
+diagnostics are recorded in `specs/findings/v1-v3-ita-verification.md`.
+`ein` with `company_name` also supports multi-unit firm diagnostics for
+R7.2; company-name fallback does not establish EIN-based co-ownership.
+*(verified; specs/findings/v1-v3-ita-verification.md — owner, plan 3,
+2026-10-13)*
 
-**R2.8** Assign each establishment a county from its address, then derive state,
-CBSA, division, and region under R6. The method — a ZIP-to-county crosswalk or
-geocoding the street address — is *(open — resolved by verification, not
-argument: match rate and county agreement on a sample decide it, discharged by
-V3)*. *(added at synthesis)*
+**R2.8** Assign each establishment a county from its address, then derive
+state, CBSA, division and region under R6. Use a cached Census exact
+street-address geography match in the common ACS2025 county frame first;
+otherwise use a HUD ZIP–county fallback only when exactly one county has
+positive business-address share and its county geography is compatible.
+Unmatched, non-exact, ambiguous, zero-business-share, out-of-scope and
+incompatible-vintage results are retained with flags; no largest-share
+county or old-Connecticut-county shortcut supplies a headline assignment.
+The stratified comparison, reference quarter, Census benchmark/vintage,
+conditional county agreement and limitations are recorded in
+`specs/findings/v1-v3-ita-verification.md`. Stage 6 applies this adopted
+rule to the full establishment table; Stage 3's sample is verification
+evidence only. *(verified; specs/findings/v1-v3-ita-verification.md —
+owner, plan 3, 2026-10-13)*
 
 **R2.9** Flag, never drop, implausible records: hours per employee outside a
 plausible annual range, zero or missing employment, and establishments whose
