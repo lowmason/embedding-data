@@ -139,3 +139,32 @@ def test_status_scope_and_incompatible_geocoder_are_reported():
     assert result['n_out_of_scope'] == 1
     assert result['n_proposed_assignable'] == 4
     assert result['share_joint_single_agree'] == 1.0
+
+def test_missing_states_keep_year_strata_and_delivered_values():
+    sample = county.stratified_sample(
+        rows([{'state': None}, {'state': None, 'year_filing_for': 2024, 'id': 2}]),
+        county.zip_candidates(hud_rows()),
+        per_stratum=1,
+    )
+    assert sample.height == 2
+    assert sample['stratum'].null_count() == 0
+    assert sample['stratum'].n_unique() == 2
+    assert sample['population_n'].to_list() == [1, 1]
+    assert sample['state'].to_list() == [None, None]
+
+@pytest.mark.parametrize('state', ['pr', ' PR '])
+def test_normalized_territory_state_is_excluded(state):
+    sample = county.stratified_sample(
+        rows([{'state': state}]), county.zip_candidates(hud_rows())
+    )
+    geocodes = sample.select('row_key').with_columns(
+        geocode_status=pl.lit('Match'),
+        match_type=pl.lit('Exact'),
+        county_geoid=pl.lit('72001'),
+    )
+    _, result = county.county_report(sample, geocodes)
+    assert sample['state'].to_list() == [state]
+    assert result['n_out_of_scope'] == 1
+    assert result['n_proposed_assignable'] == 0
+    assert result['n_joint_single_comparable'] == 0
+    assert result['n_joint_dominant_comparable'] == 0

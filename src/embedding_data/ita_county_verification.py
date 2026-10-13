@@ -62,7 +62,7 @@ def stratified_sample(
         ).with_columns(
             stratum=pl.concat_str(
                 pl.col('year_filing_for').cast(pl.String),
-                'state',
+                pl.col('state').fill_null('<missing-state>'),
                 'zip_format',
                 'county_count_class',
                 separator='|',
@@ -115,7 +115,7 @@ def county_report(sample: pl.DataFrame, geocodes: pl.DataFrame) -> tuple[pl.Data
         raise ValueError('sample/response IDs do not match exactly')
     compared = (
         sample.lazy().join(geocodes.lazy(), on='row_key', validate='1:1').with_columns(
-            flag_out_of_scope=pl.col('state').is_in(OUT_OF_SCOPE_STATES),
+            flag_out_of_scope=pl.col('state_key').str.to_uppercase().is_in(OUT_OF_SCOPE_STATES),
             flag_geocode_legacy_ct=pl.col('county_geoid').str.starts_with('090').fill_null(False),
             geocode_non_exact=pl.col('geocode_status').eq('Match').and_(
                 pl.col('match_type').ne('Exact')
