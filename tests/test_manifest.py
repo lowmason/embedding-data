@@ -160,3 +160,16 @@ def test_a_line_recorded_before_through_date_existed_still_reads(data_directory)
 
     assert entry.path == 'osha/case_detail_data_dictionary_2026.pdf'
     assert entry.through_date is None
+
+
+def test_entry_for_verifies_present_bytes(raw_file, data_directory):
+    file = paths.manifest_path(data_directory)
+    entry = describe(raw_file, data_directory)
+    manifest.append_entries(file, [entry])
+    raw_file.write_bytes(b'changed')
+    with pytest.raises(ValueError, match='SHA-256 .*differs'):
+        manifest.entry_for(file, raw_file)
+    raw_file.unlink()
+    assert manifest.recorded_entry_for(file, raw_file) == entry
+    with pytest.raises(FileNotFoundError):
+        manifest.entry_for(file, raw_file)

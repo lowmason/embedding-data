@@ -105,10 +105,26 @@ def append_entries(manifest_path: Path, entries: Iterable[ManifestEntry]) -> Non
         stream.writelines(json.dumps(asdict(entry)) + '\n' for entry in entries)
 
 
-def entry_for(manifest_path: Path, raw_file: Path) -> ManifestEntry:
-    '''The entry recorded for raw_file, so output manifests can cite it by hash.'''
+def recorded_entry_for(manifest_path: Path, raw_file: Path) -> ManifestEntry:
+    '''Find provenance even when the file is absent; never use this to cite bytes.'''
     path = raw_file.relative_to(manifest_path.parent).as_posix()
-    for entry in read_manifest(manifest_path):
-        if entry.path == path:
-            return entry
-    raise KeyError(f'{path} is not recorded in {manifest_path}')
+    matches = [item for item in read_manifest(manifest_path) if item.path == path]
+    if not matches:
+        raise KeyError(f'{path} is not recorded in {manifest_path}')
+    if len(matches) != 1:
+        raise ValueError(f'{path} is recorded more than once in {manifest_path}')
+    return matches[0]
+
+def entry_for(manifest_path: Path, raw_file: Path) -> ManifestEntry:
+    '''Return a citation only after verifying the file's current bytes.'''
+    entry = recorded_entry_for(manifest_path, raw_file)
+    actual = sha256_file(raw_file)
+    if actual != entry.sha256:
+        raise ValueError(
+            f'{entry.path}: SHA-256 {actual[:12]}... differs from the '
+            f'{entry.sha256[:12]}... recorded in {manifest_path}; the raw file has '
+            'changed since it was downloaded'
+        )
+    if raw_file.stat().st_size != entry.size:
+        raise ValueError(f'{entry.path}: size differs from its manifest entry')
+    return entry

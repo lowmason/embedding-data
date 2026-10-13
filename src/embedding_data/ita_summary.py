@@ -363,13 +363,6 @@ def build_summary_table(data_dir: Path) -> Path:
         frames = []
         for year, raw_file in summary_files(data_dir).items():
             entry = manifest.entry_for(manifest_path, raw_file)
-            sha256 = manifest.sha256_file(raw_file)
-            if sha256 != entry.sha256:
-                raise ValueError(
-                    f'{entry.path}: SHA-256 {sha256[:12]}... differs from the '
-                    f'{entry.sha256[:12]}... recorded in {manifest_path}; the raw file has '
-                    'changed since it was downloaded'
-                )
             utf8_path = Path(work) / f'{year}.csv'
             frames.append(harmonize_file(raw_file, year, entry.path, utf8_path))
         try:
