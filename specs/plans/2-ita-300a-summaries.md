@@ -44,9 +44,10 @@
 - **D3** (owner, plan review, 2026-10-12): plausible annual hours per average employee are 500–4,000, inclusive. Applied in: Task 4 (`HOURS_PER_EMPLOYEE`).
 - **D4** (owner, plan review, 2026-10-12): a bare `uv run embedding-data osha` runs both sets, mirroring `cps`. CLAUDE.md warns against running `osha` unless asked. Applied in: Task 6.
 - **D5** (owner, plan review, 2026-10-12): the plan is committed on branch `stage-2-ita-300a`, created from `main`, and execution works on that branch. Applied in: execution setup.
-- **D6** (owner, plan review, 2026-10-12): the remaining planning defaults (P2–P7 and P9–P14) and Task 8's amendments A1–A3, word for word, are approved as written. Task 8 applies them without asking again. Applied in: Tasks 1–8.
+- **D6** (owner, plan review, 2026-10-12): the remaining planning defaults are approved as written: P2–P7 and P9–P14, P1's set names (`summary`, `case-detail`), and P8's flag rules beyond D2 and D3. Those rules are that `flag_employment` also fires on negative employment, that `flag_hours_per_employee` fires when hours are missing, and that it is null wherever `flag_employment` is set. Task 8's amendments A1–A3 are approved word for word, and Task 8 applies them without asking again. Applied in: Tasks 1–8.
+- **D7** (owner, handoff, 2026-10-12): execution works in a git worktree at `/Users/lowell/Projects/embedding-data-stage-2` on the existing branch `stage-2-ita-300a`, created by the planning session with `git worktree add`. The main checkout stays on `main`. The worktree sits outside the repository, so no `.gitignore` change is needed and nothing is committed to `main`. Applied in: execution setup.
 
-**Planning defaults (approved at plan review; P1 by D4, P8 by D2 and D3, the rest by D6):**
+**Planning defaults (approved at plan review; P1 by D4 and D6, P8 by D2, D3 and D6, the rest by D6):**
 
 - **P1. Command surface.** `uv run embedding-data osha [summary] [case-detail]` mirrors `acs` and `cps`, and runs both sets by default. The existing case-detail tests pass `case-detail` explicitly. `--data-dir` is unchanged.
 - **P2. Discovery.** Releases come from the live ITA data page (`https://www.osha.gov/itadata`), not a hardcoded list.
