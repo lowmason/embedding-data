@@ -13,10 +13,11 @@ The one exception is establishment_type, where a value with no digit at all (one
 holds Executive and Legislative Offices) becomes null; any value holding a digit must
 still be a whole number. Two dictionary changes are harmonized:
 
-- size: code 2 (20-249 employees) was split into 21 (20-99) and 22 (100-249) with the 2023
-  data, but the 2023 and later files still carry 2 for some establishments. size keeps the
-  native code; size_class merges 21 and 22 into 2, one scheme in every year. Code 2 is
-  never split, because size is peak employment, not the annual average.
+- size: the split of code 2 (20-249 employees) into 21 (20-99) and 22 (100-249) is
+  documented from the 2023 data, but the 2022 file already carries 227 rows of 21 and 65
+  of 22, and the 2023 and later files still carry 2 for some establishments. size keeps
+  the native code; size_class merges 21 and 22 into 2, one scheme in every year. Code 2
+  is never split, because size is peak employment, not the annual average.
 - naics_year: delivered from the 2023 data on. Earlier files lack it, and the Summary Data
   Dictionary says data through 2022 use 2012 NAICS, so those rows take 2012 with
   naics_year_from_dictionary set. A delivered vintage other than 2012, 2017 or 2022 (the

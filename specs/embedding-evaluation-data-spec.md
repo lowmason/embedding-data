@@ -175,6 +175,12 @@ carry code `2` for some establishments, so a harmonized size class merges `21` a
 `22` into `2` beside the native code, and `2` is never split. Files before 2023
 carry no `naics_year`; the dictionary states that data through 2022 use 2012 NAICS,
 so those rows take 2012, marked as supplied by the dictionary. *(owner, plan 2,
+2026-10-12)* A delivered `naics_year` other than 2012, 2017, or 2022 (blank
+beside a code in the 2023 file; `0` in the 2024 and 2025 files, and `2025` on
+three 2025 rows) is stored as null and marked by `flag_naics_year_unknown`; the
+code and the row are kept. A text `establishment_type` becomes null, and
+`total_hours_worked` written in scientific notation is read as the whole number
+it spells; every other non-integer value fails the build. *(owner, plan 2,
 2026-10-12)*
 
 **R2.4** Retain `establishment_name`, `establishment_id`, `ein`, `company_name`,

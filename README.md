@@ -164,16 +164,18 @@ The current year's file name carries its submission through-date
 (`..._2025_through_08-31-2026.csv`). OSHA renames the file as it grows, so a later
 release is downloaded beside the earlier one and recorded as a new manifest entry with
 its `through_date`; the earlier file and entry are untouched. The run refuses a page
-that skips a year or whose current file names no through-date, and a summary file
-found on disk but missing from the manifest. A file OSHA replaces under an unchanged
-name is not detected.
+that skips a year or whose current file names no through-date, a summary file found on
+disk but missing from the manifest, and, before downloading anything, a year whose files
+would leave no single latest release (an undated file beside another, or two with one
+through-date). A file OSHA replaces under an unchanged name is not detected.
 
 The table is rebuilt on every run from each year's latest release. It keeps the
 specification's R2.4 columns plus OSHA's record `id`, the raw file it came from
 (`source_file`, the manifest path), and these harmonized columns:
 
-- `size_class`: OSHA split size code `2` (20–249 employees) into `21` and `22` with the
-  2023 data, but later files still use `2` for some establishments. `size` keeps the
+- `size_class`: the split of size code `2` (20–249 employees) into `21` and `22` is
+  documented from the 2023 data, but the 2022 file already carries 227 rows of `21` and
+  65 of `22`, and later files still use `2` for some establishments. `size` keeps the
   native code; `size_class` merges `21` and `22` back into `2`.
 - `naics_year`: files before 2023 lack it; OSHA's dictionary says those years use 2012
   NAICS, so they get 2012 with `naics_year_from_dictionary` set. A delivered vintage
@@ -184,13 +186,13 @@ specification's R2.4 columns plus OSHA's record `id`, the raw file it came from
   `flag_naics_year_unknown` marks a NAICS code left without a vintage; it records
   provenance, not implausibility.
 
-Codes, names, addresses, ZIP codes, and EINs stay as delivered, except that a
-non-numeric `establishment_type` (one 2019 row holds an industry title) becomes null and
-`total_hours_worked` in scientific notation (four rows in the 2024 and 2025 files, such
-as `8.62847E+11`) is read as the whole number it spells. A file the harmonization does
-not cover stops the build rather than being guessed at. After the build the command
-prints rows per year beside OSHA's published submission counts. A full first run
-downloads about 258 MB.
+Codes, names, addresses, ZIP codes, and EINs stay as delivered, except that an
+`establishment_type` with no digit (one 2019 row holds an industry title) becomes null
+and `total_hours_worked` in scientific notation (four rows in the 2024 and 2025 files,
+such as `8.62847E+11`) is read as the whole number it spells. A file the harmonization
+does not cover stops the build rather than being guessed at, as does a raw file whose
+SHA-256 differs from its manifest entry. After the build the command prints rows per
+year beside OSHA's published submission counts. A full first run downloads about 258 MB.
 
 ## OSHA case-detail download
 
