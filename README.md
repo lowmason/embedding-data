@@ -17,7 +17,8 @@ commands of the `embedding-data` Typer CLI. The `osha` command downloads the
 OSHA ITA case-detail CSV and its data dictionary and converts the CSV to Parquet.
 
 OSHA Form 300A ingestion, classification concordances, geography allocation,
-person-month linkage, aggregate targets, and provenance manifests are planned.
+person-month linkage, aggregate targets, and output manifests are planned. Raw
+downloads are already recorded in `data/raw/manifest.jsonl`.
 The OSHA case-detail files under `data/raw/osha/` are a different input from the
 Form 300A summaries required by the specification.
 
@@ -188,12 +189,22 @@ unassigned SOC codes read `00-9900` rather than `00-9999`; and
 
 ## Files and planned outputs
 
-After a successful download and conversion, each extract directory contains its
-definition (`extract.json`), downloaded IPUMS files (`.csv.gz` and `.xml` DDI
-codebook), and a converted `.parquet` file. A dry run writes only the definition.
-The scripts retain the compressed data and delete the temporary decompressed
-CSV after conversion. Re-running submits a new extract; resumable downloads
-and retrieval manifests are not implemented.
+All commands share one data root, `data/` by default (`--data-dir`):
+
+| Path | Contents |
+| --- | --- |
+| `raw/manifest.jsonl` | One JSON line per raw file: path, SHA-256, size, retrieval time, client and version, and either the source URL or the IPUMS collection, extract number, and sample IDs |
+| `raw/acs/<set>/usa_<number>/`, `raw/cps/<set>/cps_<number>/` | One delivered IPUMS extract: the submitted `extract.json`, the `.csv.gz` data, and the `.xml` DDI codebook |
+| `raw/osha/` | OSHA downloads as delivered |
+| `derived/<source>/` | Parquet converted from raw files |
+| `preview/<source>/<set>/extract.json` | Dry-run definitions, overwritten by the next dry run |
+
+Raw files are never edited, overwritten, or re-downloaded, and each path is
+recorded once. Files delivered before the manifest existed were moved into this
+layout by `uv run --locked python -m embedding_data.raw_backfill`. Their entries
+use the file modification time and the `uv.lock` client version, both flagged in
+`proxies`. Downloads are not resumable: re-running an IPUMS command submits a
+new extract.
 
 The specification calls for aggregate Parquet targets covering staffing
 patterns, area mixes, worker profiles, job-change flows, commuting, migration,
@@ -266,11 +277,15 @@ src/embedding_data/acs_benchmark_extract.py  ACS extract definitions and downloa
 src/embedding_data/cps_benchmark_extract.py  CPS catalog selection and downloader
 src/embedding_data/osha_benchmark_download.py OSHA case-detail download and Parquet conversion
 src/embedding_data/cli.py                    embedding-data console entry point
+src/embedding_data/paths.py                  Data root layout: raw/, derived/, preview/
+src/embedding_data/manifest.py               Append-only raw-file manifest (SHA-256 and provenance)
+src/embedding_data/ipums_delivery.py         Shared IPUMS preview, submission, download, and recording
+src/embedding_data/raw_backfill.py           One-off migration of pre-manifest raw files
 tests/                                       Offline unit, property, and conversion checks
 features/                                    Behave CPS dry-run acceptance scenarios
-data/raw/acs/                                Default ACS output location
-data/raw/cps/                                Default CPS output location
-data/raw/osha/                               OSHA case-detail downloads and Parquet
+data/raw/                                    Raw downloads as delivered, and manifest.jsonl
+data/derived/                                Parquet converted from raw files
+data/preview/                                Dry-run extract definitions
 pyproject.toml                               Project dependencies and Python requirement
 uv.lock                                      Project dependency lockfile
 ```

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-Builds aggregate evaluation targets for industry (NAICS), occupation (SOC), and geography embeddings from three sources: OSHA ITA Form 300A summaries, ACS via IPUMS USA, and CPS via IPUMS CPS. `specs/embedding-evaluation-data-spec.md` is the source of truth. Only the IPUMS extract scripts (define → submit → download → CSV-to-Parquet) and an OSHA case-detail download (download → CSV-to-Parquet) exist so far; OSHA Form 300A ingestion, code parsing, geography allocation, targets, and manifests are planned, not built.
+Builds aggregate evaluation targets for industry (NAICS), occupation (SOC), and geography embeddings from three sources: OSHA ITA Form 300A summaries, ACS via IPUMS USA, and CPS via IPUMS CPS. `specs/embedding-evaluation-data-spec.md` is the source of truth. Only the IPUMS extract scripts (define → submit → download → CSV-to-Parquet) and an OSHA case-detail download (download → CSV-to-Parquet) exist so far; Every raw file is recorded in an append-only manifest (`data/raw/manifest.jsonl`); OSHA Form 300A ingestion, code parsing, geography allocation, targets, and output manifests are planned, not built.
 
 ## Commands
 
@@ -34,6 +34,8 @@ Pre-commit runs the pre-commit-hooks file checks, `ruff-check --fix`, and the fu
 **CPS sample IDs come from the live IPUMS catalog, never a hardcoded list.** `select_samples()` keeps one sample per month, preferring the `b` basic file over the `s` supplement, and takes ASEC from 2025 on regardless of `--start`. So a CPS `--dry-run` still needs `IPUMS_API_KEY` and network access; an ACS `--dry-run` is fully offline. Apart from `--help`, do not run CPS commands, or ACS without `--dry-run`, unless the user asks — they call the IPUMS API with the real key.
 
 **OSHA download.** `osha` needs no key. osha.gov's CloudFront returns 403 to non-browser user agents, so `USER_AGENT` is a browser string. Existing files in `data/raw/osha` are never re-downloaded (raw immutability), and one missing from the manifest gets a stderr warning, not an entry. Downloads go to `.part`, are renamed only after `num_bytes_downloaded` matches `Content-Length`, and are then recorded in the raw manifest. The CSV mixes Windows-1252 and UTF-8 bytes, sometimes within one line; `decode_line` transcodes it to a temporary UTF-8 CSV that is cast strictly (codes stay strings) and sunk to `data/derived/osha`, only when that Parquet is absent. Without existing files, a run downloads about 475 MB.
+
+**Raw provenance.** `manifest.append_entries()` refuses a path already recorded, so each raw file maps to one hash for good; `manifest.entry_for()` looks an entry up for output manifests to cite. `raw_backfill.py` is a one-off (`python -m embedding_data.raw_backfill`) that moved the files delivered before the manifest into this layout; their entries flag `retrieved_at` and `client_version` as proxies. On a migrated tree it does nothing.
 
 **Credentials.** Both modules load the root `.env` (`DOTENV_PATH`) with python-dotenv; an exported `IPUMS_API_KEY` takes precedence. ACS loads it only without `--dry-run`, because its definitions need no catalog. `--data-dir` defaults to `data/` under the project root (`paths.DATA_DIR`).
 
