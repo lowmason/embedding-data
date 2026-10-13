@@ -1,10 +1,10 @@
 # V10 (ITA): Form 300A rows per year against OSHA's published counts
 
-Measured 2026-10-12 and 2026-10-13 with `uv run embedding-data osha summary` (plan 2,
-Task 7), from the files the ITA data page listed that day. The raw files were retrieved at
-2026-10-13T03:28:59Z to 03:29:02Z (the evening of 2026-10-12 in the owner's time zone); the
-stacked table was last rebuilt on 2026-10-13 at commit `1d86f27`. Gaps are recorded, not
-tuned away (spec V10).
+Measured with `uv run embedding-data osha summary` (plan 2, Task 7), from the files the ITA
+data page listed on 2026-10-12. The raw files were retrieved at 2026-10-13T03:28:59Z to
+03:29:02Z (23:28 to 23:29 on 2026-10-12 at UTC-04:00); the stacked table was last written at
+00:09 on 2026-10-13 (UTC-04:00) at commit `1d86f27`. Gaps are recorded, not tuned away
+(spec V10).
 
 ## Raw files
 
@@ -27,10 +27,10 @@ before this stage and these 12).
 | `osha/summary/summary_data_dictionary.pdf` | `54996d2febb7` | 127,028 | none in the name |
 | `osha/summary/ITA_Data_Dictionary.pdf` | `710af4f89575` | 122,831 | none in the name |
 
-The 2025 file still runs through 2026-08-31: the data page listed no newer release that
-day, so it is the only year that will gain rows. The 2023 and 2024 zips each hold one CSV
-whose name ends `_v2`, which matches OSHA's re-posting of those files under unchanged zip
-names.
+The 2025 file runs through 2026-08-31, and the data page listed no newer release that day.
+The 2023 and 2024 zips each hold one CSV whose name ends `_v2.csv`; the plan records OSHA's
+re-posting of both files under unchanged zip names (the 2023 one on 2026-05-20), which this
+run did not check.
 
 ## Rows per year
 
@@ -63,15 +63,16 @@ The command's totals lines, verbatim:
   it is listed here and not used as a comparison.
 - J.J. Keller reported "more than 300,000" establishments for 2022. That is not an OSHA
   publication and is not used.
-- No OSHA-published count was located for 2016–2022 or for 2025. The pre-2023 file names
-  carry no through-date, and the 2025 file runs through 2026-08-31, so each of those years
-  has a file date but no count to set beside it.
+- No OSHA-published count was located for 2016–2022 or for 2025. The 2025 file has a
+  through-date (2026-08-31) but no count to set beside it; the 2016–2022 file names carry
+  neither.
 
 ## Values the full files carried that the fixtures did not
 
-The fixtures were built from the first ~900 rows of each file. The first live build
-stopped on structure (plan Task 7 Step 3), and the owner decided how each case is handled
-(plan decisions D8–D11, implemented in Tasks 7a and 7b). No row was dropped.
+The fixtures were built from the first ~900 rows of each file. The live build stopped on
+structure twice (plan Task 7 Step 3), and the owner decided how each case is handled (plan
+decisions D8–D11, implemented in Tasks 7a and 7b). The build has no filter step, and the
+2024 and 2025 table counts equal their CSVs' row counts (398,620 and 400,288).
 
 | File | Rows | Delivered value | Stored as |
 | --- | --- | --- | --- |
@@ -89,7 +90,7 @@ Every other file and column passed the structural checks.
 The table has 3,206,055 rows over ten years. `size_class` holds only `1`, `2` and `3`, with
 no nulls.
 
-| Year | Rows | size 2 | size 21 | size 22 | naics 2012 | naics 2017 | naics 2022 | naics code missing | ein missing | est. id missing | duplicate ids | repeated est. ids | flag employment | flag hours | flag below size |
+| Year | Rows | size 2 | size 21 | size 22 | naics 2012 | naics 2017 | naics 2022 | naics code null | ein null | est. id null | duplicate ids | repeated est. ids | flag employment | flag hours | flag below size |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 2016 | 214,978 | 152,311 | 0 | 0 | 214,978 | 0 | 0 | 0 | 214,978 | 0 | 0 | 2 | 1,315 | 7,290 | 35,459 |
 | 2017 | 259,758 | 188,655 | 0 | 0 | 259,758 | 0 | 0 | 0 | 259,756 | 0 | 0 | 2 | 448 | 9,393 | 41,399 |
@@ -116,38 +117,43 @@ no nulls.
   60.8%. 2017 is 5.6%, 3.0% and 3.1%. A code with no usable vintage, flagged by
   `flag_naics_year_unknown`, is 2,297 rows in 2023, 203 in 2024 and 170 in 2025, 2,670 in
   all.
-- **`ein` missing.** 100.0% of 2016 rows (214,978 of 214,978), 99.999% of 2017 (259,756
-  of 259,758) and 99.3% of 2018 (287,579 of 289,534). From 2019 it is 17.9%, then
-  10.9%, 9.8%, 10.5%, 10.3%, 10.9% and 11.5% (2020 to 2025).
-- **`establishment_id`.** Present on every row of every year from 2016 (0 missing). Within
+- **`ein` null.** 100.0% of 2016 rows (214,978 of 214,978), 99.999% of 2017 (259,756 of
+  259,758) and 99.3% of 2018 (287,579 of 289,534). From 2019 it is 17.9%, then 10.9%,
+  9.8%, 10.5%, 10.3%, 10.9% and 11.5% (2020 to 2025).
+- **`establishment_id`.** Non-null on every row of every year from 2016 (0 null). Within
   a year it repeats on 2 rows in 2016 and 2017, 5,300 in 2018, 12 in 2020, 4,084 in 2021
   and 6 in 2023; it does not repeat in 2019, 2022, 2024 or 2025.
-- **Duplicate record `id`s.** Only 2021 has any: 4,082 rows share an `id`. They nearly
-  coincide with the 4,084 rows that repeat an `establishment_id` in 2021. Whether those
-  rows are identical was not examined.
-- **Missing values.** `establishment_type` is null on 29,518, 36,670 and 44,876 rows in
+- **Duplicate record `id`s.** Only 2021 has any: 4,082 rows share an `id`, and 4,084 rows
+  repeat an `establishment_id` in 2021. Whether they are the same rows, or identical, was
+  not examined.
+- **Null values.** `establishment_type` is null on 29,518, 36,670 and 44,876 rows in
   2016, 2017 and 2018, then on at most 2,957 rows a year (2,957 in 2019, 447 in 2025).
   `total_hours_worked` is null on 3, 4, 5 and 1 rows in 2016, 2017, 2018 and 2022, and on
   none in other years. `size` is never null.
 - **Flags.** The counts are in the table. `flag_hours_per_employee` is null exactly where
-  `flag_employment` is set (1,315 rows in 2016, up to 4,517 in 2025). Flagged rows are
-  kept. Some stored hours are absurd: the largest `total_hours_worked` is
-  16,831,620,723,179 (2019) and 862,847,000,000 in 2024 (the scientific-notation row).
-  Both fall far outside 500–4,000 hours per employee and are flagged.
+  `flag_employment` is set: the two counts are equal in all ten years, from 448 rows in
+  2017 to 4,517 in 2025. Flagged rows are kept. Some stored hours are implausible. The
+  largest `total_hours_worked` is 16,831,620,723,179 (2019, id 1059547, 7 employees), and
+  the largest in 2024 is 862,847,000,000 (the scientific-notation row, 133 employees).
+  Both rows have `flag_hours_per_employee` set.
 
 ## Consequences for later stages
 
 - **Stage 3 (V2 `establishment_id` persistence; the pre-2023 link on `ein`).**
-  `establishment_id` is present on every row from 2016, so V2 can test persistence over the
-  whole span; it repeats within a year in 2018 (5,300 rows) and 2021 (4,084), which a
-  persistence test must account for. `ein` is empty on 99.3% to 100.0% of 2016–2018 rows
-  and on 17.9% of 2019 rows, so a link on `ein` cannot cover 2016–2018 and is partial for
-  2019. Record `id` is not unique within 2021.
+  `establishment_id` is non-null on every row of every year, 2016 to 2025. Within a year it
+  repeats on 2 rows in 2016 and 2017, 5,300 in 2018, 12 in 2020, 4,084 in 2021 and 6 in
+  2023. V2 matches 2023 establishments to 2024 and 2025 on `ein` and address, and `ein` is
+  null on 10.3% of 2023 rows, 10.9% of 2024 and 11.5% of 2025. R2.7 links the earlier years
+  on `ein` plus name and address, and `ein` is null on 99.3% to 100.0% of 2016–2018 rows
+  and 17.9% of 2019 rows. Record `id` repeats within 2021 (4,082 rows).
 - **Stage 4 (`naics_year` mix; the deferred industry half of the filing-rule flag).**
-  From 2023 a code's vintage is 2012, 2017 or 2022 with no single majority label: 2012 is
-  41.2% of 2024 rows. 2,670 rows have a code and no usable vintage. An industry test built
-  on a vintage-specific list has to read each row's `naics_year` and cannot assume one
-  vintage per file.
-- **Stage 10 (`ein`-based dedup and co-ownership).** `ein` is unusable for 2016–2018 and
-  missing on 9.8% to 11.5% of rows in 2020–2025; employer dedup (R2.6) and
-  co-ownership (R7.2) built on it would not see those establishments.
+  Before 2023 every row's vintage is the dictionary's 2012 (214,978 to 346,799 rows a
+  year). From 2023 each file mixes vintages. 2022 is the majority label (90.9%, 55.8% and
+  60.8% of 2023 to 2025 rows), but 2012 is 41.2% of 2024 rows and 36.1% of 2025 rows, and
+  2017 is 3.0% to 5.6%. 2,670 rows have a code and no usable vintage (2,297, 203 and 170
+  in 2023 to 2025).
+- **Stage 10 (`ein`-based dedup and co-ownership).** R2.6 deduplicates on `ein`, else
+  `company_name`, and R7.2's co-ownership family is built within an employer (`ein`).
+  `ein` is null on 99.3% to 100.0% of 2016–2018 rows (1,955 of 289,534 rows in 2018 carry
+  one), 17.9% of 2019 rows and 9.8% to 11.5% of 2020–2025 rows. The null share of
+  `company_name`, R2.6's fallback, was not measured.
