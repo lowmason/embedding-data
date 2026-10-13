@@ -193,10 +193,19 @@ whole number it spells; every other non-integer value fails the build.
 and illness counts stay in the raw files; they are not benchmark inputs.
 *(chosen; D)*
 
-**R2.5** Map every NAICS code to the 2022 vintage under R5.4. ITA validates
-codes as six-digit at submission and publishes invalid codes as missing; missing
-stays missing and is never imputed from the description. *(verified; ITA —
-no-imputation rule added at synthesis)*
+**R2.5** Map supported NAICS codes to the 2022 vintage under R5.4, keeping the
+native code and vintage. Missing stays missing and is never imputed from the
+description. Six-digit format does not establish official code membership:
+the delivered files include codes absent from their recorded vintage and from
+all three supported structures. Retain these rows and unknown-vintage rows
+with explicit mapping-status and unresolved flags; assert a canonical node or
+candidate set only when official reference relationships support it. Never
+correct a native code or infer its vintage from another structure or the
+description. Malformed input and invalid reference structure still fail the
+build. Record mapping-state and unresolved counts in V11 (ITA), rather than
+requiring zero unresolved source codes. This exception applies to ITA source
+defects; other sources retain R5.3/V11's parsing requirements. *(owner, Stage 4
+design, 2026-10-13; specs/findings/stage-4-ita-code-preflight.md)*
 
 **R2.6** `industry_description` is the employer's own free text from the 300A
 form, up to 300 characters. Keep the original string and add a normalized

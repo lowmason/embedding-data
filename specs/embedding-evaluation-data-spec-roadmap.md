@@ -144,12 +144,12 @@ placements:
       > Next: resume the roadmap.
 
 - [ ] Stage 4: Code tables and ITA NAICS mapping
-      Objective: NAICS 2022 and SOC 2018 node and edge tables exist, and every ITA NAICS code maps to the 2022 vintage as a node or flagged candidate set.
-      Spec: R5.1, R5.2, R5.4, R2.5, R2.9 (industry half), V11 (ITA)
+      Objective: NAICS 2022 and SOC 2018 node and edge tables exist, and every ITA row has a supported canonical mapping or an explicit missing/unresolved state without imputation.
+      Spec: R5.1, R5.2, R5.4, R2.5, R2.9 (industry half), V11 (ITA); stage design in `specs/code-tables-ita-naics-mapping.md`
       Gap closed: R5.1 (ITA); R5.2; R5.4 (ITA vintages); R2.5; R2.9 (industry half); V11 (ITA)
       Consumes: Stage 1 manifest; Stage 2 table (`naics_code`, `naics_year`). Pre-2023 vintages are the dictionary's 2012, marked `naics_year_from_dictionary`. From 2023, coded rows with no usable vintage have a null `naics_year` and are flagged `flag_naics_year_unknown`, and 2012 codes persist in the 2024 and 2025 files. Plan 2's P8 records the filing rule's appendix versions (plan 2, Handoff; `specs/findings/v10-ita-300a-totals.md`; Resolved at resume, 2026-10-13); Stage 3 manifested 2012/2017/2022 title inputs and `ita_references` acquisition/reader/parser contracts, with title-only comparison and unknown-vintage limits (plan 3, [Handoff](plans/completed/3-ita-verification.md#handoff-to-later-stages); Resolved at resume, 2026-10-13)
       Produces: NAICS and SOC node and edge tables and their schema convention (reused by Stage 5); the candidate-set representation; 2012/2017→2022 concordance as flagged candidate sets; ITA records carrying native and canonical codes; R2.9's industry half per `specs/deferred_items.md` section `2-ita-300a-summaries`, item "Industry half of the R2.9 filing-rule flag" (plan 2, Handoff; Resolved at resume, 2026-10-13)
-      Exit: V11 reports zero unmapped codes in the ITA table, counting the rows flagged `flag_naics_year_unknown` (plan 2, Handoff; Resolved at resume, 2026-10-13); a fixture with an unparseable code fails the build; no concordance relationship is resolved to one side; sectors 31–33, 44–45, and 48–49 are each one node; the "Industry half of the R2.9 filing-rule flag" item's Done-when holds and the item is ticked
+      Exit: V11 accounts for every ITA row by mapping status and reports unresolved counts, including unknown vintages and code/vintage mismatches; only officially supported nodes or candidate sets are asserted (R2.5; `specs/findings/stage-4-ita-code-preflight.md`; owner, at Stage 4 design, 2026-10-13); a fixture with a malformed code fails the build; no concordance relationship is resolved to one side; sectors 31–33, 44–45, and 48–49 are each one node; the "Industry half of the R2.9 filing-rule flag" item's Done-when holds and the item is ticked
       ROUTING: brainstorming
 
 - [ ] Stage 5: Geography hierarchy and county reference
