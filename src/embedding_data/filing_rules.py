@@ -1,10 +1,12 @@
 import re
 from datetime import date
 from html.parser import HTMLParser
+from itertools import product
 
 import polars as pl
 
 from embedding_data.classification_tables import naics_tables
+from embedding_data.naics_relationships import candidates
 
 RULES = {
     'designated_2012': (2012, date(2017, 1, 1), date(2023, 12, 31), 'E', 66),
@@ -261,3 +263,147 @@ def validate_membership(membership, structures):
                 raise ValueError('invalid or empty membership possibility set')
             if len(possibilities) > 1 and (identity != 'partially_exempt_2007' or not touched):
                 raise ValueError('unexplained reference membership ambiguity')
+
+
+FILING_KEYS = {
+    'year_filing_for': pl.Int64,
+    'naics_code': pl.String,
+    'naics_year': pl.Int64,
+    'size_class': pl.Int64,
+}
+FILING_COLUMNS = {
+    'filing_industry_status': pl.String,
+    'flag_outside_filing_industry': pl.Boolean,
+    'flag_outside_filing_rule': pl.Boolean,
+    'flag_filing_rule_label_bridged': pl.Boolean,
+    'flag_filing_reference_ambiguous': pl.Boolean,
+}
+FILING_LOOKUP_SCHEMA = {**FILING_KEYS, **FILING_COLUMNS}
+
+
+def active_rule(rules, family, nominal_date):
+    selected = rules.filter(
+        pl.col('rule_id')
+        .str.starts_with(family)
+        .and_(pl.col('effective_from').le(nominal_date))
+        .and_(pl.col('effective_to').is_null().or_(pl.col('effective_to').ge(nominal_date)))
+    )
+    identities = selected.select('rule_id', 'vintage').unique()
+    if identities.height != 1:
+        raise ValueError('unsupported or overlapping filing-rule period')
+    rule_id, vintage = identities.row(0)
+    return vintage, {
+        code: (possibilities, touched)
+        for code, possibilities, touched in selected.select(
+            'code', 'membership_candidates', 'flag_rule_label_bridged'
+        ).iter_rows()
+    }
+
+
+def evaluate(year, code, vintage, size_class, structures, relations, rules):
+    if year is None:
+        raise ValueError('missing filing year')
+    if code is not None and not re.fullmatch(r'[0-9]{6}', code):
+        raise ValueError('malformed source NAICS code')
+    nominal = date(year + 1, 1, 1)
+    designated_vintage, designated = active_rule(rules, 'designated_', nominal)
+    exempt_vintage, exempt = active_rule(rules, 'partially_exempt_', nominal)
+    leaves = {
+        v: set(
+            structures.filter(
+                pl.col('vintage').eq(v).and_(pl.col('level').eq('national_industry'))
+            )['code'].to_list()
+        )
+        for v in (2012, 2017, 2022)
+    }
+    if vintage is not None and vintage not in leaves:
+        raise ValueError('incompatible native vintage')
+    if size_class not in (None, 1, 2, 3):
+        raise ValueError('unsupported harmonized size class')
+    outside, bridged, reference_ambiguous = None, False, False
+    if size_class is None:
+        status = 'missing_size'
+    elif size_class == 1:
+        status = 'not_applicable_below_size'
+    elif code is None:
+        status = 'missing_code'
+    elif vintage is not None and code not in leaves[vintage]:
+        status = 'invalid_native_code'
+    else:
+        interpretations = (
+            [vintage] if vintage is not None else [v for v in leaves if code in leaves[v]]
+        )
+        if not interpretations:
+            status = 'unknown_vintage_unmapped'
+        else:
+            evaluations = set()
+            for native in interpretations:
+                exemption = candidates(relations, native, code, exempt_vintage)
+                if not set(exemption).issubset(exempt):
+                    raise ValueError('missing rule membership candidate')
+                bridged = bridged or any(exempt[e][1] for e in exemption)
+                reference_ambiguous = reference_ambiguous or any(
+                    len(exempt[e][0]) > 1 for e in exemption
+                )
+                exempt_bits = {bit for e in exemption for bit in exempt[e][0]}
+                if size_class == 3:
+                    evaluations.update(exempt_bits)
+                else:
+                    designation = candidates(relations, native, code, designated_vintage)
+                    if not set(designation).issubset(designated):
+                        raise ValueError('missing designated membership candidate')
+                    designated_bits = {bit for d in designation for bit in designated[d][0]}
+                    evaluations.update(
+                        not d or e for d, e in product(designated_bits, exempt_bits)
+                    )
+            if len(evaluations) == 1:
+                status, outside = 'determinate', evaluations.pop()
+            else:
+                status = 'candidate_disagreement'
+    return {
+        'filing_industry_status': status,
+        'flag_outside_filing_industry': outside,
+        'flag_outside_filing_rule': True if size_class == 1 else outside,
+        'flag_filing_rule_label_bridged': bridged,
+        'flag_filing_reference_ambiguous': reference_ambiguous,
+    }
+
+
+def build_filing_lookup(keys, structures, relations, rules):
+    if keys.schema != FILING_KEYS or keys.is_duplicated().any():
+        raise ValueError('duplicate or incompatible filing lookup key')
+    validate_membership(rules, structures)
+    rows = []
+    for row in keys.iter_rows(named=True):
+        result = evaluate(
+            row['year_filing_for'],
+            row['naics_code'],
+            row['naics_year'],
+            row['size_class'],
+            structures,
+            relations,
+            rules,
+        )
+        rows.append({**row, **result})
+    return pl.DataFrame(rows, schema=FILING_LOOKUP_SCHEMA).sort(
+        list(FILING_KEYS), nulls_last=False
+    )
+
+
+def add_filing_flags(source, lookup):
+    names = source.collect_schema().names()
+    if '_filing_row' in names or any(c in names for c in FILING_COLUMNS):
+        raise ValueError('filing output/temporary column collision')
+    if lookup.schema != FILING_LOOKUP_SCHEMA or lookup.select(*FILING_KEYS).is_duplicated().any():
+        raise ValueError('duplicate or incompatible filing lookup')
+    joined = source.with_row_index('_filing_row').join(
+        lookup.lazy(),
+        on=list(FILING_KEYS),
+        how='left',
+        nulls_equal=True,
+        validate='m:1',
+        maintain_order='left',
+    )
+    if joined.select(pl.col('filing_industry_status').is_null().any()).collect().item():
+        raise ValueError('missing filing lookup result')
+    return joined.sort('_filing_row').drop('_filing_row').select(*names, *FILING_COLUMNS)

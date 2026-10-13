@@ -230,3 +230,205 @@ def test_missing_identity_and_duplicate_membership_refused(filing_fixture):
         )
     with pytest.raises(ValueError, match='duplicate'):
         fr.validate_membership(pl.concat([membership, membership.head(1)]), structures)
+
+
+@pytest.mark.parametrize(
+    'size,code,vintage,status,industry,overall',
+    [
+        (None, '111111', 2012, 'missing_size', None, None),
+        (1, None, None, 'not_applicable_below_size', None, True),
+        (2, None, 2012, 'missing_code', None, None),
+        (2, '999999', 2012, 'invalid_native_code', None, None),
+        (3, '999999', None, 'unknown_vintage_unmapped', None, None),
+    ],
+)
+def test_filing_status_precedence(filing_fixture, size, code, vintage, status, industry, overall):
+    structures, relations, rules = filing_fixture
+    assert fr.evaluate(2022, code, vintage, size, structures, relations, rules) == {
+        'filing_industry_status': status,
+        'flag_outside_filing_industry': industry,
+        'flag_outside_filing_rule': overall,
+        'flag_filing_rule_label_bridged': False,
+        'flag_filing_reference_ambiguous': False,
+    }
+
+
+@pytest.mark.parametrize(
+    'size,status,outside',
+    [
+        (2, 'determinate', True),
+        (3, 'candidate_disagreement', None),
+    ],
+)
+def test_reference_ambiguity_can_survive_final_unanimity(filing_fixture, size, status, outside):
+    structures, relations, membership = filing_fixture
+    selected = pl.col('rule_id').eq('partially_exempt_2007').and_(pl.col('code').eq('111112'))
+    membership = membership.with_columns(
+        membership_candidates=pl.when(selected)
+        .then(pl.lit([False, True], dtype=pl.List(pl.Boolean)))
+        .otherwise(pl.col('membership_candidates')),
+        flag_rule_label_bridged=selected,
+    )
+    result = fr.evaluate(2022, '111112', 2012, size, structures, relations, membership)
+    assert result['filing_industry_status'] == status
+    assert result['flag_outside_filing_industry'] is outside
+    assert result['flag_filing_reference_ambiguous'] is True
+    assert result['flag_filing_rule_label_bridged'] is True
+
+
+@pytest.mark.parametrize(
+    'size,code,vintage,outside',
+    [
+        (2, '111111', 2012, False),
+        (2, '111112', 2012, True),
+        (2, '111112', None, None),
+        (3, '111111', 2012, False),
+        (3, '111112', 2012, True),
+        (2, '111112', 2017, None),
+    ],
+)
+def test_candidate_unanimity(filing_fixture, size, code, vintage, outside):
+    structures, relations, membership = filing_fixture
+    result = fr.evaluate(2022, code, vintage, size, structures, relations, membership)
+    assert result['flag_outside_filing_industry'] is outside
+    assert result['filing_industry_status'] == (
+        'candidate_disagreement' if outside is None else 'determinate'
+    )
+
+
+def test_large_size_only_traverses_exemption(filing_fixture):
+    structures, relations, membership = filing_fixture
+    relations = relations.filter(pl.col('source_vintage').ne(2012))
+    assert (
+        fr.evaluate(2023, '111111', 2012, 3, structures, relations, membership)[
+            'flag_outside_filing_industry'
+        ]
+        is False
+    )
+    with pytest.raises(ValueError, match='bridge'):
+        fr.evaluate(2023, '111111', 2012, 2, structures, relations, membership)
+
+
+def test_boundary_years_use_nominal_submission_date(filing_fixture):
+    structures, relations, membership = filing_fixture
+    from code_fixtures import pair_sheet
+
+    from embedding_data.naics_relationships import parse_concordance, validate_relationships
+
+    identity = parse_concordance(pair_sheet(2012, 2017, [
+        ('111111', '111111'), ('111112', '111112'),
+    ]), 2012, 2017, 'identity.xlsx')
+    relations = pl.concat([relations.filter(pl.col('source_vintage').ne(2012)), identity])
+    validate_relationships(relations, structures)
+    for year, outside in [(2022, False), (2023, True)]:
+        assert (
+            fr.evaluate(year, '111111', 2012, 2, structures, relations, membership)[
+                'flag_outside_filing_industry'
+            ]
+            is outside
+        )
+
+
+@pytest.mark.parametrize(
+    'year,code,vintage,size,match',
+    [
+        (None, '111111', 2012, 2, 'year'),
+        (2022, '１１１１１１', 2012, 2, 'malformed'),
+        (2022, '111111', 2007, 2, 'vintage'),
+        (2022, '111111', 2012, 4, 'size'),
+        (2010, '111111', 2012, 2, 'period'),
+    ],
+)
+def test_evaluator_rejects_incompatible_inputs(filing_fixture, year, code, vintage, size, match):
+    with pytest.raises(ValueError, match=match):
+        fr.evaluate(year, code, vintage, size, *filing_fixture)
+
+
+def test_correlated_unknown_vintages_and_join_preservation(filing_fixture):
+    from code_fixtures import pair_sheet
+
+    from embedding_data.naics_relationships import parse_concordance, validate_relationships
+
+    structures, relations, membership = filing_fixture
+    swapped = parse_concordance(
+        pair_sheet(
+            2012,
+            2017,
+            [
+                ('111111', '111112'),
+                ('111112', '111111'),
+            ],
+        ),
+        2012,
+        2017,
+        'swap.xlsx',
+    )
+    relations = pl.concat([relations.filter(pl.col('source_vintage').ne(2012)), swapped])
+    validate_relationships(relations, structures)
+    membership = membership.with_columns(
+        membership_candidates=pl.when(pl.col('rule_id').eq('partially_exempt_2007'))
+        .then(pl.when(pl.col('code').eq('111111')).then(pl.lit([True])).otherwise(pl.lit([False])))
+        .otherwise(pl.col('membership_candidates')),
+    )
+    keys = pl.DataFrame(
+        [(2022, '111111', None, 2), (2022, None, None, None)], schema=fr.FILING_KEYS, orient='row'
+    )
+    lookup = fr.build_filing_lookup(keys, structures, relations, membership)
+    assert lookup.schema == fr.FILING_LOOKUP_SCHEMA
+    source = pl.concat([keys, keys.head(1)]).with_columns(
+        annual_average_employees=pl.Series([25, 1000, 250]),
+        flag_below_filing_size=False,
+        flag_naics_year_unknown=True,
+        flag_naics_mapping_unresolved=True,
+    )
+    result = fr.add_filing_flags(source.lazy(), lookup).collect()
+    assert result.select(source.columns).equals(source)
+    assert result.height == 3
+    assert result['flag_outside_filing_rule'].to_list() == [True, None, True]
+    assert result['filing_industry_status'].to_list() == [
+        'determinate',
+        'missing_size',
+        'determinate',
+    ]
+    assert result['flag_outside_filing_rule'].dtype == pl.Boolean
+    assert result['flag_filing_reference_ambiguous'].null_count() == 0
+    assert result['flag_filing_rule_label_bridged'].null_count() == 0
+    assert lookup.equals(fr.build_filing_lookup(keys.reverse(), structures, relations, membership))
+    with pytest.raises(ValueError, match='duplicate'):
+        fr.build_filing_lookup(pl.concat([keys, keys]), structures, relations, membership)
+    with pytest.raises(ValueError, match='duplicate'):
+        fr.add_filing_flags(source.lazy(), pl.concat([lookup, lookup]))
+    with pytest.raises(ValueError, match='missing'):
+        fr.add_filing_flags(source.lazy(), lookup.filter(pl.col('naics_code').is_null()))
+    with pytest.raises(ValueError, match='collision'):
+        fr.add_filing_flags(result.lazy(), lookup)
+    with pytest.raises(ValueError, match='coverage'):
+        fr.build_filing_lookup(keys, structures, relations, membership.slice(1))
+
+
+def test_unknown_singleton_and_all_out_candidates(filing_fixture):
+    structures, relations, membership = filing_fixture
+    membership = membership.with_columns(
+        membership_candidates=pl.when(pl.col('rule_id').eq('partially_exempt_2007'))
+        .then(pl.lit([True]))
+        .otherwise(pl.col('membership_candidates')),
+    )
+    for code, vintage in [('111113', None), ('111112', 2017)]:
+        result = fr.evaluate(2022, code, vintage, 2, structures, relations, membership)
+        assert result['filing_industry_status'] == 'determinate'
+        assert result['flag_outside_filing_industry'] is True
+
+
+def test_cartesian_candidate_possibilities_and_all_in(filing_fixture):
+    structures, relations, membership = filing_fixture
+    all_in = membership.with_columns(
+        membership_candidates=pl.when(pl.col('rule_id').str.starts_with('designated_'))
+        .then(pl.lit([True])).otherwise(pl.lit([False])),
+    )
+    assert fr.evaluate(2022, '111112', 2017, 2, structures, relations, all_in)[
+        'flag_outside_filing_industry'
+    ] is False
+    # Reverse candidates are paired independently within this one native interpretation.
+    assert fr.evaluate(2022, '111112', 2017, 2, structures, relations, membership)[
+        'flag_outside_filing_industry'
+    ] is None
