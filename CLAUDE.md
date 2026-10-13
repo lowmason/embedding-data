@@ -91,8 +91,10 @@ and checks the existing source against selected raw releases without rewriting i
 Existing run or `.part` names fail and earlier bundles remain immutable.
 
 The [actual V11 finding](specs/findings/v11-ita-naics-mapping.md) records
-`stage4_v11_20261013`, `codes-ita-v1`, all 3,206,055 rows, all original columns
-and verified row order. Classification forests have child-to-parent `hierarchy`
+`stage4_v11_20261013_r2`, `codes-ita-v1`, all 3,206,055 rows, all original columns
+and verified row order. This selected run remeasures reviewed code `ccd138f`
+after the CLI workbook-error diagnostic fix; the earlier `stage4_v11_20261013`
+bundle remains byte-identical. Classification forests have child-to-parent `hierarchy`
 edges and no invented root; their single-parent validator is classification-specific.
 Sorted candidate lists retain every official possibility. Known-vintage mismatches
 remain unresolved with empty candidates; unknown-vintage unions retain uncertainty

@@ -1,9 +1,9 @@
 # V11 (ITA): measured canonical mapping and filing diagnostics
 
 Measured 2026-10-13 against the full local dataset, using execution commit
-`fdfeaa1df3b5b0273d6fa86481e84b34404e2e01`, run `stage4_v11_20261013`
+`ccd138fcf8606085cf3d13821bf01f86ab35f7f2`, run `stage4_v11_20261013_r2`
 and schema/transformation version `codes-ita-v1`. The immutable bundle is
-`data/derived/codes/stage4_v11_20261013/`. This records actual produced outputs,
+`data/derived/codes/stage4_v11_20261013_r2/`. This records actual produced outputs,
 not fixture results or a preflight substitute. Stage 4 completion and whole-branch
 review are separate controller gates.
 
@@ -67,7 +67,8 @@ existing title originals were checked against the raw manifest. Registered
 `codes import-reference` retained complete official bytes and recorded local import
 time as a retrieval-time proxy. A shipped `codes acquire` replay found all thirteen
 references cached, therefore downloaded none. A second registered CLI replay with HTTP send forbidden
-confirmed zero HTTP calls and unchanged raw-manifest bytes. Audits before and after build returned
+confirmed zero HTTP calls and unchanged raw-manifest bytes during the original
+measurement. Original pre/post-build and fresh-run audits returned
 `0 raw provenance discrepancies`. No private data were transmitted.
 
 The offline build verified the selected ten raw releases, contiguous source years,
@@ -76,7 +77,19 @@ harmonization. It never called `build_summary_table`, `prepare`, or `sample`.
 Additional acceptance verified both canonical forests, all expected graph/rule counts,
 exact canonical schema, expected source-defect states, row accounting, all raw,
 source, implementation and lock hashes, every output checksum/size, and all 25
-protected source/Stage 3 hashes. No discrepancy required a code or dependency change.
+protected source/Stage 3 hashes. No measurement discrepancy required a code or dependency change. Final branch
+review identified an independent CLI exception gap: native fastexcel workbook
+errors needed the same clean exit-2 diagnostic as other parser failures. The
+reviewed fix in execution commit `ccd138f` changes CLI error handling only; it
+changes no mapping, filing, reference or dependency behavior. The code-change
+evidence policy required this fresh run rather than replacing earlier outputs.
+The earlier `stage4_v11_20261013` bundle remains available, and all fifteen of
+its files were snapshotted before this build and verified byte-identical afterward.
+The complete fresh aggregate report equals the earlier report, and runtime and
+dependency versions also match. Fresh input/output hashes are recorded below.
+The canonical Parquet physical bytes differ between runs; a further 33-slice
+comparison verifies every column, including mapping and filing fields, is logically
+identical in source order. Physical writer bytes are not the determinism contract.
 
 Strict parser/build gates reject malformed nonmissing ITA codes (anything other
 than six ASCII digits), unsupported nonnull vintages, missing/corrupt originals,
@@ -95,15 +108,15 @@ Commands used from the execution checkout (all uv commands prefixed with
 uv run --offline --locked embedding-data codes import-reference KIND ORIGINAL --data-dir /Users/lowell/Projects/embedding-data/data
 uv run --offline --locked embedding-data codes acquire --data-dir /Users/lowell/Projects/embedding-data/data
 uv run --offline --locked embedding-data audit --data-dir /Users/lowell/Projects/embedding-data/data
-uv run --offline --locked embedding-data codes build stage4_v11_20261013 --data-dir /Users/lowell/Projects/embedding-data/data
-uv run --offline --locked python .sdd/4-code-tables-ita-naics-mapping/accept-full-data.py
+uv run --offline --locked embedding-data codes build stage4_v11_20261013_r2 --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked python .sdd/4-code-tables-ita-naics-mapping/accept-full-data.py stage4_v11_20261013_r2
 uv run --offline --locked pytest
 uv run --offline --locked behave
 uv run --offline --locked ruff check .
 uv lock --offline --check
 ```
 
-Milestone results: 475 passed, 1 network test deselected; 1 Behave feature,
+Milestone results: 476 passed, 1 network test deselected; 1 Behave feature,
 2 scenarios and 10 steps passed; Ruff passed; lock check resolved 63 packages.
 
 ## Input provenance and software
@@ -183,9 +196,16 @@ Implementation SHA-256 inventory:
 | src/embedding_data/osha_encoding.py | 4e3efe187e25e1d2dd894207b9d7bdb719ae5543c740c208df401174e7ee6307 |
 | src/embedding_data/paths.py | 9adc720b3dfe07a5801e41f5f1b7cbe1d1a9d2620b4c983ef5babc63d811a014 |
 
+Additional CLI implementation hashes (not included in the build-generated implementation inventory):
+
+| file | SHA-256 |
+| --- | --- |
+| src/embedding_data/codes_cli.py | e52b213e5dec5098ad6a7f91c0ccb428f00a4f59f1560dd410a788283f2a9dd7 |
+| src/embedding_data/cli.py | 04bed79c10fad08a46aac670aa2934ddc861b5a6c9416e4738cb32505b8a3ebb |
+
 ## Bundle inventory and exact schemas
 
-`outputs.json` is detached: it covers all twelve Parquet tables plus `inputs.json` and `report.json`, and excludes itself to avoid self-reference. Its own SHA-256 is `55c357dcb6c57ffec2509019da439a7c9f477d6181becc6142071ea8537b5822`. JSON records use the `codes-ita-v1` contract; `inputs.json` records the run ID. List types are nonnull for candidates/matching vintages; Schemas below list columns in physical Parquet order. Canonical scalar fields are nullable. Mapping and reference-provenance flags are nonnullable; filing-industry and combined filing-rule flags are nullable. Source nullability is preserved.
+`outputs.json` is detached: it covers all twelve Parquet tables plus `inputs.json` and `report.json`, and excludes itself to avoid self-reference. Its own SHA-256 is `15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a`. JSON records use the `codes-ita-v1` contract; `inputs.json` records the run ID. List types are nonnull for candidates/matching vintages. Schemas below list columns in physical Parquet order. Canonical scalar fields are nullable. Mapping and reference-provenance flags are nonnullable; filing-industry and combined filing-rule flags are nullable. Source nullability is preserved.
 
 | filename | rows | bytes | SHA-256 |
 | --- | --- | --- | --- |
@@ -193,8 +213,8 @@ Implementation SHA-256 inventory:
 | filing_rule_labels.parquet | 213 | 3341 | 349372e5e2e340469622c53acbf42b3fb58b52066ea3953d155475f2037ed7df |
 | filing_rule_membership.parquet | 3297 | 9842 | 1485c190c5e6d8019f07939240773e14c9dc039111c2c10ae32207ad214d4796 |
 | filing_rules.parquet | 1624 | 6698 | 5f362737c57b7f512d8b1bc710548776c7658b1bc778f98f810279a0d46cd1d9 |
-| inputs.json | — | 17975 | 9a301fb3b3799f819d326f4171fdbf1ec197047aea8f25738fc5333721fa655f |
-| ita_300a_canonical.parquet | 3206055 | 155974239 | 31b4e30539ab3eacd7cf684569ee8dbc86b21d6fabbcc1882e281603afa82467 |
+| inputs.json | — | 17978 | 0b76c93e87f6c097eb20ca33257d3715a5a88ee83150d918e78be09930c1fc10 |
+| ita_300a_canonical.parquet | 3206055 | 156025783 | 2c64e783c8874cbe78809c0629a08faa7a0bf965d7680279350a64928a1f32ab |
 | ita_naics_lookup.parquet | 4109 | 42902 | b1dfb33644c413ba33698fbf26c1316507382077ae73226ef5c3626d5bc287c8 |
 | naics_concordance.parquet | 4603 | 19640 | 5384c1c81e973940f459c8cd9210335c5a1da6f5302c47f9fb5338bed9b262d6 |
 | naics_edges.parquet | 2105 | 12492 | caade9029e658f023f75056c0e7ebb2f9fa0d285bd91d43a32b65c2ec84d8e9c |
@@ -682,3 +702,25 @@ All following paths (relative to the actual data root) matched before imports an
 | derived/osha/verification/v1_v3_20261013_scopefix/v1.parquet | 10393 | 64015ed14a3bd4b53d71738e17f7f32690d68c1b695473184a253dce03b719d9 |
 | derived/osha/verification/v1_v3_20261013_scopefix/v2.json | 7236 | 00bd72b430bec21611c812382c0546539dcc6537c54dde6bb7236b5b299cac54 |
 | derived/osha/verification/v1_v3_20261013_scopefix/v3-strata.parquet | 37300 | 252895d349483c8e95c10db76f5dec373edcb8ac34186602c2f1783ddb9ace34 |
+
+## Earlier immutable run preservation
+
+The following fifteen files under `derived/codes/stage4_v11_20261013/` matched their pre-remeasurement SHA-256 and size after the new run completed. This older run used execution commit `fdfeaa1df3b5b0273d6fa86481e84b34404e2e01`; the selected run is now `stage4_v11_20261013_r2`.
+
+| filename | bytes | unchanged SHA-256 |
+| --- | --- | --- |
+| filing_rules.parquet | 6698 | 5f362737c57b7f512d8b1bc710548776c7658b1bc778f98f810279a0d46cd1d9 |
+| ita_300a_canonical.parquet | 155974239 | 31b4e30539ab3eacd7cf684569ee8dbc86b21d6fabbcc1882e281603afa82467 |
+| report.json | 38114 | 56dfb18ab93f244f4294c015cab38905ca3e3cbf822730e922747dcc6b89f29a |
+| naics_concordance.parquet | 19640 | 5384c1c81e973940f459c8cd9210335c5a1da6f5302c47f9fb5338bed9b262d6 |
+| soc_edges.parquet | 7036 | 38a224322b1b5f08835a17a1f9e0ddf2592c2e3b343e8cfbe9525f2d176cae28 |
+| ita_naics_lookup.parquet | 42902 | b1dfb33644c413ba33698fbf26c1316507382077ae73226ef5c3626d5bc287c8 |
+| naics_edges.parquet | 12492 | caade9029e658f023f75056c0e7ebb2f9fa0d285bd91d43a32b65c2ec84d8e9c |
+| outputs.json | 1874 | 55c357dcb6c57ffec2509019da439a7c9f477d6181becc6142071ea8537b5822 |
+| filing_rule_labels.parquet | 3341 | 349372e5e2e340469622c53acbf42b3fb58b52066ea3953d155475f2037ed7df |
+| naics_nodes.parquet | 33378 | 8a0b39dae23802c4a129fe1f89c12ae5c9c7a88eef2d3f9c292f4f4979bc229a |
+| inputs.json | 17975 | 9a301fb3b3799f819d326f4171fdbf1ec197047aea8f25738fc5333721fa655f |
+| code_paths.parquet | 24742 | ca764663db2337e340b2de60f0507be888fa3a4c06b67cd5e312f929c8d25db9 |
+| naics_native_nodes.parquet | 67980 | e0734a9a89bfdf2b9049f1dbff074f124165f79e86bf933a0c9875bdaeebd54d |
+| soc_nodes.parquet | 22379 | 7a2259678719b1fc9d5c0cf3809023d6a87bdb4d6aed4b788e2f266e0586d356 |
+| filing_rule_membership.parquet | 9842 | 1485c190c5e6d8019f07939240773e14c9dc039111c2c10ae32207ad214d4796 |

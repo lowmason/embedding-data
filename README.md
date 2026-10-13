@@ -59,8 +59,10 @@ In a restricted workspace prefix commands with
 `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache`; `--offline` prevents uv
 resolution downloads and is appropriate once dependencies and originals exist.
 
-The measured `stage4_v11_20261013` bundle uses schema `codes-ita-v1` and retains
-all 3,206,055 source rows and original columns, in source order. Its 69,035
+The measured `stage4_v11_20261013_r2` bundle uses schema `codes-ita-v1` and retains
+all 3,206,055 source rows and original columns, in source order. It remeasures
+reviewed code `ccd138f` after a CLI workbook-error diagnostic fix; the earlier
+`stage4_v11_20261013` bundle remains byte-identical. Its 69,035
 unresolved rows remain explicit; 373 unknown-vintage rows have supported
 candidate unions, which never assert a canonical scalar even when singleton.
 Crosswalk flags persist for singleton mappings. Nullable filing flags retain
