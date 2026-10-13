@@ -24,7 +24,6 @@ unassigned); counts become Int64, dates and times become Date and Time, and a
 value that does not parse fails the conversion.
 '''
 
-import codecs
 import shlex
 from datetime import UTC, datetime
 from importlib.metadata import version
@@ -38,6 +37,7 @@ import polars.selectors as cs
 import typer
 
 from embedding_data import manifest, paths
+from embedding_data.osha_encoding import decode_line
 
 app = typer.Typer(add_completion=False, pretty_exceptions_show_locals=False)
 
@@ -122,19 +122,6 @@ def download(client: httpx.Client, url: str, destination: Path) -> None:
         partial.unlink(missing_ok=True)
     size = destination.stat().st_size
     typer.echo(f'wrote {destination} ({response.http_version}, {size:,} bytes)')
-
-
-def cp1252_fallback(error: UnicodeDecodeError) -> tuple[str, int]:
-    '''Decode only the bytes UTF-8 rejected as Windows-1252; its five undefined bytes raise.'''
-    return error.object[error.start:error.end].decode('cp1252'), error.end
-
-
-codecs.register_error('osha-cp1252-fallback', cp1252_fallback)
-
-
-def decode_line(raw: bytes) -> str:
-    '''Decode one raw CSV line that may mix UTF-8 and Windows-1252 bytes.'''
-    return raw.decode('utf-8', errors='osha-cp1252-fallback')
 
 
 def csv_to_parquet(csv_path: Path, parquet_path: Path) -> Path:
