@@ -148,3 +148,34 @@ def test_bom_mojibake_and_windows_1252_bytes_survive_as_delivered(tmp_path):
     assert frame_2022['company_name'].to_list() == ['Farmerâ€™s Co-op']
     assert frame_2022['id'].to_list() == [20220]
     assert frame_2021['company_name'].to_list() == ['Owner’s Choice']
+
+
+def test_implausible_records_are_flagged_not_dropped(tmp_path):
+    cases = [  # (employees, hours, size) -> (employment, hours per employee, below size)
+        (('100', '200000', '22'), (False, False, False)),  # 2,000 hours each
+        (('100', '50000', '22'), (False, False, False)),   # 500, the inclusive lower bound
+        (('100', '400000', '22'), (False, False, False)),  # 4,000, the inclusive upper bound
+        (('100', '49900', '22'), (False, True, False)),    # 499
+        (('100', '400100', '22'), (False, True, False)),   # 4,001
+        (('100', '', '22'), (False, True, False)),         # hours missing
+        (('0', '1000', '22'), (True, None, False)),        # zero employment: no ratio
+        (('', '1000', '22'), (True, None, False)),         # employment missing: no ratio
+        (('10', '20000', '1'), (False, False, True)),      # fewer than 20 at peak
+        (('100', '200000', ''), (False, False, None)),     # size missing
+    ]
+    records = [
+        record(2024, id=str(n), annual_average_employees=e, total_hours_worked=h, size=s)
+        for n, ((e, h, s), _) in enumerate(cases)
+    ]
+
+    frame = ita_summary.add_flags(harmonized(tmp_path, 2024, year_file(2024, records)).lazy())
+    flags = frame.select(
+        'flag_employment', 'flag_hours_per_employee', 'flag_below_filing_size'
+    ).collect()
+
+    assert flags.rows() == [expected for _, expected in cases]
+    assert flags.schema == {
+        'flag_employment': pl.Boolean,
+        'flag_hours_per_employee': pl.Boolean,
+        'flag_below_filing_size': pl.Boolean,
+    }

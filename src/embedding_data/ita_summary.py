@@ -43,6 +43,8 @@ NAICS_YEAR_FROM = 2023
 DICTIONARY_NAICS_YEAR = 2012
 NAICS_YEARS = [2012, 2017, 2022]
 SIZE_CLASS = {1: 1, 2: 2, 21: 2, 22: 2, 3: 3}
+# Plausible annual hours worked per average employee, inclusive: about 10 to 77 hours a week.
+HOURS_PER_EMPLOYEE = (500, 4_000)
 
 
 def transcode(raw_file: Path, utf8_path: Path) -> None:
@@ -127,3 +129,25 @@ def harmonize_file(
     lf = harmonize(pl.scan_csv(utf8_path, infer_schema=False), year, source_file)
     check_summary(lf, year, source_file)
     return lf
+
+
+def add_flags(lf: pl.LazyFrame) -> pl.LazyFrame:
+    '''Flag, never drop, the implausible records spec R2.9 names.
+
+    flag_employment: annual average employment is missing, zero, or negative.
+    flag_hours_per_employee: hours per average employee fall outside HOURS_PER_EMPLOYEE, or
+        hours are missing; null where employment is flagged, since no ratio exists.
+    flag_below_filing_size: fewer than 20 employees at peak (size_class 1), outside the
+        filing rule in every industry. Whether a larger establishment's industry places it
+        outside the rule needs NAICS vintage concordances and is not evaluated here.
+    '''
+    employees, hours = pl.col('annual_average_employees'), pl.col('total_hours_worked')
+    no_employment = employees.is_null() | (employees <= 0)
+    implausible_hours = hours.is_null() | (hours / employees).is_between(
+        *HOURS_PER_EMPLOYEE
+    ).not_()
+    return lf.with_columns(
+        flag_employment=no_employment,
+        flag_hours_per_employee=pl.when(no_employment).then(None).otherwise(implausible_hours),
+        flag_below_filing_size=pl.col('size_class') == 1,
+    )
