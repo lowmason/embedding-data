@@ -13,14 +13,15 @@ training and the protocol for scoring embeddings are separate from this project.
 
 The repository currently implements IPUMS ACS and CPS extract definitions,
 submission, download, and CSV-to-Parquet conversion, run as the `acs` and `cps`
-commands of the `embedding-data` Typer CLI. The `osha` command downloads the
-OSHA ITA case-detail CSV and its data dictionary and converts the CSV to Parquet.
+commands of the `embedding-data` Typer CLI. The `osha` command acquires
+every OSHA ITA Form 300A summary file from 2016 on and stacks them into one
+establishment-year table, and downloads the case-detail CSV and its dictionary.
 
-OSHA Form 300A ingestion, classification concordances, geography allocation,
+Classification concordances, geography allocation,
 person-month linkage, aggregate targets, and output manifests are planned. Raw
 downloads are already recorded in `data/raw/manifest.jsonl`.
-The OSHA case-detail files under `data/raw/osha/` are a different input from the
-Form 300A summaries required by the specification.
+The OSHA case-detail files are acquired but feed no target; the specification's
+establishment data are the Form 300A summaries.
 
 The extract workflows have been checked with offline definitions and synthetic
 fixtures. Live IPUMS sample and variable acceptance remains to be verified.
@@ -29,7 +30,7 @@ fixtures. Live IPUMS sample and variable acceptance remains to be verified.
 
 | Source | Samples or coverage | Purpose |
 | --- | --- | --- |
-| [OSHA Injury Tracking Application](https://www.osha.gov/itadata), Form 300A summaries | 2016–2025, planned | Establishment employment, hours, location, NAICS codes, employer descriptions, and firm structure |
+| [OSHA Injury Tracking Application](https://www.osha.gov/itadata), Form 300A summaries | 2016–2025 | Establishment employment, hours, location, NAICS codes, employer descriptions, and firm structure |
 | IPUMS USA / ACS | 2023–2024 core; optional 2022 comparator and 2020–2024 five-year sample | Staffing patterns, worker profiles, area mixes, commuting, and migration |
 | IPUMS CPS | Monthly samples from January 2025; ASEC samples from 2025 | Job transitions, earnings profiles, and state migration |
 
@@ -147,9 +148,46 @@ data root. CPS stores industry and occupation as Census codes; conversion pads
 `IND`, `OCC`, `INDLY`, and `OCCLY` to four-character strings. Mapping them to
 NAICS and SOC remains a later step.
 
+## OSHA Form 300A summaries
+
+`uv run embedding-data osha summary` reads the [ITA data page](https://www.osha.gov/itadata)
+and downloads every file it lists as `<year> Summary Data` from 2016 on, plus the two
+summary data dictionaries, over HTTP/2:
+
+| Path | Contents |
+| --- | --- |
+| `raw/osha/summary/<year>/<OSHA's file name>` | That year's summary file as delivered: a zip holding one CSV through 2024, a CSV for the current year |
+| `raw/osha/summary/summary_data_dictionary.pdf`, `ITA_Data_Dictionary.pdf` | OSHA's field definitions (2024 on; 2016–2023) |
+| `derived/osha/ita_300a_summary.parquet` | One row per establishment-year, all years stacked |
+
+The current year's file name carries its submission through-date
+(`..._2025_through_08-31-2026.csv`). OSHA renames the file as it grows, so a later
+release is downloaded beside the earlier one and recorded as a new manifest entry with
+its `through_date`; the earlier file and entry are untouched. The run refuses a page
+that skips a year or whose current file names no through-date, and a summary file
+found on disk but missing from the manifest. A file OSHA replaces under an unchanged
+name is not detected.
+
+The table is rebuilt on every run from each year's latest release. It keeps the
+specification's R2.4 columns plus OSHA's record `id`, the raw file it came from
+(`source_file`, the manifest path), and these harmonized columns:
+
+- `size_class`: OSHA split size code `2` (20–249 employees) into `21` and `22` with the
+  2023 data, but later files still use `2` for some establishments. `size` keeps the
+  native code; `size_class` merges `21` and `22` back into `2`.
+- `naics_year`: files before 2023 lack it; OSHA's dictionary says those years use 2012
+  NAICS, so they get 2012 with `naics_year_from_dictionary` set.
+- `flag_employment`, `flag_hours_per_employee` (outside 500–4,000 hours per average
+  employee), and `flag_below_filing_size` (under 20 employees). Flagged rows are kept.
+
+Codes, names, addresses, ZIP codes, and EINs stay as delivered. A file the
+harmonization does not cover stops the build rather than being guessed at. After the
+build the command prints rows per year beside OSHA's published submission counts. A
+full first run downloads about 258 MB.
+
 ## OSHA case-detail download
 
-The `osha` command needs no account or key. It downloads two files from osha.gov
+`uv run embedding-data osha case-detail` needs no account or key. It downloads two files from osha.gov
 over HTTP/2 into `data/raw/osha/`, records each in `data/raw/manifest.jsonl`
 with its URL, retrieval time, SHA-256, and `httpx` version, and converts the CSV
 to Parquet in `data/derived/osha/`:
@@ -161,8 +199,8 @@ to Parquet in `data/derived/osha/`:
 | `derived/osha/ITA_Case_Detail_Data_2025_through_08-31-2026.parquet` | The CSV with typed columns |
 
 ```bash
-uv run embedding-data osha
-uv run embedding-data osha --data-dir /tmp/osha-data
+uv run embedding-data osha case-detail
+uv run embedding-data osha case-detail --data-dir /tmp/osha-data
 ```
 
 A raw file that already exists is kept as delivered and not downloaded again,
@@ -183,8 +221,7 @@ example `2134`); conversion does not restore them. Counts become `Int64`, the
 three date columns `Date`, and the two time columns `Time`. A value that does not
 parse stops the conversion.
 
-These are case-detail records from Forms 300 and 301, not the Form 300A
-establishment summaries required by the specification. The delivered file
+These are case-detail records from Forms 300 and 301; they feed no target. The delivered file
 differs from its dictionary: the dictionary lists `created_timestamp` and the
 OIICS `*_pred` columns, while the CSV has `date_submitted` and no OIICS columns;
 unassigned SOC codes read `00-9900` rather than `00-9999`; and
@@ -198,7 +235,7 @@ All commands share one data root, `data/` by default (`--data-dir`):
 | --- | --- |
 | `raw/manifest.jsonl` | One JSON line per raw file: path, SHA-256, size, retrieval time, client and version, and either the source URL or the IPUMS collection, extract number, and sample IDs |
 | `raw/acs/<set>/usa_<number>/`, `raw/cps/<set>/cps_<number>/` | One delivered IPUMS extract: the submitted `extract.json`, the `.csv.gz` data, and the `.xml` DDI codebook |
-| `raw/osha/` | OSHA downloads as delivered |
+| `raw/osha/` | OSHA downloads as delivered; summaries under `raw/osha/summary/<year>/` |
 | `derived/<source>/` | Parquet converted from raw files |
 | `preview/<source>/<set>/extract.json` | Dry-run definitions, overwritten by the next dry run |
 
@@ -282,7 +319,10 @@ acceptance or survey totals.
 specs/embedding-evaluation-data-spec.md      Full data requirements and verification tasks
 src/embedding_data/acs_benchmark_extract.py  ACS extract definitions and downloader
 src/embedding_data/cps_benchmark_extract.py  CPS catalog selection and downloader
-src/embedding_data/osha_benchmark_download.py OSHA case-detail download and Parquet conversion
+src/embedding_data/osha_benchmark_download.py The osha command: Form 300A and case-detail downloads
+src/embedding_data/ita_catalog.py            Form 300A releases listed on the ITA data page
+src/embedding_data/ita_summary.py            Stacked, harmonized, flagged Form 300A table
+src/embedding_data/osha_encoding.py          Mixed UTF-8 / Windows-1252 line decoding
 src/embedding_data/cli.py                    embedding-data console entry point
 src/embedding_data/paths.py                  Data root layout: raw/, derived/, preview/
 src/embedding_data/manifest.py               Append-only raw-file manifest (SHA-256 and provenance)

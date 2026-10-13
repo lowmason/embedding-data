@@ -49,11 +49,12 @@ def test_acs_help_describes_acs_benchmark(cli_runner):
     assert 'IPUMS USA extracts' in result.output
 
 
-def test_osha_help_describes_case_detail_download(cli_runner):
+def test_osha_help_describes_summaries_and_case_detail(cli_runner):
     result = cli_runner.invoke(cli.app, ['osha', '--help'])
 
     assert result.exit_code == 0, result.output
-    assert 'OSHA ITA case-detail' in result.output
+    assert 'OSHA ITA Form 300A summaries and case-detail' in result.output
+    assert 'summary and/or case-detail' in result.output
 
 
 def test_cps_dry_run_reaches_cps_module(cli_runner, data_directory, dotenv_path):
