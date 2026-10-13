@@ -159,6 +159,8 @@ def acquire_geocodes(data_dir: Path, run_id: str) -> None:
         vintage_id = matches[0]['id']
         for name, request_hash in sorted(inputs['requests'].items()):
             request_file = directory / 'requests' / name
+            with request_file.open(newline='', encoding='utf-8') as stream:
+                expected_ids = {row[0] for row in csv.reader(stream)}
             destination = refs.reference_path(data_dir, raw_relative + f'/{request_hash}.csv')
             if not refs.existing_reference(data_dir, destination):
                 with request_file.open('rb') as stream:
@@ -171,7 +173,9 @@ def acquire_geocodes(data_dir: Path, run_id: str) -> None:
                         files={'addressFile': (name, stream, 'text/csv')}
                     )
                 response.raise_for_status()
-                county.parse_geocodes(response.text)
+                parsed = county.parse_geocodes(response.text)
+                if expected_ids != set(parsed['row_key'].to_list()):
+                    raise ValueError('Census batch response IDs differ from request IDs')
                 partial = destination.with_name(destination.name + '.part')
                 try:
                     partial.write_bytes(response.content)
@@ -182,8 +186,6 @@ def acquire_geocodes(data_dir: Path, run_id: str) -> None:
                     paths.manifest_path(data_dir), destination,
                     GEOCODER + '/geographies/addressbatch'
                 )
-            with request_file.open(newline='', encoding='utf-8') as stream:
-                expected_ids = {row[0] for row in csv.reader(stream)}
             parsed = county.parse_geocodes(destination.read_text())
             if expected_ids != set(parsed['row_key'].to_list()):
                 raise ValueError('Census batch response IDs differ from request IDs')

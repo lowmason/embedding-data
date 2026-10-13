@@ -13,7 +13,8 @@ from embedding_data import ita_verification_run as run
 from embedding_data import paths
 from embedding_data.osha_benchmark_download import record_download
 
-def test_raw_summary_to_cached_offline_reports(tmp_path, monkeypatch):
+@pytest.mark.parametrize('invalid_response', [None, 'missing-id', 'wrong-id'])
+def test_raw_summary_to_cached_offline_reports(tmp_path, monkeypatch, invalid_response):
     monkeypatch.setattr(run, 'BATCH_LIMIT', 3)
     for year in range(2016, 2026):
         write_release(
@@ -86,6 +87,10 @@ def test_raw_summary_to_cached_offline_reports(tmp_path, monkeypatch):
         filename = re.search(rb'filename="([^"]+)"', request.content).group(1).decode()
         with (directory / 'requests' / filename).open(newline='') as stream:
             row_keys = [row[0] for row in csv.reader(stream)]
+        if invalid_response == 'missing-id':
+            row_keys = row_keys[:-1]
+        elif invalid_response == 'wrong-id':
+            row_keys[0] = 'unexpected-id'
         for row_key in row_keys:
             writer.writerow(
                 [
@@ -98,7 +103,32 @@ def test_raw_summary_to_cached_offline_reports(tmp_path, monkeypatch):
     monkeypatch.setattr(
         run, 'make_client', lambda: httpx.Client(transport=httpx.MockTransport(respond))
     )
+    raw_cache = refs.reference_path(tmp_path, 'census-geocoder/fixture')
+    if invalid_response is not None:
+        with pytest.raises(ValueError, match='response IDs differ'):
+            run.acquire_geocodes(tmp_path, 'fixture')
+        assert not list(raw_cache.glob('*.csv'))
+        assert not list(raw_cache.glob('*.part'))
+        assert not any(
+            item.path.startswith('references/census-geocoder/fixture/')
+            and item.path.endswith('.csv')
+            for item in run.manifest.read_manifest(paths.manifest_path(tmp_path))
+        )
+        assert not (directory / 'geocoding.json').exists()
+        invalid_response = None
     run.acquire_geocodes(tmp_path, 'fixture')
+    before = paths.manifest_path(tmp_path).read_bytes()
+    cached_bytes = {file: file.read_bytes() for file in raw_cache.iterdir()}
+
+    def reject_request(_):
+        raise AssertionError('cached acquisition contacted Census')
+
+    monkeypatch.setattr(
+        run, 'make_client', lambda: httpx.Client(transport=httpx.MockTransport(reject_request))
+    )
+    run.acquire_geocodes(tmp_path, 'fixture')
+    assert paths.manifest_path(tmp_path).read_bytes() == before
+    assert {file: file.read_bytes() for file in raw_cache.iterdir()} == cached_bytes
     monkeypatch.setattr(
         run, 'make_client', lambda: (_ for _ in ()).throw(AssertionError('network'))
     )
