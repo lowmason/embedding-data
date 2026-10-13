@@ -53,6 +53,7 @@ Required raw references are:
 | NAICS 2012 to 2017 concordance | Full official Census relationship file; compose with 2017 to 2022 |
 | NAICS 2017 to 2022 concordance | Full official Census relationship file; canonical candidates |
 | NAICS 2007 structure and 2007 to 2012 concordance | Official Census originals; auxiliary membership and exemption bridge |
+| NAICS 2002 complete code/title text and full 2002 to 2007 concordance | Official Census originals; bounded interpretation of exemption labels `5173` and `5181` only; no new ITA native vintage. *(owner, plan 4, 2026-10-13)* |
 | SOC 2018 structure | Original BLS structure workbook; canonical occupation hierarchy |
 | Historical and current designated-industry lists | Original 2016 and 2023 rule publications, including their appendices; effective-period and list membership |
 | Partially exempt industry list | Official OSHA Subpart B list and its explicit 2007-vintage guidance |
@@ -63,8 +64,16 @@ Use the [Census concordance catalog](https://www.census.gov/naics/concordances/c
 Acquire complete workbooks, not changes-only concordances. Historical lists
 come from the [2016 rule](https://www.federalregister.gov/documents/2016/05/12/2016-10443/improve-tracking-of-workplace-injuries-and-illnesses)
 and [2023 rule](https://www.federalregister.gov/documents/2023/07/21/2023-15091/improve-tracking-of-workplace-injuries-and-illnesses).
-The [OSHA exempt list](https://www.osha.gov/recordkeeping/presentations/exempttable)
-and [FAQ 2-4](https://www.osha.gov/faq/2-4) establish the 2007 exemption vintage.
+The [OSHA regulatory appendix](https://www.osha.gov/laws-regs/regulations/standardnumber/1904/1904SubpartBAppA)
+and [FAQ 2-4](https://www.osha.gov/faq/2-4) describe the nominal exemption
+basis as NAICS 2007. The original appendix nevertheless contains `5173` and
+`5181`, which are absent from the official 2007 structure and present in
+2002. Preserve both published labels and interpret only these documented
+exceptions through the complete official 2002-to-2007 relation, under the
+possibility-set contract below. This is a conservative reference
+interpretation for R2.9, not an assertion of OSHA's intended treatment of a
+merged industry's individual establishments. See the
+[reference preflight](findings/stage-4-filing-rule-reference-preflight.md). *(owner, plan 4, 2026-10-13)*
 
 Archive original bytes under `raw/references/`, with official source URLs,
 SHA-256, acquisition/import time, and client version in the raw manifest.
@@ -118,11 +127,13 @@ structure. Never silently deduplicate invalid structure rows.
 
 For the existing pinned inputs, require 2,125 NAICS 2022 nodes (1,012 finest
 codes, 20 sectors) and 1,447 SOC 2018 nodes (867 detailed, 23 major groups).
-Native 2012/2017 structures retain Stage 3's full/six-digit checks. Validate the
-2007 auxiliary structure and bridge against their acquired official originals,
-including complete endpoint membership and parent closure; record their counts
-and hashes in the Stage 4 finding. The 2007 vintage is an auxiliary rule
-reference, not an inferred ITA vintage or a new canonical system.
+Native 2012/2017 structures retain Stage 3's full/six-digit checks. Validate
+the 2002 and 2007 auxiliary structures and both 2002-to-2007 and
+2007-to-2012 bridges against their acquired official originals, including
+complete endpoint membership and parent closure. Require 2,341/1,179
+full/finest nodes for the pinned 2002 text and 2,328/1,175 for 2007; record
+counts and hashes in the Stage 4 finding. Both are auxiliary rule references,
+not inferred ITA native vintages or new canonical systems. *(owner, plan 4, 2026-10-13)*
 
 Publish `code_paths.parquet` with `node_id:String` and
 `path:List(String)`: each path lists node IDs from its sector/major root through
@@ -206,14 +217,51 @@ into establishment rows, deduplicate establishments, or filter unresolved rows.
 
 ## Filing-rule evaluation
 
-Build a versioned list table with `rule_id:String`, `vintage:Int64`,
-`code:String`, `effective_from:Date`, `effective_to:Date` (nullable), and
-`source_file:String`. Rule IDs are `designated_2012`, `designated_2017`, and
-`partially_exempt_2007`; `(rule_id, code)` is unique. Expand listed
-sectors/groups to valid finest codes using that list's own structure. Verify
-every listed code; prefix matching across
-vintages is forbidden. Preserve historical list differences from the official
-texts rather than updating an old list in place.
+Keep `filing_rules.parquet` as the definite-member projection with
+`rule_id:String`, `vintage:Int64`, `code:String`, `effective_from:Date`,
+`effective_to:Date` (nullable), and `source_file:String`. Rule IDs remain
+`designated_2012`, `designated_2017`, and `partially_exempt_2007`;
+`(rule_id, code)` is unique. A row in this table asserts definite membership,
+not merely one supported possibility.
+
+Publish `filing_rule_labels.parquet` with `rule_id:String`,
+`vintage:Int64`, `listed_code:String`, `label_vintage:Int64`,
+`flag_rule_label_legacy:Boolean`, and `source_file:String`;
+`(rule_id, listed_code)` is unique. Retain every original published label.
+The rule's nominal vintage remains in `vintage`; `label_vintage` is 2002
+only for the two allowlisted exemption labels `5173` and `5181`, and
+otherwise equals the rule vintage. Validate each label in its interpreted
+structure; every other unmatched label is a reference error. Original
+code/title text remains archived in the cited raw publication.
+
+Publish `filing_rule_membership.parquet` with all definite-table fields
+plus `membership_candidates:List(Boolean)` and
+`flag_rule_label_bridged:Boolean`. Include exactly one row for every finest
+code in each rule's own vintage, including nonmembers. Possibilities are
+nonnull, sorted and duplicate-free, and exactly `[false]`, `[true]`, or
+`[false, true]`; flags are nonnullable. The definite table is exactly the
+`[true]` projection of this complete membership relation.
+
+For the exemption rule, expand the 80 valid listed groups within NAICS
+2007 by validated ancestry. Expand only legacy labels `5173` and `5181`
+within NAICS 2002 into their finest leaves. For each 2007 finest code,
+retain every 2002 predecessor from the complete direct official relation.
+If a valid 2007 listed group covers it, membership is `[true]`. Otherwise,
+its possibilities are the union of each predecessor's membership in the
+expanded legacy-label set. A merge with covered and uncovered predecessors
+therefore yields `[false, true]`. Set `flag_rule_label_bridged` when at
+least one predecessor belongs to that legacy set, even when a whole-node
+2007 exemption already establishes `[true]`. Missing predecessors or
+incomplete endpoint coverage fail reference validation; they never create
+false unanimity.
+
+The pinned inputs yield `[false, true]` for 2007 `517110`: predecessor
+`518111` belongs to legacy `5181`, while `517110` and `517510` do not.
+Never promote this partial coverage to a whole-node exemption. Other legacy
+successors already sit under valid listed 2007 groups `5179` or `5191`.
+No list-wide vintage replacement, numeric prefix matching across vintages,
+preferred predecessor, allocation weight, or inferred industry is permitted.
+Preserve the official lists' historical versions and periods. *(owner, plan 4, 2026-10-13)*
 
 The designated 20–249 list uses NAICS 2012 for 2016–2022 filing years and
 NAICS 2017 for the 2023 filing year onward: the revised rule became effective
@@ -230,15 +278,16 @@ evaluator until a recorded rule version covers them.
 Use `size_class`, which reflects peak-employment size, never annual-average
 employment to infer a size class. For each reference-supported native
 interpretation, traverse the official relationships directly into the
-designated and exempt lists' own vintages. Do not route through canonical 2022
-and back when a direct vintage path exists. Preserve every rule-native
-candidate. For each native-vintage interpretation, evaluate the Cartesian
-product of its designated-list and exemption-list candidates, then union
-evaluations across the supported interpretations. Do not mix candidates from
-different native-vintage interpretations before this evaluation. This is a
-conservative unweighted possibility set, not evidence about which part of a
-split the establishment occupies. No weights or preferred side resolve
-uncertain membership. Size class 3 needs only the exemption candidates.
+designated and exempt rules' own vintages, retaining every rule-native
+candidate. Do not route through canonical 2022 and back when a direct path
+exists. For each interpretation, form the designated membership possibilities
+and the exemption membership possibilities from the complete membership
+relation, then evaluate their Cartesian product. Union the resulting outcomes
+across interpretations; never pool candidates across different native-vintage
+interpretations before evaluating them. Size class 3 needs only exemption
+possibilities. These are conservative unweighted possibilities, not evidence
+about which predecessor or part of a split an establishment occupies.
+No weights or preferred side resolve uncertain membership. *(owner, plan 4, 2026-10-13)*
 
 - Size class 2: outside when not designated or partially exempt.
 - Size class 3: outside when partially exempt.
@@ -261,10 +310,19 @@ otherwise determinate. No industry membership is asserted for class 1.
 Keep `flag_below_filing_size` unchanged. Add
 `flag_outside_filing_rule:Boolean` as true for size class 1, otherwise the
 industry result for size classes 2/3, otherwise null. Preserve uncertainty
-instead of treating null as false. A missing bridge for an otherwise supported
-code fails reference validation; it cannot produce a falsely unanimous result
-from partial coverage. These are filing-universe diagnostics under R2.2/R2.9;
+instead of treating null as false. Add nonnullable
+`flag_filing_rule_label_bridged:Boolean` when an evaluated exemption
+candidate is marked bridged, and `flag_filing_reference_ambiguous:Boolean`
+when an evaluated exemption candidate has `[false, true]` membership.
+These provenance flags persist even if the final filing outcome is unanimous;
+for statuses that evaluate no industry membership, both are false.
+An ambiguous membership can still produce `determinate` outside status when
+both possibilities give the same result. Actual outcome disagreement remains
+`candidate_disagreement` with nullable industry/rule results.
+A missing bridge or membership row for an otherwise supported code fails
+reference validation. These are filing-universe diagnostics under R2.2/R2.9;
 they neither drop rows nor establish that an observed submission was improper.
+Native NAICS uncertainty flags and admitted ITA vintages remain unchanged. *(owner, plan 4, 2026-10-13)*
 
 ## Build surface, outputs, and provenance
 
@@ -279,7 +337,8 @@ Publish a complete bundle under `data/derived/codes/<run_id>/`:
 
 - `naics_nodes.parquet`, `soc_nodes.parquet`, and their edge tables;
 - validated native/auxiliary NAICS structures, `naics_concordance.parquet`,
-  the versioned filing lists, and `code_paths.parquet`;
+  `filing_rules.parquet`, `filing_rule_labels.parquet`,
+  `filing_rule_membership.parquet`, and `code_paths.parquet`; *(owner, plan 4, 2026-10-13)*
 - `ita_naics_lookup.parquet` and `ita_300a_canonical.parquet`;
 - `inputs.json` and `report.json`.
 
@@ -294,8 +353,13 @@ Stage 6 still implements the R7 target writer.
 The report partitions all input rows by filing year and mapping status, with
 missing, unresolved, ambiguous, and crosswalked counts reported separately.
 It reports candidate-count distributions and each filing-rule state, including
-null results and vintage uncertainty. Counts must reconcile to the full input;
-flags can overlap and are not disjoint report partitions.
+null results and vintage uncertainty. Also report original label counts,
+legacy-label counts, definite/nonmember/mixed rule-native membership counts,
+and each record-level reference provenance flag by filing year. Counts must
+reconcile to the full input; flags can overlap and are not disjoint report
+partitions. The finding must distinguish this adopted conservative
+reference interpretation from an externally confirmed legal interpretation
+and document the mixed-predecessor limit. *(owner, plan 4, 2026-10-13)*
 
 Commit a V11 (ITA) finding from the full offline build with actual raw and
 reference hashes, counts, schema/version, the adopted source exception, and
