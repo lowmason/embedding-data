@@ -72,3 +72,42 @@
       `ipums_delivery.py` have one blank line where PEP 8 wants two before the first top-level
       definition; ruff's selected rules do not flag it. Size: quick-fix. Done when: both files
       have two blank lines there.
+
+## 2-ita-300a-summaries — 2026-10-13
+- [ ] Industry half of the R2.9 filing-rule flag (plan D2, P8): `flag_below_filing_size`
+      covers the size half only. The rule's industry lists (29 CFR 1904 Subpart E App. A and
+      Subpart B App. A) use fixed NAICS vintages and no concordance exists yet, so prefix
+      matching now would mis-flag establishments. See
+      specs/plans/completed/2-ita-300a-summaries.md (P8); touches `add_flags` in
+      `src/embedding_data/ita_summary.py`. Size: plan. Done when: R2.9's industry half is
+      evaluated with concordance candidate sets. Target: Stage 4.
+- [ ] Same-name replacement at the source (plan P11): OSHA re-posted the 2016-2020 zips on
+      2025-11-25 and the 2023 and 2024 zips on 2026-05-20 with `_v2` members, under unchanged
+      names. A path has one manifest entry forever, so `osha summary`
+      (`src/embedding_data/osha_benchmark_download.py`) never fetches a refreshed file under
+      an old name. Size: quick-fix. Revisit if: OSHA re-posts a file under an existing name
+      and a stage needs the revision.
+- [ ] Dictionary-link gaps in `acquire_summary` (`src/embedding_data/osha_benchmark_download.py`;
+      final-review fix wave): a dictionary file name is date-checked only after its download,
+      and a traversal or malformed dictionary link is refused before any download but exits
+      with a traceback, not a clean exit, because dictionary destinations are built by
+      `file_name` outside `acquire_summary`'s `try`. No real dictionary name carries a
+      through-date. Size: quick-fix. Revisit if: OSHA publishes a dated or oddly named
+      dictionary link.
+- [ ] Stage 2 test and hardening gaps (task-review Minors, triaged ship): (a)
+      `manifest.describe_file` accepts a `datetime` for `through_date` and would write a full
+      timestamp, and no test pins `through_date` as None when omitted; (b)
+      `ita_catalog.check_complete` takes `max(years)` before any empty guard (unreachable
+      through `parse_catalog`); (c) no test for a null `year_filing_for` or for `transcode` on
+      an unknown suffix; (d) no test for missing hours beside zero employees (which of
+      `flag_employment` and `flag_hours_per_employee` wins); (e) a year directory holding only
+      `.part` or `.DS_Store` raises a misleading "cannot choose one of []" error, and neither
+      it nor the empty-root error is tested; (f) no case-detail first-run test pins its
+      request list; (g) no test mixes two non-null scientific-notation widths in one column or
+      feeds `inf`/`NaN` (both probed by hand, and they pass); (h) the stacked-build test
+      does not assert flag values end to end (add a fixture row with `naics_year` `0`); (i)
+      an `establishment_type` whose only digits are superscripts (Unicode category No) has
+      no `\d` match, so D13 nulls it instead of failing. Files:
+      `tests/test_ita_summary.py`, `tests/test_ita_catalog.py`,
+      `tests/test_manifest.py`, `tests/test_osha_benchmark_download.py`. Size: quick-fix.
+      Done when: each gap has a test or a recorded decision to accept it.

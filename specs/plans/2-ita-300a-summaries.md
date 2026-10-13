@@ -1,5 +1,9 @@
 # ITA Form 300A Acquisition and Stacked Establishment Table Implementation Plan
 
+**Status: COMPLETE (2026-10-13)** — executed via subagent-driven-development; deferred items in specs/deferred_items.md
+
+> Deviation (every commit step): commits end with `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`, not the `Claude Opus 5.5` line the steps show (the session's attribution rule). Two commits first written with the Opus line (87c4d3c, 114b2ac) were amended, message only, before anything was published.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: implement this plan task-by-task via subagent-driven-development (the default) — or executing-plans when your human partner chose inline execution at the handoff. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 > Roadmap: specs/embedding-evaluation-data-spec-roadmap.md, Stage 2 — on plan
@@ -46,6 +50,15 @@
 - **D5** (owner, plan review, 2026-10-12): the plan is committed on branch `stage-2-ita-300a`, created from `main`, and execution works on that branch. Applied in: execution setup.
 - **D6** (owner, plan review, 2026-10-12): the remaining planning defaults are approved as written: P2–P7 and P9–P14, P1's set names (`summary`, `case-detail`), and P8's flag rules beyond D2 and D3. Those rules are that `flag_employment` also fires on negative employment, that `flag_hours_per_employee` fires when hours are missing, and that it is null wherever `flag_employment` is set. Task 8's amendments A1–A3 are approved word for word, and Task 8 applies them without asking again. Applied in: Tasks 1–8.
 - **D7** (owner, handoff, 2026-10-12): execution works in a git worktree at `/Users/lowell/Projects/embedding-data-stage-2` on the existing branch `stage-2-ita-300a`, created by the planning session with `git worktree add`. The main checkout stays on `main`. The worktree sits outside the repository, so no `.gitignore` change is needed and nothing is committed to `main`. Applied in: execution setup.
+- **D8** (owner, Task 7 stop, 2026-10-12): a `naics_year` outside 2012, 2017 and 2022 (blank beside a code in the 2023 file, `0` in the 2024 and 2025 files, `2025` on three 2025 rows) is stored as null with `naics_year_from_dictionary` false. The code and the row are kept, and the new `flag_naics_year_unknown` is set where a code has no usable vintage. It no longer fails the build. Applied in: Task 7a (commit 87c4d3c).
+- **D9** (owner, Task 7 stop, 2026-10-12): a non-numeric `establishment_type` becomes null and the row is kept (the 2019 file has one such value). Narrowed by D13. Applied in: Task 7a.
+- **D10** (owner, Task 7 stop, 2026-10-12): any other non-integer value in an integer column fails with a `ValueError` that names the file and the column, raised by `harmonize_file` before the sink. Applied in: Task 7a.
+- **D11** (owner, second Task 7 stop, 2026-10-12): for `total_hours_worked` only, scientific notation that spells a whole number is read exactly as written (`8.62847E+11` is 862,847,000,000), the row is kept, and `flag_hours_per_employee` fires on the ratio. Other fractions, scientific notation in other columns, and values too large or not finite still fail with the named `ValueError`. Applied in: Task 7b (commit 1d86f27).
+- **D12** (owner, completion gate, 2026-10-12/13): spec amendment A4 is appended to R2.3 as drafted; it records D8, D9 and D11. Applied in: commit 1dd442c.
+- **D13** (owner, completion gate, 2026-10-12/13): D9 is narrowed. Only an `establishment_type` with no digit in it (Unicode-aware) becomes null; one with a digit must cast cleanly or the build fails, so `1E+2`, `1,5` and `Type 2` fail loudly. Applied in: commit 8f28015.
+- **D14** (owner, completion gate, 2026-10-12/13): the V10 gap wording ("gap +8,620" against "over 390,000") stays as the plan wrote it; the finding says the true gap is at most that. Applied in: nothing (no change).
+- **D15** (owner, completion gate, 2026-10-13): A4 is reworded to "An `establishment_type` with no digit in it becomes null", so the spec matches D13. Applied in: commit ea5b9d0.
+- **D16** (owner, completion gate, 2026-10-13): the real table is rebuilt with the final code, using the Task 7 command. It exited 0 with 3,206,055 rows and left the 29-entry manifest unchanged. Applied in: execution (no commit).
 
 **Planning defaults (approved at plan review; P1 by D4 and D6, P8 by D2, D3 and D6, the rest by D6):**
 
@@ -54,6 +67,7 @@
   - An anchor whose text reads `<year> Summary Data` is a release. Text beginning `Summary Data Dictionary` marks a dictionary.
   - The year comes from the link text.
   - The run refuses a page that skips a year after 2016, or whose current-year file names no through-date.
+  > Amended: it also refuses a page that lists a year twice or names a through-date that is not a real date, before any download (commit d3610d0).
 - **P3. Raw layout.** A summary file goes to `raw/osha/summary/<year>/<OSHA's file name>`, with percent-escapes decoded (`ITA Data CY 2016.zip`). The two summary dictionaries go to `raw/osha/summary/`. Case-detail paths are unchanged.
 - **P4. Through-date in the manifest.** `ManifestEntry` gains `through_date: str | None = None`, an ISO date parsed from the file name (`..._through_08-31-2026.csv`). Lines written before the field existed still read.
 - **P5. One raw file per year, rebuilt every run.**
@@ -82,7 +96,9 @@
   - a fraction that is not zero (the 2019 file writes `452990.00`);
   - a NAICS code that is not six digits;
   - a size code or NAICS vintage the dictionary does not define.
+  > Amended by D8, D10, D11 and D13: a vintage the dictionary does not define is stored as null and flagged, not a failure; a non-integer in an integer column fails naming the file and column; an `establishment_type` with no digit becomes null; scientific-notation `total_hours_worked` that spells a whole number is read as written.
 - **P10. Columns.** The table keeps R2.4's columns plus `id` (OSHA's record number), `source_file`, `naics_year_from_dictionary`, `size_class` and the three flags. Injury counts, submission timestamps and change reasons stay in the raw files.
+  > Amended by D8: a fourth flag, `flag_naics_year_unknown`, follows `flag_below_filing_size` (24 columns in all).
 - **P11. Same-name replacement at the source is not detected.** OSHA re-posted the 2016–2020 zips on 2025-11-25, and the 2023 and 2024 zips on 2026-05-20 with `_v2` members, under unchanged names. A path has one manifest entry forever, so a refreshed file under an old name is not fetched. This becomes a deferred item.
 - **P12. V10 counts.** The code holds only figures OSHA published, with an unambiguous year:
   - 2023: exactly 385,488, as of 2024-05-31 (OSHA 2023 Work-Related Injury and Illness Summary).
@@ -136,7 +152,7 @@
   - `through_date(name: str) -> datetime.date | None`.
   - `check_complete(catalog: Catalog) -> None`, which raises `ValueError`.
 
-- [ ] **Step 1: Record the page fixture**
+- [x] **Step 1: Record the page fixture**
 
 Create `tests/fixtures/osha/itadata.html` with exactly this content. The two card bodies are copied verbatim from the page as fetched on 2026-10-12, tab indentation included:
 
@@ -185,7 +201,7 @@ and "Historical Data" cards, verbatim. A U.S. government work. -->
 </body></html>
 ```
 
-- [ ] **Step 2: Register the `network` marker**
+- [x] **Step 2: Register the `network` marker**
 
 In `pyproject.toml`, replace the `[tool.pytest.ini_options]` table with:
 
@@ -199,7 +215,7 @@ markers = [
 filterwarnings = ["error::pytest.PytestUnknownMarkWarning"]
 ```
 
-- [ ] **Step 3: Write the failing tests**
+- [x] **Step 3: Write the failing tests**
 
 Create `tests/test_ita_catalog.py`:
 
@@ -290,12 +306,14 @@ def test_the_live_page_still_lists_every_summary_year():
     assert catalog.dictionaries
 ```
 
-- [ ] **Step 4: Run the tests to verify they fail**
+- [x] **Step 4: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_ita_catalog.py -v`
 Expected: collection fails with `ImportError: cannot import name 'ita_catalog'`.
 
-- [ ] **Step 5: Write the module**
+- [x] **Step 5: Write the module**
+
+> Deviation: hardened after the final review (commit d3610d0). `file_name` refuses a decoded name that is empty, `.`, `..` or holds `/` or `\`; `through_date` names the file when the date is not real; `check_complete` validates every year's through-date and refuses a year listed twice, so an unbuildable page is refused before the first download.
 
 Create `src/embedding_data/ita_catalog.py`:
 
@@ -403,7 +421,7 @@ def check_complete(catalog: Catalog) -> None:
         raise ValueError(f'the {current} summary file names no through-date: {current_names}')
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_ita_catalog.py -v`
 Expected: every test passes. The canary is reported as deselected (`1 deselected`).
@@ -411,7 +429,7 @@ Expected: every test passes. The canary is reported as deselected (`1 deselected
 Run: `uv run --locked pytest`
 Expected: all tests pass, with `1 deselected`.
 
-- [ ] **Step 7: Lint and commit**
+- [x] **Step 7: Lint and commit**
 
 ```bash
 uv run --locked ruff check .
@@ -435,7 +453,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   - `ManifestEntry.through_date: str | None = None`, an ISO date, and the dataclass's last field.
   - `manifest.describe_file(..., through_date: datetime.date | None = None)`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `tests/test_manifest.py`, change the datetime import to:
 
@@ -473,12 +491,12 @@ def test_a_line_recorded_before_through_date_existed_still_reads(data_directory)
     assert entry.through_date is None
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_manifest.py -v`
 Expected: `test_through_date_is_recorded_as_an_iso_date` fails with `TypeError: describe_file() got an unexpected keyword argument 'through_date'`, and `test_a_line_recorded_before_through_date_existed_still_reads` fails with `AttributeError` on `through_date`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `src/embedding_data/manifest.py`:
 
@@ -502,7 +520,7 @@ and add this argument to the `ManifestEntry(...)` call, after `proxies=tuple(pro
         through_date=None if through_date is None else through_date.isoformat(),
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_manifest.py -v`
 Expected: all pass.
@@ -515,7 +533,7 @@ Expected: `17`. A `0` means the path is wrong: stop.
 Run: `uv run --locked pytest`
 Expected: all pass, `1 deselected`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 uv run --locked ruff check .
@@ -552,7 +570,7 @@ The harmonized frame has exactly these columns, in this order:
 - the text columns `establishment_name`, `company_name`, `ein`, `street_address`, `city`, `state`, `zip_code` and `industry_description`, all String;
 - `naics_code` (String), `naics_year` (Int64), `naics_year_from_dictionary` (Boolean), `size_class` (Int64) and `source_file` (String).
 
-- [ ] **Step 1: Move the decoder into `osha_encoding`**
+- [x] **Step 1: Move the decoder into `osha_encoding`**
 
 Create `src/embedding_data/osha_encoding.py`:
 
@@ -589,7 +607,7 @@ In `src/embedding_data/osha_benchmark_download.py`, make these changes:
 Run: `uv run --locked pytest tests/test_osha_benchmark_download.py -q`
 Expected: all pass. `osha.decode_line` still resolves through the import.
 
-- [ ] **Step 2: Write the fixture builders**
+- [x] **Step 2: Write the fixture builders**
 
 Create `tests/ita_fixtures.py`:
 
@@ -718,7 +736,7 @@ def year_file(year: int, records: list[dict[str, str]] | None = None) -> bytes:
     return zipped(MEMBER_NAMES[year], data)
 ```
 
-- [ ] **Step 3: Write the failing tests**
+- [x] **Step 3: Write the failing tests**
 
 Create `tests/test_ita_summary.py`:
 
@@ -875,12 +893,14 @@ def test_bom_mojibake_and_windows_1252_bytes_survive_as_delivered(tmp_path):
     assert frame_2021['company_name'].to_list() == ['Owner’s Choice']
 ```
 
-- [ ] **Step 4: Run the tests to verify they fail**
+- [x] **Step 4: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_ita_summary.py -v`
 Expected: collection fails with `ImportError: cannot import name 'ita_summary'`.
 
-- [ ] **Step 5: Write the module**
+- [x] **Step 5: Write the module**
+
+> Deviation: Tasks 7a and 7b changed `harmonize` and `check_summary` after the live run stopped on structure, and the final review added `integer_value` as the one rule behind the cast and its pre-check; see Task 7 Step 3 and D8-D11 and D13.
 
 Create `src/embedding_data/ita_summary.py`:
 
@@ -1016,7 +1036,7 @@ def harmonize_file(
     return lf
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_ita_summary.py -v`
 Expected: all pass. That's 10 parametrized format cases plus the targeted cases.
@@ -1024,7 +1044,7 @@ Expected: all pass. That's 10 parametrized format cases plus the targeted cases.
 Run: `uv run --locked pytest`
 Expected: all pass, `1 deselected`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 uv run --locked ruff check .
@@ -1048,7 +1068,9 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   - `ita_summary.HOURS_PER_EMPLOYEE = (500, 4_000)`.
   - `ita_summary.add_flags(lf: pl.LazyFrame) -> pl.LazyFrame`, which adds the Boolean columns `flag_employment`, `flag_hours_per_employee` and `flag_below_filing_size`. The hours and filing-size flags are nullable.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
+
+> Deviation: a row for negative employment, `(('-5', '1000', '22'), (True, None, False))`, was added to the parametrized test after the Task 4 review, because D6 requires `flag_employment` on negative employment (commit 820a3fd).
 
 Append to `tests/test_ita_summary.py`:
 
@@ -1084,12 +1106,12 @@ def test_implausible_records_are_flagged_not_dropped(tmp_path):
     }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `uv run --locked pytest tests/test_ita_summary.py::test_implausible_records_are_flagged_not_dropped -v`
 Expected: FAIL with `AttributeError: module 'embedding_data.ita_summary' has no attribute 'add_flags'`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `src/embedding_data/ita_summary.py`, add after `SIZE_CLASS`:
 
@@ -1123,12 +1145,12 @@ def add_flags(lf: pl.LazyFrame) -> pl.LazyFrame:
     )
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_ita_summary.py -v`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 uv run --locked ruff check .
@@ -1175,7 +1197,7 @@ The stacked table's columns, in order:
 
 Rows are sorted by `year_filing_for`, then `id`.
 
-- [ ] **Step 1: Add the raw-tree fixture helper**
+- [x] **Step 1: Add the raw-tree fixture helper**
 
 Append to `tests/ita_fixtures.py`, and add the imports at the top:
 
@@ -1214,7 +1236,7 @@ def write_release(
     return path
 ```
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 In `tests/test_ita_summary.py`:
 - Add `write_release` to the `from ita_fixtures import (...)` list.
@@ -1353,12 +1375,14 @@ def test_totals_report_sets_rows_beside_published_counts(data_directory):
     ]
 ```
 
-- [ ] **Step 3: Run the tests to verify they fail**
+- [x] **Step 3: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_ita_summary.py -v`
 Expected: the new tests fail with `AttributeError: module 'embedding_data.ita_summary' has no attribute 'build_summary_table'`. Tasks 3 and 4 tests still pass.
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
+
+> Deviation: `build_summary_table` also checks each raw file's SHA-256 against its manifest entry before harmonizing and fails on a mismatch (commit 2efe294). The table has a 24th column, `flag_naics_year_unknown`, after `flag_below_filing_size` (D8).
 
 In `src/embedding_data/ita_summary.py`, extend the imports to:
 
@@ -1520,7 +1544,7 @@ def report_lines(report: pl.DataFrame) -> list[str]:
     return lines
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_ita_summary.py -v`
 Expected: all pass.
@@ -1528,7 +1552,7 @@ Expected: all pass.
 Run: `uv run --locked pytest`
 Expected: all pass, `1 deselected`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 uv run --locked ruff check .
@@ -1558,7 +1582,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   - `osha_benchmark_download.SETS`, `acquire_summary(data_dir)`, `acquire_case_detail(data_dir)` and `record_download(...)`.
   - `osha_benchmark_download.file_name` stays importable, for `raw_backfill`. So do `DICTIONARY_URL`, `CSV_URL`, `make_client`, `download`, `decode_line`, `csv_to_parquet`, `is_recorded`, `refuse_replacement` and `BACKFILL_COMMAND`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `tests/test_osha_benchmark_download.py`:
 
@@ -1778,12 +1802,14 @@ def test_osha_help_describes_summaries_and_case_detail(cli_runner):
     assert 'summary and/or case-detail' in result.output
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_osha_benchmark_download.py tests/test_cli.py -v`
 Expected: the new summary tests fail, because `osha` takes no `summary` argument (exit code 2). The CLI help test fails. The existing case-detail tests also fail, because `case-detail` is an unexpected extra argument.
 
-- [ ] **Step 3: Replace the command module**
+- [x] **Step 3: Replace the command module**
+
+> Deviation: the check before the first download also refuses a page that lists a year twice, a through-date that is not a real date, and a year whose latest release cannot be chosen from its files plus the listed one (commit d3610d0).
 
 Replace `src/embedding_data/osha_benchmark_download.py` with:
 
@@ -2066,7 +2092,7 @@ if __name__ == '__main__':
     app()
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_osha_benchmark_download.py tests/test_cli.py tests/test_raw_backfill.py -v`
 Expected: all pass.
@@ -2077,7 +2103,7 @@ Expected: all pass, `1 deselected`.
 Run: `uv run embedding-data osha --help`
 Expected: the help's first line reads "Download OSHA ITA Form 300A summaries and case-detail data, and build their Parquet tables.", and the argument help reads `summary and/or case-detail (default: both)`. This makes no network request.
 
-- [ ] **Step 5: Update `README.md`**
+- [x] **Step 5: Update `README.md`**
 
 1. In `## Current state`, replace these two sentences:
 
@@ -2201,7 +2227,9 @@ src/embedding_data/ita_summary.py            Stacked, harmonized, flagged Form 3
 src/embedding_data/osha_encoding.py          Mixed UTF-8 / Windows-1252 line decoding
 ~~~
 
-- [ ] **Step 6: Update `CLAUDE.md`**
+- [x] **Step 6: Update `CLAUDE.md`**
+
+> Deviation: after the Task 6 review (commit 6027b0a) three statements this stage made false were corrected beyond the strings below: the CLAUDE.md invariant (now: the Form 300A summaries are under `data/raw/osha/summary/`, and the case-detail files directly under `data/raw/osha/` feed no target), the CLAUDE.md Raw provenance paragraph (the backfill records the OSHA case-detail files), and the `raw_backfill.py` docstring. Commits 1dd442c and ea5b9d0 later added the new refusals and rules to the OSHA paragraph and the README.
 
 1. In `## What this repo is`, replace
 
@@ -2233,7 +2261,7 @@ and change the **Expected baseline** sentence to: `**Expected baseline:** the fu
 
 5. In `**Test seams.**`, after the sentence ending `leaves \`num_bytes_downloaded\` at 0.`, insert: `OSHA summary tests serve the recorded ITA page \`tests/fixtures/osha/itadata.html\` and bodies from \`tests/ita_fixtures.year_file\`, one per published file format; \`write_release\` places and records a raw summary file.`
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 uv run --locked ruff check .
@@ -2257,7 +2285,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 The raw files this task downloads are immutable and recorded for good, so they must land in the main checkout's data tree, `/Users/lowell/Projects/embedding-data/data`, and never in a worktree's empty `data/`. Every command below names that root explicitly, as `REAL_DATA`, set again in each step because shell state does not carry over between commands. Run the commands from the checkout that holds Tasks 1–6 (the worktree, if one is in use).
 
-- [ ] **Step 1: Ask for the go-ahead**
+- [x] **Step 1: Ask for the go-ahead**
 
 Stop and ask your human partner, word for word:
 
@@ -2265,7 +2293,7 @@ Stop and ask your human partner, word for word:
 
 Wait for a clear yes.
 
-- [ ] **Step 2: Record the starting state**
+- [x] **Step 2: Record the starting state**
 
 Run: `git status --short`
 Expected: clean.
@@ -2273,7 +2301,9 @@ Expected: clean.
 Run: `uv run --locked python -c "from pathlib import Path; from embedding_data import manifest, paths; print(len(manifest.read_manifest(paths.manifest_path(Path('/Users/lowell/Projects/embedding-data/data')))))"`
 Expected: `17`. A `0` means the path is wrong: stop.
 
-- [ ] **Step 3: Run the acquisition**
+- [x] **Step 3: Run the acquisition**
+
+> Deviation: the controller ran Task 7 and the live run stopped on structure twice, as this step directs; the owner decided each case (D8-D11) and two unplanned tasks followed. Task 7a (commits 87c4d3c, 114b2ac): an undefined `naics_year` becomes null with the new `flag_naics_year_unknown` (D8), a non-numeric `establishment_type` becomes null (D9), and a non-integer in an integer column fails naming the file and column (D10). Task 7b (commit 1d86f27): scientific-notation `total_hours_worked` is read exactly (D11). The third run built the table: exit 0, 3,206,055 rows.
 
 Run: `REAL_DATA=/Users/lowell/Projects/embedding-data/data; uv run embedding-data osha summary --data-dir "$REAL_DATA"`
 Expected:
@@ -2283,7 +2313,7 @@ Expected:
 
 **If the build fails on structure** (a `ValueError` from `check_summary`, a missing column, a zip member count, or `InvalidOperationError` from a non-zero fraction), stop. Keep the downloaded files: they are recorded and immutable. Report the exact error to your human partner and change no code until they decide. The fixtures were built from the first ~900 rows of each file, so this is the place a full file can still surprise.
 
-- [ ] **Step 4: Verify the manifest and the exit criteria**
+- [x] **Step 4: Verify the manifest and the exit criteria**
 
 Run:
 
@@ -2338,7 +2368,9 @@ EOF
 
 Expected: the first frame lists only `1`, `2` and `3`, plus `null` if any size is missing. That shows `2` never sits beside `21`/`22` after harmonization. The second frame has one row per year.
 
-- [ ] **Step 5: Write the finding**
+- [x] **Step 5: Write the finding**
+
+> Deviation: the finding adds a section, "Values the full files carried that the fixtures did not", and expands "Observed in the stacked table" beyond one sentence per item. Two fact-check passes corrected it (commits f7b0055, 386b691; the finding is daa43c2).
 
 Create `specs/findings/v10-ita-300a-totals.md`, filling every value from the Step 3 and Step 4 outputs:
 
@@ -2389,7 +2421,7 @@ through-date and whether OSHA had posted a release newer than 2026-08-31.>
 - Stage 10 (`ein`-based dedup and co-ownership).>
 ```
 
-- [ ] **Step 6: Commit the finding**
+- [x] **Step 6: Commit the finding**
 
 ```bash
 git add specs/findings/v10-ita-300a-totals.md
@@ -2411,7 +2443,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 The wording below was approved at plan review (D6). Before editing, check that the Task 7 output still supports A2. That means `establishment_id` is present in every year, code `2` appears beside `21`/`22` from 2023, and there is no `naics_year` column before 2023. If any of these fails, stop and ask; don't edit A2's wording on your own. The status line stays untouched.
 
-- [ ] **Step 1: Amendment A1 (R2.1, case detail; D1)**
+- [x] **Step 1: Amendment A1 (R2.1, case detail; D1)**
 
 Replace:
 
@@ -2433,7 +2465,9 @@ and re-acquire until OSHA moves it to the historical list. *(verified; ITA)* The
 no target. *(owner, plan 2, 2026-10-12)*
 ```
 
-- [ ] **Step 2: Amendment A2 (R2.3, the delivered files)**
+- [x] **Step 2: Amendment A2 (R2.3, the delivered files)**
+
+> Deviation: after the final review the owner approved a fourth amendment, A4, appended to R2.3 (commit 1dd442c): an undefined `naics_year` is null and flagged, an `establishment_type` with no digit is null, scientific-notation `total_hours_worked` is read as the whole number it spells, and every other non-integer fails the build (D12, D13). Commit ea5b9d0 reworded the `establishment_type` clause (D15).
 
 Replace:
 
@@ -2463,7 +2497,7 @@ so those rows take 2012, marked as supplied by the dictionary. *(owner, plan 2,
 2026-10-12)*
 ```
 
-- [ ] **Step 3: Amendment A3 (R9.1, the `osha` command)**
+- [x] **Step 3: Amendment A3 (R9.1, the `osha` command)**
 
 Replace:
 
@@ -2482,7 +2516,7 @@ declared in `pyproject.toml`. *(implemented; XA, XC)* ITA acquisition runs the s
 way, as `uv run embedding-data osha`. *(owner, plan 2, 2026-10-12)*
 ```
 
-- [ ] **Step 4: Final verification**
+- [x] **Step 4: Final verification**
 
 Run each command and confirm the output:
 
@@ -2501,7 +2535,7 @@ Expected:
 - `uv lock --check`: the lockfile is up to date.
 - pre-commit: every hook passes.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add specs/embedding-evaluation-data-spec.md
@@ -2533,3 +2567,10 @@ When the Plan Completion Protocol writes `## Handoff to later stages` (step 3a),
 - **Deferred items to append** (confirmed at plan review: D2 for the first, D6 for the second):
   - The industry half of the filing-rule flag (Size: plan; Target: Stage 4; Done when: R2.9's industry half is evaluated with concordance candidate sets).
   - Same-name replacement at the source (Size: quick-fix; Revisit if: OSHA re-posts a file under an existing name and a stage needs the revision).
+
+## Handoff to later stages
+
+- **Stage 3 (ITA verification).** Consumes `data/derived/osha/ita_300a_summary.parquet` (`ita_summary.TABLE_NAME`): 3,206,055 rows over 2016-2025 with the 24 columns of `ita_summary.COLUMNS` (R2.4's, `id`, `naics_year_from_dictionary`, `size_class`, `source_file` and four flags). The roadmap's `Produces` names the R2.9 flags; the table has a fourth, `flag_naics_year_unknown` (D8). `source_file` is the manifest path, resolved with `manifest.entry_for`, which still does not re-hash; but `build_summary_table` now checks each input's SHA-256 against its entry and fails on a mismatch (commit 2efe294), so the "Manifest audit" item (`specs/deferred_items.md`, section `1-raw-provenance`) is covered for the summary inputs only. For V2, `establishment_id` is non-null on every row from 2016 and repeats within a year on 2 rows (2016, 2017), 5,300 (2018), 12 (2020), 4,084 (2021) and 6 (2023); its 2016-2023 dictionary definition is per user account (`specs/findings/v10-ita-300a-totals.md`, "Observed in the stacked table"). R2.7's "From the 2023 data, `establishment_id` is the candidate key" and R2.3's retained "three dictionary changes introduced with the 2023 data" predate that finding. Whether 2021's 4,082 rows with a shared record `id` are duplicates was not examined. The planning notes on ZIP, EIN and description defects (V3, V1) came from sampled rows and were not re-measured on the full files; the table stores all three as delivered. Items deferred into this stage: none.
+- **Stage 4 (code tables and ITA NAICS mapping).** Consumes `naics_code` (a six-digit string; the build fails on anything else; null on no row in any year) and `naics_year`. As built, `naics_year` is 2012 on every pre-2023 row, marked by `naics_year_from_dictionary`, and is null beside a code on 2,670 rows (2,297 in 2023, 203 in 2024, 170 in 2025), flagged by `flag_naics_year_unknown`; the roadmap's `Produces` does not mention the null. From 2023 the vintages are mixed, and 2012 is 41.2% of 2024 rows and 36.1% of 2025 rows, against the dictionary's "most are 2022" (finding, "Observed in the stacked table"). Deferred into this stage: the industry half of R2.9's filing-rule flag, `specs/deferred_items.md` section `2-ita-300a-summaries`, item "Industry half of the R2.9 filing-rule flag"; P8 above records the appendix versions it needs.
+- **Stage 6 (target contract and ITA area-mix slice).** Cite raw inputs through each row's `source_file` and `manifest.entry_for`. The table is rebuilt on every `osha summary` run, so a target built from it should record which `source_file` values, and their SHA-256, it used. Flagged rows are kept in the table (R2.9). `size_class` merges `21` and `22` into `2` and is the one scheme in every year; the native `size` is kept, so `2` still appears beside `21`/`22` there from the 2023 file (spec R2.3, A2). The V10 gaps are in the finding: 2023 +8,746 against OSHA's exact count, 2024 +8,620 against a lower bound, and no published count located for 2016-2022 or 2025. Nothing else differs from the roadmap's `Produces`.
+- **Stage 10 (ITA establishment targets).** The roadmap's `Consumes` names Stages 3, 4 and 6, but R2.6 deduplication and R7.2 co-ownership read `ein` from this table. `ein` is null on 99.3% to 100.0% of 2016-2018 rows, 17.9% of 2019 and 9.8% to 11.5% of 2020-2025 (finding). The null share of `company_name`, R2.6's fallback, was not measured.

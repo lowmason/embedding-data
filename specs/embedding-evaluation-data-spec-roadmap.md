@@ -119,7 +119,7 @@ placements:
       > Stage 1: COMPLETE (2026-10-12) — implemented by plan 1 (specs/plans/completed/1-raw-provenance.md). Its Handoff section names what Stages 2, 3, 4, 5, 6 and 7 consume.
       > Next: resume the roadmap.
 
-- [ ] Stage 2: ITA 300A acquisition and stacked establishment table
+- [x] Stage 2: ITA 300A acquisition and stacked establishment table
       Objective: Every Form 300A summary file from 2016 on is acquired and stacked into one harmonized establishment-year table.
       Spec: R2.1, R2.3, R2.4, R2.9, R1.1, R9.1, V10 (ITA)
       Gap closed: R1.1; R2.1; R2.3; R2.4; R2.9; V10 (ITA); `osha` command drift
@@ -127,6 +127,9 @@ placements:
       Produces: stacked 300A Parquet keyed on `year_filing_for` with R2.4 columns, harmonized size codes and `naics_year`, R2.9 flags; current-year through-date in the manifest
       Exit: every year 2016–2025 appears with its raw file hashed in the manifest; size code `2` never co-occurs with `21`/`22` after harmonization; flagged rows are retained, not dropped; rows per year are compared with OSHA's published submission counts and the gaps recorded; a re-acquired current-year file is recorded as a new entry, leaving the earlier file and its entry unchanged (plan 1, Handoff; Resolved at resume, 2026-10-12); spec amendment adds `osha` to R9.1 and records case detail as acquired, feeding no target
       ROUTING: writing-plans
+
+      > Stage 2: COMPLETE (2026-10-13) — implemented by plan 2 (specs/plans/completed/2-ita-300a-summaries.md). Its Handoff section names what Stages 3, 4, 6 and 10 consume.
+      > Next: resume the roadmap.
 
 - [ ] Stage 3: ITA verification
       Objective: Settle the three open ITA facts by measurement before any ITA target is built.
