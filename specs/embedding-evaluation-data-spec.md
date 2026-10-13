@@ -27,8 +27,8 @@ documentation during the session.
 | Locator | Source | Standing |
 | --- | --- | --- |
 | **D** | Design session, 2026-10-12 | Binding for the choices made there: sources, samples, variables, universes. |
-| **XA** | `acs_benchmark_extract.py`, with `acs_benchmark_samples_variables.xlsx` | Executable ACS extract definition. Dry-run tested; not yet submitted to IPUMS. |
-| **XC** | `cps_benchmark_extract.py`, with `cps_benchmark_samples_variables.xlsx` | Executable CPS extract definition. Sample selection tested against a mocked catalog only. |
+| **XA** | `acs_benchmark_extract.py`, with `acs_benchmark_samples_variables.xlsx` | Executable ACS extract definition. Dry-run tested; first submitted 2026-10-12 *(owner, plan 1, 2026-10-12)*. |
+| **XC** | `cps_benchmark_extract.py`, with `cps_benchmark_samples_variables.xlsx` | Executable CPS extract definition. Sample selection tested against a mocked catalog; first submitted 2026-10-12 *(owner, plan 1, 2026-10-12)*. |
 | **ITA** | OSHA ITA data page and Summary Data Dictionary (`osha.gov/itadata`) | Primary documentation for R2. |
 | **USA** | IPUMS USA variable, geography, and terms pages (`usa.ipums.org`) | Primary documentation for R3. |
 | **CPS** | IPUMS CPS variable and code pages (`cps.ipums.org`) | Primary documentation for R4. |
@@ -132,14 +132,19 @@ characters), and reuse it for IPUMS CPS with CPS named as the source:
 > distances track them. Outputs are aggregate only; I will not attempt to
 > identify individuals.
 
-*(chosen; D)*
+*(chosen; D)* Both collections approved the registration, and the account's
+first extracts were delivered on 2026-10-12 (see Rollout). *(owner, plan 1,
+2026-10-12)*
 
 **R1.4** Raw downloads are immutable and kept as delivered: ITA zip and CSV
 files; IPUMS `.csv.gz` data with its `.xml` DDI codebook and the submitted
 definition (`extract.json`). A manifest records each raw file's source URL or
 IPUMS sample IDs, extract number, retrieval time, SHA-256, and client version.
 Transformations read raw files and write derived Parquet; nothing edits a raw
-file. *(added at synthesis; `extract.json` implemented in XA, XC)*
+file. *(added at synthesis; `extract.json` implemented in XA, XC)* Files
+delivered before the manifest existed are recorded with their modification time
+and the `uv.lock` client version, each flagged as a proxy. *(owner, plan 1,
+2026-10-12)*
 
 ### R2 — OSHA ITA establishment summaries
 
@@ -563,8 +568,10 @@ bullet here.
 
 ## Rollout
 
-**IPUMS registration blocks the most.** R3 and R4 cannot start until both
-collections approve the account, so submit the R1.3 statement first.
+**IPUMS registration is complete.** Both collections approved the account, and
+five extracts were submitted and delivered on 2026-10-12: ACS `usa_00001`
+(core), `usa_00002` (vintage), and `usa_00003` (five-year), and CPS `cps_00001`
+(monthly) and `cps_00002` (ASEC). *(owner, plan 1, 2026-10-12)*
 
 ITA needs no account, so it goes first and carries the vertical slice that
 proves this spec: one ITA year through R2 harmonization, R5 code mapping, R6
@@ -576,7 +583,9 @@ current window.
 V9 sets the cell-count gate after the first full build and before any embedder
 is scored.
 
-XA and XC were tested offline only: dry runs, a mocked sample catalog, and
-synthetic conversions. Their first live submissions are V5. Planned targets are
-never described as built, and no result from a fixture or a partial extract is
-reported as a benchmark.
+XA and XC were tested offline (dry runs, a mocked sample catalog, and synthetic
+conversions) before their first live submissions on 2026-10-12. Those
+submissions are V5's evidence; V4 and V5 stay open until their results are
+recorded, and no delivered extract is trusted before then. *(owner, plan 1,
+2026-10-12)* Planned targets are never described as built, and no result from a
+fixture or a partial extract is reported as a benchmark.
