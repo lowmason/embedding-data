@@ -85,24 +85,43 @@ def import_hud(data_dir: Path, workbook: Path, quarter: str) -> Path:
 def read_hud(file: Path) -> pl.DataFrame:
     raw = pl.read_excel(file, read_options={'dtypes': 'string'})
     raw.columns = [name.strip().upper() for name in raw.columns]
+    if {'COUNTY', 'GEOID'}.issubset(raw.columns):
+        raise ValueError('ambiguous HUD COUNTY/GEOID columns')
+    if 'GEOID' in raw.columns:
+        if not re.fullmatch(r'ZIP[-_]COUNTY(?:[-_][0-9]+)?\.xlsx?', file.name, re.IGNORECASE):
+            raise ValueError('HUD GEOID requires an unambiguous ZIP-COUNTY workbook name')
+        raw = raw.rename({'GEOID': 'COUNTY'})
     if not {'ZIP', 'COUNTY', 'BUS_RATIO'}.issubset(raw.columns):
         raise ValueError('HUD ZIP/COUNTY/BUS_RATIO columns missing')
-    result = raw.lazy().select(
+    state = pl.col('STATE').str.strip_chars() if 'STATE' in raw.columns else pl.lit(None)
+    normalized = raw.lazy().select(
         zip_key=pl.col('ZIP').str.strip_chars().str.replace(r'\.0$', '').str.zfill(5),
-        county_geoid=pl.col('COUNTY').str.strip_chars().str.replace(r'\.0$', '').str.zfill(5),
+        county_geoid=pl.col('COUNTY').str.strip_chars().str.replace(r'\.0$', ''),
         bus_ratio=pl.col('BUS_RATIO').cast(pl.Float64, strict=True),
-    ).sort('zip_key', 'county_geoid').collect()
+        state=state,
+    )
+    noncounty = pl.any_horizontal([
+        pl.col('county_geoid').eq(code).and_(pl.col('state').eq(state_code))
+        for state_code, code in {'AS': '60', 'FM': '64', 'MH': '68', 'PW': '70'}.items()
+    ]).and_(pl.col('bus_ratio').eq(0)).fill_null(False)
+    result = normalized.with_columns(noncounty_geography=noncounty).sort(
+        'zip_key', 'county_geoid'
+    ).collect()
     invalid = result.filter(
         pl.col('zip_key').str.contains(r'^[0-9]{5}$').not_().or_(
-            pl.col('county_geoid').str.contains(r'^[0-9]{5}$').not_()
+            pl.col('county_geoid').str.contains(r'^[0-9]{5}$').not_().and_(
+                pl.col('noncounty_geography').not_()
+            )
         ).or_(pl.col('bus_ratio').is_null()).or_(pl.col('bus_ratio').is_finite().not_()).or_(
             pl.col('bus_ratio').is_between(0, 1).not_()
         ).fill_null(True)
     )
-    if invalid.height or result.is_empty() or result.select('zip_key',
-                                                            'county_geoid').is_duplicated().any():
+    if invalid.height or result.is_empty() or result.select(
+        'zip_key', 'county_geoid'
+    ).is_duplicated().any():
         raise ValueError('invalid or duplicate HUD candidates')
-    return result
+    return result.drop('state')
+
 
 def parse_titles(raw: pl.DataFrame, vintage: int) -> pl.DataFrame:
     for index, row in enumerate(raw.rows()):
