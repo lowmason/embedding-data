@@ -107,7 +107,7 @@ placements:
 
 ## Stages
 
-- [ ] Stage 1: Raw provenance and safe re-runs
+- [x] Stage 1: Raw provenance and safe re-runs
       Objective: Every raw file has a manifest entry, and no command can overwrite or reconvert a delivered file.
       Spec: R1.4, R1.2, R1.3, R4.3, Rollout
       Gap closed: R1.4; R4.3 (sample floor); Parquet-in-raw drift; spec staleness on R1.3 and Rollout registration
@@ -115,6 +115,9 @@ placements:
       Produces: raw-manifest writer and reader (later output manifests cite raw inputs by its hashes); derived-Parquet location outside `data/raw`; per-extract output layout safe to re-run
       Exit: manifest entries exist for all seven pre-existing raw files, with SHA-256 and extract number, and retrieval time and client version flagged as proxies; no Parquet remains under `data/raw`; a test shows a second run leaves an earlier `extract.json` and its data byte-identical; `cps --start 2024-12` exits non-zero; spec amendment records registration complete and the 2026-10-12 submissions
       ROUTING: writing-plans
+
+      > Stage 1: COMPLETE (2026-10-12) — implemented by plan 1 (specs/plans/completed/1-raw-provenance.md). Its Handoff section names what Stages 2, 3, 4, 5, 6 and 7 consume.
+      > Next: resume the roadmap.
 
 - [ ] Stage 2: ITA 300A acquisition and stacked establishment table
       Objective: Every Form 300A summary file from 2016 on is acquired and stacked into one harmonized establishment-year table.

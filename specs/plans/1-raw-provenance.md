@@ -1,5 +1,7 @@
 # Raw Provenance and Safe Re-runs Implementation Plan
 
+**Status: COMPLETE (2026-10-12)** — executed via subagent-driven-development; deferred items in specs/deferred_items.md
+
 > **For agentic workers:** REQUIRED SUB-SKILL: implement this plan task-by-task via subagent-driven-development (the default) — or executing-plans when your human partner chose inline execution at the handoff. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 > Roadmap: specs/embedding-evaluation-data-spec-roadmap.md, Stage 1 — on plan
@@ -65,7 +67,7 @@
   - `manifest.append_entries(manifest_path: Path, entries: Iterable[ManifestEntry]) -> None`. It raises `ValueError` and writes nothing when any path is already recorded or repeated, and it is a no-op for no entries.
   - `manifest.entry_for(manifest_path: Path, raw_file: Path) -> ManifestEntry`, which raises `KeyError` when the file is not recorded.
 
-- [ ] **Step 1: Add the `data_directory` fixture**
+- [x] **Step 1: Add the `data_directory` fixture**
 
 In `tests/conftest.py`, append after the `output_directory` fixture:
 
@@ -75,7 +77,7 @@ def data_directory(tmp_path):
     return tmp_path / 'data'
 ```
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Create `tests/test_manifest.py`:
 
@@ -217,12 +219,12 @@ def test_entry_for_finds_a_raw_file_by_location(raw_file, data_directory):
         manifest.entry_for(manifest_path, raw_file.with_name('usa_00002.xml'))
 ```
 
-- [ ] **Step 3: Run the tests to verify they fail**
+- [x] **Step 3: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_manifest.py -v`
 Expected: collection error, `ImportError: cannot import name 'manifest' from 'embedding_data'`.
 
-- [ ] **Step 4: Write `paths.py`**
+- [x] **Step 4: Write `paths.py`**
 
 Create `src/embedding_data/paths.py`:
 
@@ -257,7 +259,7 @@ def manifest_path(data_dir: Path) -> Path:
     return data_dir / 'raw' / 'manifest.jsonl'
 ```
 
-- [ ] **Step 5: Write `manifest.py`**
+- [x] **Step 5: Write `manifest.py`**
 
 Create `src/embedding_data/manifest.py`:
 
@@ -367,17 +369,17 @@ def entry_for(manifest_path: Path, raw_file: Path) -> ManifestEntry:
     raise KeyError(f'{path} is not recorded in {manifest_path}')
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_manifest.py -v`
 Expected: 10 passed.
 
-- [ ] **Step 7: Run the full suite and lint**
+- [x] **Step 7: Run the full suite and lint**
 
 Run: `uv run --locked pytest -q && uv run --locked ruff check .`
 Expected: `54 passed`; `All checks passed!`
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/embedding_data/paths.py src/embedding_data/manifest.py tests/test_manifest.py tests/conftest.py
@@ -404,7 +406,7 @@ git commit -m "feat(manifest): add the append-only raw manifest and data-root la
   - `ipums_delivery.parquet_path(data_dir: Path, source: str, set_name: str, csv_gz: Path) -> Path`, which returns `derived/<source>/<set>/<name>.parquet`.
   - ACS: `csv_to_parquet(csv_gz: Path, parquet_path: Path) -> Path`, and `main(extracts, data_dir, dry_run)` with the option `--data-dir`; `--out` is gone.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Replace `tests/test_acs_benchmark_extract.py` with:
 
@@ -647,12 +649,14 @@ def test_acs_dry_run_neither_reads_key_nor_creates_client(
     assert set(definition['samples']) == {'us2023a', 'us2024a'}
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_acs_benchmark_extract.py tests/test_cli.py -v`
 Expected: FAIL. `test_default_paths_point_to_project_root` fails with `KeyError: 'data_dir'`, and the invocation tests exit 2 with `No such option: --data-dir`.
 
-- [ ] **Step 3: Write `ipums_delivery.py`**
+- [x] **Step 3: Write `ipums_delivery.py`**
+
+> Deviation: `deliver()` shipped differently from the code below, after the final review (commits cde1278, e579a8f). The download is staged in `<set>/<name>.part/`, the three expected files (`extract.json`, `<name>.csv.gz`, `<name>.xml`) are verified, hashed and checked against the manifest there, and only then is the directory renamed to `<set>/<name>/` and its entries appended; anything else in the directory (such as `.DS_Store`) is not recorded. New: `manifest.check_appendable()`, which `append_entries` shares. A `.part` directory is an interrupted delivery, neither recorded nor a delivery.
 
 Create `src/embedding_data/ipums_delivery.py`:
 
@@ -741,7 +745,7 @@ def parquet_path(data_dir: Path, source: str, set_name: str, csv_gz: Path) -> Pa
     return paths.derived_dir(data_dir, source) / set_name / f'{name}.parquet'
 ```
 
-- [ ] **Step 4: Move the ACS command onto `--data-dir` (2-space indentation)**
+- [x] **Step 4: Move the ACS command onto `--data-dir` (2-space indentation)**
 
 In `src/embedding_data/acs_benchmark_extract.py`, replace the docstring paragraph
 
@@ -852,12 +856,12 @@ def main(
 
 `SAMPLE_SETS`, `VARIABLE_GROUPS`, `SCHEMA_OVERRIDES`, `build_extract`, `app` and the `__main__` guard stay as they are. `import json` goes, because the definition is now written by `ipums_delivery`.
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_acs_benchmark_extract.py tests/test_cli.py -v`
 Expected: all passed.
 
-- [ ] **Step 6: Update the ACS docs**
+- [x] **Step 6: Update the ACS docs**
 
 In `README.md`, replace
 
@@ -896,12 +900,12 @@ with
 uv run embedding-data acs core --dry-run --data-dir "$(mktemp -d)"   # offline: no key, no network
 ```
 
-- [ ] **Step 7: Run the full suite, Behave and lint**
+- [x] **Step 7: Run the full suite, Behave and lint**
 
 Run: `uv run --locked pytest -q && uv run --locked behave && uv run --locked ruff check .`
 Expected: all pytest passed, 2 scenarios passed, `All checks passed!`. CPS and OSHA still use `--out` at this point.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/embedding_data/ipums_delivery.py src/embedding_data/acs_benchmark_extract.py tests/test_acs_benchmark_extract.py tests/test_cli.py README.md CLAUDE.md
@@ -923,7 +927,7 @@ git commit -m "feat(acs): deliver each extract into its own raw directory and re
 - Consumes: `ipums_delivery.write_preview`, `deliver` and `parquet_path` (Task 2); `manifest.read_manifest` and `paths.manifest_path` (Task 1).
 - Produces: CPS `csv_to_parquet(csv_gz: Path, parquet_path: Path) -> Path`, and `main(extracts, start, data_dir, dry_run)` with the option `--data-dir`; `--out` is gone.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Replace `tests/test_cps_benchmark_extract.py` with:
 
@@ -1197,12 +1201,12 @@ def preview_path(context, name):
     assert list(context.data_directory.rglob('*.parquet')) == []
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_cps_benchmark_extract.py tests/test_cli.py -v; uv run --locked behave`
 Expected: pytest FAIL, with `KeyError: 'data_dir'` and `No such option: --data-dir`. Behave fails both scenarios with exit code 2.
 
-- [ ] **Step 3: Move the CPS command onto `--data-dir`**
+- [x] **Step 3: Move the CPS command onto `--data-dir`**
 
 In `src/embedding_data/cps_benchmark_extract.py`, replace the docstring lines
 
@@ -1307,12 +1311,12 @@ and the `dry_run` help string `'Write definitions without submitting.'` with `'W
 
 `import json` goes. Everything above the loop in `main`, and `parse_month`, `select_samples` and `build_extract`, stay unchanged.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_cps_benchmark_extract.py tests/test_cps_properties.py tests/test_cli.py -v && uv run --locked behave`
 Expected: all passed; 2 scenarios passed.
 
-- [ ] **Step 5: Update the CPS and shared-flow docs**
+- [x] **Step 5: Update the CPS and shared-flow docs**
 
 In `README.md`, replace
 
@@ -1343,12 +1347,12 @@ In `CLAUDE.md`, replace the whole `**Shared flow.**` paragraph with:
 
 and in the `**Credentials.**` paragraph replace `Output defaults to `data/raw/acs` and `data/raw/cps` under the project root.` with ``--data-dir` defaults to `data/` under the project root (`paths.DATA_DIR`).`
 
-- [ ] **Step 6: Run the full suite and lint**
+- [x] **Step 6: Run the full suite and lint**
 
 Run: `uv run --locked pytest -q && uv run --locked ruff check .`
 Expected: all passed; `All checks passed!`
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/embedding_data/cps_benchmark_extract.py tests/test_cps_benchmark_extract.py tests/test_cli.py features/environment.py features/steps/cps_dry_run.py README.md CLAUDE.md
@@ -1368,7 +1372,7 @@ git commit -m "feat(cps): deliver each extract into its own raw directory and re
 - Consumes: `parse_month` (unchanged).
 - Produces: `cps_benchmark_extract.MONTHLY_FIRST = '2025-01'`. A `--start` earlier than it raises `typer.BadParameter` (exit 2) before the key is read.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `tests/test_cps_benchmark_extract.py`:
 
@@ -1403,12 +1407,14 @@ def test_cps_start_before_2025_exits_non_zero(cli_runner, data_directory, dotenv
     client_factory.assert_not_called()
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_cps_benchmark_extract.py tests/test_cli.py -k "before" -v`
 Expected: FAIL. Without the floor, the `test_cps_benchmark_extract.py` cases exit 0, because 2024-12 and 2020-01 select catalog samples normally. The `test_cli.py` case exits 1, because it has no key. None of them prints `is before 2025-01`.
 
-- [ ] **Step 3: Implement the floor**
+- [x] **Step 3: Implement the floor**
+
+> Deviation: owner ruling after the Task 4 review (commit af5be31): the floor applies only when `monthly` is among the requested extracts, so `cps asec --start 2020-01` is no longer refused. Two tests added.
 
 In `src/embedding_data/cps_benchmark_extract.py`, below `ASEC_FIRST_YEAR = 2025`, add:
 
@@ -1444,21 +1450,21 @@ monthly: every basic monthly sample from --start (default and earliest 2025-01, 
     first month on the 2022 Census industry codes; occupation has used 2018 codes since
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_cps_benchmark_extract.py tests/test_cps_properties.py tests/test_cli.py -v && uv run --locked behave`
 Expected: all passed; 2 scenarios passed. The Hypothesis properties still pass, because `parse_month` and `select_samples` are unchanged.
 
-- [ ] **Step 5: Update the README row**
+- [x] **Step 5: Update the README row**
 
 In `README.md`, replace the cell text `Catalog samples from `--start`, default `2025-01`; excludes ASEC` with `Catalog samples from `--start`, default and earliest `2025-01` (an earlier start is refused); excludes ASEC`.
 
-- [ ] **Step 6: Run the full suite and lint**
+- [x] **Step 6: Run the full suite and lint**
 
 Run: `uv run --locked pytest -q && uv run --locked ruff check .`
 Expected: all passed; `All checks passed!`
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/embedding_data/cps_benchmark_extract.py tests/test_cps_benchmark_extract.py tests/test_cli.py README.md
@@ -1482,7 +1488,7 @@ git commit -m "feat(cps): refuse monthly starts before January 2025"
   - `osha.main(data_dir)` with the option `--data-dir`.
   - `osha.DICTIONARY_URL`, `osha.CSV_URL` and `osha.file_name(url) -> str`, unchanged and used by Task 6.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Replace `tests/test_osha_benchmark_download.py` with:
 
@@ -1710,12 +1716,14 @@ def test_conversion_fails_on_an_unparseable_typed_value(tmp_path):
     assert list(derived.iterdir()) == []
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_osha_benchmark_download.py -v`
 Expected: FAIL. You should see `KeyError: 'data_dir'`, `No such option: --data-dir`, and a `TypeError` from `csv_to_parquet()` taking one positional argument.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
+
+> Deviation: two owner-approved additions. (1) An existing raw file that is missing from the manifest now draws a stderr warning naming `python -m embedding_data.raw_backfill --data-dir <shell-quoted data dir>`; nothing is recorded there (commit 65debc2; `shlex.quote` added in 3491905). (2) A missing raw file that the manifest still records makes `osha` exit 1 with no request, instead of re-downloading over the old entry (commit 3491905).
 
 In `src/embedding_data/osha_benchmark_download.py`, replace the docstring lines
 
@@ -1845,12 +1853,12 @@ def main(
 
 In `tests/conftest.py`, delete the `output_directory` fixture. First confirm nothing still uses it: `grep -rn output_directory tests features` should print nothing.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_osha_benchmark_download.py tests/test_cli.py -v`
 Expected: all passed.
 
-- [ ] **Step 5: Update the OSHA docs**
+- [x] **Step 5: Update the OSHA docs**
 
 In `README.md`, replace everything from `The `osha` command needs no account or key. It downloads two files from osha.gov` through `command sends a browser `User-Agent`.` with:
 
@@ -1896,12 +1904,12 @@ and replace the whole `**OSHA download.**` paragraph with:
 **OSHA download.** `osha` needs no key. osha.gov's CloudFront returns 403 to non-browser user agents, so `USER_AGENT` is a browser string. Existing files in `data/raw/osha` are never re-downloaded (raw immutability). Downloads go to `.part`, are renamed only after `num_bytes_downloaded` matches `Content-Length`, and are then recorded in the raw manifest. The CSV mixes Windows-1252 and UTF-8 bytes, sometimes within one line; `decode_line` transcodes it to a temporary UTF-8 CSV that is cast strictly (codes stay strings) and sunk to `data/derived/osha`, only when that Parquet is absent. Without existing files, a run downloads about 475 MB.
 ```
 
-- [ ] **Step 6: Run the full suite, Behave and lint**
+- [x] **Step 6: Run the full suite, Behave and lint**
 
 Run: `uv run --locked pytest -q && uv run --locked behave && uv run --locked ruff check .`
 Expected: all passed; 2 scenarios passed; `All checks passed!`
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/embedding_data/osha_benchmark_download.py tests/test_osha_benchmark_download.py tests/conftest.py README.md CLAUDE.md
@@ -1923,7 +1931,7 @@ git commit -m "feat(osha): record downloads and convert once, outside raw"
   - `raw_backfill.backfill(data_dir: Path, lock_path: Path) -> list[ManifestEntry]`. It validates and hashes everything, then moves files and appends entries, and returns the entries appended (`[]` on a migrated tree).
   - `raw_backfill.app`, a single-command Typer app with `--data-dir`, run as `python -m embedding_data.raw_backfill`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/test_raw_backfill.py`:
 
@@ -2133,12 +2141,14 @@ def test_the_command_reports_what_it_recorded(legacy, cli_runner):
     assert '8 entries appended to' in result.output
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_raw_backfill.py -v`
 Expected: collection error, `ImportError: cannot import name 'raw_backfill' from 'embedding_data'`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
+
+> Deviation: owner-approved changes after the Task 6 review (commit a2eff14) and the final review. `occupied()` raises a `FileExistsError` that names both paths and the remedy; the "delete" advice appears only for a derived Parquet, never for a raw file. `check_plan()` runs before the first move and also refuses an entry path already in the manifest and two moves to one destination. The docstring and CLAUDE.md now say a failure after files have moved cannot be recovered by re-running. In `tests/test_raw_backfill.py`, ruff Q001 changed the `LOCK` string from `'''` to `"""`.
 
 Create `src/embedding_data/raw_backfill.py`:
 
@@ -2325,12 +2335,12 @@ if __name__ == '__main__':
     app()
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_raw_backfill.py -v`
 Expected: 8 passed (3 single tests, 4 parametrized cases and 1 CLI test).
 
-- [ ] **Step 5: Update the cross-cutting docs**
+- [x] **Step 5: Update the cross-cutting docs**
 
 In `README.md`, replace
 
@@ -2406,12 +2416,12 @@ In `CLAUDE.md`, replace `OSHA Form 300A ingestion, code parsing, geography alloc
 **Raw provenance.** `manifest.append_entries()` refuses a path already recorded, so each raw file maps to one hash for good; `manifest.entry_for()` looks an entry up for output manifests to cite. `raw_backfill.py` is a one-off (`python -m embedding_data.raw_backfill`) that moved the files delivered before the manifest into this layout; their entries flag `retrieved_at` and `client_version` as proxies. On a migrated tree it does nothing.
 ```
 
-- [ ] **Step 6: Run the full suite, Behave and lint**
+- [x] **Step 6: Run the full suite, Behave and lint**
 
 Run: `uv run --locked pytest -q && uv run --locked behave && uv run --locked ruff check .`
 Expected: all passed; 2 scenarios passed; `All checks passed!`
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/embedding_data/raw_backfill.py tests/test_raw_backfill.py README.md CLAUDE.md
@@ -2432,11 +2442,11 @@ This task changes the real, gitignored data tree and commits nothing. **The cont
 - Consumes: `raw_backfill` (Task 6) and `manifest.read_manifest` and `sha256_file` (Task 1).
 - Produces: `data/raw/manifest.jsonl` with 17 entries; the five extracts in `data/raw/<source>/<set>/<name>/`; six Parquet files under `data/derived/`.
 
-- [ ] **Step 1: Get the go-ahead**
+- [x] **Step 1: Get the go-ahead**
 
 Ask your human partner, in these words: "Task 7 migrates the real data now, before the branch merges. It moves the files under `/Users/lowell/Projects/embedding-data/data/raw` into per-extract directories, moves six Parquet files to `data/derived`, and appends 17 entries to a new `data/raw/manifest.jsonl`. Proceed?" Do not continue without an explicit yes.
 
-- [ ] **Step 2: Record the pre-run state**
+- [x] **Step 2: Record the pre-run state**
 
 ```bash
 REAL_DATA=/Users/lowell/Projects/embedding-data/data
@@ -2453,12 +2463,12 @@ Expected:
 
 Any other result: stop and report to your human partner.
 
-- [ ] **Step 3: Run the backfill**
+- [x] **Step 3: Run the backfill**
 
 Run: `REAL_DATA=/Users/lowell/Projects/embedding-data/data; uv run --locked python -m embedding_data.raw_backfill --data-dir "$REAL_DATA"`
 Expected: 17 `recorded …` lines, then `17 entries appended to /Users/lowell/Projects/embedding-data/data/raw/manifest.jsonl`. A count of `0` means it ran against the wrong root: stop. If it raises, nothing has moved. Report the message to your human partner and stop.
 
-- [ ] **Step 4: Verify hashes, coverage, and the seven deliveries**
+- [x] **Step 4: Verify hashes, coverage, and the seven deliveries**
 
 ```bash
 REAL_DATA=/Users/lowell/Projects/embedding-data/data
@@ -2506,7 +2516,7 @@ Expected:
 - No output from the first `find`.
 - Six paths from the second.
 
-- [ ] **Step 5: Check that a dry run leaves raw alone**
+- [x] **Step 5: Check that a dry run leaves raw alone**
 
 ```bash
 REAL_DATA=/Users/lowell/Projects/embedding-data/data
@@ -2516,7 +2526,7 @@ find "$REAL_DATA/raw" -type f -newer "$REAL_DATA/raw/manifest.jsonl"
 
 Expected: `core: wrote /Users/lowell/Projects/embedding-data/data/preview/acs/core/extract.json`, and no output from `find`.
 
-- [ ] **Step 6: Report**
+- [x] **Step 6: Report**
 
 Nothing is committed, because `data/` is gitignored. Paste the Step 4 output into the task report.
 
@@ -2531,7 +2541,7 @@ Nothing is committed, because `data/` is gitignored. Paste the Step 4 output int
 - Consumes: nothing.
 - Produces: the spec records registration, the 2026-10-12 deliveries and the backfill proxies. Its status header is untouched.
 
-- [ ] **Step 1: Apply the five amendments exactly**
+- [x] **Step 1: Apply the five amendments exactly**
 
 Edit 1 — Locator table. Replace
 
@@ -2618,19 +2628,19 @@ recorded, and no delivered extract is trusted before then. *(owner, plan 1,
 fixture or a partial extract is reported as a benchmark.
 ```
 
-- [ ] **Step 2: Verify the amendments landed and nothing else changed**
+- [x] **Step 2: Verify the amendments landed and nothing else changed**
 
 Run: `grep -c 'owner, plan 1' specs/embedding-evaluation-data-spec.md && git diff --stat specs/embedding-evaluation-data-spec.md && head -4 specs/embedding-evaluation-data-spec.md`
 Expected: `6` (XA, XC, R1.3, R1.4, Rollout ×2). The diff touches only that file. The header still reads `> For agentic workers: REQUIRED NEXT SKILL: derive-roadmap — do not plan this`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add specs/embedding-evaluation-data-spec.md
 git commit -m "docs(specs): record IPUMS registration, first deliveries, and backfill proxies"
 ```
 
-- [ ] **Step 4: Final verification**
+- [x] **Step 4: Final verification**
 
 ```bash
 uv run --locked pytest -q
@@ -2652,3 +2662,36 @@ Expected:
 - `cps --help` lists `--data-dir` and `--start`, and does not list `--out`.
 
 Then run the Plan Completion Protocol, including step 3a (roadmap handoff). Leave the spec in place at step 5.
+
+## Handoff to later stages
+
+- **Stage 2 (ITA 300A acquisition).** Consumes the manifest writer and derived location as built:
+  `manifest.describe_file(file, raw_root, retrieved_at=, client=, client_version=, source_url=)`
+  then `manifest.append_entries(manifest_path, entries)`; paths are POSIX, relative to
+  `data/raw`, and one entry per path forever. Raw ITA files go to
+  `paths.raw_dir(data_dir, 'osha')`, derived Parquet to `paths.derived_dir(data_dir, 'osha')`.
+  The `osha` helpers moved: `make_client` is at `osha_benchmark_download.py:71`, `download` (the
+  `.part` rename) at `:105`, `decode_line` at `:135`, not the roadmap's `:63`, `:78`, `:108`.
+  `osha main` takes `--data-dir`, not `--out`. Traps found in execution: (1) `osha` converts only
+  when the derived Parquet is absent ("exists, not converting again"), so a stacked table must
+  not rely on it rebuilding; (2) a raw file that exists but is not in the manifest draws a
+  stderr warning and is not recorded, and a raw file that is missing but still recorded makes
+  the command exit 1, so a new year's file needs a new name or an explicit decision; (3) running
+  `osha` before the backfill had collided with the legacy Parquet (the backfill has since run on
+  the only legacy tree). Items deferred into this stage: none.
+- **Stage 3 (ITA verification).** Consumes the manifest writer. `manifest.entry_for(manifest_path,
+  raw_file)` finds an entry by file location so output manifests can cite a raw input by hash,
+  but it does not re-hash the file. Deferred into this stage:
+  `specs/deferred_items.md` section `1-raw-provenance`, item "manifest audit".
+- **Stages 4, 5 and 6 (code tables, geography, target contract).** Each consumes the manifest:
+  cite raw inputs with `manifest.entry_for(...)`. The manifest is `data/raw/manifest.jsonl`
+  (gitignored with the data). Nothing differs from the roadmap's `Produces`.
+- **Stage 7 (IPUMS extract verification).** Consumes the manifest and derived Parquet. Derived
+  Parquet is `data/derived/<source>/<set>/<name>.parquet`, built by `csv_to_parquet(csv_gz,
+  parquet_path)` in each module. The five existing extracts were backfilled, so their entries
+  carry `proxies = ('retrieved_at', 'client_version')` (modification time, `uv.lock` version),
+  and their `extract.json` files carry `"version": null`, where a new delivery carries the API
+  version. A new delivery is staged in `<set>/<name>.part/` and renamed only when complete; a
+  `.part` directory is an interrupted delivery. Deferred into this stage:
+  `specs/deferred_items.md` section `1-raw-provenance`, items "ACS and CPS convert-if-absent"
+  and "legacy extract.json version".
