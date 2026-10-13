@@ -260,12 +260,11 @@ def test_hours_that_spell_no_whole_number_an_int64_holds_fail(tmp_path, written)
 @pytest.mark.parametrize(
     'column',
     [
-        'id', 'establishment_id', 'size', 'annual_average_employees', 'year_filing_for',
-        'naics_year',
+        'id', 'establishment_id', 'establishment_type', 'size', 'annual_average_employees',
+        'year_filing_for', 'naics_year',
     ],
 )
 def test_scientific_notation_in_another_integer_column_fails(tmp_path, column):
-    # establishment_type is not listed: E-notation there is text, which becomes null.
     data = year_file(2024, [record(2024, **{column: '1E+2'})])
 
     with pytest.raises(ValueError, match=not_a_whole_number(source_file(2024), column)):
@@ -284,8 +283,11 @@ def test_a_text_establishment_type_becomes_null_and_its_row_is_kept(tmp_path):
     assert frame.select('id', 'establishment_type').rows() == [(1, None), (2, 2)]
 
 
-def test_a_numeric_establishment_type_with_a_fraction_fails(tmp_path):
-    data = year_file(2019, [record(2019, establishment_type='1.5')])
+@pytest.mark.parametrize('written', ['1.5', '1,5', '1e3', 'Type 2', '１', '٣'])
+def test_an_establishment_type_holding_a_digit_must_be_a_whole_number(tmp_path, written):
+    # Only a value with no digit at all is text (D13). A full-width or Arabic-Indic digit
+    # is still a digit, so it reaches the cast and fails rather than being nulled.
+    data = year_file(2019, [record(2019, establishment_type=written)])
 
     with pytest.raises(
         ValueError, match=not_a_whole_number(source_file(2019), 'establishment_type'),
@@ -405,7 +407,9 @@ TABLE_SCHEMA = {
     'flag_hours_per_employee': pl.Boolean, 'flag_below_filing_size': pl.Boolean,
     'flag_naics_year_unknown': pl.Boolean, 'source_file': pl.String,
 }
-NEXT_2025 = 'ITA_300A_Summary_Data_2025_through_11-30-2026.csv'
+# Later than RELEASE_NAMES[2025] (through 08-31-2026) by date but earlier by name, so a
+# release chosen by name order instead of through-date would be the wrong one.
+NEXT_2025 = 'ITA_300A_Summary_Data_2025_through_01-31-2027.csv'
 
 
 def table_path(data_directory):

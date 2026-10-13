@@ -9,9 +9,9 @@ a long number; in that column alone, such a value is read as the whole number it
 It is expanded on its digit string, not through a float, whose 53-bit significand would
 silently round a longer value (1.23456789012345678E+17). Any other value that is not a
 whole number, or that Int64 cannot hold, fails the build with the file and column named.
-The one exception is establishment_type, where text (one 2019 row holds Executive and
-Legislative Offices) becomes null; a number there must still be whole. Two dictionary
-changes are harmonized:
+The one exception is establishment_type, where a value with no digit at all (one 2019 row
+holds Executive and Legislative Offices) becomes null; any value holding a digit must
+still be a whole number. Two dictionary changes are harmonized:
 
 - size: code 2 (20-249 employees) was split into 21 (20-99) and 22 (100-249) with the 2023
   data, but the 2023 and later files still carry 2 for some establishments. size keeps the
@@ -57,8 +57,6 @@ REQUIRED_COLUMNS = [*INTEGER_COLUMNS, *TEXT_COLUMNS, 'naics_code']
 NAICS_YEAR_FROM = 2023
 DICTIONARY_NAICS_YEAR = 2012
 NAICS_YEARS = [2012, 2017, 2022]
-# Digits and points, optionally signed or padded: an establishment_type that looks numeric.
-NUMERIC = r'^\s*[-+]?[\d.]+\s*$'
 # Scientific notation as a spreadsheet writes a long number (8.62847E+11), signed like a
 # plain number and, like one, not padded. [0-9], because Rust's \d matches any Unicode digit.
 SCIENTIFIC = (
@@ -162,16 +160,18 @@ def expand_scientific(value: pl.Expr) -> pl.Expr:
 
 
 def integer_value(column: str) -> pl.Expr:
-    '''The raw string an integer column is cast from; non-numeric establishment_type is null.
+    '''The raw string an integer column is cast from; establishment_type with no digit is null.
 
-    The text is masked out before the cast rather than skipped by a branch around it, so
-    the strict cast never sees it, whichever rows Polars evaluates a branch on.
-    total_hours_worked in scientific notation is written out in digits (expand_scientific);
-    no other column reads that notation as a number.
+    An establishment_type with no digit at all is text, masked out before the cast rather
+    than skipped by a branch around it, so the strict cast never sees it, whichever rows
+    Polars evaluates a branch on. Any value holding a digit reaches the cast; the mask uses
+    Rust's \\d, which matches any Unicode digit, so a full-width 1 fails there rather than
+    being nulled. total_hours_worked in scientific notation is written out in digits
+    (expand_scientific); no other column reads that notation as a number.
     '''
     value = pl.col(column)
     if column == 'establishment_type':
-        return pl.when(value.str.contains(NUMERIC)).then(value)
+        return pl.when(value.str.contains(r'\d')).then(value)
     if column == 'total_hours_worked':
         return expand_scientific(value)
     return value
