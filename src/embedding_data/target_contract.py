@@ -90,6 +90,9 @@ def write_targets(frame: pl.LazyFrame | pl.DataFrame, destination: Path) -> dict
     if published.select(keys.ne(keys.sort_by(TARGET_KEY_COLUMNS)).any()).collect().item():
         raise ValueError('serialized target keys are not sorted')
     record = file_record(destination)
+    schema = published.collect_schema()
+    record.update(rows=published.select(pl.len()).collect().item(), columns=list(schema),
+                  schema={column: str(dtype) for column, dtype in schema.items()})
     if record['rows'] != expected_rows:
         raise ValueError('serialized target row count differs')
     return record

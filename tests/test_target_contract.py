@@ -173,3 +173,16 @@ def test_shared_ids_do_not_impose_family_membership(kind, value):
     tc.validate_targets(target_rows().head(1).with_columns(pl.lit(kind).alias('unit_b_type'),
                                                   pl.lit(value).alias('unit_b'),
                                                   pl.lit(-42.5).alias('value')))
+
+
+@pytest.mark.parametrize('name', ['targets', 'targets.PARQUET'])
+def test_writer_inventory_does_not_depend_on_destination_suffix(tmp_path, name):
+    frame = target_rows()
+    destination = tmp_path / name
+    record = tc.write_targets(frame, destination)
+    assert record['rows'] == frame.height
+    assert record['columns'] == frame.columns
+    assert record['schema'] == {column: str(dtype) for column, dtype in frame.schema.items()}
+    assert record['sha256'] == file_record(destination)['sha256']
+    assert record['size'] == destination.stat().st_size
+    assert_frame_equal(pl.read_parquet(destination), frame.sort(tc.TARGET_KEY_COLUMNS))
