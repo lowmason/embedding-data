@@ -113,3 +113,24 @@ def source_frames(tmp_path):
         'members': gp.parse_members(read(files['cbsa_2023'])),
         'hud': ita_references.read_hud(files['hud_2025q4']),
     }
+
+
+def fixture_registry(files):
+    from dataclasses import replace
+
+    from embedding_data import geography_references as gr
+    from embedding_data import manifest
+
+    return {k: replace(gr.REGISTRY[k], sha256=manifest.sha256_file(file),
+                       size=file.stat().st_size, fixture=True, state_scope=FIXTURE_SCOPE)
+            for k, file in files.items()}
+
+
+def seed_geography_tree(data_dir):
+    from embedding_data import geography_references as gr
+
+    files = originals(data_dir / 'originals')
+    registry = fixture_registry(files)
+    for kind, file in files.items():
+        gr.import_reference(data_dir, kind, file, registry=registry)
+    return registry
