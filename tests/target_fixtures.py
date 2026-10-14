@@ -219,3 +219,38 @@ def census_client(requests: list[dict], *, fail_batch: int | None = None) -> htt
                               stream=httpx.ByteStream(body))
 
     return httpx.Client(transport=httpx.MockTransport(serve), timeout=600)
+
+
+def assignment_inputs(tmp_path, *, status='Match', kind='Exact', returned='01001',
+                      zip_code='00001', state='AL', street='1 Main', city='Town'):
+    from geography_fixtures import source_frames
+
+    from embedding_data import geography_hud, geography_tables
+    from embedding_data.ita_assignment_prepare import request_frames
+    from embedding_data.target_inputs import CANONICAL_SCHEMA
+
+    sources = source_frames(tmp_path)
+    counties = geography_tables.assemble(sources)['county_reference']
+    hud = geography_hud.lookup(geography_hud.annotate(sources['hud'], counties))
+    row = dict.fromkeys(CANONICAL_SCHEMA)
+    row.update(year_filing_for=2023, id=1, establishment_id=99,
+               street_address=street, city=city,
+               state=state, zip_code=zip_code)
+    canonical = pl.DataFrame([row], schema=CANONICAL_SCHEMA).lazy()
+    index, requests = request_frames(canonical)
+    responses = requests.select('request_id').with_columns(
+        pl.lit(status, dtype=pl.String).alias('geocode_status'),
+        pl.lit(kind, dtype=pl.String).alias('match_type'),
+        pl.lit(returned, dtype=pl.String).alias('geocode_county_geoid'))
+    return canonical, index, responses, hud, counties
+
+
+def assignment_case(census_status, match_type, returned_county, zip_code, state):
+    from tempfile import TemporaryDirectory
+
+    from embedding_data.ita_assignment import assign
+
+    with TemporaryDirectory() as directory:
+        inputs = assignment_inputs(Path(directory), status=census_status, kind=match_type,
+                                   returned=returned_county, zip_code=zip_code, state=state)
+        return assign(*inputs).collect().row(0, named=True)
