@@ -2,6 +2,7 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
+import httpx
 import polars as pl
 from code_fixtures import seed_code_tree
 from geography_fixtures import seed_geography_tree
@@ -164,3 +165,57 @@ def submitted_edge_cases():
         'state': ['', '', 'AL', 'AL', 'AL', 'AL', None, 'PR'],
         'zip_code': [None, 'invalid', '12345-6789', '123456789', '1234', '00001', '', '00001'],
     })
+
+
+def census_client(requests: list[dict], *, fail_batch: int | None = None) -> httpx.Client:
+    '''Serve the actual multipart Census protocol without network or source data.'''
+    import csv
+    import hashlib
+    import io
+    from email import policy
+    from email.parser import BytesParser
+
+    batch = 0
+
+    def serve(request):
+        nonlocal batch
+        call = {'method': request.method, 'url': str(request.url)}
+        requests.append(call)
+        if request.url.path.endswith('/benchmarks'):
+            return httpx.Response(200, json={
+                'benchmarks': [{'benchmarkName': 'Public_AR_Current', 'id': 7}]})
+        if request.url.path.endswith('/vintages'):
+            assert request.url.params['benchmark'] == '7'
+            return httpx.Response(200, json={
+                'vintages': [{'vintageName': 'ACS2025_Current', 'id': 999}]})
+        assert request.method == 'POST'
+        assert request.url.path.endswith('/geographies/addressbatch')
+        message = BytesParser(policy=policy.default).parsebytes(
+            ('Content-Type: ' + request.headers['content-type'] + '\r\n\r\n').encode()
+            + request.read())
+        parts = {part.get_param('name', header='content-disposition'): part
+                 for part in message.iter_parts()}
+        payload = parts['addressFile'].get_payload(decode=True)
+        call.update(benchmark=parts['benchmark'].get_content().strip(),
+                    vintage=parts['vintage'].get_content().strip(),
+                    request_sha256=hashlib.sha256(payload).hexdigest())
+        if batch == fail_batch:
+            raise httpx.ReadError('fixture interrupted batch', request=request)
+        batch += 1
+        output = io.StringIO(newline='')
+        writer = csv.writer(output)
+        counties = {'Exact A': '01001', 'Exact B': '51510', 'Exact C': '51059',
+                    'Exact excluded': '72001'}
+        for identifier, street, _city, _state, _zip in csv.reader(
+                io.StringIO(payload.decode('utf-8'))):
+            if street in counties:
+                county = counties[street]
+                writer.writerow([identifier, '', 'Match', 'Exact', '', '', '', '',
+                                 county[:2], county[2:], '', ''])
+            else:
+                writer.writerow([identifier, '', 'Tie' if street == 'Tie' else 'No_Match'])
+        body = output.getvalue().encode()
+        return httpx.Response(200, headers={'Content-Length': str(len(body))},
+                              stream=httpx.ByteStream(body))
+
+    return httpx.Client(transport=httpx.MockTransport(serve), timeout=600)
