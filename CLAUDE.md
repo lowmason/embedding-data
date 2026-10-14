@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-Builds aggregate evaluation targets for industry (NAICS), occupation (SOC), and geography embeddings from three sources: OSHA ITA Form 300A summaries, ACS via IPUMS USA, and CPS via IPUMS CPS. `specs/embedding-evaluation-data-spec.md` is the source of truth. So far the IPUMS extract scripts (define → submit → download → CSV-to-Parquet), the OSHA Form 300A summary acquisition with its stacked establishment-year table, and an OSHA case-detail download (download → CSV-to-Parquet) exist; every raw file is recorded in an append-only manifest (`data/raw/manifest.jsonl`); canonical NAICS/SOC graphs, NAICS concordances, ITA candidate mapping and filing-universe diagnostics are built. Geography allocation, ACS/CPS code parsers, targets and the shared target writer remain planned.
+Builds aggregate evaluation targets for industry (NAICS), occupation (SOC), and geography embeddings from three sources: OSHA ITA Form 300A summaries, ACS via IPUMS USA, and CPS via IPUMS CPS. `specs/embedding-evaluation-data-spec.md` is the source of truth. So far the IPUMS extract scripts (define → submit → download → CSV-to-Parquet), the OSHA Form 300A summary acquisition with its stacked establishment-year table, and an OSHA case-detail download (download → CSV-to-Parquet) exist; every raw file is recorded in an append-only manifest (`data/raw/manifest.jsonl`); canonical NAICS/SOC graphs, NAICS concordances, ITA candidate mapping and filing-universe diagnostics are built. Geography reference bundles now supply the complete 2025 county inventory, July 2023 metropolitan/micropolitan membership and 2025Q4 HUD eligibility; PUMA allocation, full establishment assignment, ACS/CPS code parsers, targets and the shared target writer remain planned.
 
 ## Commands
 
@@ -112,6 +112,20 @@ dependency versions, schemas and aggregates support later provenance; this is no
 the R7 target writer. Source summary and Stage 3 file hashes must remain unchanged.
 Geography, ACS/CPS parsing, targets and headline-inclusion decisions retain their
 later-stage scope and the source spec's Core principle and stricter V11 contract.
+
+**Geography bundle (Stage 5).** `geography acquire` and `geography import-reference KIND FILE`
+register verified original bytes; `geography build RUN_ID --data-dir ROOT` builds offline.
+Use the real root explicitly in worktrees. The selected production run and its original,
+software and output inventories are in
+`specs/findings/stage-5-geography-reference-build.md`. Six Parquets use `geography-v1`,
+shared node/edge schemas and dedicated geography validation. Both metro and micro CBSAs
+retain type and central/outlying roles; their counties may span states. Complete county
+inventory is independent of HUD/CBSA coverage. HUD retains every ZIP and row; compute
+eligibility from all original positive candidates before scope checks. `zip_dominant_county`
+is diagnostic; only `eligible` has `zip_fallback_county`. Preserve Stage 3 selector/importer
+interfaces and exact Census-first/delivered-state rules. This stage supplies references;
+Stage 6 assigns establishments and Stage 8 allocates PUMAs. Never rebuild source summaries,
+Stage 3 verification artifacts or Stage 4 code bundles to prepare geography references.
 
 **Test seams.** Tests and Behave steps patch the module-level `IpumsApiClient` (autospec) and `DOTENV_PATH` with `patch.object`, so both must remain module globals looked up at call time. OSHA tests patch `make_client` with a `partial` that injects an `httpx.MockTransport`; fake responses must use `stream=httpx.ByteStream(...)`, because a `content=` body is preloaded and leaves `num_bytes_downloaded` at 0. OSHA summary tests serve the recorded ITA page `tests/fixtures/osha/itadata.html` and bodies from `tests/ita_fixtures.year_file`, one per published file format; `write_release` places and records a raw summary file. The `cli_runner` fixture in `tests/conftest.py` removes `IPUMS_API_KEY` from the environment. The root `.env` holds a real key: a new test that does not patch both `DOTENV_PATH` and `IpumsApiClient` can load it and make live IPUMS requests. Every command test must also pass `--data-dir` (the `data_directory` fixture): `--data-dir` defaults to the real `data/` tree through a Typer default bound at import, so patching `paths.DATA_DIR` cannot redirect it, and a stray test would write fake extracts into `data/raw` and append fake entries to the append-only manifest.
 
