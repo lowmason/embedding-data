@@ -56,6 +56,7 @@ This plan creates no ACS/CPS transformations, extra target years/families, geogr
 
 - **D1** (owner, plan review, 2026-10-14): Approve plan 6 as written, including its five implementation defaults. Applied in: Tasks 1–8 and Global Constraints. The owner's design decisions remain recorded in the stage spec; no spec amendment is introduced.
 - **D2** (owner, plan review, 2026-10-14): Execute the approved plan via subagent-driven-development in a fresh session. Applied in: Tasks 1–8 and Plan review and execution boundary.
+- **D3** (owner, execution preflight, 2026-10-14): Use one implementation-registry test helper in `tests/target_fixtures.py` with explicit local autouse fixture wrappers in Tasks 2–3, resolving the duplicated-logic review conflict. The helper is invoked only by those local wrappers, never by global conftest or V12. Applied in: Tasks 2–3.
 
 ---
 
@@ -291,17 +292,26 @@ git commit -m "feat(targets): verify selected code and geography inputs"
 
 - [ ] **Step 1: Write identity and batching failures.**
 
-Preparation fingerprints acquisition/assignment implementation files that land in Tasks 3–4. Keep this task independently testable without adding placeholder production modules: install this autouse fixture **only in `tests/test_ita_assignment_prepare.py`**. Its record uses the exact test registry and actual hashes; `check_preparation` compares against that same registry. Once the files exist, the fixture naturally includes them. Production always requires the complete constant tuple; Task 7's tests do not install this fixture.
+Preparation fingerprints acquisition/assignment implementation files that land in Tasks 3–4. Keep this task independently testable without adding placeholder production modules: put the shared implementation-registry helper in `tests/target_fixtures.py` and install its local autouse wrapper **only in `tests/test_ita_assignment_prepare.py`** (D3). Its record uses the exact test registry and actual hashes; `check_preparation` compares against that same registry. Once the files exist, the fixture naturally includes them. Production always requires the complete constant tuple; Task 7's tests do not install this fixture.
 
 ```python
-@pytest.fixture(autouse=True)
-def implemented_software_boundary(monkeypatch):
+def install_implemented_software_boundary(monkeypatch):
     import importlib.util
     from embedding_data import ita_assignment_prepare as preparation
 
     modules = tuple(name for name in preparation.FROZEN_MODULES
                     if importlib.util.find_spec('embedding_data.' + name) is not None)
     monkeypatch.setattr(preparation, 'FROZEN_MODULES', modules)
+```
+
+The local test-module wrapper is:
+
+```python
+@pytest.fixture(autouse=True)
+def implemented_software_boundary(monkeypatch):
+    from target_fixtures import install_implemented_software_boundary
+
+    install_implemented_software_boundary(monkeypatch)
 ```
 
 ```python
@@ -433,17 +443,14 @@ git commit -m "feat(ita): freeze full-table Census request identities"
 
 - [ ] **Step 1: Write acquisition, cache/resume and malformed-response tests.** `target_fixtures.census_client(requests: list[dict], *, fail_batch: int | None = None) -> httpx.Client` serves catalogs with deliberately nonhistorical IDs (benchmark `7`, vintage `999`) and generates valid original response CSVs from uploaded request IDs. It chooses fixture outcomes by exact submitted street strings. Patch the acquisition module's `make_client`; exercise the real form construction, parser and receipts.
 
-This test module also needs the local software boundary until Task 4's assignment implementation exists. Add it directly in `tests/test_ita_assignment_acquire.py`; do not put it in global conftest or the V12 fixture helper:
+This test module also needs the local software boundary until Task 4's assignment implementation exists. Add the explicit local wrapper directly in `tests/test_ita_assignment_acquire.py` using the shared helper from Task 2 (D3); do not install it in global conftest or invoke it from the V12 fixture path:
 
 ```python
 @pytest.fixture(autouse=True)
 def implemented_software_boundary(monkeypatch):
-    import importlib.util
-    from embedding_data import ita_assignment_prepare as preparation
+    from target_fixtures import install_implemented_software_boundary
 
-    modules = tuple(name for name in preparation.FROZEN_MODULES
-                    if importlib.util.find_spec('embedding_data.' + name) is not None)
-    monkeypatch.setattr(preparation, 'FROZEN_MODULES', modules)
+    install_implemented_software_boundary(monkeypatch)
 ```
 
 ```python
