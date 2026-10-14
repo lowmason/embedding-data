@@ -9,6 +9,7 @@ from embedding_data import (
     geography_cli,
     manifest_audit,
     osha_benchmark_download,
+    targets_cli,
 )
 
 app = typer.Typer(add_completion=False, pretty_exceptions_show_locals=False)
@@ -31,3 +32,4 @@ app.command('audit', help=manifest_audit.__doc__.splitlines()[0])(manifest_audit
 
 app.add_typer(codes_cli.app, name='codes')
 app.add_typer(geography_cli.app, name='geography')
+app.add_typer(targets_cli.app, name='targets')

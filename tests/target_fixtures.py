@@ -272,3 +272,55 @@ def assigned_tree(data_dir: Path) -> tuple[pl.LazyFrame, pl.DataFrame, pl.DataFr
                          pl.scan_parquet(prepared.source_index), evidence.responses,
                          pl.read_parquet(selected.geography['hud_zip_lookup']), counties)
     return assignments, pl.read_parquet(selected.codes['naics_nodes']), counties
+
+
+def forbid_external_access(monkeypatch) -> None:
+    '''Block credentials and real transports while permitting fixture file reads.'''
+    import socket
+
+    import dotenv
+
+    from embedding_data import (
+        acs_benchmark_extract,
+        cps_benchmark_extract,
+        ita_assignment_acquire,
+        ita_verification_run,
+    )
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError('offline command attempted external access')
+
+    monkeypatch.setattr(socket, 'create_connection', forbidden)
+    monkeypatch.setattr(socket.socket, 'connect', forbidden)
+    monkeypatch.setattr(socket.socket, 'connect_ex', forbidden)
+    monkeypatch.setattr(dotenv, 'load_dotenv', forbidden)
+    for module in (acs_benchmark_extract, cps_benchmark_extract):
+        monkeypatch.setattr(module, 'load_dotenv', forbidden)
+        monkeypatch.setattr(module, 'IpumsApiClient', forbidden)
+        monkeypatch.setattr(module, 'DOTENV_PATH', Path('/nonexistent-fixture/.env'))
+    for module in (ita_assignment_acquire, ita_verification_run):
+        monkeypatch.setattr(module, 'make_client', forbidden)
+    for name in ('IPUMS_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY',
+                 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_SESSION_TOKEN',
+                 'BLS_CONTACT_EMAIL', 'HUD_API_KEY'):
+        monkeypatch.delenv(name, raising=False)
+
+
+def acquired_tree(data_dir: Path, monkeypatch):
+    from embedding_data import ita_assignment_acquire as acquisition
+
+    with monkeypatch.context() as offline:
+        forbid_external_access(offline)
+        prepared = prepared_tree(data_dir)
+        # Only this acquisition factory is released, and only to MockTransport.
+        offline.setattr(acquisition, 'make_client', lambda: census_client([]))
+        acquisition.acquire(data_dir, prepared.directory.name)
+    return prepared
+
+
+def run_ita_v12(data_dir: Path, monkeypatch) -> Path:
+    from embedding_data.ita_target_build import build
+
+    prepared = acquired_tree(data_dir, monkeypatch)
+    forbid_external_access(monkeypatch)
+    return build(data_dir, prepared.directory.name, 'fixture_v12')
