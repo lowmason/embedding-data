@@ -20,9 +20,10 @@ establishment-year table, and downloads the case-detail CSV and its dictionary.
 The `codes` command builds NAICS 2022 and SOC 2018 classification graphs, full
 NAICS concordances, candidate mappings and filing-universe diagnostics in a
 separate immutable ITA bundle. The [measured V11 finding](specs/findings/v11-ita-naics-mapping.md)
-records the full-data run and its unresolved source codes. Geography allocation,
-ACS/CPS code parsers, person-month linkage, aggregate targets and the shared
-target writer remain planned. Raw downloads are recorded in
+records the full-data run and its unresolved source codes. Geography references and
+the shared target writer are implemented. The reviewed ITA assignment and 2023
+area-mix commands below await production acceptance. PUMA allocation, ACS/CPS
+code parsers, person-month linkage and other target families remain planned. Raw downloads are recorded in
 `data/raw/manifest.jsonl`.
 The OSHA case-detail files are acquired but feed no target; the specification's
 establishment data are the Form 300A summaries.
@@ -107,8 +108,76 @@ CBSA memberships are present; counties outside all CBSAs remain in the county re
 Administrative edges and county-to-CBSA edges are separate typed relationships. HUD
 2025Q4 retains all candidates and ZIPs, including zero-business ZIPs. Only an original,
 compatible positive singleton is eligible for fallback; a dominant share is diagnostic.
-Missing ZIPs differ from present all-zero ZIPs. Full establishment assignment and PUMA
-allocation are later stages; these references do not assert historical address geography.
+Missing ZIPs differ from present all-zero ZIPs. The Stage 6 commands below use these references for assignment; PUMA
+allocation remains planned; these references do not assert historical address geography.
+
+## ITA assignment and 2023 area-mix targets
+
+The reviewed command surface separates offline preparation, explicit public Census
+acquisition and offline target construction. Always name the real root in a worktree:
+
+```bash
+UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embedding-data targets prepare-ita stage6_ita_assignment_20261014 --codes-run stage4_v11_20261013_r2 --geography-run stage5_geography_20261014 --data-dir /Users/lowell/Projects/embedding-data/data
+UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embedding-data targets acquire-ita stage6_ita_assignment_20261014 --data-dir /Users/lowell/Projects/embedding-data/data
+UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embedding-data targets build-ita stage6_ita_assignment_20261014 stage6_ita_area_mix_20261014 --year 2023 --data-dir /Users/lowell/Projects/embedding-data/data
+UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embedding-data targets build-ita stage6_ita_assignment_20261014 stage6_ita_area_mix_20261014_replay --year 2023 --data-dir /Users/lowell/Projects/embedding-data/data
+```
+
+`uv --offline` prevents package fetching; `acquire-ita` still deliberately makes
+Census HTTP calls. Preparation and build make no downloads and use no credentials.
+One preparation freezes the full 2016–2025 source-row index, distinct submitted
+address requests and software inventories under
+`derived/osha/assignment-inputs/<assignment_run_id>/`. Acquisition is sequential,
+with the existing 600-second client timeout. It stores catalogs, raw responses and
+receipts under `raw/references/census-geocoder/ita-assignment/<assignment_run_id>/`.
+After a transport or validation failure, inspect the failure and explicitly rerun
+the same acquisition command to resume from verified completed batches. Do not
+alter requests, substitute frames or add blind retries. Changed preparation or
+assignment software/dependencies require a new preparation selection.
+
+Run IDs are immutable: occupied final or `.part` names fail. Inspect interrupted
+staging and choose an explicit fresh ID; never overwrite an existing run. Selected
+upstream runs have pinned detached `outputs.json` hashes. Alternate upstream runs
+require `--codes-outputs-sha256 SHA256` and/or
+`--geography-outputs-sha256 SHA256` on `prepare-ita`, paired with their explicit
+`--codes-run` and `--geography-run` IDs. Never rebuild the source summary, run
+verification `sample`, or change earlier bundles to prepare these commands.
+
+Each target bundle under `derived/targets/<target_run_id>/` has exactly seven files:
+`ita_county_assignments.parquet`, `ita_area_mix.parquet`,
+`county_denominators.parquet`, `target_flag_counts.parquet`, `inputs.json`,
+`report.json` and `outputs.json`. Assignments preserve the 38 canonical columns,
+source order and every submitted record, including duplicates and repeated IDs.
+The unique grain is `source_row`; an ID is not a confirmed unique establishment.
+The common administrative county frame is 2025; CBSA membership is July 2023,
+HUD is 2025Q4, and Census Current address data remain mutable across batches.
+These frames do not reconstruct historical geography.
+
+Only `--year 2023` is supported for targets. Each eligible submitted record counts
+one, using a valid native six-digit NAICS 2022 industry and an adopted compatible
+county assignment. Census exact assignment takes precedence; compatible HUD
+original positive singletons are allowed and flagged. Crosswalked, unresolved or
+ambiguous industry values and unassigned geography are excluded. Employment,
+hours and nullable filing-rule flags remain diagnostics, never target filters.
+
+The 16-column `targets-v1` schema carries typed county/industry units, metadata,
+`value`, null `se`, `se_method='none'`, support counts and sorted flags. Observed
+cell shares divide eligible cell counts by eligible county counts; no synthetic
+zero cells or minimum count gate is applied. `n_unweighted` and `n_weighted` are
+cell supports. County denominators retain assigned, eligible and excluded-industry
+counts, including counties with zero eligible records. Flag counts record positive
+true/null support for each numerator and denominator; labels such as
+`numerator:flag_assignment_hud:true` indicate some support, not that all records
+carry the flag. Every target has `size_gate_pending`; V9 remains pending.
+
+This is conditional on a program-selected filing universe with unvalidated
+reported employment and preserved duplicate multiplicity. Coverage establishes
+neither county accuracy nor representativeness of all establishments. Inputs and
+reports record citations, hashes, versions and disjoint coverage alongside
+overlapping diagnostics. `outputs.json` hashes the other six files; its checksum
+is detached. Cached replay must match ordered logical rows and canonical JSON
+apart from documented run IDs, creation times and consequential inventories.
+Physical Parquet hashes describe each particular serialization.
 
 ## Data sources
 
@@ -406,7 +475,8 @@ The specification calls for aggregate Parquet targets covering staffing
 patterns, area mixes, worker profiles, job-change flows, commuting, migration,
 employer text–code pairs, and industry co-ownership. It also calls for NAICS
 2022 and SOC 2018 mappings, typed geography edges, allocation flags, uncertainty
-estimates, cell counts, and input hashes. These targets are not yet built.
+estimates, cell counts, and input hashes. The ITA area-mix command is implemented;
+production acceptance is recorded separately. The other families remain planned.
 
 Benchmark data stay separate from embedder training and model selection.
 IPUMS microdata remain local and must not be committed or redistributed as
