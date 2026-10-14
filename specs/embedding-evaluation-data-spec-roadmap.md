@@ -163,14 +163,17 @@ placements:
       > Stage 4: COMPLETE (2026-10-13) — implemented by plan 4 (specs/plans/completed/4-code-tables-ita-naics-mapping.md). Its [Handoff section](plans/completed/4-code-tables-ita-naics-mapping.md#handoff-to-later-stages) names what Stages 5, 6, 8, 10 and 11 consume, and revalidates all remaining stages.
       > Next: resume the roadmap.
 
-- [ ] Stage 5: Geography hierarchy and county reference
+- [x] Stage 5: Geography hierarchy and county reference
       Objective: Typed geography nodes and edges exist for both paths, together with the county-assignment reference Stage 3 chose.
-      Spec: R6.1, R6.2, R6.4, R2.8 (method); stage design in `specs/geography-hierarchy-county-reference.md`
+      Spec: R6.1, R6.2, R6.4, R2.8 (method); stage design in `specs/completed/geography-hierarchy-county-reference.md`
       Gap closed: R6.1; R6.2; R6.4
       Consumes: Stage 1 manifest; Stage 3 adopted R2.8/R6 method and compatibility decisions, manifested 2025Q4 HUD workbook, `ita_references.import_hud`/`read_hud` and `ita_county_verification.zip_candidates` contracts, and common 2025 Census county frame (plan 3, Handoff; Resolved at resume, 2026-10-13); selected Stage 4 bundle's typed node/edge and root-through-node path conventions, with `classification_tables.forest` single-parent validation confined to classification graphs (plan 4, [Handoff](plans/completed/4-code-tables-ita-naics-mapping.md#handoff-to-later-stages)) (Resolved at resume, 2026-10-13)
       Produces: county, state, division, region, and CBSA nodes with typed edges; full production geography and county-assignment references beyond Stage 3's verification inputs (plan 3, Handoff; Resolved at resume, 2026-10-13)
       Exit: every county-equivalent nests in exactly one state, division, and region; metropolitan and micropolitan CBSAs are both included with their types distinguished, and multi-state CBSAs appear as cross-state edges; counties outside all CBSAs carry no CBSA edge (owner, Stage 5 design, 2026-10-13); Connecticut planning regions are the county-equivalents; no Puerto Rico or island-area nodes
       ROUTING: brainstorming
+
+> Stage 5: COMPLETE (2026-10-14) — implemented by plan 5 (specs/plans/completed/5-geography-hierarchy-county-reference.md). Its Handoff section revalidates Stages 6–13.
+> Next: resume the roadmap.
 
 - [ ] Stage 6: Target contract and ITA area-mix slice
       Objective: One ITA year runs end to end into an area-mix target in the shared output schema, with its manifest.

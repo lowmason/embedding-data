@@ -79,6 +79,37 @@ checksum, mapping state and limitation. Relatedness remains observed: no targets
 are inferred from classification edges, and this ITA source exception does not
 relax ACS/CPS parsing or later headline-target inclusion requirements.
 
+## Geography reference bundles
+
+`geography acquire` verifies every registered destination before downloading missing
+official Census originals. HUD 2025Q4 is imported separately when absent:
+
+```bash
+uv run embedding-data geography import-reference hud_2025q4 ZIP-COUNTY_122025.xlsx --data-dir data
+uv run embedding-data geography acquire --data-dir data
+uv run --offline --locked embedding-data geography build NEW_RUN_ID --data-dir data
+```
+
+Use the intended data root explicitly when running from a worktree. Existing originals,
+final run names and `.part` names are immutable. Cached acquisition makes no HTTP request;
+build is offline and refuses missing or changed manifested inputs. Changed original bytes
+require a distinct source identity and recorded decision.
+
+Each `derived/geography/<run_id>/` bundle contains six Parquets: `geography_nodes`,
+`geography_edges`, `county_reference`, `cbsa_reference`, `hud_zip_county`, and
+`hud_zip_lookup`, plus `inputs.json`, `report.json`, and detached `outputs.json`.
+Select a complete run explicitly and verify its inventories; there is no latest alias.
+The [production finding](specs/findings/stage-5-geography-reference-build.md) records
+the selected run, original hashes, schemas, counts and limitations.
+
+Administrative nodes use the 2025 frame. Both July 2023 metropolitan and micropolitan
+CBSA memberships are present; counties outside all CBSAs remain in the county reference.
+Administrative edges and county-to-CBSA edges are separate typed relationships. HUD
+2025Q4 retains all candidates and ZIPs, including zero-business ZIPs. Only an original,
+compatible positive singleton is eligible for fallback; a dominant share is diagnostic.
+Missing ZIPs differ from present all-zero ZIPs. Full establishment assignment and PUMA
+allocation are later stages; these references do not assert historical address geography.
+
 ## Data sources
 
 | Source | Samples or coverage | Purpose |
