@@ -35,10 +35,82 @@ def test_golden_shares_and_coverage(inputs):
     assert result.report['all_year_partition'] == dict(
         source=21, unassigned_geography=3, assigned_excluded_industry=11, eligible=7)
     assert result.report['exact_duplicates'] == {'groups': 1, 'rows': 2, 'excess': 1}
-    assert result.report['repeated_ids']['id'] == {'groups': 1, 'rows': 2, 'excess': 1}
+    assert result.report['repeated_ids'] == {
+        'id': {'groups': 1, 'rows': 2, 'excess': 1},
+        'establishment_id': {'groups': 1, 'rows': 2, 'excess': 1},
+    }
     assert target['se'].null_count() == 3
     assert target['se_method'].to_list() == ['none'] * 3
     assert all('size_gate_pending' in flags for flags in target['flags'])
+
+
+def test_handwritten_all_year_report_coverage(inputs):
+    result = mix.estimate(inputs[0], inputs[1])
+    report = result.report
+    # Seven pre-2023 dictionary-vintage rows are assigned but industry-excluded.
+    assert report['partition_by_year'] == [
+        dict(year_filing_for=year, source=1, assigned=1, eligible=0,
+             unassigned_geography=0, assigned_excluded_industry=1)
+        for year in range(2016, 2023)
+    ] + [
+        dict(year_filing_for=2023, source=12, assigned=9, eligible=5,
+             unassigned_geography=3, assigned_excluded_industry=4),
+        dict(year_filing_for=2024, source=1, assigned=1, eligible=1,
+             unassigned_geography=0, assigned_excluded_industry=0),
+        dict(year_filing_for=2025, source=1, assigned=1, eligible=1,
+             unassigned_geography=0, assigned_excluded_industry=0),
+    ]
+    # Census covers eight 2023 rows, including four excluded industries;
+    # HUD covers one contributor and all three unassigned rows remain visible.
+    assert report['method_coverage_by_year'] == [
+        dict(year_filing_for=year, assignment_method='census_exact', len=1)
+        for year in range(2016, 2023)
+    ] + [
+        dict(year_filing_for=2023, assignment_method='census_exact', len=8),
+        dict(year_filing_for=2023, assignment_method='hud_singleton', len=1),
+        dict(year_filing_for=2023, assignment_method='unassigned', len=3),
+        dict(year_filing_for=2024, assignment_method='census_exact', len=1),
+        dict(year_filing_for=2025, assignment_method='census_exact', len=1),
+    ]
+    coverage_flags = {
+        'naics_year_from_dictionary', 'flag_naics_year_unknown',
+        'flag_delivered_state_out_of_scope', 'flag_geocode_county_out_of_scope',
+        'flag_assignment_hud',
+    }
+    assert [row for row in report['flags_by_year']
+            if row['flag_name'] in coverage_flags] == [
+        dict(year_filing_for=year, flag_name='naics_year_from_dictionary',
+             flag_state='true', n=1)
+        for year in range(2016, 2023)
+    ] + [
+        dict(year_filing_for=2023, flag_name='flag_assignment_hud', flag_state='true', n=1),
+        dict(year_filing_for=2023, flag_name='flag_delivered_state_out_of_scope',
+             flag_state='true', n=1),
+        dict(year_filing_for=2023, flag_name='flag_geocode_county_out_of_scope',
+             flag_state='true', n=1),
+        dict(year_filing_for=2023, flag_name='flag_naics_year_unknown', flag_state='true', n=1),
+    ]
+    # Sorted D=[0, 1, 4], C=[1, 1, 3]. Quantiles use nearest order statistics,
+    # rounding midpoint ties upward; median is the central observation.
+    assert report['county_denominator_distribution'] == dict(
+        count=3, min=0, p25=1., median=1., p75=4., p95=4., max=4)
+    assert report['cell_count_distribution'] == dict(
+        count=3, min=1, p25=1., median=1., p75=3., p95=3., max=3)
+
+
+def test_reused_establishment_id_is_separate_from_submission_id(inputs):
+    # 23003 reuses the duplicate pair's establishment ID but keeps its own id.
+    # The two exact 23001 submissions stay identical and remain two contributors.
+    assignments = inputs[0].with_columns(
+        pl.when(pl.col('id').eq(23003)).then(pl.lit(23001))
+        .otherwise(pl.col('establishment_id')).alias('establishment_id'))
+    result = mix.estimate(assignments, inputs[1])
+    assert result.report['exact_duplicates'] == {'groups': 1, 'rows': 2, 'excess': 1}
+    assert result.report['repeated_ids'] == {
+        'id': {'groups': 1, 'rows': 2, 'excess': 1},
+        'establishment_id': {'groups': 1, 'rows': 3, 'excess': 2},
+    }
+    assert result.targets.collect()['n_unweighted'].to_list() == [3, 1, 1]
 
 
 def test_true_null_support_and_county_labels(inputs):
