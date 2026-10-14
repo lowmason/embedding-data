@@ -1,10 +1,12 @@
 # Geography hierarchy and county reference
 
+**Status: COMPLETE (2026-10-14)** — implemented by [plan 5](../plans/completed/5-geography-hierarchy-county-reference.md); production evidence in the [measured finding](../findings/stage-5-geography-reference-build.md).
+
 ## Scope and adopted design
 
-Stage 5 of [the roadmap](embedding-evaluation-data-spec-roadmap.md) implements
+Stage 5 of [the roadmap](../embedding-evaluation-data-spec-roadmap.md) implements
 R6.1, R6.2 and R6.4 and supplies the production references for the adopted R2.8
-method in [the source spec](embedding-evaluation-data-spec.md). The owner
+method in [the source spec](../embedding-evaluation-data-spec.md). The owner
 approved the design on 2026-10-13:
 
 - Include both metropolitan and micropolitan CBSAs, preserving their types.
@@ -17,7 +19,7 @@ approved the design on 2026-10-13:
   lookup, including zero-business-share and incompatible/excluded diagnostics.
 - Acquire/import original references separately from an offline build.
 
-The [reference preflight](findings/stage-5-geography-reference-preflight.md)
+The [reference preflight](../findings/stage-5-geography-reference-preflight.md)
 settles the original layouts, hashes, scope counts and compatibility checks.
 It is design evidence, not a completed production build.
 

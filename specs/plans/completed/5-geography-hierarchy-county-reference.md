@@ -1,5 +1,7 @@
 # Geography hierarchy and county reference Implementation Plan
 
+**Status: COMPLETE (2026-10-14)** — executed via subagent-driven-development; nothing deferred
+
 > **For agentic workers:** REQUIRED SUB-SKILL: implement this plan task-by-task via subagent-driven-development (the default) — or executing-plans when your human partner chose inline execution at the handoff. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Publish a verified, immutable geography-v1 bundle containing the complete 2025 county inventory, both July 2023 CBSA types, typed geography relationships, and the complete 2025Q4 HUD candidate/eligibility lookup.
@@ -8,7 +10,7 @@
 
 **Tech Stack:** Python >=3.14; existing Polars >=2.0.0, fastexcel >=0.21.0, httpx >=0.28.1 and Typer >=0.27.3; pytest; standard-library csv, zipfile, pathlib and dataclasses. No dependency or lockfile changes.
 
-**Spec:** [specs/geography-hierarchy-county-reference.md](../geography-hierarchy-county-reference.md), implementing R6.1, R6.2, R6.4 and the reference portion of R2.8 in [the source spec](../embedding-evaluation-data-spec.md). Read the stage spec and [reference preflight](../findings/stage-5-geography-reference-preflight.md) before execution.
+**Spec:** [specs/geography-hierarchy-county-reference.md](../../completed/geography-hierarchy-county-reference.md), implementing R6.1, R6.2, R6.4 and the reference portion of R2.8 in [the source spec](../../embedding-evaluation-data-spec.md). Read the stage spec and [reference preflight](../../findings/stage-5-geography-reference-preflight.md) before execution.
 
 > Roadmap: specs/embedding-evaluation-data-spec-roadmap.md, Stage 5 — on plan completion, tick the stage and re-validate later stages against what shipped.
 
@@ -117,7 +119,7 @@ Run focused red/green tests within each task. Run the complete command group at 
 
 **Interfaces:** Consumes raw `pl.DataFrame` sheets with all cells read as strings and an original `Path` for the Gazetteer. Produces `parse_states(raw, *, scope=SCOPE) -> dict[str, pl.DataFrame]` with `states`, `divisions`, `regions`, `excluded_states`; `parse_counties(file: Path) -> pl.DataFrame`; `parse_members(raw: pl.DataFrame) -> pl.DataFrame`; constants `SCOPE`, `EXCLUDED`, and internal schemas. All codes remain strings; all source rows are validated before scope filtering.
 
-- [ ] **Step 1: Create fixtures and the failing parser tests.** Put the following complete fixture module in `tests/geography_fixtures.py`. The membership fixtures deliberately include synthetic metro/micro IDs; titles never drive joins.
+- [x] **Step 1: Create fixtures and the failing parser tests.** Put the following complete fixture module in `tests/geography_fixtures.py`. The membership fixtures deliberately include synthetic metro/micro IDs; titles never drive joins.
 
 ```python
 import csv
@@ -328,11 +330,11 @@ def test_county_archive_member_and_header_are_strict(tmp_path):
             gp.parse_counties(file)
 ```
 
-- [ ] **Step 2: Run the red test.**
+- [x] **Step 2: Run the red test.**
 
 Run: `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_geography_parsers.py -q`. Expected: collection fails because `geography_parsers` does not exist; never accept a dependency/fixture failure as the intended red.
 
-- [ ] **Step 3: Implement the strict parser boundary.** Create `geography_parsers.py` with the following code. The fixed scope list is an explicit administrative contract, checked against the state original; it is not a code-to-title lookup.
+- [x] **Step 3: Implement the strict parser boundary.** Create `geography_parsers.py` with the following code. The fixed scope list is an explicit administrative contract, checked against the state original; it is not a code-to-title lookup.
 
 ```python
 import csv
@@ -488,8 +490,8 @@ def parse_members(raw: pl.DataFrame) -> pl.DataFrame:
     return result
 ```
 
-- [ ] **Step 4: Run green tests and lint the new files.** Run the focused command from Step 2, then `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked ruff check src/embedding_data/geography_parsers.py tests/geography_fixtures.py tests/test_geography_parsers.py`. Expected: all parser cases pass and no lint errors after formatting/import fixes. Formatting may change the listings' wrapping, never their contracts.
-- [ ] **Step 5: Commit and review the parser deliverable.**
+- [x] **Step 4: Run green tests and lint the new files.** Run the focused command from Step 2, then `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked ruff check src/embedding_data/geography_parsers.py tests/geography_fixtures.py tests/test_geography_parsers.py`. Expected: all parser cases pass and no lint errors after formatting/import fixes. Formatting may change the listings' wrapping, never their contracts.
+- [x] **Step 5: Commit and review the parser deliverable.**
 
 ```bash
 git add src/embedding_data/geography_parsers.py tests/geography_fixtures.py tests/test_geography_parsers.py
@@ -502,7 +504,7 @@ git commit -m 'feat(geography): parse strict original reference layouts'
 
 **Interfaces:** Consumes Task 1's source-frame dictionary. Produces `assemble(sources: dict[str, pl.DataFrame]) -> dict[str, pl.DataFrame]` with `geography_nodes`, `geography_edges`, `county_reference`, `cbsa_reference`; `validate_graph(nodes, edges) -> None`; `validate_tables(tables, sources) -> None`; `SCHEMAS` with the four exact output contracts. No paths Parquet is produced.
 
-- [ ] **Step 1: Write relationship tests with explicit expected facts.**
+- [x] **Step 1: Write relationship tests with explicit expected facts.**
 
 ```python
 import polars as pl
@@ -588,8 +590,8 @@ def test_admin_parent_is_not_a_cbsa_parent_and_titles_must_agree(tmp_path):
         gt.validate_tables(tables, sources)
 ```
 
-- [ ] **Step 2: Verify red.** Run `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_geography_tables.py -q`. Expected: missing `geography_tables`, not a parser/fixture defect.
-- [ ] **Step 3: Implement exact schemas, source assembly and graph validation.**
+- [x] **Step 2: Verify red.** Run `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_geography_tables.py -q`. Expected: missing `geography_tables`, not a parser/fixture defect.
+- [x] **Step 3: Implement exact schemas, source assembly and graph validation.**
 
 ```python
 import re
@@ -770,8 +772,8 @@ def validate_tables(tables, sources) -> None:
 
 `validate_tables` deliberately checks rebuilt source parity as well as generic graph invariants; handwritten fixture expectations independently check the assembler. Expected-table comparison also enforces all-together CBSA nullability, official titles/IDs, count/state-set parity, and deterministic order. Source parsers remain the authority for duplicate and malformed original rows.
 
-- [ ] **Step 4: Verify green and mutation rejection.** Run `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_geography_parsers.py tests/test_geography_tables.py -q`, then focused ruff for the new files. Expected: all pass, including deliberately invalid graphs/references. Keep the 14-node/13-edge fixture expectations distinct from production acceptance.
-- [ ] **Step 5: Commit and review the graph/reference deliverable.**
+- [x] **Step 4: Verify green and mutation rejection.** Run `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_geography_parsers.py tests/test_geography_tables.py -q`, then focused ruff for the new files. Expected: all pass, including deliberately invalid graphs/references. Keep the 14-node/13-edge fixture expectations distinct from production acceptance.
+- [x] **Step 5: Commit and review the graph/reference deliverable.**
 
 ```bash
 git add src/embedding_data/geography_tables.py tests/test_geography_tables.py
@@ -784,7 +786,7 @@ git commit -m 'feat(geography): build complete typed graph and county references
 
 **Interfaces:** Consumes `read_hud`'s validated four-column frame and Task 2's complete county reference. Produces `annotate(hud: pl.DataFrame, counties: pl.DataFrame) -> pl.DataFrame`; `lookup(candidates: pl.DataFrame) -> pl.DataFrame`; exact `HUD_SCHEMA`, `LOOKUP_SCHEMA`, and `SCHEMAS`. It does not assign establishments or invoke the Stage 3 selector.
 
-- [ ] **Step 1: Write the failing eligibility tests.**
+- [x] **Step 1: Write the failing eligibility tests.**
 
 ```python
 import polars as pl
@@ -844,8 +846,8 @@ def test_reordered_candidates_produce_identical_sorted_lookup(tmp_path):
     assert_frame_equal(gh.lookup(one), gh.lookup(two))
 ```
 
-- [ ] **Step 2: Verify red.** Run `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_geography_hud.py -q`. Expected: missing `geography_hud`.
-- [ ] **Step 3: Implement row-preserving diagnostics and original-candidate aggregation.**
+- [x] **Step 2: Verify red.** Run `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_geography_hud.py -q`. Expected: missing `geography_hud`.
+- [x] **Step 3: Implement row-preserving diagnostics and original-candidate aggregation.**
 
 ```python
 from collections import defaultdict
@@ -920,8 +922,8 @@ def lookup(candidates: pl.DataFrame) -> pl.DataFrame:
 
 The bounded eager grouping is intentional for this small reference. It preserves all candidate identities before computing eligibility; no downstream consumer may turn `zip_dominant_county` into a fallback assignment. A unique maximum across multiple candidates remains only a diagnostic.
 
-- [ ] **Step 4: Verify green and Stage 3 precedence regressions.** Run `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_geography_hud.py tests/test_ita_county_verification.py tests/test_ita_references.py -q`, then focused ruff. Expected: new HUD contracts and unchanged Census/HUD precedence tests pass. No changes to the old selector/importer/parser or its fixtures.
-- [ ] **Step 5: Commit and review the HUD lookup deliverable.**
+- [x] **Step 4: Verify green and Stage 3 precedence regressions.** Run `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_geography_hud.py tests/test_ita_county_verification.py tests/test_ita_references.py -q`, then focused ruff. Expected: new HUD contracts and unchanged Census/HUD precedence tests pass. No changes to the old selector/importer/parser or its fixtures.
+- [x] **Step 5: Commit and review the HUD lookup deliverable.**
 
 ```bash
 git add src/embedding_data/geography_hud.py tests/test_geography_hud.py
@@ -934,7 +936,7 @@ git commit -m 'feat(geography): preserve full HUD inventory and singleton eligib
 
 **Interfaces:** Consumes Tasks 1/3 parsers, existing manifest primitives and `ita_references.existing_reference`. Produces frozen `Reference`, `REGISTRY`, `reference_path(data_dir, reference) -> Path`, `preflight(data_dir, registry) -> dict[str, bool]`, `parse_reference(file, reference) -> dict[str, pl.DataFrame]`, `import_reference(data_dir, kind, original, *, registry=REGISTRY) -> Path`, `acquire(data_dir, *, registry=REGISTRY) -> list[Path]`, `read_sources(data_dir, *, registry=REGISTRY) -> dict[str, pl.DataFrame]`. Production identities require inspected hashes/sizes. Fixture replacements explicitly carry fixture identity and scope, not production claims.
 
-- [ ] **Step 1: Add fixture registry/seed helpers and failing immutable-reference tests.** Append this code to `tests/geography_fixtures.py`:
+- [x] **Step 1: Add fixture registry/seed helpers and failing immutable-reference tests.** Append this code to `tests/geography_fixtures.py`:
 
 ```python
 def fixture_registry(files):
@@ -1103,8 +1105,8 @@ def test_exclusive_partial_failure_preserves_competing_bytes(tmp_path, monkeypat
     assert not dest.exists()
 ```
 
-- [ ] **Step 2: Verify red.** Run `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_geography_references.py -q`. Expected: missing `geography_references`.
-- [ ] **Step 3: Implement the new geography reference boundary.**
+- [x] **Step 2: Verify red.** Run `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_geography_references.py -q`. Expected: missing `geography_references`.
+- [x] **Step 3: Implement the new geography reference boundary.**
 
 ```python
 import os
@@ -1299,8 +1301,8 @@ def read_sources(data_dir, *, registry=REGISTRY):
 
 All registered destinations are checked before acquisition requests. HUD acquisition is an explicit import because its registered URL is a catalog, not an unauthenticated binary download. Imports into the new boundary preserve Stage 3's existing original path and provenance; the existing Stage 3 command is still supported. No personal skill path enters runtime code.
 
-- [ ] **Step 4: Run green reference tests and the first full milestone.** Run the focused command from Step 2, then the complete four-command group in Durable testing strategy. Expected: all new/old tests, Behave, lint and lock checks pass. The invalid-workbook test accepts only the reader exception families also handled by Task 5's CLI boundary.
-- [ ] **Step 5: Commit and review the reference deliverable.**
+- [x] **Step 4: Run green reference tests and the first full milestone.** Run the focused command from Step 2, then the complete four-command group in Durable testing strategy. Expected: all new/old tests, Behave, lint and lock checks pass. The invalid-workbook test accepts only the reader exception families also handled by Task 5's CLI boundary.
+- [x] **Step 5: Commit and review the reference deliverable.**
 
 ```bash
 git add src/embedding_data/geography_references.py tests/geography_fixtures.py tests/test_geography_references.py
@@ -1313,7 +1315,9 @@ git commit -m 'feat(geography): acquire and import pinned immutable originals'
 
 **Interfaces:** Consumes the complete four-identity registry and all previous pure transforms. Produces `build(data_dir: Path, run_id: str, *, registry=gr.REGISTRY) -> Path`, `SCHEMA_VERSION = 'geography-v1'`, `write_json(file, payload) -> None`, `report(tables, sources) -> dict`, and the `geography` command group. Final bundles contain exactly six Parquets and `inputs.json`, `report.json`, `outputs.json`; no source establishment/code bundle is read or rebuilt.
 
-- [ ] **Step 1: Write failing build and CLI contracts.** In `tests/test_geography_build.py`:
+- [x] **Step 1: Write failing build and CLI contracts.** In `tests/test_geography_build.py`:
+
+> Deviation: Three command-level help cases each supply a temporary --data-dir; redundant subgroup-only help was omitted because the subgroup has no data-dir option. Added actual malformed ZIP/XLSX CLI cases required by the prose; no shipped interface changed.
 
 ```python
 import json
@@ -1459,8 +1463,8 @@ def test_missing_reference_is_actionable_without_traceback(tmp_path):
     assert 'Traceback' not in result.output
 ```
 
-- [ ] **Step 2: Verify red.** Run `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_geography_build.py tests/test_geography_cli.py -q`. Expected: missing builder/CLI subgroup.
-- [ ] **Step 3: Implement the builder and concise CLI boundary.** Create `geography_build.py`:
+- [x] **Step 2: Verify red.** Run `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_geography_build.py tests/test_geography_cli.py -q`. Expected: missing builder/CLI subgroup.
+- [x] **Step 3: Implement the builder and concise CLI boundary.** Create `geography_build.py`:
 
 ```python
 import json
@@ -1671,8 +1675,8 @@ app.add_typer(geography_cli.app, name='geography')
 
 The code inventory intentionally includes the CLI and reused parser/schema modules. Import these modules only after their definitions exist; module import does not execute acquisition or load credentials. JSON source citations use the existing provenance dataclass, while reference scope is converted to a sorted JSON list.
 
-- [ ] **Step 4: Run green and the second full milestone.** Run focused build/CLI tests, then the complete four-command group in Durable testing strategy. Expected: all pass; no production inputs/outputs changed. Confirm errors from malformed ZIP/XLSX originals are concise exit-2 messages. Preserve failed staging for inspection; no automatic deletion or reuse of occupied names.
-- [ ] **Step 5: Commit and review publication/CLI.**
+- [x] **Step 4: Run green and the second full milestone.** Run focused build/CLI tests, then the complete four-command group in Durable testing strategy. Expected: all pass; no production inputs/outputs changed. Confirm errors from malformed ZIP/XLSX originals are concise exit-2 messages. Preserve failed staging for inspection; no automatic deletion or reuse of occupied names.
+- [x] **Step 5: Commit and review publication/CLI.**
 
 ```bash
 git add src/embedding_data/geography_build.py src/embedding_data/geography_cli.py src/embedding_data/cli.py tests/test_geography_build.py tests/test_geography_cli.py
@@ -1685,7 +1689,7 @@ git commit -m 'feat(geography): publish verified offline geography bundles'
 
 **Interfaces:** Consumes reviewed Tasks 1–5, the four pinned public originals and the real data root. Produces explicitly selected `data/derived/geography/stage5_geography_20261013/`, independent comparison bundle `stage5_geography_20261013_repeat/`, a committed measured finding and an actual-shipped Handoff. If either run name is occupied, retain it and select two new safe names consistently in the acceptance commands/finding/Handoff; never delete or reuse an earlier bundle.
 
-- [ ] **Step 1: Capture protected artifacts, then import/acquire the original references.** These are execution-only production commands. Run from the execution worktree; every production command supplies the original checkout's data directory. No OSHA download, summary rebuild, verification sample/geocode command, or codes build is part of acceptance.
+- [x] **Step 1: Capture protected artifacts, then import/acquire the original references.** These are execution-only production commands. Run from the execution worktree; every production command supplies the original checkout's data directory. No OSHA download, summary rebuild, verification sample/geocode command, or codes build is part of acceptance.
 
 Capture the source summary and every Stage 3/4 artifact's bytes before acquisition/build:
 
@@ -1721,7 +1725,9 @@ UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --locked embedding-data
 
 Expected: all four raw paths are manifest-covered, source URLs/hashes/sizes match the preflight, cached references are untouched, and re-running cached acquisition performs zero HTTP requests as covered by Task 4.
 
-- [ ] **Step 2: Build two new bundles offline.**
+- [x] **Step 2: Build two new bundles offline.**
+
+> Deviation: Actual execution-date run IDs are stage5_geography_20261014 and stage5_geography_20261014_repeat; the planning-date command examples below are retained as history.
 
 ```bash
 UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embedding-data geography build stage5_geography_20261013 --data-dir /Users/lowell/Projects/embedding-data/data
@@ -1750,7 +1756,9 @@ UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embe
 
 Expected: exit 0, a distinct final directory containing nine files, and no comparison partial. Verify first-run physical immutability and logical equality with Step 3.
 
-- [ ] **Step 3: Verify full-data acceptance and generate the measured finding only on success.** Run this complete verifier after both builds. It asserts exact inspected-production counts, typed source parity and all original/physical inventories; it compares logical table content rather than assuming separate Parquet files are byte-identical. All failures must be resolved or explicitly returned to the owner; a fixture pass cannot replace this gate.
+- [x] **Step 3: Verify full-data acceptance and generate the measured finding only on success.** Run this complete verifier after both builds. It asserts exact inspected-production counts, typed source parity and all original/physical inventories; it compares logical table content rather than assuming separate Parquet files are byte-identical. All failures must be resolved or explicitly returned to the owner; a fixture pass cannot replace this gate.
+
+> Deviation: A temporary verifier extraction initially stopped at an embedded Markdown fence and failed Python parsing before execution; corrected the extraction and passed the complete verifier. No implementation or production artifact changed because of that error.
 
 ```bash
 UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked python - <<'PY'
@@ -1899,7 +1907,7 @@ PY
 
 Use America/New_York for the finding/completion date if host local time differs. Review the generated finding against fresh command output, including all schemas, source exclusions, status/flag counts and limits. If final review changes code, rebuild with new safe run IDs and regenerate this evidence against the reviewed implementation; never relabel an old run as the new code.
 
-- [ ] **Step 4: Document shipped commands and consumer selection, then rerun checks.** Append the following section to `README.md` in the command/reference area:
+- [x] **Step 4: Document shipped commands and consumer selection, then rerun checks.** Append the following section to `README.md` in the command/reference area:
 
 ````markdown
 ## Geography reference bundles
@@ -1971,9 +1979,11 @@ git add specs/findings/stage-5-geography-reference-build.md README.md CLAUDE.md
 git commit -m 'docs(geography): record verified production bundle and consumer limits'
 ```
 
-- [ ] **Step 5: Resolve final review and completion leftovers before any stage tick.** Use requesting-code-review on the whole execution branch against this plan and stage spec, then receiving-code-review to assess findings. Fix material findings and rerun relevant checks/production acceptance if code changes. Batch owner questions for genuinely blocked leftovers; do not tick/retire while unanswered. Apply writing-plans' resolve-before-defer gate, close any prior backlog items actually delivered by this plan, and append only consciously deferred items with paths, size and closure conditions. No currently open ledger item is intentionally solved by this plan; no empty deferred section is appended.
+- [x] **Step 5: Resolve final review and completion leftovers before any stage tick.** Use requesting-code-review on the whole execution branch against this plan and stage spec, then receiving-code-review to assess findings. Fix material findings and rerun relevant checks/production acceptance if code changes. Batch owner questions for genuinely blocked leftovers; do not tick/retire while unanswered. Apply writing-plans' resolve-before-defer gate, close any prior backlog items actually delivered by this plan, and append only consciously deferred items with paths, size and closure conditions. No currently open ledger item is intentionally solved by this plan; no empty deferred section is appended.
 
-- [ ] **Step 6: Record actual-shipped Handoff for every later stage, tick/stamp Stage 5, and retire.** Once all preceding gates hold, apply writing-plans' Plan Completion Protocol and verification-before-completion. Record what shipped from the deviation ledger as well as final code; an interim interface later reverted still belongs in the applicable bullet. Cite the stage spec/finding rather than restating requirements. Do not pre-fill this section with completion claims during planning.
+> Deviation: Final review found no Critical/Important issues. The sole Minor test gap was fixed in d071ef6 with distinct-county same-CBSA conflict cases and approved scoped re-review. The Codex second opinion was skipped under codex-review.md because the controller was Codex; no separate Codex-reviewed SHA is claimed. Nothing remains deferred.
+
+- [x] **Step 6: Record actual-shipped Handoff for every later stage, tick/stamp Stage 5, and retire.** Once all preceding gates hold, apply writing-plans' Plan Completion Protocol and verification-before-completion. Record what shipped from the deviation ledger as well as final code; an interim interface later reverted still belongs in the applicable bullet. Cite the stage spec/finding rather than restating requirements. Do not pre-fill this section with completion claims during planning.
 
 The final `## Handoff to later stages` must cover each remaining entry:
 
@@ -2014,3 +2024,119 @@ Spec coverage: scope/reference boundaries and original parsing are covered by Gl
 The placeholder scan is clear. Function names, reference keys, schemas, registry fields, output filenames and CLI arguments are consistent across tasks and were exercised in a temporary fixture rehearsal. Production verifier scripts parse; their acceptance assertions must still run against published production bundles during execution. The preflight is design evidence, and the temporary read-only transform rehearsal does not meet the production gate.
 
 Plan review is approved by D1. Recommended execution handoff: `/clear` or a fresh session, then subagent-driven-development on this file. Its six explicit interfaces and independently reviewable parser, graph, HUD, I/O and publication contracts suit fresh task workers. Inline execution through executing-plans is also available if the owner chooses it; continue in task order with the same milestone/review/completion gates.
+
+## Execution outcome
+
+Completed 2026-10-14. All six tasks and their reviews passed. Production evidence is
+in the [measured finding](../../findings/stage-5-geography-reference-build.md).
+Final verification after the test-only review fix: 532 pytest passed, one network
+canary deselected; two Behave scenarios/ten steps passed; ruff, offline lock and
+whitespace checks passed. Review changed tests only after production publication;
+the cited implementation and lock hashes remain valid. No production rebuild was
+needed. The resolve-before-defer pass found no skipped or descoped work, unresolved
+review finding, or earlier backlog item delivered by this plan. Nothing deferred;
+`specs/deferred_items.md` is unchanged.
+
+## Handoff to later stages
+
+The [retired stage design](../../completed/geography-hierarchy-county-reference.md)
+and [production finding](../../findings/stage-5-geography-reference-build.md) are
+the requirements and measured evidence. The selected complete bundle is
+`data/derived/geography/stage5_geography_20261014/` under
+`/Users/lowell/Projects/embedding-data/data`; its independent logical repeat is
+`data/derived/geography/stage5_geography_20261014_repeat/`. Both use
+`geography-v1` and contain `geography_nodes.parquet`, `geography_edges.parquet`,
+`county_reference.parquet`, `cbsa_reference.parquet`, `hud_zip_county.parquet`, and
+`hud_zip_lookup.parquet`, plus `inputs.json`, `report.json`, and `outputs.json`.
+The finding records every exact schema; the executable schema registry is
+[`geography_build.SCHEMAS`](../../../src/embedding_data/geography_build.py), with
+geography-specific validation. Four manifest-backed original citations, all
+implementation/lock hashes and eight detached output entries were verified.
+Selected `outputs.json` SHA-256 is
+`5584b122d45a3617e731f7179d53e9625eb67fd15515d0cd7a5dab366132290d`.
+The repeat is logically equal; all nine first-run physical hashes and 79 protected
+source/Stage 3/Stage 4/original-reference files stayed unchanged.
+
+Shared execution traps: do not use `classification_tables.forest` for geography;
+its same-vintage/single-parent constraints reject the separate typed paths.
+Excel headers are found by exact contents, not compressed versus physical row
+positions; only recognized footer text is skipped and malformed codes still fail.
+HUD parsing preserves the registered logical basename `ZIP-COUNTY_122025.xlsx`.
+All positive HUD candidates are aggregated before scope or compatibility filtering.
+Administrative 2025, OMB July 2023 and HUD 2025Q4 identities are stamped separately.
+Acquisition verifies pinned manifested bytes, cached acquisition makes zero HTTP
+calls, and the offline builder refuses missing/changed inputs and occupied final
+or `.part` names. There is no latest alias or mixing of runs. Command-level help
+tests use temporary roots; no production interface was renamed or reverted.
+
+- **Stage 6:** Consume the selected bundle and all six names/schemas and verified
+  inventories above. The full county reference includes 3,144 county-equivalents,
+  Connecticut's nine planning regions and 1,300 counties outside CBSAs. The 925
+  CBSAs distinguish 387 metropolitan and 538 micropolitan areas; 59 span states.
+  The four child-to-parent edge types are `county_state`, `state_division`,
+  `division_region`, and `county_cbsa`. Administrative nodes use 2025 and CBSA
+  membership July 2023, with no forced CBSA state parent. `hud_zip_lookup`
+  counts all original positive candidates: only a compatible in-scope original
+  singleton has `eligibility_status=eligible` and `zip_fallback_county`; maxima
+  and ties are diagnostic. Every present ZIP remains represented, all-zero lists
+  are empty rather than null, absent ZIPs differ from zero-business ZIPs, and
+  independent scope/legacy/incompatibility flags persist. Preserve Stage 3 exact
+  Census-first method precedence and the separate delivered-state veto. Full-table
+  establishment assignment, Census acquisition and targets remain Stage 6; Stage 4
+  canonical data stays separate. Difference from roadmap Produces: none in scope;
+  this names the concrete bundle and refusal contracts. Deferred items: none.
+
+- **Stage 7:** Existing Stage 1 manifest/derived-Parquet and Stage 3 manifest-audit/verified-citation dependencies are unchanged.
+  These manifest-backed geography references do not verify IPUMS extracts,
+  sample/weight rules, or historical delivery versions. The separately stamped
+  common-frame references cannot establish historical input compatibility.
+  Difference from roadmap Produces: none; no cross-cutting IPUMS provenance
+  interface changed. Deferred items: none.
+
+- **Stage 8:** Consume complete `county_reference`, county nodes and typed
+  `county_cbsa` membership from the selected bundle, including Connecticut
+  planning regions and both CBSA types. `cbsa_reference.state_fips` is a
+  member-derived set, not a scalar parent; non-CBSA counties remain present.
+  Exact schemas and inventories are cited above. PUMA factors, intersections and
+  V8 remain Stage 8; common-frame references do not resolve historical PUMA
+  compatibility and no majority allocation is supplied. The shared classification
+  schema does not authorize its single-parent validator. Difference from roadmap
+  Produces: none; complete named references make the stated output concrete.
+  Deferred items: none.
+
+- **Stage 9:** Consume Stage 5 typed relationships and rollups through this selected
+  bundle together with Stage 8 allocations. Preserve metro/micro type and missing
+  CBSA membership; do not force a CBSA state parent. No MET2023-only metro assignment,
+  majority allocation or relatedness target is supplied by this build. Other
+  Stage 6/7/8 dependencies remain unchanged. Difference from roadmap Produces:
+  none. Deferred items: none.
+
+- **Stage 10:** Stage 5 adds no employer/linkage/text inclusion rule. Existing
+  Stage 3/4/6 dependencies and inclusion decisions persist unchanged. Shared
+  geography schema/provenance changes introduce no employer or linkage interface;
+  reference validity alone cannot validate historical delivery addresses.
+  Difference from roadmap Produces: none; no additional stage-specific refusal
+  beyond the common-frame limit applies. Deferred items: none.
+
+- **Stage 11:** Stage 5 adds no CPS scheme, linkage or weight rule. Existing
+  Stage 6/7 dependencies persist; keep Stage 4 classification validation separate
+  from geography. Geography's dual paths must not be passed to the classification
+  single-parent validator. Difference from roadmap Produces: none; no CPS
+  interface changed. Deferred items: none.
+
+- **Stage 12:** Later geographic outputs must preserve metro/micro type,
+  common-frame limits, and R4.4 CPS metro eligibility independently; these
+  references do not make every CPS record metro-eligible. Existing Stage 9/11
+  helpers remain the dependencies. Difference from roadmap Produces: none;
+  Stage 5 adds no output-target or CPS eligibility interface. Deferred items: none.
+
+- **Stage 13:** Consume the selected bundle's verified raw/software/output
+  inventories and production finding named above. Both runs passed exact schemas,
+  counts and source parity; logical repeatability is distinct from immutable
+  physical run hashes. Original identities do not freeze future Census Current
+  service responses. Stage 5 supplies no target family, V9 gate or
+  IPUMS/comparator verification. Difference from roadmap Produces: none; the
+  concrete inventories implement its reference output. Deferred items: none.
+
+Later-stage roadmap reconciliation belongs to derive-roadmap on resume; no later
+entry was redesigned or edited in this completion. Next: resume the roadmap.

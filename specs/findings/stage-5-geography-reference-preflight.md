@@ -87,7 +87,7 @@ method remain adopted; Stage 6 performs full establishment assignment.
 ## Next checkpoint
 
 The owner approved the design on 2026-10-13; the
-[stage spec](../geography-hierarchy-county-reference.md) records its contracts.
+[stage spec](../completed/geography-hierarchy-county-reference.md) records its contracts.
 Next is an implementation plan in a fresh writing-plans session.
 The implementation must manifest original inputs, validate and publish the
 production graph/reference bundle, test the stage exits, and record an actual
