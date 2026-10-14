@@ -138,7 +138,7 @@ Freeze `request_index.parquet` with `request_id`, the four nonnull submitted
 string fields, and `n_source_rows: UInt64`. Include every distinct submitted tuple,
 including partial/blank and delivered-state-excluded tuples, as Stage 3 did;
 incomplete addresses remain diagnostic, not invented complete addresses. Sort by
-request ID and write headerless UTF-8 CSV batches of at most 10,000 rows using
+request ID and write headerless UTF-8 CSV batches of at most 1,000 rows using
 the existing CSV quoting/order contract: ID, street, city, state, ZIP. Response
 IDs must exactly cover these requests, even where the service reports no match.
 
@@ -149,6 +149,21 @@ detached inventory for the other preparation files. Code/dependency changes to
 preparation or assignment invalidate resume/build and require new preparation;
 there is no silent mixed-version resume. Unrelated changes to a later estimator
 may produce a new target run with their own recorded implementation inventory.
+
+Owner amendment (2026-10-14): use a Stage 6 operational batch limit of 1,000,
+within the unchanged Census service maximum of 10,000. The original immutable
+`stage6_ita_assignment_20261014` preparation and its acquisition controls remain
+unchanged, with their original software identity and incomplete status. After a
+peer reset before response headers on its full first batch and a successful
+1,000-record diagnostic, create `stage6_ita_assignment_20261014_1000` under the
+amended software. Preserve identical source-row/request identities and submitted
+tuples; only the request partition and its recorded software/provenance change.
+Do not import diagnostic subset responses into either production acquisition.
+For the measured 1,113,538 requests, expect 1,114 batches (1,113 of 1,000 and
+one of 538); verify the actual files. Selected upstream runs, Current options,
+sequential execution, 600-second timeout and explicit verified resume are retained.
+Acceptance uses new target IDs `stage6_ita_area_mix_20261014_1000` and
+`stage6_ita_area_mix_20261014_1000_replay`.
 
 The read-only design workload estimate was 1,113,538 distinct submitted tuples
 across 3,206,055 source rows, before any request filtering. It is a planning bound,

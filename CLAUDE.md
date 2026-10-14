@@ -140,6 +140,13 @@ is offline, as is preparation. Always pass `--data-dir
 /Users/lowell/Projects/embedding-data/data`; `uv --offline` only prevents package
 fetching, not the acquisition command's HTTP calls. README gives exact commands.
 
+Stage 6 preparation uses its own operational limit of 1,000 Census records per batch.
+Stage 3's default and the Census service maximum remain 10,000. Verification reconstructs
+each preparation's recorded limit. Changing preparation software requires a new preparation;
+preserve the original `stage6_ita_assignment_20261014` and its acquisition controls with
+their original frozen software contract. The amended preparation is
+`stage6_ita_assignment_20261014_1000`; never import diagnostic subset responses into it.
+
 The seven-file target bundle preserves all-year source order and duplicate
 multiplicity while estimating native-2022 submitted-record shares for 2023 only.
 The shared `target_contract` validates/writes `targets-v1`; `ita_target_build.verify_bundle`

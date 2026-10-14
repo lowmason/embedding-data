@@ -16,13 +16,13 @@ import polars as pl
 from embedding_data import geography_references as gr
 from embedding_data import manifest, paths, target_inputs, target_io
 from embedding_data.ita_verification import zip_key
-from embedding_data.ita_verification_run import BATCH_LIMIT
 from embedding_data.target_inputs import SelectedInputs
 
 IDENTITY_VERSION = 'ita-request-v1'
 SCHEMA_VERSION = 'ita-assignment-inputs-v1'
 ZIP_VERSION = 'ita-verification-zip-v1'
 SOFTWARE_VERSION = 'ita-assignment-software-v1'
+BATCH_LIMIT = 1000
 SERVICE_BATCH_LIMIT = 10_000
 SUBMITTED = ['street', 'city', 'state', 'zip']
 SOURCE_INDEX_SCHEMA = {'source_row': pl.UInt64, 'request_id': pl.String}

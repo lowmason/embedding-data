@@ -90,6 +90,68 @@ def test_service_batch_boundary(tmp_path):
             == record['rows']
 
 
+def test_public_prepare_defaults_to_thousand_record_batches(tmp_path, monkeypatch):
+    import target_fixtures
+    from ita_fixtures import record
+
+    from embedding_data import ita_assignment_prepare as preparation
+    from embedding_data import ita_verification_run
+
+    target_fixtures.forbid_external_access(monkeypatch)
+    years = target_fixtures.golden_source_rows()
+    years[2023] = [record(
+        2023, id=str(23000 + number), establishment_id=str(23000 + number),
+        naics_code='111111', naics_year='2022',
+        street_address='Exact A' if number == 0 else f'{number} Café "A", Floor 2',
+        city='Fixture Town', state='AL', zip_code='00001') for number in range(1001)]
+    years[2023].append(years[2023][0].copy())
+    monkeypatch.setattr(target_fixtures, 'golden_source_rows', lambda: years)
+    selected = seed_inputs(tmp_path)
+    preparation.prepare(
+        tmp_path, 'requests', 'fixture_codes', 'fixture_geography',
+        codes_outputs_sha256=selected.provenance['codes']['outputs_sha256'],
+        geography_outputs_sha256=selected.provenance['geography']['outputs_sha256'])
+    prepared = preparation.check_preparation(tmp_path, 'requests')
+    assert prepared.inputs['batch_limit'] == 1000
+    assert [batch['rows'] for batch in prepared.inputs['batches']] == [1000, 1]
+    assert [batch['path'] for batch in prepared.inputs['batches']] == [
+        'requests/batch_00000.csv', 'requests/batch_00001.csv']
+    assert prepared.inputs['source_years'] == list(range(2016, 2026))
+    assert prepared.inputs['distinct_requests'] == 1001
+    assert preparation.SERVICE_BATCH_LIMIT == ita_verification_run.BATCH_LIMIT == 10_000
+
+    source = pl.read_parquet(prepared.selected.canonical)
+    index = pl.read_parquet(prepared.source_index)
+    requests = pl.read_parquet(prepared.request_index)
+    assert source.height == prepared.inputs['source_rows'] == index.height == 1011
+    assert index['source_row'].to_list() == list(range(source.height))
+    assert index['request_id'].to_list() == [preparation.request_id(row) for row in
+        source.select('street_address', 'city', 'state', 'zip_code').iter_rows()]
+    assert requests['n_source_rows'].sum() == source.height
+    assert requests.filter(pl.col('street').eq('Exact A'))['n_source_rows'].item() == 11
+    csv_rows = []
+    for start, file in zip((0, 1000), prepared.batches, strict=True):
+        expected = requests.slice(start, 1000)
+        with file.open(newline='', encoding='utf-8') as stream:
+            rows = list(csv.reader(stream))
+        assert rows == [list(row) for row in expected.select(
+            'request_id', 'street', 'city', 'state', 'zip').iter_rows()]
+        assert preparation.validate_batch(file, expected) == expected['request_id'].to_list()
+        csv_rows.extend(rows)
+    assert [row[0] for row in csv_rows] == sorted(requests['request_id'].to_list())
+
+
+def test_verification_uses_frozen_batch_limit(tmp_path, monkeypatch):
+    from embedding_data import ita_assignment_prepare as preparation
+
+    target_limit = 10_000
+    prepared = prepared_tree(tmp_path, batch_limit=target_limit)
+    monkeypatch.setattr(preparation, 'BATCH_LIMIT', 1)
+    checked = preparation.check_preparation(tmp_path, 'requests')
+    assert checked.inputs['batch_limit'] == target_limit
+    assert checked.batches == prepared.batches
+
+
 @pytest.mark.parametrize('defect', ['empty', 'header', 'short', 'repeat', 'order', 'tuple', 'id'])
 def test_batch_rejects_invalid_rows(tmp_path, defect):
     from embedding_data.ita_assignment_prepare import request_frames, validate_batch

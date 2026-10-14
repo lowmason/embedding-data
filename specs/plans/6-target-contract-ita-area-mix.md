@@ -58,6 +58,8 @@ This plan creates no ACS/CPS transformations, extra target years/families, geogr
 - **D2** (owner, plan review, 2026-10-14): Execute the approved plan via subagent-driven-development in a fresh session. Applied in: Tasks 1–8 and Plan review and execution boundary.
 - **D3** (owner, execution preflight, 2026-10-14): Use one implementation-registry test helper in `tests/target_fixtures.py` with explicit local autouse fixture wrappers in Tasks 2–3, resolving the duplicated-logic review conflict. The helper is invoked only by those local wrappers, never by global conftest or V12. Applied in: Tasks 2–3.
 
+- **D4** (owner, transport recovery, 2026-10-14): Amend Stage 6 to a 1,000-record operational Census batch limit in a new preparation, preserving the original frozen run. The Census service maximum remains 10,000 and Stage 3 is unchanged. Apply a minimal preparation-only default change, verify the unpatched production default and boundary, and review it before preparing. New preparation `stage6_ita_assignment_20261014_1000`; acceptance targets `stage6_ita_area_mix_20261014_1000` and `_replay`. The original `stage6_ita_assignment_20261014` and its four raw controls stay byte-identical with their original software contract. All original tuples/source-row mappings and upstream selections remain equal; diagnostic subsets cannot populate production evidence. Resume Task 8 Steps 2–6 under this amendment; preserve all original acceptance criteria. Expected observed workload is 1,114 batches (1,113 × 1,000 + 538).
+
 ---
 
 ## Entry evidence and approved implementation choices
@@ -1148,9 +1150,9 @@ git commit -m "feat(targets): publish offline ITA bundles and seed V12"
 - [ ] **Step 1: Document the reviewed command surface before freezing production software.** Put these concrete examples in README, explaining one-time full-table preparation/acquisition, cached resume, offline replay, all-year assignment versus 2023-only target and where files live:
 
 ```bash
-UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embedding-data targets prepare-ita stage6_ita_assignment_20261014 --codes-run stage4_v11_20261013_r2 --geography-run stage5_geography_20261014 --data-dir /Users/lowell/Projects/embedding-data/data
-UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embedding-data targets acquire-ita stage6_ita_assignment_20261014 --data-dir /Users/lowell/Projects/embedding-data/data
-UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embedding-data targets build-ita stage6_ita_assignment_20261014 stage6_ita_area_mix_20261014 --year 2023 --data-dir /Users/lowell/Projects/embedding-data/data
+UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embedding-data targets prepare-ita stage6_ita_assignment_20261014_1000 --codes-run stage4_v11_20261013_r2 --geography-run stage5_geography_20261014 --data-dir /Users/lowell/Projects/embedding-data/data
+UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embedding-data targets acquire-ita stage6_ita_assignment_20261014_1000 --data-dir /Users/lowell/Projects/embedding-data/data
+UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embedding-data targets build-ita stage6_ita_assignment_20261014_1000 stage6_ita_area_mix_20261014_1000 --year 2023 --data-dir /Users/lowell/Projects/embedding-data/data
 ```
 
 `uv --offline` prevents package fetching; the acquisition subcommand still deliberately makes Census HTTP calls. State that explicitly next to the example. README text must include: submitted-record counts including duplicates; conditional program-selected universe and unvalidated employment; native-2022 eligibility; adopted HUD singleton support; no SE/none; size_gate_pending; separate 2025/2023/2025Q4/Current frames; no automatic downloads from offline commands; immutable run IDs/partial inspection; exact alternate-run checksum options. Explain output schemas/flag support/denominators and that no county-accuracy or representativeness claim follows from coverage.
@@ -1188,7 +1190,7 @@ cp /Users/lowell/Projects/embedding-data/data/raw/manifest.jsonl /private/tmp/em
 
 The before-inventory includes only files present now; new Stage 6 files later under the raw Census parent are allowed. It is not a requirement that the raw manifest's whole-file hash remain constant during acquisition. Also run `target_inputs.select` on the real root with the two explicit selected runs and confirm detached hashes match the spec. Inspect the returned source year counts (2016–2025), total **3,206,055**, unchanged source/canonical physical parity, valid upstream inventories and raw dictionary citations. No builder/sample/download runs in this preflight.
 
-- [ ] **Step 3: Run real offline preparation and record the observed workload.** Run README's exact `prepare-ita` command. Record its source/index/request inventories, software/dependency/commit/lock inventories, rows and actual distinct tuple/batch counts. Compare the actual count to the design estimate **1,113,538 tuples**, explaining any measured difference rather than asserting the estimate is a completed-call count. At 10,000/request batch the estimate implies 112 batches; use the actual frozen files to count work. Include incomplete and delivered-excluded requests as required. Verify prepared file hashes before acquiring.
+- [ ] **Step 3: Run real offline preparation and record the observed workload.** Run README's exact `prepare-ita` command. Record its source/index/request inventories, software/dependency/commit/lock inventories, rows and actual distinct tuple/batch counts. Compare the actual count to the design estimate **1,113,538 tuples**, explaining any measured difference rather than asserting the estimate is a completed-call count. Under D4, at 1,000/request batch the estimate implies 1,114 batches (1,113 full plus 538 records); use the actual new frozen files to count work. Verify the source and request indexes are logically identical to the preserved original preparation, and include its complete directory plus four raw controls in the protected before/after inventory. Include incomplete and delivered-excluded requests as required. Verify prepared file hashes before acquiring.
 
 If planned run names already exist, verify their contents and either resume a matching preparation or choose an explicit new safe suffixed run ID and record that actual selection everywhere. Never remove/overwrite an occupied final or `.part` to force the example names through. A leftover `.part` remains an inspection task; it is not evidence of successful preparation.
 
@@ -1197,7 +1199,7 @@ If planned run names already exist, verify their contents and either resume a ma
 Once acquisition verifies every batch, run README's exact `build-ita` command. Run a second offline build from the same assignment inputs:
 
 ```bash
-UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embedding-data targets build-ita stage6_ita_assignment_20261014 stage6_ita_area_mix_20261014_replay --year 2023 --data-dir /Users/lowell/Projects/embedding-data/data
+UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embedding-data targets build-ita stage6_ita_assignment_20261014_1000 stage6_ita_area_mix_20261014_1000_replay --year 2023 --data-dir /Users/lowell/Projects/embedding-data/data
 ```
 
 Prove replay equality for all four Parquets by schema, ordered logical rows and exact counts. Compare JSON after removing only the documented target-run IDs/execution times and the consequential inventories/checksums of those files. Catalog/receipt/response acquisition times, options and hashes must remain identical. Report physical Parquet checksums as per-run inventories; do not claim them stable across future library versions. Run `verify_bundle` on both outputs and record detached `outputs.json` SHA-256 checksums.
