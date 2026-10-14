@@ -130,3 +130,37 @@ def corrupt_selected(data_dir, selected, defect):
     target_io.write_json(outputs_file, outputs)
     family = 'geography' if defect == 'geography_edge' else 'codes'
     selected.provenance[family]['outputs_sha256'] = manifest.sha256_file(outputs_file)
+
+
+def install_implemented_software_boundary(monkeypatch):
+    import importlib.util
+
+    from embedding_data import ita_assignment_prepare as preparation
+
+    modules = tuple(name for name in preparation.FROZEN_MODULES
+                    if importlib.util.find_spec('embedding_data.' + name) is not None)
+    monkeypatch.setattr(preparation, 'FROZEN_MODULES', modules)
+
+
+def prepared_tree(data_dir: Path, *, batch_limit: int = 10_000):
+    from unittest.mock import patch
+
+    from embedding_data import ita_assignment_prepare as preparation
+
+    selected = seed_inputs(data_dir)
+    with patch.object(preparation, 'BATCH_LIMIT', batch_limit):
+        preparation.prepare(
+            data_dir, 'requests', 'fixture_codes', 'fixture_geography',
+            codes_outputs_sha256=selected.provenance['codes']['outputs_sha256'],
+            geography_outputs_sha256=selected.provenance['geography']['outputs_sha256'])
+    return preparation.check_preparation(data_dir, 'requests')
+
+
+def submitted_edge_cases():
+    return pl.DataFrame({
+        'street_address': [None, '', '1 Main St', '1 MAIN ST', '1 Main St ',
+                           'Café "A",\nFloor 2', '', 'Excluded'],
+        'city': ['', None, 'Town', 'Town', 'Town', 'Québec', None, 'Town'],
+        'state': ['', '', 'AL', 'AL', 'AL', 'AL', None, 'PR'],
+        'zip_code': [None, 'invalid', '12345-6789', '123456789', '1234', '00001', '', '00001'],
+    })
