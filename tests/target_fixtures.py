@@ -204,7 +204,7 @@ def census_client(requests: list[dict], *, fail_batch: int | None = None) -> htt
         batch += 1
         output = io.StringIO(newline='')
         writer = csv.writer(output)
-        counties = {'Exact A': '01001', 'Exact B': '51510', 'Exact C': '51059',
+        counties = {'Exact A': '01001', 'Exact B': '51510', 'Exact C': '51001',
                     'Exact excluded': '72001'}
         for identifier, street, _city, _state, _zip in csv.reader(
                 io.StringIO(payload.decode('utf-8'))):
@@ -254,3 +254,21 @@ def assignment_case(census_status, match_type, returned_county, zip_code, state)
         inputs = assignment_inputs(Path(directory), status=census_status, kind=match_type,
                                    returned=returned_county, zip_code=zip_code, state=state)
         return assign(*inputs).collect().row(0, named=True)
+
+
+def assigned_tree(data_dir: Path) -> tuple[pl.LazyFrame, pl.DataFrame, pl.DataFrame]:
+    from unittest.mock import patch
+
+    from embedding_data import ita_assignment_acquire as acquisition
+    from embedding_data.ita_assignment import assign
+
+    prepared = prepared_tree(data_dir)
+    with patch.object(acquisition, 'make_client', lambda: census_client([])):
+        acquisition.acquire(data_dir, prepared.directory.name)
+    evidence = acquisition.read_evidence(data_dir, prepared)
+    selected = prepared.selected
+    counties = pl.read_parquet(selected.geography['county_reference'])
+    assignments = assign(pl.scan_parquet(selected.canonical),
+                         pl.scan_parquet(prepared.source_index), evidence.responses,
+                         pl.read_parquet(selected.geography['hud_zip_lookup']), counties)
+    return assignments, pl.read_parquet(selected.codes['naics_nodes']), counties
