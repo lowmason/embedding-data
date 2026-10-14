@@ -60,6 +60,17 @@ def test_duplicate_and_contradictory_membership_fail():
             gp.parse_members(sheet(MEMBER_ROWS + [last]))
 
 
+@pytest.mark.parametrize(('column', 'value'), [
+    pytest.param(3, 'Contradictory metropolitan title', id='title'),
+    pytest.param(4, 'Micropolitan Statistical Area', id='type'),
+])
+def test_cbsa_description_contradiction_with_distinct_counties_fails(column, value):
+    rows = [list(row) for row in MEMBER_ROWS]
+    rows[4][column] = value
+    with pytest.raises(ValueError, match='CBSA title/type contradicts'):
+        gp.parse_members(sheet(rows))
+
+
 def test_only_known_footers_with_empty_other_cells_are_accepted():
     footer = [gp.CBSA_FOOTERS[0]] + [None] * 11
     assert gp.parse_members(sheet(MEMBER_ROWS + [footer])).height == 4
