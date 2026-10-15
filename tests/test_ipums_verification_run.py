@@ -105,7 +105,7 @@ def complete_inputs(tmp_path, monkeypatch):
         parquet = root / relative
         parquet.parent.mkdir(parents=True)
         converted.write_parquet(parquet)
-        selections[f'{source}/{set_name}'] = {'delivery_id': name, 'parquet': relative}
+        selections[f'{source}/{set_name}'] = {'delivery': name, 'parquet': relative}
     selection = tmp_path / 'selection.json'
     selection.write_text(json.dumps(selections))
     import dotenv
@@ -244,7 +244,7 @@ def test_selection_rejects_unsafe_or_incomplete_profiles(complete_inputs, mutati
     elif mutation == 'traversal':
         values['acs/core']['parquet'] = '../outside.parquet'
     elif mutation == 'part':
-        values['acs/core']['delivery_id'] += '.part'
+        values['acs/core']['delivery'] += '.part'
     elif mutation == 'wrong_delivery':
         values['acs/core']['parquet'] = values['acs/vintage']['parquet']
     elif mutation.endswith('symlink'):

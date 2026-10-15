@@ -78,12 +78,12 @@ def _selection(text):
     for profile, item in selection.items():
         source, set_name = profile.split('/')
         collection = ipums_conversion.COLLECTIONS[source]
-        if (not isinstance(item, dict) or set(item) != {'delivery_id', 'parquet'}
-                or not isinstance(item['delivery_id'], str)
-                or not re.fullmatch(rf'{collection}_[0-9]+', item['delivery_id'])
+        if (not isinstance(item, dict) or set(item) != {'delivery', 'parquet'}
+                or not isinstance(item['delivery'], str)
+                or not re.fullmatch(rf'{collection}_[0-9]+', item['delivery'])
                 or not isinstance(item['parquet'], str)):
             raise ValueError(f'{profile}: invalid delivery selection')
-        expected = f'derived/{source}/{set_name}/{item["delivery_id"]}.parquet'
+        expected = f'derived/{source}/{set_name}/{item["delivery"]}.parquet'
         if item['parquet'] != expected:
             raise ValueError(f'{profile}: selected Parquet must belong to the selected delivery')
     return selection
@@ -118,7 +118,7 @@ def _selected_inputs(data_dir, selection):
     for profile in PROFILES:
         source, set_name = profile.split('/')
         item = selection[profile]
-        name = item['delivery_id']
+        name = item['delivery']
         directory = target_io.relative_file(data_dir, f'raw/{source}/{set_name}/{name}')
         csv_gz = ipums_conversion._verify_delivery(
             data_dir, directory, ipums_conversion.COLLECTIONS[source])
@@ -126,7 +126,8 @@ def _selected_inputs(data_dir, selection):
         if parquet.with_name(parquet.name + '.part').exists():
             raise ValueError(f'{profile}: incomplete selected Parquet')
         result[profile] = {
-            **item, 'parquet_record': target_io.file_record(parquet),
+            'delivery_id': name, 'parquet': item['parquet'],
+            'parquet_record': target_io.file_record(parquet),
             'raw_citations': [_citation(data_dir, file) for file in (
                 directory / 'extract.json', directory / f'{name}.xml', csv_gz)],
             'definition': ipums_ddi.read_definition(directory / 'extract.json'),
