@@ -149,14 +149,14 @@ def _reference_file(data_dir, reference_id, kind):
 
 
 def _acs_context(frame, universe):
-    return frame.with_columns(
+    return frame.lazy().with_columns(
         pl.lit('annual').alias('period'), pl.col('year').alias('period_start'),
         pl.col('year').alias('period_end'), pl.concat_list('year').alias('period_years'),
         pl.lit(universe, dtype=pl.String).alias('universe'),
         pl.lit('residence').alias('geography_basis'),
         pl.when(pl.col('state_fips').is_in(sorted(ipums_references.ACS_COMPARISON_STATES)))
         .then(pl.lit('50_states_dc')).otherwise(pl.lit('outside_50_states_dc'))
-        .alias('geography_scope'))
+        .alias('geography_scope')).collect()
 
 
 def _acs_references(data_dir, reference_id):
@@ -175,12 +175,12 @@ def _acs_references(data_dir, reference_id):
         frame = ipums_references.parse_acs_levels(
             _reference_file(data_dir, reference_id, f'acs_{year}_employment'), year)
         frames.append(_acs_context(frame, ipums_totals.ACS_UNIVERSE if proven else None))
-    annual = pl.concat(frames)
-    pooled = annual.group_by('state_fips').agg(
+    annual = pl.concat([frame.lazy() for frame in frames]).collect()
+    pooled = annual.lazy().group_by('state_fips').agg(
         pl.col('published').sum().truediv(2).alias('published'),
         pl.col('year').n_unique().alias('_years'),
     ).with_columns(
-        pl.when(pl.col('_years') == 2).then(pl.col('published')).otherwise(None)
+        pl.when(pl.col('_years').eq(2)).then(pl.col('published')).otherwise(None)
         .alias('published'), pl.lit(None, dtype=pl.Int64).alias('year'),
         pl.lit('persons').alias('units'), pl.lit('annual_average').alias('period'),
         pl.lit(2023, dtype=pl.Int64).alias('period_start'),
@@ -193,26 +193,26 @@ def _acs_references(data_dir, reference_id):
         pl.when(pl.col('state_fips').is_in(sorted(ipums_references.ACS_COMPARISON_STATES)))
         .then(pl.lit('50_states_dc')).otherwise(pl.lit('outside_50_states_dc'))
         .alias('geography_scope'),
-    ).select(annual.columns)
-    return pl.concat([annual, pooled]), evidence
+    ).select(annual.columns).collect()
+    return pl.concat([annual.lazy(), pooled.lazy()]).collect(), evidence
 
 
 def _bls_references(data_dir, reference_id):
     # This parser validates the separately frozen series title, units and A-1 universe.
     return ipums_references.parse_bls_levels(
-        _reference_file(data_dir, reference_id, 'cps_employment')).with_columns(
+        _reference_file(data_dir, reference_id, 'cps_employment')).lazy().with_columns(
         pl.lit('monthly').alias('period'),
-        (pl.col('year') * 100 + pl.col('month')).alias('period_start'),
-        (pl.col('year') * 100 + pl.col('month')).alias('period_end'),
+        pl.col('year').mul(100).add(pl.col('month')).alias('period_start'),
+        pl.col('year').mul(100).add(pl.col('month')).alias('period_end'),
         pl.concat_list('year').alias('period_years'),
         pl.lit(ipums_totals.CPS_UNIVERSE).alias('universe'),
         pl.lit('residence').alias('geography_basis'),
-        pl.lit('50_states_dc').alias('geography_scope'))
+        pl.lit('50_states_dc').alias('geography_scope')).collect()
 
 
 def _delivery_columns(frame, profile, item):
-    return frame.with_columns(pl.lit(profile).alias('extract_key'),
-                              pl.lit(item['delivery_id']).alias('delivery_id'))
+    return frame.lazy().with_columns(pl.lit(profile).alias('extract_key'),
+                                     pl.lit(item['delivery_id']).alias('delivery_id')).collect()
 
 
 def _comparisons(measured, published, profile, item, references, kinds):
@@ -221,13 +221,13 @@ def _comparisons(measured, published, profile, item, references, kinds):
             else ['year', 'month'])
     result = ipums_totals.compare_levels(measured, published, keys)
     provenance = {kind: references['receipt']['originals'][kind] for kind in kinds}
-    return _delivery_columns(result, profile, item).with_columns(
+    return _delivery_columns(result, profile, item).lazy().with_columns(
         pl.lit(source).alias('source'), pl.lit(set_name).alias('set_name'),
         pl.lit(json.dumps(provenance, sort_keys=True)).alias('published_provenance'),
         pl.lit(json.dumps(item['raw_citations'], sort_keys=True)).alias('delivery_provenance'),
         pl.lit('WTFINL differs from the official composite estimator' if source == 'cps'
                else 'PERWT annual and complete two-year average; no allocation filter')
-        .alias('estimator_note'))
+        .alias('estimator_note')).collect()
 
 
 def _measure_profile(data_dir, staging, profile, item, catalog, lists, published, references):
@@ -340,7 +340,7 @@ def measure(data_dir: Path, run_id: str, reference_id: str, selection_file: Path
     pieces['verification_checks'] = [pl.DataFrame(checks, schema=CHECK_SCHEMA, orient='row')]
     contracts = {}
     for name, frames in pieces.items():
-        table = pl.concat(frames, how='diagonal_relaxed')
+        table = pl.concat([frame.lazy() for frame in frames], how='diagonal_relaxed').collect()
         file = staging / f'{name}.parquet'
         table.write_parquet(file)
         contracts[file.name] = {key: value for key, value in target_io.file_record(file).items()
