@@ -21,18 +21,15 @@ kept as strings. When pooling the two core years, halve PERWT and REPWTP1-80
 for annual-average totals; compositions and shares are unaffected.
 '''
 
-import gzip
 import os
-import shutil
 from pathlib import Path
 from typing import Annotated
 
-import polars as pl
 import typer
 from dotenv import load_dotenv
 from ipumspy import IpumsApiClient, MicrodataExtract
 
-from embedding_data import ipums_delivery, paths
+from embedding_data import ipums_conversion, ipums_delivery, paths
 
 DOTENV_PATH = paths.PROJECT_ROOT / '.env'
 
@@ -63,13 +60,7 @@ VARIABLE_GROUPS = {
   'migration': ['MIGRATE1', 'MIGPLAC1', 'MIGPUMA1', 'MIGMET23'],
 }
 
-# Codes like '31M' and '1110XX' must not be parsed as numbers, and the
-# CPI-adjusted wage has decimals that a short inference window can miss.
-SCHEMA_OVERRIDES = {
-  'INDNAICS': pl.String,
-  'OCCSOC': pl.String,
-  'INCWAGE_CPIU_2010': pl.Float64,
-}
+SCHEMA_OVERRIDES = ipums_conversion.ACS_SCHEMA_OVERRIDES
 
 
 def build_extract(name: str) -> MicrodataExtract:
@@ -95,19 +86,8 @@ def build_extract(name: str) -> MicrodataExtract:
 
 
 def csv_to_parquet(csv_gz: Path, parquet_path: Path) -> Path:
-  '''Stream-decompress an IPUMS .csv.gz beside parquet_path, then sink it to Parquet lazily.'''
-  parquet_path.parent.mkdir(parents=True, exist_ok=True)
-  csv_path = parquet_path.with_suffix('.csv')
-  try:
-    with gzip.open(csv_gz, 'rb') as src, csv_path.open('wb') as dst:
-      shutil.copyfileobj(src, dst, length=16 * 1024 * 1024)
-    (
-      pl.scan_csv(csv_path, schema_overrides=SCHEMA_OVERRIDES, infer_schema_length=100_000)
-      .sink_parquet(parquet_path)
-    )
-  finally:
-    csv_path.unlink(missing_ok=True)
-  return parquet_path
+  '''Convert a delivered gzip CSV without replacing an existing Parquet.'''
+  return ipums_conversion.convert(csv_gz, parquet_path, 'acs')
 
 
 @app.command(help=__doc__.splitlines()[0])
@@ -124,12 +104,23 @@ def main(
     bool,
     typer.Option('--dry-run', help='Write definitions to preview/ without submitting.'),
   ] = False,
+  convert_only: Annotated[
+    bool,
+    typer.Option('--convert-only', help='Recover missing Parquet offline.'),
+  ] = False,
 ) -> None:
   extracts = extracts or ['core']
 
   unknown = sorted(set(extracts).difference(SAMPLE_SETS))
   if unknown:
     raise typer.BadParameter('unknown extract(s): ' + ', '.join(unknown), param_hint='extracts')
+
+  if convert_only:
+    if dry_run:
+      raise typer.BadParameter('--convert-only cannot be combined with --dry-run')
+    for parquet in ipums_conversion.recover(data_dir, 'acs', extracts):
+      typer.echo(f'wrote {parquet}')
+    return
 
   # Definitions need no catalog lookup, so a dry run reads no key and stays offline.
   client = None
