@@ -47,7 +47,9 @@ UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embe
 UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embedding-data cps monthly --convert-only --data-dir /Users/lowell/Projects/embedding-data/data
 ```
 
-Select one or more existing sets, or omit sets to select all for that source.
+Select one or more existing sets. Omitting sets selects ACS `core`, or both CPS
+sets (`monthly` and `asec`). To recover all ACS sets, explicitly pass
+`core vintage five_year` before `--convert-only`.
 Recovery preflights every selected raw triple and manifest identity before writing.
 Existing final Parquets are retained; occupied `.part` paths and symlinks fail.
 A unique decompression scratch directory and exclusive `.part` output precede
