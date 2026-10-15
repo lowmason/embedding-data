@@ -518,6 +518,8 @@ Registered primary-source identities:
 | bls_a1_metadata | https://www.bls.gov/news.release/empsit.t01.htm |
 | asec_2025_documentation | https://www2.census.gov/programs-surveys/cps/techdocs/cpsmar25.pdf |
 | asec_2026_documentation | https://www2.census.gov/programs-surveys/cps/techdocs/cpsmar26.pdf |
+| cps_jan2025_industry_documentation | https://www2.census.gov/programs-surveys/cps/methodology/IndustryCodes_Jan2025.pdf |
+| cps_industry_2025_codes | https://cps.ipums.org/cps/codes/ind_2025_codes.shtml |
 
 ~~~json
 {"seriesid":["LNU02000000"],"startyear":"2025","endyear":"2026"}
@@ -916,6 +918,8 @@ after the evidence/review gates below. No production microdata enter git.
   runnable production selection.
 
 - [ ] **Step 2: Acquire and inspect the actual public references.**
+
+  Execution deviation: the observed 2025 ASEC appendix contradiction requires the two supplemental industry documents above and a fresh v3 reference snapshot; preserve earlier v2 snapshots unchanged.
 
   Run acquire-references stage7_ipums_references_20261015 with the explicit
   root. The executor must inspect real workbook sheets/headers and metadata

@@ -16,6 +16,7 @@ from ipums_fixtures import (
     acs_levels,
     bls_documents,
     bls_response,
+    cps_industry_documentation,
     industry_workbook,
     reference_originals,
 )
@@ -685,7 +686,7 @@ def test_cached_receipt_requires_external_manifest_entry(tmp_path, monkeypatch, 
 def full_reference_registry(tmp_path, monkeypatch):
     module = references()
     registered = dict(module.REGISTRY)
-    assert len(registered) == 25
+    assert len(registered) == 27
     originals = reference_originals(tmp_path / 'public-layout-fixtures', registered)
     fixtures = {kind: replace(reference, sha256=manifest.sha256_file(originals[kind])
                               if reference.sha256 else None)
@@ -710,13 +711,13 @@ def forbid_reference_access(monkeypatch, module):
 
 def assert_full_reference_snapshot(data_dir, module, completed, originals, *, imported):
     receipt = module.check_references(data_dir, completed.name)
-    assert len(receipt['originals']) == 25
-    assert len(receipt['files']) == 26
-    assert len(receipt['raw_citations']) == 26
+    assert len(receipt['originals']) == 27
+    assert len(receipt['files']) == 28
+    assert len(receipt['raw_citations']) == 28
     assert 'receipt.json' not in receipt['files']
     assert manifest_audit.audit(data_dir) == []
     entries = manifest.read_manifest(paths.manifest_path(data_dir))
-    assert len(entries) == 27
+    assert len(entries) == 29
     assert sum(entry.source_url is None for entry in entries) == 1
     for kind, original in originals.items():
         reference = module.REGISTRY[kind]
@@ -782,7 +783,7 @@ def test_full_registry_acquire_protected_queries_audit_and_credential_free_cache
     install_transport(monkeypatch, module, public)
     caplog.set_level(logging.DEBUG)
     completed = module.acquire(tmp_path, 'full-acquire')
-    assert len(public_calls) == 23
+    assert len(public_calls) == 25
     assert len(protected_calls) == 2
     assert len(credential_reads) == 1
     receipt = assert_full_reference_snapshot(
@@ -805,7 +806,7 @@ def test_full_registry_import_finalizes_once_and_cached_replay_is_offline(tmp_pa
     forbid_reference_access(monkeypatch, module)
     for index, (kind, original) in enumerate(originals.items()):
         completed = module.import_reference(tmp_path, 'full-import', kind, original)
-        if index < 24:
+        if index < 26:
             assert completed.name == 'full-import.part'
             assert not (completed / 'receipt.json').exists()
             assert not paths.manifest_path(tmp_path).exists()
@@ -817,3 +818,95 @@ def test_full_registry_import_finalizes_once_and_cached_replay_is_offline(tmp_pa
     assert module.check_references(tmp_path, 'full-import') == receipt
     with pytest.raises(ValueError, match='immutable'):
         module.import_reference(tmp_path, 'full-import', 'usa_samples', originals['usa_samples'])
+
+
+SUPPLEMENTAL_REFERENCES = {
+    'cps_jan2025_industry_documentation': (
+        'https://www2.census.gov/programs-surveys/cps/methodology/IndustryCodes_Jan2025.pdf',
+        'IndustryCodes_Jan2025.pdf',
+        'b990eb54c8e4af81e23f0cc94959b260b0cd448f5794d955152c49cb0f7ac7c1'),
+    'cps_industry_2025_codes': (
+        'https://cps.ipums.org/cps/codes/ind_2025_codes.shtml',
+        'ind_2025_codes.shtml',
+        '28b64ba7cad2911d3c776c1610039b320c02533c469ae55337afa9552da3a816'),
+}
+
+
+@pytest.mark.parametrize('kind', SUPPLEMENTAL_REFERENCES)
+def test_supplemental_documentary_identities_are_pinned(kind):
+    module = references()
+    assert kind in module.REGISTRY
+    reference = module.REGISTRY[kind]
+    assert (reference.url, reference.filename, reference.sha256) == SUPPLEMENTAL_REFERENCES[kind]
+    assert reference.method == 'GET'
+    assert reference.request_body is None
+    assert kind not in module.ipums_census_access.ACS_QUERIES
+    assert module.PARSER_VERSION == 'ipums-public-references-v3'
+
+
+@pytest.mark.parametrize('kind', SUPPLEMENTAL_REFERENCES)
+def test_supplemental_documentary_hash_mutation_is_rejected(tmp_path, monkeypatch, kind):
+    module = references()
+    assert kind in module.REGISTRY
+    original = write_text(tmp_path, 'changed', 'changed original')
+    forbid_reference_access(monkeypatch, module)
+    with pytest.raises(ValueError, match='original differs from inspected source vintage'):
+        module.import_reference(tmp_path, 'changed-document', kind, original)
+    assert not paths.manifest_path(tmp_path).exists()
+
+
+def test_supplemental_pdf_rejects_invalid_magic_even_with_fixture_pin(tmp_path, monkeypatch):
+    module = references()
+    kind = 'cps_jan2025_industry_documentation'
+    assert kind in module.REGISTRY
+    original = write_text(tmp_path, 'invalid.pdf', 'not a PDF')
+    monkeypatch.setitem(module.REGISTRY, kind, replace(
+        module.REGISTRY[kind], sha256=manifest.sha256_file(original)))
+    with pytest.raises(ValueError, match='not a PDF'):
+        module._validate_original(kind, original)
+
+
+@pytest.mark.parametrize('mutation', [
+    lambda text: text.replace('2025 onward', '2024 onward'),
+    lambda text: text.replace('id="page-title"', 'id="wrong"'),
+    lambda text: text.replace('<h1', '<h2').replace('</h1>', '</h2>'),
+    lambda text: text.replace('class="list-fixed-dt"', 'class="wrong"'),
+    lambda text: text[:text.index('<dl')],
+    lambda text: text.replace('<dt>0000</dt>', '<dt>abc</dt>'),
+    lambda text: text.replace('<dt>0000</dt>', '<dt>0001</dt>'),
+    lambda text: text.replace('<dt>0000</dt><dd>Synthetic industry 0</dd>', ''),
+    lambda text: text.replace('<dd>Synthetic industry 0</dd>', '<dd> </dd>'),
+    lambda text: text.replace('<dt>0000</dt><dd>Synthetic industry 0</dd>',
+                              '<dd>Synthetic industry 0</dd><dt>0000</dt>'),
+    lambda text: text.replace('Other motor vehicle dealers', 'Automobile dealers'),
+    lambda text: text.replace('Credit unions, and savings institutions', 'Savings institutions'),
+    lambda text: text + text,
+])
+def test_supplemental_industry_documentary_identity_and_shape(tmp_path, monkeypatch, mutation):
+    module = references()
+    kind = 'cps_industry_2025_codes'
+    assert kind in module.REGISTRY
+    original = write_text(tmp_path, 'codes.shtml', mutation(cps_industry_documentation()))
+    monkeypatch.setitem(module.REGISTRY, kind, replace(
+        module.REGISTRY[kind], sha256=manifest.sha256_file(original)))
+    with pytest.raises(ValueError, match='CPS industry documentary'):
+        module._validate_original(kind, original)
+
+
+def test_v2_snapshot_is_preserved_but_not_current_parser_valid(tmp_path, monkeypatch,
+                                                            full_reference_registry):
+    module, originals = full_reference_registry
+    forbid_reference_access(monkeypatch, module)
+    monkeypatch.setattr(module, 'PARSER_VERSION', 'ipums-public-references-v2')
+    monkeypatch.setattr(module, 'REGISTRY', {
+        kind: reference for kind, reference in module.REGISTRY.items()
+        if kind not in SUPPLEMENTAL_REFERENCES})
+    for kind in module.REGISTRY:
+        completed = module.import_reference(tmp_path, 'old-v2', kind, originals[kind])
+    before = {file.name: file.read_bytes() for file in completed.iterdir()}
+    manifest_bytes = paths.manifest_path(tmp_path).read_bytes()
+    monkeypatch.setattr(module, 'PARSER_VERSION', 'ipums-public-references-v3')
+    with pytest.raises(ValueError, match='identity/parser version differs'):
+        module.check_references(tmp_path, 'old-v2')
+    assert {file.name: file.read_bytes() for file in completed.iterdir()} == before
+    assert paths.manifest_path(tmp_path).read_bytes() == manifest_bytes

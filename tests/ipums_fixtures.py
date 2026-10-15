@@ -153,6 +153,18 @@ def acs_levels(*, include_pr=True):
     return rows
 
 
+def cps_industry_documentation():
+    labels = {f'{code:04}': f'Synthetic industry {code}' for code in range(264)}
+    labels.update({
+        '4681': 'Other motor vehicle dealers',
+        '6881': 'Credit unions, and savings institutions '
+        'and other depository credit intermediation'})
+    rows = ''.join(f'<dt>{code}</dt><dd>{title}</dd>' for code, title in labels.items())
+    return ('<h1 id="page-title">Industry Codes: 2025 onward '
+            '(2022 Census Classification Scheme)</h1><dl class="list-fixed-dt">'
+            f'{rows}</dl>')
+
+
 def reference_originals(directory, registry):
     '''Tiny inspected-layout inputs; pinned originals use fixture-only hashes in tests.'''
     from pathlib import Path
@@ -177,8 +189,10 @@ def reference_originals(directory, registry):
             file.write_bytes(recorded.read_bytes())
         elif kind in ('bls_series_metadata', 'bls_a1_metadata'):
             assert file.is_file()
-        elif kind.startswith('asec_'):
+        elif kind.startswith('asec_') or kind == 'cps_jan2025_industry_documentation':
             file.write_bytes(b'%PDF-1.4\n% Synthetic documentary-byte fixture\n%%EOF\n')
+        elif kind == 'cps_industry_2025_codes':
+            file.write_text(cps_industry_documentation())
         elif kind.startswith('acs_'):
             year = kind.split('_')[1]
             file.write_text(f'<html><title>Census Data API: /data/{year}/acs/acs1/groups/B23025'

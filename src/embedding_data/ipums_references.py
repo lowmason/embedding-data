@@ -20,8 +20,9 @@ from embedding_data import ipums_census_access, manifest, paths, target_io
 from embedding_data.geography_parsers import SCOPE as ACS_COMPARISON_STATES
 from embedding_data.osha_benchmark_download import USER_AGENT
 
-PARSER_VERSION = 'ipums-public-references-v2'
+PARSER_VERSION = 'ipums-public-references-v3'
 MAX_ORIGINAL_BYTES = 32 * 1024 * 1024
+CPS_INDUSTRY_DOCUMENTARY_COUNT = 266
 BLS_SERIES = 'LNU02000000'
 BLS_REQUEST_BODY = b'{"seriesid":["LNU02000000"],"startyear":"2025","endyear":"2026"}'
 SELECTED_MONTHS = frozenset(
@@ -69,6 +70,13 @@ REGISTRY = {
         'https://www2.census.gov/programs-surveys/cps/techdocs/cpsmar26.pdf',
         'asec_2026_documentation.pdf',
         sha256='8f6d4c10ae5e720449ae23fdf739bb7812aff8102218d7c013be8ce737125107'),
+    'cps_jan2025_industry_documentation': Reference(
+        'https://www2.census.gov/programs-surveys/cps/methodology/IndustryCodes_Jan2025.pdf',
+        'IndustryCodes_Jan2025.pdf',
+        sha256='b990eb54c8e4af81e23f0cc94959b260b0cd448f5794d955152c49cb0f7ac7c1'),
+    'cps_industry_2025_codes': Reference(
+        'https://cps.ipums.org/cps/codes/ind_2025_codes.shtml', 'ind_2025_codes.shtml',
+        sha256='28b64ba7cad2911d3c776c1610039b320c02533c469ae55337afa9552da3a816'),
     **{f'usa_{name.lower()}': Reference(f'https://usa.ipums.org/usa-action/variables/{name}',
                                       f'usa_{name.lower()}.html')
        for name in ('PERWT', 'REPWTP')},
@@ -333,6 +341,26 @@ def parse_bls_levels(file: Path) -> pl.DataFrame:
     return _bls_response(file)
 
 
+def _validate_cps_industry_documentation(file):
+    text = file.read_text(encoding='utf-8')
+    headings = re.findall(r'<h1 id="page-title">([^<]+)</h1>', text)
+    lists = re.findall(r'<dl class="list-fixed-dt">(.*?)</dl>', text, flags=re.DOTALL)
+    title = 'Industry Codes: 2025 onward (2022 Census Classification Scheme)'
+    if headings != [title] or len(lists) != 1:
+        raise ValueError('CPS industry documentary heading/list identity differs')
+    pair_pattern = r'<dt>([0-9]{4})</dt>\s*<dd>([^<]+)</dd>'
+    pairs = re.findall(pair_pattern, lists[0])
+    labels = {code: ' '.join(label.split()) for code, label in pairs}
+    if (re.sub(pair_pattern, '', lists[0]).strip()
+            or len(pairs) != CPS_INDUSTRY_DOCUMENTARY_COUNT
+            or len(labels) != len(pairs) or not all(labels.values())):
+        raise ValueError('CPS industry documentary definition-list shape differs')
+    if (labels.get('4681') != 'Other motor vehicle dealers'
+            or labels.get('6881') != 'Credit unions, and savings institutions '
+            'and other depository credit intermediation'):
+        raise ValueError('CPS industry documentary identifying labels differ')
+
+
 def _validate_original(kind, file):
     reference = REGISTRY[kind]
     if reference.sha256 is not None and manifest.sha256_file(file) != reference.sha256:
@@ -351,9 +379,11 @@ def _validate_original(kind, file):
         _series_metadata(file)
     elif kind == 'bls_a1_metadata':
         _a1_metadata(file)
-    elif kind.startswith('asec_'):
+    elif kind == 'cps_industry_2025_codes':
+        _validate_cps_industry_documentation(file)
+    elif kind.startswith('asec_') or kind == 'cps_jan2025_industry_documentation':
         if not file.read_bytes().startswith(b'%PDF-'):
-            raise ValueError('ASEC documentary original is not a PDF')
+            raise ValueError(f'{kind}: documentary original is not a PDF')
     else:
         text = file.read_text(encoding='utf-8')
         if kind.startswith('acs_'):
