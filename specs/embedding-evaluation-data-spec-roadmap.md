@@ -208,7 +208,7 @@ placements:
 > Stage 6: COMPLETE (2026-10-15) — implemented by plan 6 (specs/plans/completed/6-target-contract-ita-area-mix.md). Its [Handoff section](plans/completed/6-target-contract-ita-area-mix.md#handoff-to-later-stages) names what Stages 9–13 consume.
 > Next: resume the roadmap.
 
-- [ ] Stage 7: IPUMS extract verification
+- [x] Stage 7: IPUMS extract verification
       Objective: The five delivered IPUMS extracts are verified before any ACS or CPS transformation reads them.
       Spec: V4, V5, V6, V7, V10 (ACS, CPS); R3.2, R3.5, R4.5, R4.9, R4.11; Design provenance (XA, XC)
       Gap closed: V4; V5; V6; V7; V10 (ACS, CPS); the open markers on R3.2, R3.5, R4.5, R4.9, R4.11
@@ -216,6 +216,9 @@ placements:
       Produces: written finding with sample IDs, accepted names, weight-storage rule, INDLY scheme verdict, and totals gaps; the 2022 Census industry code list acquired under the manifest; script corrections if any; ACS and CPS convert-if-absent per `specs/deferred_items.md` section `1-raw-provenance`, item "ACS and CPS convert-if-absent" (plan 1, Handoff; Resolved at resume, 2026-10-12)
       Exit: finding committed; the five open markers carry verified markers citing it; XA and XC standing cites the finding (plan 1 already recorded the 2026-10-12 submissions; owner, at resume, 2026-10-12); ACS state employment and CPS monthly employment gaps against published levels are recorded, not tuned away; the "ACS and CPS convert-if-absent" item's Done-when holds and the item is ticked
       ROUTING: writing-plans
+
+> Stage 7: COMPLETE (2026-10-15) — implemented by plan 7 (specs/plans/completed/7-ipums-extract-verification.md). Its [Handoff section](plans/completed/7-ipums-extract-verification.md#handoff-to-later-stages) names what Stages 8–13 consume.
+> Next: resume the roadmap.
 
 - [ ] Stage 8: ACS codes and area allocation
       Objective: Every ACS industry and occupation code parses to a node or candidate set, and every ACS microdata area allocates to counties by population weight.

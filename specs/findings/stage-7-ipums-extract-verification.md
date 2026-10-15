@@ -824,9 +824,10 @@ UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embe
 These are executed provenance commands, not instructions to overwrite occupied
 runs. A future measurement uses fresh IDs and the applicable software contract.
 Ruff, offline lock check and Behave passed (one feature, two scenarios, ten steps).
-The normal commit invokes the full coverage suite; its actual result is recorded
-in the implementation handoff. Final whole-branch review and completion protocol
-remain controller-owned. The five verified source-spec clauses are scoped to
+The normal full coverage hooks passed, including the final README correction
+commit `9a437b1`; no detailed full-suite count is inferred from suppressed hook
+output. All per-task reviews and the final whole-branch review are resolved.
+The completion protocol and roadmap stamp are recorded in retired plan 7. The five verified source-spec clauses are scoped to
 these actual deliveries; other open markers and later requirements are retained.
 
 ## Consequences and limits for later stages
@@ -852,5 +853,17 @@ these actual deliveries; other open markers and later requirements are retained.
   inference, and no target/ITA description may enter training or model selection
   for the embedder it evaluates.
 
-Stage 7's roadmap checkbox, final whole-branch review and plan retirement are
-controlled separately; this finding does not claim those workflow gates ran.
+The final whole-branch review covered `a48149d..e050672` and found no Critical
+or Important issues. Its sole Minor, README recovery defaults, was corrected in
+`9a437b1`; scoped re-review approved the result with no new findings. Per-task
+reviews, final review/re-review and the final correction's passing coverage-hook
+log are preserved under
+`derived/ipums/verification-evidence/stage7_final_review_20261015/`.
+The inventory excludes itself; its detached SHA-256 is `40918a98faa6771d9ce82886b84d70384ea3d8cb9d54c285a6ee9f64cc3f0793`.
+
+The [retired plan 7](../plans/completed/7-ipums-extract-verification.md) records
+completion, deviations, backlog closure and the Stage 8–13 revalidation handoff.
+Stage 7 is ticked/stamped COMPLETE (2026-10-15); no later stage was started.
+The 2026 `9890` category clarification remains a named Stage 11 deferred item,
+not an invented mapping or an unresolved Stage 7 native-vintage/storage decision.
+Branch integration remains an explicit owner choice after completion bookkeeping.

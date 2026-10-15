@@ -1,5 +1,7 @@
 # IPUMS Extract Verification Implementation Plan
 
+**Status: COMPLETE (2026-10-15)** — executed via subagent-driven-development; deferred items in specs/deferred_items.md
+
 > **For agentic workers:** REQUIRED SUB-SKILL: implement this plan task-by-task via subagent-driven-development (the default) — or executing-plans when the owner chooses inline execution at the handoff. Steps use checkbox syntax for tracking.
 
 > Roadmap: specs/embedding-evaluation-data-spec-roadmap.md, Stage 7 — on plan completion, tick the stage and re-validate later stages against what shipped.
@@ -20,11 +22,11 @@ httpx >=0.28.1, Typer >=0.27.3 and fastexcel >=0.21.0; pytest/Hypothesis;
 stdlib gzip, shutil, tempfile, csv, decimal, json, hashlib, dataclasses and
 xml.etree.ElementTree. No new dependency or lockfile change.
 
-**Spec:** [Source spec](../embedding-evaluation-data-spec.md), scoped to Stage 7
-of the [roadmap](../embedding-evaluation-data-spec-roadmap.md): V4–V7,
+**Spec:** [Source spec](../../embedding-evaluation-data-spec.md), scoped to Stage 7
+of the [roadmap](../../embedding-evaluation-data-spec-roadmap.md): V4–V7,
 V10 (ACS/CPS), R3.2/R3.5/R4.5/R4.9/R4.11 and Design provenance XA/XC.
 Read completed plans 1 and 3's Handoff sections and the Stage 7-targeted items
-in [deferred items](../deferred_items.md).
+in [deferred items](../../deferred_items.md).
 
 ## Global Constraints
 
@@ -306,7 +308,7 @@ two extract modules and their tests. Keep ipums_delivery.deliver unchanged.
 - recover(data_dir: Path, source: str, sets: list[str]) -> list[Path] verifies
   every selected complete delivery triple before writing missing outputs.
 
-- [ ] **Step 1: Write failing observable recovery and atomicity tests.**
+- [x] **Step 1: Write failing observable recovery and atomicity tests.**
 
   Create synthetic gzip data, matching XML/definition, and three real manifest
   entries in tmp_path. Include both source types and a second selected set.
@@ -333,13 +335,13 @@ two extract modules and their tests. Keep ipums_delivery.deliver unchanged.
   delivery ending in .part. Interrupted directories are never converted;
   whole-tree audit reports them separately.
 
-- [ ] **Step 2: Run the new tests red.**
+- [x] **Step 2: Run the new tests red.**
 
   Run pytest tests/test_ipums_conversion.py and the two extract test modules
   with the offline locked prefix above. Expected: unsupported --convert-only
   or missing shared conversion behavior; preserve the actual failure output.
 
-- [ ] **Step 3: Implement the shared conversion/recovery and CLI branch.**
+- [x] **Step 3: Implement the shared conversion/recovery and CLI branch.**
 
   Decompress in a caller-owned temporary directory. Acquire the derived
   <name>.parquet.part path with exclusive creation before sinking. Installed
@@ -390,13 +392,13 @@ two extract modules and their tests. Keep ipums_delivery.deliver unchanged.
   normal new-submission behavior. Keep existing csv_to_parquet wrappers calling
   the shared converter, preserving callers and indentation.
 
-- [ ] **Step 4: Run green and record M1 recovery evidence.**
+- [x] **Step 4: Run green and record M1 recovery evidence.**
 
   Run the new tests, existing ACS/CPS/property tests, and ruff. A synthetic
   failure after writing partial bytes must leave neither a new final nor an
   owned staging path. Existing final/raw/other-set byte hashes stay unchanged.
 
-- [ ] **Step 5: Commit the focused change.**
+- [x] **Step 5: Commit the focused change.**
 
   Commit message: fix(ipums): recover missing conversions without resubmission.
   List the exact modified files in git add; do not include production data.
@@ -421,7 +423,7 @@ test_ipums_ddi.py and test_ipums_parity.py. Reuse Task 1's scanner/decompression
   temporary_directory: Path) -> dict builds an independent expected CSV scan
   and compares it with the existing Parquet.
 
-- [ ] **Step 1: Write failing DDI, legacy-version and parity tests.**
+- [x] **Step 1: Write failing DDI, legacy-version and parity tests.**
 
   Include a generic SAMPLE dictionary containing more samples than delivered,
   quality flags at extract and variable levels, helper REPWTP plus expanded
@@ -444,11 +446,11 @@ test_ipums_ddi.py and test_ipums_parity.py. Reuse Task 1's scanner/decompression
   boundaries, empty batches, nulls, float differences and a column-order
   difference. Test ACS alphanumeric preservation and CPS pre-cast zero-padding.
 
-- [ ] **Step 2: Run the targeted tests red.**
+- [x] **Step 2: Run the targeted tests red.**
 
   Expected missing modules/functions. No test reads the real data tree.
 
-- [ ] **Step 3: Implement metadata parsing and the bounded comparison.**
+- [x] **Step 3: Implement metadata parsing and the bounded comparison.**
 
   Reject duplicate DDI variable names/category values, malformed exponents,
   non-CSV definitions, unsupported sources and missing required metadata.
@@ -471,12 +473,12 @@ test_ipums_ddi.py and test_ipums_parity.py. Reuse Task 1's scanner/decompression
   is an unstable API. Chunk size bounds application-held rows, not all scanner
   buffers or process memory.
 
-- [ ] **Step 4: Run green and record M1 metadata/parity evidence.**
+- [x] **Step 4: Run green and record M1 metadata/parity evidence.**
 
   Run the Task 1–2 tests and ruff. Confirm a dtype-only mutation fails even
   where DataFrame.equals would accept equivalent numeric values.
 
-- [ ] **Step 5: Commit.**
+- [x] **Step 5: Commit.**
 
   Commit message: feat(ipums): verify delivery metadata and ordered conversion fidelity.
 
@@ -543,7 +545,7 @@ Their source locations are in the evidence appendix below. D3 authorizes only
 runtime key authentication for the two registered ACS levels queries; no other
 authenticated page or IPUMS microdata endpoint is a fallback.
 
-- [ ] **Step 1: Inspect public layouts, then write failing parser/cache tests.**
+- [x] **Step 1: Inspect public layouts, then write failing parser/cache tests.**
 
   Before defining workbook/parser fixtures, inspect the actual registered
   public originals in task-owned temporary storage. This public-only preflight
@@ -559,7 +561,7 @@ authenticated page or IPUMS microdata endpoint is a fallback.
   unexpected series ID, failed status, HTML masquerading as a workbook and
   missing selected months. Preserve legitimate footnotes rather than drop them.
 
-- [ ] **Step 2: Run tests red, then implement strict parse contracts.**
+- [x] **Step 2: Run tests red, then implement strict parse contracts.**
 
   Use Step 1's verified public workbook headers as parser anchors.
   Keep the original full Census lists distinct from ACS PUMS lists;
@@ -573,7 +575,9 @@ authenticated page or IPUMS microdata endpoint is a fallback.
   BLS levels must name the requested NSA series and monthly periods, with
   source units of thousands. Do not fabricate the missing October 2025.
 
-- [ ] **Step 3: Implement explicit acquisition/import and receipts.**
+- [x] **Step 3: Implement explicit acquisition/import and receipts.**
+
+  > Deviation: The generated receipt is externally manifested and excludes itself from its inventory. The initial v2 snapshot has 25 originals plus POST body and receipt; the final v3 snapshot has 27 originals plus those two supporting records. No audit exemption was added.
 
   D3: fetch the two ACS queries with a runtime Census key when required.
   Keep their registered credential-free URLs as source identity; never persist
@@ -600,7 +604,7 @@ authenticated page or IPUMS microdata endpoint is a fallback.
   dependency. Verify their bytes and record inspected appendix/page references
   in the finding; use the pdf skill when inspecting them during execution.
 
-- [ ] **Step 4: Run green and commit.**
+- [x] **Step 4: Run green and commit.**
 
   Run test_ipums_references.py and existing manifest/audit tests. MockTransport
   must cover the POST body and a recorded successful response. Cached replay
@@ -616,7 +620,7 @@ frame: pl.LazyFrame, source: str, set_name: str, sample_catalog: dict) -> dict
 returns named aggregate frames and a JSON status record. It accepts Task 2's
 parsed metadata and Task 3's public catalog, never makes an HTTP call.
 
-- [ ] **Step 1: Write failing acceptance tests with explicit expected sets.**
+- [x] **Step 1: Write failing acceptance tests with explicit expected sets.**
 
   Cover all five source/set profiles. Exact replicate names are:
 
@@ -632,7 +636,7 @@ parsed metadata and Task 3's public catalog, never makes an HTTP call.
   missing automatic QMIGRAT1 is retained as missing coverage, not a successful
   allocation check. Include nontrivial quality-flag values stored as strings.
 
-- [ ] **Step 2: Run tests red and implement the aggregate acceptance checks.**
+- [x] **Step 2: Run tests red and implement the aggregate acceptance checks.**
 
   Compare definition requested names, DDI names, raw header and actual Parquet
   ordered schema. Record required detailed variables, actual Q flags and
@@ -658,7 +662,7 @@ parsed metadata and Task 3's public catalog, never makes an HTTP call.
   variable_inventory.parquet, sample_counts.parquet, flag_coverage.parquet.
   Include extract/source/set keys in each. No person identifier is an output.
 
-- [ ] **Step 3: Run green and commit.**
+- [x] **Step 3: Run green and commit.**
 
   Run test_ipums_acceptance.py and Task 2's tests.
   Commit message: feat(ipums): measure accepted variables and delivered sample composition.
@@ -690,7 +694,7 @@ their three test modules. Keep these pure measurement units separate.
   from Task 2's original-converter scan, which must preserve the historical
   Parquet dtypes for parity.
 
-- [ ] **Step 1: Write failing storage and scheme tests.**
+- [x] **Step 1: Write failing storage and scheme tests.**
 
   Use raw lexical CSV fixtures with 123.4500 and 0.0000 under dcml=4;
   an integer ACS replicate under dcml=0; helper REPWTP; an automatic household
@@ -715,7 +719,7 @@ their three test modules. Keep these pure measurement units separate.
   malformed values into valid codes. Preserve the original delivered code and
   source dictionary meaning.
 
-- [ ] **Step 2: Write failing handwritten totals tests.**
+- [x] **Step 2: Write failing handwritten totals tests.**
 
   ACS fixture: state 01 civilian employment 100 in 2023 and 140 in 2024,
   plus military weight 900 and an under-16 record. Annual outputs are 100/140;
@@ -729,11 +733,13 @@ their three test modules. Keep these pure measurement units separate.
   is +100, relative gap 100/1900. Zero/missing published levels retain null
   relative gaps with an explicit reason, not infinity or a fabricated zero.
 
-- [ ] **Step 3: Run all three test modules red.**
+- [x] **Step 3: Run all three test modules red.**
 
   Preserve missing-module or failed-contract evidence before implementation.
 
-- [ ] **Step 4: Implement storage diagnostics and explicit scale evidence.**
+- [x] **Step 4: Implement storage diagnostics and explicit scale evidence.**
+
+  > Deviation: Added scan_numeric_csv as an explicit exact-Decimal measurement interface; historical converter scans retain their original dtypes for full ordered parity. Callers own decompressed-CSV lifetime. Industry lexical diagnostics use a separate String scan so CPS normalization cannot hide short delivered strings.
 
   Scan weight columns as strings from raw CSV for counts with explicit decimal
   points, lexical precision, null/blank/non-numeric values and ranges; use
@@ -764,7 +770,7 @@ their three test modules. Keep these pure measurement units separate.
   cross-sectional monthly employment weights. No new weight column is written
   into existing Parquets. Publish weight_diagnostics.parquet and weight_rules.json.
 
-- [ ] **Step 5: Implement scheme and totals measurements.**
+- [x] **Step 5: Implement scheme and totals measurements.**
 
   Publish industry_frequencies.parquet for IND and INDLY by ASEC YEAR, with
   frequencies, documented special status, each list's membership and label.
@@ -797,7 +803,7 @@ their three test modules. Keep these pure measurement units separate.
   October 2025 separate from zero and distinguish the mutable reference
   snapshot from the historical delivered extracts.
 
-- [ ] **Step 6: Run green, document M2 evidence and commit.**
+- [x] **Step 6: Run green, document M2 evidence and commit.**
 
   Run the three new test modules, Tasks 2–4 tests and ruff.
   Commit message: feat(ipums): measure weight storage industry vintages and employment gaps.
@@ -830,7 +836,7 @@ embedding-data ipums verify RUN_ID --outputs-sha256 SHA256 --data-dir ROOT
 embedding-data ipums compare-runs FIRST_ID SECOND_ID --data-dir ROOT
 ~~~
 
-- [ ] **Step 1: Write the complete synthetic raw-to-report test red.**
+- [x] **Step 1: Write the complete synthetic raw-to-report test red.**
 
   Seed all five profiles with tiny manifested definitions/DDI/gzip CSV,
   independently converted or deliberately corrupted Parquets and public
@@ -839,7 +845,9 @@ embedding-data ipums compare-runs FIRST_ID SECOND_ID --data-dir ROOT
   measure/verify/replay. Assert exact handwritten sample/variable/weight/
   scheme/totals results, not merely that files exist.
 
-- [ ] **Step 2: Implement explicit selections and software provenance.**
+- [x] **Step 2: Implement explicit selections and software provenance.**
+
+  > Deviation: The public selection uses the approved delivery/parquet shape; an initial delivery_id input was corrected before review. Internal frozen provenance keeps delivery_id. Git labels remain informational; executing file hashes bind the runs.
 
   The selection file is an object mapping each exact source/set to its delivery
   ID and derived relative path. Require exactly the five selected profiles;
@@ -856,7 +864,7 @@ embedding-data ipums compare-runs FIRST_ID SECOND_ID --data-dir ROOT
   whole mutable raw manifest as an all-future-input gate; reverify selected
   entries and permit unrelated legitimate appends.
 
-- [ ] **Step 3: Implement bounded offline orchestration/publication.**
+- [x] **Step 3: Implement bounded offline orchestration/publication.**
 
   Verify selected citations, source/derived hashes and metadata before
   measurement. Check full ordered CSV/Parquet fidelity for every delivery.
@@ -878,7 +886,7 @@ embedding-data ipums compare-runs FIRST_ID SECOND_ID --data-dir ROOT
   An occupied final or staging name fails; a replay uses a fresh ID. Publish
   only aggregates, never temporary decompressed CSVs.
 
-- [ ] **Step 4: Add mutation and CLI-isolation tests; run green.**
+- [x] **Step 4: Add mutation and CLI-isolation tests; run green.**
 
   Mutate one raw byte, existing Parquet, selected reference, software inventory,
   output schema, output count, output byte and detached checksum separately.
@@ -888,7 +896,7 @@ embedding-data ipums compare-runs FIRST_ID SECOND_ID --data-dir ROOT
   Replay under identical inputs must equal the first run's ordered aggregate
   outputs. Different run metadata need not have equal physical hashes.
 
-- [ ] **Step 5: Run the complete repository checks and commit.**
+- [x] **Step 5: Run the complete repository checks and commit.**
 
   Record M3 and fix regressions before proceeding.
   Commit message: feat(ipums): publish reproducible offline extract verification runs.
@@ -899,7 +907,7 @@ embedding-data ipums compare-runs FIRST_ID SECOND_ID --data-dir ROOT
 README.md, CLAUDE.md, source spec, deferred items, roadmap and this plan only
 after the evidence/review gates below. No production microdata enter git.
 
-- [ ] **Step 1: Freeze the actual selection and before-state inventory.**
+- [x] **Step 1: Freeze the actual selection and before-state inventory.**
 
   Use /Users/lowell/Projects/embedding-data/data explicitly. Write a local
   gitignored selection JSON for the five delivery/path rows in Entry evidence.
@@ -917,7 +925,9 @@ after the evidence/review gates below. No production microdata enter git.
   table, using the same shape; the one-entry example is intentionally not a
   runnable production selection.
 
-- [ ] **Step 2: Acquire and inspect the actual public references.**
+- [x] **Step 2: Acquire and inspect the actual public references.**
+
+  > Deviation: Exact validated originals were imported because of BLS transport restrictions and the ACS key requirement, then cached acquisition was checked offline. Import times are proxies. Two additional official documentary sources resolve the stale 2025 appendix conflict; the fresh v3 snapshot preserves the earlier v2 snapshot unchanged.
 
   Execution deviation: the observed 2025 ASEC appendix contradiction requires the two supplemental industry documents above and a fresh v3 reference snapshot; preserve earlier v2 snapshots unchanged.
 
@@ -929,7 +939,9 @@ after the evidence/review gates below. No production microdata enter git.
   coding from harmonization; consult classification-codes and bls-data-context.
   Every claimed source fact in the finding cites the frozen original and URL.
 
-- [ ] **Step 3: Run production measurement and exact aggregate replay.**
+- [x] **Step 3: Run production measurement and exact aggregate replay.**
+
+  > Deviation: The initial pair exposed a parent-REPWTP acceptance false positive. A failing fixture, minimal correction and clean review preceded fresh selected _r2 runs. The initial pair remains immutable. Portable elapsed timing is recorded; peak memory was unavailable because the platform denied the kernel query.
 
   ~~~bash
   UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embedding-data ipums measure stage7_ipums_verification_20261015 --references stage7_ipums_references_20261015 --selection /Users/lowell/Projects/embedding-data/data/derived/ipums/stage7-selection.json --data-dir /Users/lowell/Projects/embedding-data/data
@@ -943,7 +955,7 @@ after the evidence/review gates below. No production microdata enter git.
   do not weaken full-file fidelity to a sample because the five-year file is
   large. Relevant software changes require new measured runs.
 
-- [ ] **Step 4: Independently reconcile the actual aggregates.**
+- [x] **Step 4: Independently reconcile the actual aggregates.**
 
   Use a small independent local script/read-only analysis to reconcile raw and
   derived row totals, observed sample/month partitions, exact 80/160 replicate
@@ -958,7 +970,7 @@ after the evidence/review gates below. No production microdata enter git.
   A successful fixture suite or matching two calls to the same flawed function
   is not this independent reconciliation.
 
-- [ ] **Step 5: Write the measured finding and resolve adoption gates.**
+- [x] **Step 5: Write the measured finding and resolve adoption gates.**
 
   The finding contains:
 
@@ -990,7 +1002,7 @@ after the evidence/review gates below. No production microdata enter git.
   missing evidence; do not resubmit automatically or mark the corrected
   definition as accepted before delivery evidence exists.
 
-- [ ] **Step 6: Apply evidence-backed source-spec and command documentation.**
+- [x] **Step 6: Apply evidence-backed source-spec and command documentation.**
 
   Replace only the five Stage 7 open-marker clauses with verified markers that
   cite the finding and the specific measured result. Keep their surrounding
@@ -1024,7 +1036,9 @@ after the evidence/review gates below. No production microdata enter git.
   legacy-version item with the verified nullable-reader contract and a pointer
   to this plan; never by rewriting immutable definitions.
 
-- [ ] **Step 7: Final checks, whole-branch review and completion protocol.**
+- [x] **Step 7: Final checks, whole-branch review and completion protocol.**
+
+  > Deviation: Provider model aliases were unavailable, so supported standard/capable GPT tiers and read-only reviewer contracts were used. The additional Codex CLI seat was skipped under its same-family rule. The sole final-review Minor was corrected and scoped re-review approved; no review finding remains open.
 
   Run all repository checks from the test strategy; resolve final review
   findings using receiving-code-review. Use requesting-code-review for the
@@ -1119,3 +1133,119 @@ merit a separate focused review. Preserve the measured adoption gates in Task 7.
 
 This plan is the zero-context execution handoff. No planning chat history,
 uncommitted private note or task in another chat is required to execute it.
+
+
+## Completion record
+
+All seven tasks, their implementation/review gates, actual five-delivery full-file
+measurement, detached verification, exact replay and independent reconciliation
+are complete. No implementation step was skipped. Setup reused the authorized
+worktree path and surviving branch after owner-authorized recreation; the exact
+approved plan was committed as 0876c65 before implementation. Decisions D1–D3
+remain the approvals of record. Supplemental primary-source discovery was an
+execution deviation within V6 verification, not a new owner decision. The
+conditional D1 R4.6 replacement was not applied: the actual four-cell matrix
+supports native 2022 for both fields in both years.
+
+The selected software was e0222e2; subsequent commits changed documentation only.
+The final whole-branch review covered a48149d..e050672; README defaults were
+corrected in 9a437b1 and scoped re-review reports Ready to merge: Yes. There are
+no remaining Critical, Important or Minor findings. The normal full coverage
+hook passed on the final correction, with Ruff, offline lock and both Behave
+scenarios also passing. Earlier coverage-only Hypothesis deadline flakiness in
+an unchanged ITA property was reproduced, retained in execution evidence and
+passed on normal retry; no deadline, hook or unrelated implementation changed.
+All final gates passed. Per-task and final review evidence is preserved locally
+under data/derived/ipums/verification-evidence/stage7_final_review_20261015;
+its inventory.json excludes itself and has detached SHA-256 `40918a98faa6771d9ce82886b84d70384ea3d8cb9d54c285a6ee9f64cc3f0793`.
+
+The actual [finding](../../findings/stage-7-ipums-extract-verification.md) records
+both selected run pins, the independent evidence pins, all source identities,
+13,437,460 ordered rows, 2,460 preserved files and exactly 56 new manifest
+records across the retained diagnostic and selected reference snapshots.
+Machine interpretation unknowns remain intact; evidence-backed manual adoption
+is recorded separately. No owner input remains necessary for Stage 7 storage
+or native-vintage adoption. The 2026 meaning of code 9890 is a later Stage 11
+category/mapping clarification, recorded in deferred items; it is not guessed.
+The earlier convert-if-absent and nullable legacy-version items are closed.
+Backlog health after closure and the one new Stage 11 item: 12 open, 4 ever
+closed (25% closure rate), none aged over 45 days; all open items are 0–14 days
+old and the oldest is 3 days. No volume or aged-tail triage threshold is met.
+
+This plan and Stage 7 are complete; branch integration remains an explicit
+owner choice under finishing-a-development-branch. The shared source spec stays
+live. No later roadmap stage was begun or reordered.
+
+## Handoff to later stages
+
+The durable [measured finding](../../findings/stage-7-ipums-extract-verification.md)
+and [source spec](../../embedding-evaluation-data-spec.md) are the authority for
+all consumers below. The selected reference is
+`stage7_ipums_references_20261015_r2` (parser v3, 27 originals); the selected runs
+are `stage7_ipums_verification_20261015_r2` and its `_replay` sibling. Their
+checksums, schemas and independent evidence inventories are in the finding.
+Always pass `/Users/lowell/Projects/embedding-data/data` explicitly. Old v2
+snapshots and diagnostic runs are immutable historical evidence and do not
+satisfy the current parser/software contract. Executing code/dependency changes
+require fresh measurement IDs; doc-only commits do not change frozen file hashes.
+
+- **Stage 8:** Consume the three verified ACS identities, full ordered schemas,
+  SAMPLE/MULTYEAR partitions and actual flag domains from the finding and
+  `variable_inventory`, `sample_counts` and `flag_coverage`. Reusable interfaces
+  are `ipums_ddi.read_definition/read_ddi`,
+  `ipums_acceptance.measure_acceptance` and
+  `ipums_verification_run.verify_bundle`; source files remain unchanged.
+  Under R3/R5/V11, preserve raw strings alongside mappings: INDNAICS is length 8
+  with widespread padding and alphabetic tokens; OCCSOC is length 6 with X-like
+  categories. Core QMIGRAT1 is String/all-null in 2023 and String 0/4 in 2024,
+  five-year is Int64 0/4, and vintage lacks it. Missing applicability remains
+  unavailable evidence. No ACS parser, PUMA allocation or V11 completion shipped.
+- **Stage 9:** Under R3/R7 and V7/V10, consume literal factor-1 CSV weight values,
+  per-variable exact diagnostics and the annual 2023/2024 and pooled civilian
+  resident age-16+ ACS comparison contexts. `ipums_weights.measure_weights` and
+  `scan_numeric_csv` supply Decimal38 scans at observed lexical scale;
+  `ipums_conversion.decompressed_csv` owns temporary-file lifetime. Keep that
+  scan separate from the original-converter fidelity scan. Negative replicate
+  values are legitimate and retained. Household and replicate designs are not
+  validated merely by PERWT employment agreement. Missing flags are not false.
+  No estimation, allocation, replicate-SE or target helper shipped.
+- **Stage 10:** No new ITA behavior is introduced. The finding's preserved Stage
+  2–6 source/bundle hashes and existing target contracts stand. Stage 7 helpers
+  and IPUMS coverage are not authority to rebuild, change ITA eligibility, or
+  amend R2/R7/V12 behavior.
+- **Stage 11:** Under R4/R5/R7, consume the explicit IND/INDLY × 2025/2026 native
+  2022 matrix, full official 2017/2022 leaves and separately documented specials.
+  `ipums_references.parse_industry_list/parse_industry_metadata` and
+  `check_references` are reusable; the additional Jan-2025 Census PDF and IPUMS
+  2025-onward codebook are documentary originals, not a completed microdata parser.
+  Shared code membership alone never proves vintage. Keep raw short numeric
+  strings distinct from required normalized four-character storage. The machine
+  frequency helper intentionally leaves native_vintage unknown; the finding
+  supplies reviewed documentary adoption. Preserve 9890 outside-list status;
+  its 2026 meaning is the new `7-ipums-extract-verification` deferred item.
+  Any native-vintage concordance remains candidate-set work if later inputs
+  require it; none was built here. Preserve EMPSAME/ACTSAME reversed category
+  numbering, NIU/refused/unknown states, the three MISH-universe exceptions and
+  missing linkage weights before building links. WTFINL gaps retain composite
+  estimator, publication revision and population-control limits; October 2025
+  is absent, never zero. No linkage, flow, CPS parser or SE helper shipped.
+- **Stage 12:** Consume verified current/ASEC variables and weight coverage only
+  through later Stage 9/11 helpers. QOCCLY exists but QINDLY does not; missing
+  flags never imply unallocated status. ACS and CPS QMIGRAT1 codes/types differ.
+  Under R4/R7, 9890 and other documented special/unknown states need explicit
+  treatment before eligibility or targets. No metro eligibility, panel-link
+  success, job-change rate, causal result or SE is inherited from this stage.
+- **Stage 13:** Consume the selected physical inventories, exact ordered replay,
+  independent aggregate checks and the scoped V4–V7/V10 closures. Use
+  `ipums_verification_run.verify_bundle(directory, data_dir,
+  expected_outputs_sha256=...)` for detached trust;
+  `compare_runs(first, second)` establishes logical repeatability rather than
+  external trust. Source versions, unknown legacy API versions, DDI/dataset/client
+  versions and mutable publication vintages remain separate. R7/R8, citations,
+  comparators, V9 and full V12 family construction remain later work. These are
+  verification diagnostics, with no coverage-to-accuracy inference and no
+  permission to use evaluation targets in embedder training or model selection.
+
+At the subsequent resume, derive-roadmap revalidates/amends later roadmap
+Consumes against this handoff. This execution only ticks Stage 7 and does not
+plan Stage 8 or change the stage partition. **Next: resume the roadmap.**
