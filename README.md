@@ -21,9 +21,10 @@ The `codes` command builds NAICS 2022 and SOC 2018 classification graphs, full
 NAICS concordances, candidate mappings and filing-universe diagnostics in a
 separate immutable ITA bundle. The [measured V11 finding](specs/findings/v11-ita-naics-mapping.md)
 records the full-data run and its unresolved source codes. Geography references and
-the shared target writer are implemented. The reviewed ITA assignment and 2023
-area-mix commands below await production acceptance. PUMA allocation, ACS/CPS
-code parsers, person-month linkage and other target families remain planned. Raw downloads are recorded in
+the shared target writer are implemented. The [measured Stage 6 finding](specs/findings/stage-6-ita-area-mix-build.md)
+records full-data ITA assignment, the 2023 area-mix target and exact cached replay.
+PUMA allocation, ACS/CPS code parsers, person-month linkage and other target
+families remain planned. Raw downloads are recorded in
 `data/raw/manifest.jsonl`.
 The OSHA case-detail files are acquired but feed no target; the specification's
 establishment data are the Form 300A summaries.
@@ -143,15 +144,22 @@ request IDs and source-row mappings are unchanged. The wire bytes double literal
 backslashes; requests without them remain byte-identical. The measured prior request
 inventory contains 42 literal backslashes across 29 batches.
 
-The new software requires the fresh `_1000_csv` preparation above after review.
-Preserve both `stage6_ita_assignment_20261014` and
+The selected production run uses the fresh `_1000_csv` preparation above.
+These are the commands that produced it; the existing immutable run names must not
+be overwritten or rerun as new preparations. Preserve both
+`stage6_ita_assignment_20261014` and
 `stage6_ita_assignment_20261014_1000`, including the latter's 283 completed raw batches,
 with their original software and bytes. Never edit or reinterpret those frozen runs,
 or import cached or diagnostic responses into the new acquisition. The measured
-1,113,538 distinct requests imply 1,114 expected batches (1,113 of 1,000 plus 538),
-not completed calls; verify the new preparation before acquiring. Sequential execution,
+1,113,538 distinct requests produced 1,114 completed fresh batches (1,113 of 1,000
+plus 538); these are batch counts, not total HTTP calls. Sequential execution,
 Current options, the 600-second timeout and explicit verified resume are unchanged.
-Production acceptance, full ordered replay, QA and the measured finding remain pending.
+The [measured finding](specs/findings/stage-6-ita-area-mix-build.md) records the exact
+preparation/first/replay detached pins, source and software inventories, 3,206,055
+preserved source rows, 126,958 target cells and 324,191 eligible 2023 records.
+Both public verifiers and exact ordered four-table replay passed; the 3,069 county
+denominators include four zero-eligible counties with no target cells. Final
+repository checks and reviews are tracked separately in that finding.
 
 Run IDs are immutable: occupied final or `.part` names fail. Inspect interrupted
 staging and choose an explicit fresh ID; never overwrite an existing run. Selected
@@ -294,8 +302,8 @@ separate from coverage. The corrected evidence run is `v1_v3_20261013_scopefix`,
 replaying the original cached responses with their original receipts.
 Ambiguous, unmatched, scope and vintage results
 remain flagged. The finding reports raw and weighted sample evidence, not county
-accuracy or a full-table assignment; targets and full production assignment remain
-planned.
+accuracy or a full-table assignment. The separate [Stage 6 production finding](specs/findings/stage-6-ita-area-mix-build.md)
+records the later full-table assignment and conditional 2023 target.
 
 ## ACS extracts
 

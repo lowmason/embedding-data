@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-Builds aggregate evaluation targets for industry (NAICS), occupation (SOC), and geography embeddings from three sources: OSHA ITA Form 300A summaries, ACS via IPUMS USA, and CPS via IPUMS CPS. `specs/embedding-evaluation-data-spec.md` is the source of truth. So far the IPUMS extract scripts (define → submit → download → CSV-to-Parquet), the OSHA Form 300A summary acquisition with its stacked establishment-year table, and an OSHA case-detail download (download → CSV-to-Parquet) exist; every raw file is recorded in an append-only manifest (`data/raw/manifest.jsonl`); canonical NAICS/SOC graphs, NAICS concordances, ITA candidate mapping and filing-universe diagnostics are built. Geography reference bundles now supply the complete 2025 county inventory, July 2023 metropolitan/micropolitan membership and 2025Q4 HUD eligibility; the reviewed Stage 6 commands implement full establishment assignment, a 2023 ITA area-mix target and the shared target writer, pending production acceptance. PUMA allocation, ACS/CPS code parsers and other target families remain planned.
+Builds aggregate evaluation targets for industry (NAICS), occupation (SOC), and geography embeddings from three sources: OSHA ITA Form 300A summaries, ACS via IPUMS USA, and CPS via IPUMS CPS. `specs/embedding-evaluation-data-spec.md` is the source of truth. So far the IPUMS extract scripts (define → submit → download → CSV-to-Parquet), the OSHA Form 300A summary acquisition with its stacked establishment-year table, and an OSHA case-detail download (download → CSV-to-Parquet) exist; every raw file is recorded in an append-only manifest (`data/raw/manifest.jsonl`); canonical NAICS/SOC graphs, NAICS concordances, ITA candidate mapping and filing-universe diagnostics are built. Geography reference bundles now supply the complete 2025 county inventory, July 2023 metropolitan/micropolitan membership and 2025Q4 HUD eligibility; the Stage 6 commands have measured full-data ITA assignment, a 2023 ITA area-mix target and exact cached replay through the shared target writer; the selected data acceptance is recorded in `specs/findings/stage-6-ita-area-mix-build.md`. PUMA allocation, ACS/CPS code parsers and other target families remain planned.
 
 ## Commands
 
@@ -147,11 +147,18 @@ preserve the original `stage6_ita_assignment_20261014` and its acquisition contr
 their original frozen software contract. Execution correction D5 also preserves
 `stage6_ita_assignment_20261014_1000` and its 283 completed raw batches. Stage 6's CSV
 writer and validator now use backslash escaping with doubled quotes, preserving all
-logical strings and IDs; Stage 3 is unchanged. After review, use fresh preparation
-`stage6_ita_assignment_20261014_1000_csv` and targets
-`stage6_ita_area_mix_20261014_1000_csv` / `_replay`. Expect 1,114 batches, not completed
-calls. Do not edit old frozen requests or import old/diagnostic responses. All production
-acceptance, ordered replay, QA and measured-finding requirements remain pending.
+logical strings and IDs; Stage 3 is unchanged. The selected preparation is
+`stage6_ita_assignment_20261014_1000_csv`, with targets
+`stage6_ita_area_mix_20261014_1000_csv` / `_replay`. The
+[measured production finding](specs/findings/stage-6-ita-area-mix-build.md) records
+all detached input/output pins and frozen inventories: 1,114 completed fresh batches
+for 1,113,538 distinct tuples, 3,206,055 ordered source records, and 126,958 target
+cells supported by 324,191 eligible 2023 records. Both public verifiers, exact
+ordered four-table replay, independent support reconciliation and the whole-tree
+audit passed. The 3,069 denominator counties include four with zero eligible
+support and no target cells. These are measured data gates; final repository
+checks/reviews and completion protocol are tracked separately in the finding.
+Do not edit old frozen requests or import old/diagnostic responses.
 
 The seven-file target bundle preserves all-year source order and duplicate
 multiplicity while estimating native-2022 submitted-record shares for 2023 only.
@@ -163,8 +170,9 @@ Coverage does not validate accuracy or representativeness. Keep source summary,
 prior verification/code/geography bundles and manifested originals unchanged;
 never call upstream builders or `sample` to prepare this stage. Occupied run and
 staging names require inspection and a fresh selection, never overwrite. Relevant
-software/dependency changes invalidate preparation/resume. Production acceptance
-must be measured separately from the V12 fixture; later families and V9 remain planned.
+software/dependency changes invalidate preparation/resume. The nonfixture production
+measurement is separate from the 21-row/five-eligible V12 readiness fixture;
+later families and V9 remain planned.
 
 **Test seams.** Tests and Behave steps patch the module-level `IpumsApiClient` (autospec) and `DOTENV_PATH` with `patch.object`, so both must remain module globals looked up at call time. OSHA tests patch `make_client` with a `partial` that injects an `httpx.MockTransport`; fake responses must use `stream=httpx.ByteStream(...)`, because a `content=` body is preloaded and leaves `num_bytes_downloaded` at 0. OSHA summary tests serve the recorded ITA page `tests/fixtures/osha/itadata.html` and bodies from `tests/ita_fixtures.year_file`, one per published file format; `write_release` places and records a raw summary file. The `cli_runner` fixture in `tests/conftest.py` removes `IPUMS_API_KEY` from the environment. The root `.env` holds a real key: a new test that does not patch both `DOTENV_PATH` and `IpumsApiClient` can load it and make live IPUMS requests. Every command test must also pass `--data-dir` (the `data_directory` fixture): `--data-dir` defaults to the real `data/` tree through a Typer default bound at import, so patching `paths.DATA_DIR` cannot redirect it, and a stray test would write fake extracts into `data/raw` and append fake entries to the append-only manifest.
 
