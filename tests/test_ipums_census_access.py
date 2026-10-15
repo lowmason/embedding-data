@@ -384,3 +384,96 @@ def test_preflight_refuses_data_tree_before_credential_access(tmp_path, monkeypa
     with pytest.raises(ValueError, match='production data tree'):
         module.preflight(tmp_path / 'data' / 'new')
     assert not (tmp_path / 'data').exists()
+
+
+def encoded_echo(encoding):
+    unicode_key = ''.join(f'\\u{ord(character):04x}' for character in SENTINEL)
+    mixed_unicode = ''.join(f'\\u{ord(character):04x}' if index % 2 else character
+                            for index, character in enumerate(SENTINEL))
+    percent_key = ''.join(f'%{ord(character):02x}' for character in SENTINEL)
+    mixed_percent = ''.join(f'%{ord(character):02X}' if index % 2 else character
+                            for index, character in enumerate(SENTINEL))
+    decimal_key = ''.join(f'&#{ord(character)};' for character in SENTINEL)
+    hex_key = ''.join(f'&#x{ord(character):X};' for character in SENTINEL)
+    mixed_html = ''.join(f'&#x{ord(character):x};' if index % 2 else character
+                         for index, character in enumerate(SENTINEL))
+    mixed_url_html = ''.join(f'%{ord(character):02x}' if index % 2
+                             else f'&#{ord(character)};'
+                             for index, character in enumerate(SENTINEL))
+    cases = {
+        'json_unicode_value': '{"error":"key=' + unicode_key + '"}',
+        'json_unicode_key': '{"' + unicode_key + '":"refused"}',
+        'json_mixed_value': '{"error":"key=' + mixed_unicode + '"}',
+        'json_duplicate_value': '{"error":"' + unicode_key + '","error":"safe"}',
+        'json_nested_value': '["safe",{"error":["' + unicode_key + '"]}]',
+        'url_percent': 'key=' + percent_key,
+        'url_mixed': 'key=' + mixed_percent,
+        'html_decimal': '<p>key=' + decimal_key + '</p>',
+        'html_hex': '<p>key=' + hex_key + '</p>',
+        'html_mixed': '<p>key=' + mixed_html + '</p>',
+        'mixed_url_html': 'key=' + mixed_url_html,
+        'json_url_value': json.dumps({'error': mixed_percent}),
+    }
+    return cases[encoding].encode()
+
+
+@pytest.mark.parametrize('operation', ['preflight', 'acquire'])
+@pytest.mark.parametrize('encoding', [
+    'json_unicode_value', 'json_unicode_key', 'json_mixed_value', 'json_duplicate_value',
+    'json_nested_value', 'url_percent', 'url_mixed', 'html_decimal', 'html_hex',
+    'html_mixed', 'mixed_url_html', 'json_url_value'])
+def test_equivalent_encoded_echo_never_written_or_recorded(tmp_path, monkeypatch, caplog,
+                                                           operation, encoding):
+    echoed = encoded_echo(encoding)
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        logging.getLogger('httpcore.connection').debug('response %s', echoed)
+        return httpx.Response(200, content=echoed)
+
+    module = install_transport(monkeypatch, handler)
+    monkeypatch.setenv('CENSUS_API_KEY', SENTINEL)
+    monkeypatch.setattr(references, 'REGISTRY', {
+        kind: references.REGISTRY[kind] for kind in KINDS})
+    monkeypatch.setattr(references, 'make_client', lambda: httpx.Client(
+        transport=httpx.MockTransport(forbidden)))
+    caplog.set_level(logging.DEBUG)
+    output = tmp_path / 'encoded'
+    if operation == 'preflight':
+        safe_failure(lambda: module.preflight(output))
+    else:
+        safe_failure(lambda: references.acquire(tmp_path, 'encoded'))
+        output = tmp_path / 'raw/references/ipums-verification/encoded.part'
+    assert output.is_dir()
+    assert not list(output.iterdir())
+    assert not (tmp_path / 'raw/manifest.jsonl').exists()
+    assert not list(tmp_path.rglob('metadata.json'))
+    assert not list(tmp_path.rglob('receipt.json'))
+    assert len(calls) == 1
+    assert SENTINEL not in caplog.text
+    assert echoed.decode() not in caplog.text
+
+
+def test_safe_encoded_text_preserves_original_bytes_and_hash(tmp_path, monkeypatch):
+    import hashlib
+    original = b'{"display":"\\u0041 %42 &#67;","nested":{"public":"value"}} \n'
+    module = install_transport(monkeypatch, lambda _: httpx.Response(200, content=original))
+    monkeypatch.setenv('CENSUS_API_KEY', SENTINEL)
+    output = module.preflight(tmp_path / 'safe-encoded')
+    metadata = json.loads((output / 'metadata.json').read_text())
+    for kind in KINDS:
+        record = metadata['originals'][kind]
+        assert (output / record['filename']).read_bytes() == original
+        assert record['sha256'] == hashlib.sha256(original).hexdigest()
+        assert record['size_bytes'] == len(original)
+
+
+def test_json_echo_inspection_work_is_bounded_and_fails_closed(tmp_path, monkeypatch):
+    original = json.dumps(['public'] * 5).encode()
+    module = install_transport(monkeypatch, lambda _: httpx.Response(200, content=original))
+    monkeypatch.setattr(module, 'MAX_ECHO_INSPECTION_ITEMS', 4)
+    monkeypatch.setenv('CENSUS_API_KEY', SENTINEL)
+    output = tmp_path / 'bounded-inspection'
+    safe_failure(lambda: module.preflight(output))
+    assert not list(output.iterdir())

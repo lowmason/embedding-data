@@ -12,7 +12,7 @@ import warnings
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-from urllib.parse import quote, quote_plus
+from urllib.parse import quote, quote_plus, unquote, unquote_plus
 
 import httpx
 from dotenv import dotenv_values
@@ -24,6 +24,7 @@ ACS_QUERIES = {
         f'https://api.census.gov/data/{year}/acs/acs1?get=NAME,B23025_004E&for=state:*',
         f'acs_{year}_employment.json') for year in (2023, 2024)}
 MAX_ORIGINAL_BYTES = 32 * 1024 * 1024
+MAX_ECHO_INSPECTION_ITEMS = 100_000
 
 
 @contextmanager
@@ -72,11 +73,40 @@ def make_client():
                         headers={'User-Agent': USER_AGENT}, event_hooks={})
 
 
+def _text_contains_echo(text, credential):
+    # Fixed inspection passes: raw, URL/form decoding and HTML entities in either
+    # order. Never repeatedly decode until stable or rewrite the original bytes.
+    for decoded in (text, unquote(text), unquote_plus(text)):
+        if credential in decoded or credential in html.unescape(decoded):
+            return True
+    html_text = html.unescape(text)
+    return credential in unquote(html_text) or credential in unquote_plus(html_text)
+
+
 def _reject_echo(body, credential):
     spellings = (credential, quote(credential, safe=''), quote_plus(credential, safe=''),
                  json.dumps(credential, ensure_ascii=True)[1:-1], html.escape(credential))
-    if any(spelling.encode('utf-8') in body for spelling in spellings):
+    if (any(spelling.encode('utf-8') in body for spelling in spellings)
+            or _text_contains_echo(body.decode('utf-8', errors='replace'), credential)):
         raise ValueError('credential echoed by response')
+    try:
+        # Retain every object pair, including duplicate fields which a dict would
+        # discard. This is security inspection of strings, not an ACS parser.
+        pending = [json.loads(body, object_pairs_hook=list)]
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return
+    inspected = 0
+    while pending:
+        if inspected >= MAX_ECHO_INSPECTION_ITEMS:
+            raise ValueError('response exceeds security inspection bound')
+        value = pending.pop()
+        inspected += 1
+        if isinstance(value, str) and _text_contains_echo(value, credential):
+            raise ValueError('credential echoed by response')
+        if isinstance(value, (list, tuple)):
+            if len(pending) + len(value) > MAX_ECHO_INSPECTION_ITEMS - inspected:
+                raise ValueError('response exceeds security inspection bound')
+            pending.extend(value)
 
 
 def fetch_original(kind: str, url: str, credential: str) -> bytes:
