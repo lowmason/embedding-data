@@ -324,7 +324,7 @@ def measure_acceptance(definition: dict, ddi: dict, frame: pl.LazyFrame, source:
         unexpected_count.cast(pl.UInt64).alias('selection_unexpected_rows'),
     ).collect().row(0, named=True)
     observed_replicates = {name for name in set(schema) | set(ddi_names)
-                           if name.startswith('REPWTP')}
+                           if name.startswith('REPWTP') and name != 'REPWTP'}
     status = {
         **keys, **selection_counts,
         'raw_header_parity': 'external_required',

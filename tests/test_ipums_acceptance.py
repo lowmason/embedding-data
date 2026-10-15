@@ -160,7 +160,7 @@ def test_exact_replicate_range_never_accepts_parent_or_extra(source, set_name, m
     result = measure(args)
     assert result['status']['status'] == 'fail'
     assert result['status']['replicates_missing'] == [missing]
-    assert result['status']['replicates_unexpected'] == ['REPWTP', extra]
+    assert result['status']['replicates_unexpected'] == [extra]
 
 
 @pytest.mark.parametrize('source,set_name,variable', [
@@ -384,3 +384,44 @@ def test_unrequested_interior_month_is_reported_without_inventing_catalog_availa
     assert status['periods_not_requested'] == ['2025-02']
     assert status['periods_absent'] == ['2025-02']
     assert status['status'] == 'pass'
+
+
+@pytest.mark.parametrize('source,set_name', [
+    ('acs', 'core'), ('acs', 'vintage'), ('acs', 'five_year'), ('cps', 'asec'),
+])
+def test_delivered_parent_helper_is_separate_from_complete_numbered_replicates(source, set_name):
+    args = list(delivery(source, set_name))
+    args[1]['variables'].append({
+        'name': 'REPWTP', 'label': 'Replicate weight helper', 'implied_decimals': 0,
+        'categories': [], 'instructions': [],
+    })
+    args[2] = args[2].with_columns(pl.lit(1).alias('REPWTP'))
+    result = measure(args)
+    assert result['status']['status'] == 'pass'
+    assert result['status']['replicates_missing'] == []
+    assert result['status']['replicates_unexpected'] == []
+    assert result['status']['ddi_parquet_order_equal'] is True
+    helper = result['variable_inventory'].filter(pl.col('variable').eq('REPWTP'))
+    assert helper.select('requested', 'required', 'replicate', 'in_ddi', 'in_parquet').rows() == [
+        (True, False, False, True, True),
+    ]
+    args[2] = args[2].select('REPWTP', pl.exclude('REPWTP'))
+    reordered = measure(args)['status']
+    assert reordered['ddi_parquet_order_equal'] is False
+    assert reordered['status'] == 'fail'
+
+
+@pytest.mark.parametrize('source,set_name', [('acs', 'core'), ('cps', 'asec')])
+@pytest.mark.parametrize('unexpected', ['REPWTPunknown', 'REPWTP0', 'REPWTP161'])
+def test_unknown_or_out_of_range_replicate_suffix_still_fails(source, set_name, unexpected):
+    args = list(delivery(source, set_name))
+    args[1]['variables'].append({
+        'name': unexpected, 'label': 'Unexpected replicate name', 'implied_decimals': 0,
+        'categories': [], 'instructions': [],
+    })
+    args[2] = args[2].with_columns(pl.lit(1).alias(unexpected))
+    status = measure(args)['status']
+    assert status['ddi_parquet_order_equal'] is True
+    assert status['replicates_missing'] == []
+    assert status['replicates_unexpected'] == [unexpected]
+    assert status['status'] == 'fail'
