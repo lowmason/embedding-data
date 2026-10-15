@@ -360,6 +360,16 @@ def _filenames(kinds):
     return names
 
 
+def _require_unrecorded_snapshot(data_dir, final):
+    manifest_file = paths.manifest_path(data_dir)
+    expected_paths = {(final / name).relative_to(manifest_file.parent).as_posix()
+                      for name in _filenames(REGISTRY)}
+    recorded_paths = {entry.path for entry in manifest.read_manifest(manifest_file)}
+    if expected_paths & recorded_paths:
+        raise ValueError(f'{final.name}: manifest-recorded reference paths require restoration; '
+                         'use a fresh reference ID')
+
+
 def _request_record(kind, retrieved_at, *, imported):
     reference = REGISTRY[kind]
     return {'source_url': reference.url, 'method': reference.method,
@@ -497,6 +507,7 @@ def acquire(data_dir: Path, reference_id: str) -> Path:
     if gr.occupied(final):
         check_references(data_dir, reference_id)
         return final
+    _require_unrecorded_snapshot(data_dir, final)
     _, staging = target_io.stage(final.parent, reference_id, data_dir)
     originals = {}
     with make_client() as client:
@@ -538,6 +549,7 @@ def import_reference(data_dir: Path, reference_id: str, kind: str, original: Pat
     final, staging = _snapshot_paths(data_dir, reference_id)
     if gr.occupied(final):
         raise ValueError('occupied snapshot; completed references are immutable')
+    _require_unrecorded_snapshot(data_dir, final)
     state_file = staging / 'import-state.json'
     if gr.occupied(staging):
         if not state_file.is_file():

@@ -2,6 +2,7 @@
 
 import importlib
 import json
+import shutil
 from pathlib import Path
 
 import httpx
@@ -461,3 +462,49 @@ def test_industry_refuses_changed_documented_special_label(tmp_path):
     ])
     with pytest.raises(ValueError, match='special'):
         references().parse_industry_list(file, 2017)
+
+
+@pytest.mark.parametrize('operation', ['acquire', 'import'])
+@pytest.mark.parametrize('retained_manifest', ['all_originals', 'request_body_only'])
+def test_recorded_missing_snapshot_refused_before_staging_and_client(tmp_path, monkeypatch,
+                                                                   operation, retained_manifest):
+    module = references()
+    kinds = ['bls_series_metadata', 'bls_a1_metadata', 'cps_employment']
+    monkeypatch.setattr(module, 'REGISTRY', {kind: module.REGISTRY[kind] for kind in kinds})
+    originals = tmp_path / 'official-fixtures'
+    originals.mkdir()
+    bls_documents(originals)
+    response = Path(__file__).parent / 'fixtures/ipums/bls-employment-v1.json'
+    imported = originals / 'levels.json'
+    imported.write_bytes(response.read_bytes())
+
+    def handler(request):
+        if request.method == 'POST':
+            return httpx.Response(200, content=response.read_bytes())
+        name = ('bls_series_metadata.txt' if 'ln.series' in str(request.url)
+                else 'bls_a1_metadata.html')
+        return httpx.Response(200, content=(originals / name).read_bytes())
+
+    install_transport(monkeypatch, module, handler)
+    completed = module.acquire(tmp_path, 'recorded')
+    receipt = module.check_references(tmp_path, 'recorded')
+    manifest_file = paths.manifest_path(tmp_path)
+    if retained_manifest == 'request_body_only':
+        request_entries = [entry for entry in receipt['raw_citations']
+                           if entry['path'].endswith('/cps_employment.request.json')]
+        assert len(request_entries) == 1
+        manifest_file.write_text(json.dumps(request_entries[0]) + '\n')
+    recorded_bytes = manifest_file.read_bytes()
+    shutil.rmtree(completed)
+    staging = completed.with_name('recorded.part')
+    monkeypatch.setattr(module, 'make_client', no_client)
+
+    with pytest.raises(ValueError, match='recorded.*restor'):
+        if operation == 'acquire':
+            module.acquire(tmp_path, 'recorded')
+        else:
+            module.import_reference(tmp_path, 'recorded', 'cps_employment', imported)
+
+    assert not completed.exists()
+    assert not staging.exists()
+    assert manifest_file.read_bytes() == recorded_bytes
