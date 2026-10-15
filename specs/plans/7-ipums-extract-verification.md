@@ -51,8 +51,20 @@ Stage boundaries:
 
 - Use the five 2026-10-12 deliveries. V5 uses those real submissions, definitions,
   delivered DDI and headers; do not submit new extracts to repeat acceptance.
-- Public-reference acquisition is explicit and uses no authentication. Offline
-  commands neither load the root .env nor create an IPUMS client.
+- Public-reference acquisition is explicit. D3 permits a Census API key only
+  for the two registered 2023/2024 ACS B23025_004E public aggregate queries.
+  All other public references remain unauthenticated. Offline commands neither
+  read Census credentials, load the root .env nor create an IPUMS client.
+- D3 secret handling: accept Census credentials only at explicit acquisition
+  runtime through CENSUS_API_KEY or a hidden local prompt. Do not put key values
+  in chat, command arguments, files, logs, exception output, manifests, receipts,
+  request inventories or hashes. Provenance retains the exact registered query
+  without its authentication parameter. Disable credential-bearing HTTP logging,
+  suppress unsanitized transport exception chains, refuse redirects and reject
+  any response that echoes the key before writing bytes. No root .env loading.
+  A standalone public-only preflight helper may acquire the two original JSON
+  responses into exclusively owned temporary storage for actual layout inspection;
+  this does not satisfy full-registry or production acceptance gates.
 - Do not call ACS/CPS acquisition, OSHA, build_summary_table, verification sample,
   or any Stage 4–6 builder to prepare this stage.
 - Leave the raw originals, existing derived Parquets and Stage 2–6 artifacts
@@ -79,6 +91,16 @@ Stage boundaries:
 - **D2** (owner, execution handoff, 2026-10-15): "Handoff prompt for new session."
   Execute the approved plan via subagent-driven-development in a fresh
   session. Applied in: execution entry and Self-review and execution handoff.
+- **D3** (owner, execution amendment, 2026-10-15): "Amend the plan to allow
+  a Census API key for those two public ACS queries. Help me configure access
+  without exposing the key in logs or provenance, keep verification offline,
+  then continue Stage 7." Approved exception: only the exact registered
+  acs_2023_employment and acs_2024_employment queries may receive a runtime Census
+  key. Add a small dedicated acquisition-only transport/prompt module and tests
+  as needed; inspect actual successful originals before implementing the ACS
+  parser. Add safe local-entry documentation. Preserve all earlier raw/data,
+  offline verification, source inspection and measured adoption requirements.
+  Applied in: Global Constraints, Task 3 acquisition and Task 6 CLI isolation.
 
 ---
 
@@ -455,6 +477,8 @@ test_ipums_ddi.py and test_ipums_parity.py. Reuse Task 1's scanner/decompression
 
 **Files:** Create ipums_references.py and test_ipums_references.py; add small
 public-layout fixtures to tests/ipums_fixtures.py or tests/fixtures/ipums/.
+D3 adds ipums_census_access.py, test_ipums_census_access.py and safe access
+instructions in README.md for acquisition-only credential handling.
 
 **Interfaces:**
 
@@ -506,8 +530,9 @@ Also snapshot the public metadata pages needed to interpret accepted variables,
 storage and source schemes. Keep a closed registry of explicit URL identities:
 USA PERWT, REPWTP and the B23025 group metadata; CPS WTFINL, EARNWT, LNKFW1MWT,
 ASECWT, REPWTP, IND, INDLY, UH_IND_A10, UH_INDLYR_A10, EMPSAME and ACTSAME.
-Their source locations are in the evidence appendix below. No authenticated
-page or IPUMS microdata endpoint is a fallback.
+Their source locations are in the evidence appendix below. D3 authorizes only
+runtime key authentication for the two registered ACS levels queries; no other
+authenticated page or IPUMS microdata endpoint is a fallback.
 
 - [ ] **Step 1: Inspect public layouts, then write failing parser/cache tests.**
 
@@ -540,6 +565,15 @@ page or IPUMS microdata endpoint is a fallback.
   source units of thousands. Do not fabricate the missing October 2025.
 
 - [ ] **Step 3: Implement explicit acquisition/import and receipts.**
+
+  D3: fetch the two ACS queries with a runtime Census key when required.
+  Keep their registered credential-free URLs as source identity; never persist
+  the wire URL containing the key. Cached checks/imports/measurement must work
+  with credential access forbidden. Test key scope, missing/invalid-key errors,
+  redirect refusal, echoed-key response rejection, transport/HTTP/exception/log
+  redaction and absence of the key from every output artifact. Local setup must
+  allow hidden entry without shell-history/argv/file/chat exposure. Document
+  official registration/activation and the safe public-original preflight flow.
 
   Use httpx with sequential requests, browser user agent where needed, bounded
   timeout and no blind retries. Write downloaded bytes to exclusively owned
