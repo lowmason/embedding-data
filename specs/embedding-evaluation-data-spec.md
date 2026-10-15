@@ -461,9 +461,10 @@ as flagged candidate sets. No relationship is resolved by picking one side.
 ### R6 — Geography hierarchy
 
 **R6.1** **Geography is two paths, not one chain.** Counties nest strictly in
-states, census divisions, and census regions. Counties also belong to CBSAs
-under the 2023 OMB delineations, which can cross state lines, and non-metro
-counties belong to no metropolitan area. Represent geography as node and edge
+states, census divisions, and census regions. Counties also belong to metropolitan
+or micropolitan CBSAs under the 2023 OMB delineations, which can cross state
+lines. Preserve the two CBSA types; counties outside both have no CBSA
+membership. *(owner, Stage 5 design, 2026-10-13)* Represent geography as node and edge
 tables with typed edges, never as a single tree. The non-tree structure is
 deliberate: it stress-tests hyperbolic embeddings that assume tree-like
 geometry. *(chosen; D)*

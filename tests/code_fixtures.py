@@ -127,7 +127,7 @@ def write_xlsx(file: Path, rows: list[list[str | None]]) -> None:
         )
 
 
-def seed_code_tree(data_dir: Path) -> dict[str, cr.Reference]:
+def seed_code_tree(data_dir: Path, *, include_summary: bool = True) -> dict[str, cr.Reference]:
     originals = data_dir / 'originals'
     originals.mkdir(parents=True)
     registry = dict(cr.REGISTRY)
@@ -179,41 +179,42 @@ def seed_code_tree(data_dir: Path) -> dict[str, cr.Reference]:
         )
         registry[kind] = replace(registry[kind], expected=1)
         cr.import_reference(data_dir, kind, file, registry=registry)
-    for year in (2022, 2023):
-        directory = paths.raw_dir(data_dir, 'osha') / 'summary' / str(year)
-        directory.mkdir(parents=True)
-        raw = directory / f'fixture_{year}.zip'
-        row = {name: 'Fixture' for name in ita_summary.TEXT_COLUMNS}
-        row.update(
-            year_filing_for=str(year),
-            id='1',
-            establishment_id='1',
-            establishment_type='1',
-            size='2',
-            annual_average_employees='30',
-            total_hours_worked='60000',
-            naics_code='111112',
-        )
-        if year >= 2023:
-            row['naics_year'] = '2017'
-        csv_text = io.StringIO()
-        writer = csv.DictWriter(csv_text, fieldnames=list(row))
-        writer.writeheader()
-        writer.writerows(
-            [row, row]
-        )  # Deliberate identical rows, not an accidental fixture duplicate.
-        with ZipFile(raw, 'w') as archive:
-            archive.writestr('fixture.csv', csv_text.getvalue())
-        entry = manifest.describe_file(
-            raw,
-            paths.manifest_path(data_dir).parent,
-            retrieved_at=datetime(2026, 10, 13, tzinfo=UTC),
-            client='fixture',
-            client_version='1',
-            source_url='https://www.osha.gov/fixture',
-        )
-        manifest.append_entries(paths.manifest_path(data_dir), [entry])
-    ita_summary.build_summary_table(
-        data_dir
-    )  # Fixture setup only; production code_build never calls this.
+    if include_summary:
+        for year in (2022, 2023):
+            directory = paths.raw_dir(data_dir, 'osha') / 'summary' / str(year)
+            directory.mkdir(parents=True)
+            raw = directory / f'fixture_{year}.zip'
+            row = {name: 'Fixture' for name in ita_summary.TEXT_COLUMNS}
+            row.update(
+                year_filing_for=str(year),
+                id='1',
+                establishment_id='1',
+                establishment_type='1',
+                size='2',
+                annual_average_employees='30',
+                total_hours_worked='60000',
+                naics_code='111112',
+            )
+            if year >= 2023:
+                row['naics_year'] = '2017'
+            csv_text = io.StringIO()
+            writer = csv.DictWriter(csv_text, fieldnames=list(row))
+            writer.writeheader()
+            writer.writerows(
+                [row, row]
+            )  # Deliberate identical rows, not an accidental fixture duplicate.
+            with ZipFile(raw, 'w') as archive:
+                archive.writestr('fixture.csv', csv_text.getvalue())
+            entry = manifest.describe_file(
+                raw,
+                paths.manifest_path(data_dir).parent,
+                retrieved_at=datetime(2026, 10, 13, tzinfo=UTC),
+                client='fixture',
+                client_version='1',
+                source_url='https://www.osha.gov/fixture',
+            )
+            manifest.append_entries(paths.manifest_path(data_dir), [entry])
+        ita_summary.build_summary_table(
+            data_dir
+        )  # Fixture setup only; production code_build never calls this.
     return registry

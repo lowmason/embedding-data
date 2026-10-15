@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-Builds aggregate evaluation targets for industry (NAICS), occupation (SOC), and geography embeddings from three sources: OSHA ITA Form 300A summaries, ACS via IPUMS USA, and CPS via IPUMS CPS. `specs/embedding-evaluation-data-spec.md` is the source of truth. So far the IPUMS extract scripts (define → submit → download → CSV-to-Parquet), the OSHA Form 300A summary acquisition with its stacked establishment-year table, and an OSHA case-detail download (download → CSV-to-Parquet) exist; every raw file is recorded in an append-only manifest (`data/raw/manifest.jsonl`); canonical NAICS/SOC graphs, NAICS concordances, ITA candidate mapping and filing-universe diagnostics are built. Geography allocation, ACS/CPS code parsers, targets and the shared target writer remain planned.
+Builds aggregate evaluation targets for industry (NAICS), occupation (SOC), and geography embeddings from three sources: OSHA ITA Form 300A summaries, ACS via IPUMS USA, and CPS via IPUMS CPS. `specs/embedding-evaluation-data-spec.md` is the source of truth. So far the IPUMS extract scripts (define → submit → download → CSV-to-Parquet), the OSHA Form 300A summary acquisition with its stacked establishment-year table, and an OSHA case-detail download (download → CSV-to-Parquet) exist; every raw file is recorded in an append-only manifest (`data/raw/manifest.jsonl`); canonical NAICS/SOC graphs, NAICS concordances, ITA candidate mapping and filing-universe diagnostics are built. Geography reference bundles now supply the complete 2025 county inventory, July 2023 metropolitan/micropolitan membership and 2025Q4 HUD eligibility; the Stage 6 commands have measured full-data ITA assignment, a 2023 ITA area-mix target and exact cached replay through the shared target writer; the selected data acceptance is recorded in `specs/findings/stage-6-ita-area-mix-build.md`. PUMA allocation, ACS/CPS code parsers and other target families remain planned.
 
 ## Commands
 
@@ -112,6 +112,67 @@ dependency versions, schemas and aggregates support later provenance; this is no
 the R7 target writer. Source summary and Stage 3 file hashes must remain unchanged.
 Geography, ACS/CPS parsing, targets and headline-inclusion decisions retain their
 later-stage scope and the source spec's Core principle and stricter V11 contract.
+
+**Geography bundle (Stage 5).** `geography acquire` and `geography import-reference KIND FILE`
+register verified original bytes; `geography build RUN_ID --data-dir ROOT` builds offline.
+Use the real root explicitly in worktrees. The selected production run and its original,
+software and output inventories are in
+`specs/findings/stage-5-geography-reference-build.md`. Six Parquets use `geography-v1`,
+shared node/edge schemas and dedicated geography validation. Both metro and micro CBSAs
+retain type and central/outlying roles; their counties may span states. Complete county
+inventory is independent of HUD/CBSA coverage. HUD retains every ZIP and row; compute
+eligibility from all original positive candidates before scope checks. `zip_dominant_county`
+is diagnostic; only `eligible` has `zip_fallback_county`. Preserve Stage 3 selector/importer
+interfaces and exact Census-first/delivered-state rules. This stage supplies references;
+Stage 6 assigns establishments and Stage 8 allocates PUMAs. Never rebuild source summaries,
+Stage 3 verification artifacts or Stage 4 code bundles to prepare geography references.
+
+**ITA assignment and target commands (Stage 6).** `targets prepare-ita ASSIGNMENT_ID`
+requires `--codes-run` and `--geography-run`; the selected production runs have pinned
+detached inventories. Alternate runs require `--codes-outputs-sha256` and/or
+`--geography-outputs-sha256`. Preparation freezes source/request indexes and batches
+under `derived/osha/assignment-inputs/`. `targets acquire-ita ASSIGNMENT_ID` alone
+contacts Census, sequentially with a 600-second timeout, storing verified immutable
+catalogs/responses/receipts under `raw/references/census-geocoder/ita-assignment/`.
+Explicit cached resume verifies completed batches and frozen software; do not edit
+requests or retry blindly. `targets build-ita ASSIGNMENT_ID TARGET_ID --year 2023`
+is offline, as is preparation. Always pass `--data-dir
+/Users/lowell/Projects/embedding-data/data`; `uv --offline` only prevents package
+fetching, not the acquisition command's HTTP calls. README gives exact commands.
+
+Stage 6 preparation uses its own operational limit of 1,000 Census records per batch.
+Stage 3's default and the Census service maximum remain 10,000. Verification reconstructs
+each preparation's recorded limit. Changing preparation software requires a new preparation;
+preserve the original `stage6_ita_assignment_20261014` and its acquisition controls with
+their original frozen software contract. Execution correction D5 also preserves
+`stage6_ita_assignment_20261014_1000` and its 283 completed raw batches. Stage 6's CSV
+writer and validator now use backslash escaping with doubled quotes, preserving all
+logical strings and IDs; Stage 3 is unchanged. The selected preparation is
+`stage6_ita_assignment_20261014_1000_csv`, with targets
+`stage6_ita_area_mix_20261014_1000_csv` / `_replay`. The
+[measured production finding](specs/findings/stage-6-ita-area-mix-build.md) records
+all detached input/output pins and frozen inventories: 1,114 completed fresh batches
+for 1,113,538 distinct tuples, 3,206,055 ordered source records, and 126,958 target
+cells supported by 324,191 eligible 2023 records. Both public verifiers, exact
+ordered four-table replay, independent support reconciliation and the whole-tree
+audit passed. The 3,069 denominator counties include four with zero eligible
+support and no target cells. These are measured data gates; final repository
+checks/reviews and completion protocol are tracked separately in the finding.
+Do not edit old frozen requests or import old/diagnostic responses.
+
+The seven-file target bundle preserves all-year source order and duplicate
+multiplicity while estimating native-2022 submitted-record shares for 2023 only.
+The shared `target_contract` validates/writes `targets-v1`; `ita_target_build.verify_bundle`
+verifies publication. Denominators and true/null flag counts retain diagnostic
+support; all targets have null SE/`none` and `size_gate_pending`. The common county
+2025, CBSA July 2023, HUD 2025Q4 and mutable Census Current frames are separate.
+Coverage does not validate accuracy or representativeness. Keep source summary,
+prior verification/code/geography bundles and manifested originals unchanged;
+never call upstream builders or `sample` to prepare this stage. Occupied run and
+staging names require inspection and a fresh selection, never overwrite. Relevant
+software/dependency changes invalidate preparation/resume. The nonfixture production
+measurement is separate from the 21-row/five-eligible V12 readiness fixture;
+later families and V9 remain planned.
 
 **Test seams.** Tests and Behave steps patch the module-level `IpumsApiClient` (autospec) and `DOTENV_PATH` with `patch.object`, so both must remain module globals looked up at call time. OSHA tests patch `make_client` with a `partial` that injects an `httpx.MockTransport`; fake responses must use `stream=httpx.ByteStream(...)`, because a `content=` body is preloaded and leaves `num_bytes_downloaded` at 0. OSHA summary tests serve the recorded ITA page `tests/fixtures/osha/itadata.html` and bodies from `tests/ita_fixtures.year_file`, one per published file format; `write_release` places and records a raw summary file. The `cli_runner` fixture in `tests/conftest.py` removes `IPUMS_API_KEY` from the environment. The root `.env` holds a real key: a new test that does not patch both `DOTENV_PATH` and `IpumsApiClient` can load it and make live IPUMS requests. Every command test must also pass `--data-dir` (the `data_directory` fixture): `--data-dir` defaults to the real `data/` tree through a Typer default bound at import, so patching `paths.DATA_DIR` cannot redirect it, and a stray test would write fake extracts into `data/raw` and append fake entries to the append-only manifest.
 
