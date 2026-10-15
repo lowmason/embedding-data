@@ -17,9 +17,10 @@ import polars as pl
 
 from embedding_data import geography_references as gr
 from embedding_data import ipums_census_access, manifest, paths, target_io
+from embedding_data.geography_parsers import SCOPE as ACS_COMPARISON_STATES
 from embedding_data.osha_benchmark_download import USER_AGENT
 
-PARSER_VERSION = 'ipums-public-references-v1'
+PARSER_VERSION = 'ipums-public-references-v2'
 MAX_ORIGINAL_BYTES = 32 * 1024 * 1024
 BLS_SERIES = 'LNU02000000'
 BLS_REQUEST_BODY = b'{"seriesid":["LNU02000000"],"startyear":"2025","endyear":"2026"}'
@@ -203,9 +204,42 @@ def parse_industry_metadata(file: Path, vintage: int) -> dict:
 
 
 def parse_acs_levels(file: Path, year: int) -> pl.DataFrame:
-    '''Fail closed until a registered successful original passes layout preflight.'''
-    raise ValueError('ACS levels preflight blocked: registered public URLs return Missing Key; '
-                     'inspect owner-provided official originals before implementing this parser')
+    '''Parse person counts; retain optional PR (72), outside ACS_COMPARISON_STATES.
+
+    Source year is supplied from the canonical request/receipt, never inferred
+    from this response body, which has no year field.
+    '''
+    if type(year) is not int or year not in (2023, 2024):
+        raise ValueError('ACS levels require a registered 2023 or 2024 source year')
+    try:
+        response = json.loads(file.read_text(encoding='utf-8'))
+    except (json.JSONDecodeError, UnicodeDecodeError) as error:
+        raise ValueError('invalid ACS levels response JSON') from error
+    header = ['NAME', 'B23025_004E', 'state']
+    if not isinstance(response, list) or not response or response[0] != header:
+        raise ValueError('invalid ACS levels response structure/header')
+    rows = response[1:]
+    for row in rows:
+        if (not isinstance(row, list) or len(row) != len(header)
+                or any(not isinstance(value, str) for value in row)
+                or not row[0].strip() or not re.fullmatch(r'[0-9]+', row[1])):
+            raise ValueError('invalid ACS levels row/string/count format')
+    states = [row[2] for row in rows]
+    if (len(states) != len(set(states)) or not ACS_COMPARISON_STATES.issubset(states)
+            or not set(states).issubset(ACS_COMPARISON_STATES | {'72'})):
+        raise ValueError('ACS levels require unique 50-state/DC coverage with optional PR72')
+    raw = pl.DataFrame(rows, schema={name: pl.String for name in header}, orient='row')
+    try:
+        levels = raw.lazy().select(
+            pl.lit(year, dtype=pl.Int64).alias('year'),
+            pl.col('state').alias('state_fips'),
+            pl.col('B23025_004E').cast(pl.Float64).alias('published'),
+            pl.lit('persons').alias('units')).collect()
+    except pl.exceptions.PolarsError as error:
+        raise ValueError('invalid ACS levels numeric representation') from error
+    if not levels['published'].is_finite().all() or (levels['published'] < 0).any():
+        raise ValueError('ACS levels must be finite nonnegative person counts')
+    return levels
 
 
 def _series_metadata(file):
@@ -363,7 +397,7 @@ def _filenames(kinds):
 def _require_unrecorded_snapshot(data_dir, final):
     manifest_file = paths.manifest_path(data_dir)
     expected_paths = {(final / name).relative_to(manifest_file.parent).as_posix()
-                      for name in _filenames(REGISTRY)}
+                      for name in _filenames(REGISTRY) | {'receipt.json'}}
     recorded_paths = {entry.path for entry in manifest.read_manifest(manifest_file)}
     if expected_paths & recorded_paths:
         raise ValueError(f'{final.name}: manifest-recorded reference paths require restoration; '
@@ -442,8 +476,14 @@ def _publish(data_dir, reference_id, staging, originals):
         if target_io.file_record(final / name) != files[name]:
             raise ValueError('original changed during publication')
     manifest.append_entries(paths.manifest_path(data_dir), entries)
-    _write_exclusive(final / 'receipt.json', (json.dumps(
+    receipt_file = final / 'receipt.json'
+    _write_exclusive(receipt_file, (json.dumps(
         receipt, sort_keys=True, indent=2, allow_nan=False) + '\n').encode())
+    # The generated receipt is externally manifested, never self-inventoried.
+    receipt_entry = manifest.describe_file(
+        receipt_file, raw_root, retrieved_at=datetime.now(UTC),
+        client='embedding-data', client_version=version('embedding-data'))
+    manifest.append_entries(paths.manifest_path(data_dir), [receipt_entry])
     for file in staging.iterdir():
         file.unlink()
     staging.rmdir()
@@ -458,7 +498,12 @@ def check_references(data_dir: Path, reference_id: str) -> dict:
         raise ValueError('incomplete or occupied reference snapshot')
     for file in final.rglob('*'):
         gr.safe_path(file, data_dir)
-    receipt = json.loads((final / 'receipt.json').read_text(encoding='utf-8'))
+    receipt_file = final / 'receipt.json'
+    receipt_entry = manifest.entry_for(paths.manifest_path(data_dir), receipt_file)
+    if (receipt_entry.source_url is not None or receipt_entry.client != 'embedding-data'
+            or receipt_entry.proxies):
+        raise ValueError('generated reference receipt provenance differs')
+    receipt = json.loads(receipt_file.read_text(encoding='utf-8'))
     if (receipt.get('reference_id') != reference_id
             or receipt.get('parser_version') != PARSER_VERSION
             or set(receipt.get('originals', {})) != set(REGISTRY)):

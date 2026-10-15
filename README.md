@@ -280,7 +280,9 @@ a response echoing the credential is rejected before its bytes are written.
 An interrupted output directory remains occupied: inspect it and choose a fresh
 path for another attempt. A preflight download provides evidence for actual
 layout inspection; full-registry reference readiness and production acceptance
-remain separate gates. ACS level parsing remains blocked until that inspection.
+remain separate gates. ACS level parsing now validates the inspected official
+response layout; production reference adoption and delivery acceptance remain
+unmeasured.
 
 Normal explicit reference acquisition accepts the same existing local file via
 `acquire(data_dir, reference_id, census_env_file=Path(...))`. Only uncached

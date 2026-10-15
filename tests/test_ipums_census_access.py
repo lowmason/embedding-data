@@ -241,8 +241,8 @@ def test_normal_acquire_scopes_key_and_canonical_request_record(tmp_path, monkey
         transport=httpx.MockTransport(public)))
     install_transport(monkeypatch, census)
     monkeypatch.setenv('CENSUS_API_KEY', SENTINEL)
-    # ACS validation intentionally stays blocked until actual originals are inspected.
-    with pytest.raises(ValueError, match='preflight'):
+    # The security payload is opaque JSON, not the inspected ACS aggregate array.
+    with pytest.raises(ValueError, match='ACS levels response structure'):
         references.acquire(tmp_path, 'scoped')
     assert len(public_calls) == 3
     assert len(census_calls) == 1

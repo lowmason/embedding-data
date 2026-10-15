@@ -136,3 +136,57 @@ def bls_documents(directory):
         '<tr><th>Not seasonally adjusted</th></tr>'
         '<tr><th>Civilian noninstitutional population</th></tr>'
         '<tr><th>Men, 16 years and over</th></tr><tr><th>Employed</th></tr></table></html>')
+
+
+# Codes and shape inspected in both canonical 2023/2024 public ACS responses.
+ACS_STATE_CODES = tuple('01 02 04 05 06 08 09 10 11 12 13 15 16 17 18 19 20 21 22 '
+                        '23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 '
+                        '42 44 45 46 47 48 49 50 51 53 54 55 56'.split())
+
+
+def acs_levels(*, include_pr=True):
+    rows = [['NAME', 'B23025_004E', 'state']]
+    rows.extend([[f'Fixture state {code}', str(100 + index), code]
+                 for index, code in enumerate(ACS_STATE_CODES)])
+    if include_pr:
+        rows.append(['Puerto Rico', '777', '72'])
+    return rows
+
+
+def reference_originals(directory, registry):
+    '''Tiny inspected-layout inputs; pinned originals use fixture-only hashes in tests.'''
+    from pathlib import Path
+
+    directory.mkdir()
+    bls_documents(directory)
+    originals = {}
+    for kind, reference in registry.items():
+        file = directory / reference.filename
+        if kind == 'usa_samples':
+            file.write_text(SAMPLE_CATALOG)
+        elif kind.startswith('census_industry_'):
+            industry_workbook(file, int(kind.rsplit('_', 1)[1]))
+        elif kind in ('acs_2023_employment', 'acs_2024_employment'):
+            rows = acs_levels()
+            if kind == 'acs_2024_employment':
+                for row in rows[1:]:
+                    row[1] = str(int(row[1]) + 100)
+            file.write_text(json.dumps(rows))
+        elif kind == 'cps_employment':
+            recorded = Path(__file__).parent / 'fixtures/ipums/bls-employment-v1.json'
+            file.write_bytes(recorded.read_bytes())
+        elif kind in ('bls_series_metadata', 'bls_a1_metadata'):
+            assert file.is_file()
+        elif kind.startswith('asec_'):
+            file.write_bytes(b'%PDF-1.4\n% Synthetic documentary-byte fixture\n%%EOF\n')
+        elif kind.startswith('acs_'):
+            year = kind.split('_')[1]
+            file.write_text(f'<html><title>Census Data API: /data/{year}/acs/acs1/groups/B23025'
+                            '</title><table><tr><td>B23025_004E</td></tr></table></html>')
+        else:
+            collection, variable = kind.split('_', 1)
+            file.write_text(f'<html><title>IPUMS {collection.upper()}: descr: {variable.upper()}'
+                            f'</title><h1>{variable.upper()}</h1><h2>Description</h2>'
+                            '<p>Synthetic public variable metadata.</p></html>')
+        originals[kind] = file
+    return originals
