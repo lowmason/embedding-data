@@ -144,8 +144,14 @@ Stage 6 preparation uses its own operational limit of 1,000 Census records per b
 Stage 3's default and the Census service maximum remain 10,000. Verification reconstructs
 each preparation's recorded limit. Changing preparation software requires a new preparation;
 preserve the original `stage6_ita_assignment_20261014` and its acquisition controls with
-their original frozen software contract. The amended preparation is
-`stage6_ita_assignment_20261014_1000`; never import diagnostic subset responses into it.
+their original frozen software contract. Execution correction D5 also preserves
+`stage6_ita_assignment_20261014_1000` and its 283 completed raw batches. Stage 6's CSV
+writer and validator now use backslash escaping with doubled quotes, preserving all
+logical strings and IDs; Stage 3 is unchanged. After review, use fresh preparation
+`stage6_ita_assignment_20261014_1000_csv` and targets
+`stage6_ita_area_mix_20261014_1000_csv` / `_replay`. Expect 1,114 batches, not completed
+calls. Do not edit old frozen requests or import old/diagnostic responses. All production
+acceptance, ordered replay, QA and measured-finding requirements remain pending.
 
 The seven-file target bundle preserves all-year source order and duplicate
 multiplicity while estimating native-2022 submitted-record shares for 2023 only.

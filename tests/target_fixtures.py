@@ -207,7 +207,8 @@ def census_client(requests: list[dict], *, fail_batch: int | None = None) -> htt
         counties = {'Exact A': '01001', 'Exact B': '51510', 'Exact C': '51001',
                     'Exact excluded': '72001'}
         for identifier, street, _city, _state, _zip in csv.reader(
-                io.StringIO(payload.decode('utf-8'))):
+                io.StringIO(payload.decode('utf-8'), newline=''), escapechar='\\',
+                doublequote=True, strict=True):
             if street in counties:
                 county = counties[street]
                 writer.writerow([identifier, '', 'Match', 'Exact', '', '', '', '',

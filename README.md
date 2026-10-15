@@ -117,10 +117,10 @@ The reviewed command surface separates offline preparation, explicit public Cens
 acquisition and offline target construction. Always name the real root in a worktree:
 
 ```bash
-UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embedding-data targets prepare-ita stage6_ita_assignment_20261014_1000 --codes-run stage4_v11_20261013_r2 --geography-run stage5_geography_20261014 --data-dir /Users/lowell/Projects/embedding-data/data
-UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embedding-data targets acquire-ita stage6_ita_assignment_20261014_1000 --data-dir /Users/lowell/Projects/embedding-data/data
-UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embedding-data targets build-ita stage6_ita_assignment_20261014_1000 stage6_ita_area_mix_20261014_1000 --year 2023 --data-dir /Users/lowell/Projects/embedding-data/data
-UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embedding-data targets build-ita stage6_ita_assignment_20261014_1000 stage6_ita_area_mix_20261014_1000_replay --year 2023 --data-dir /Users/lowell/Projects/embedding-data/data
+UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embedding-data targets prepare-ita stage6_ita_assignment_20261014_1000_csv --codes-run stage4_v11_20261013_r2 --geography-run stage5_geography_20261014 --data-dir /Users/lowell/Projects/embedding-data/data
+UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embedding-data targets acquire-ita stage6_ita_assignment_20261014_1000_csv --data-dir /Users/lowell/Projects/embedding-data/data
+UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embedding-data targets build-ita stage6_ita_assignment_20261014_1000_csv stage6_ita_area_mix_20261014_1000_csv --year 2023 --data-dir /Users/lowell/Projects/embedding-data/data
+UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embedding-data targets build-ita stage6_ita_assignment_20261014_1000_csv stage6_ita_area_mix_20261014_1000_csv_replay --year 2023 --data-dir /Users/lowell/Projects/embedding-data/data
 ```
 
 `uv --offline` prevents package fetching; `acquire-ita` still deliberately makes
@@ -135,14 +135,23 @@ the same acquisition command to resume from verified completed batches. Do not
 alter requests, substitute frames or add blind retries. Changed preparation or
 assignment software/dependencies require a new preparation selection.
 
-Stage 6 preparation now partitions requests into batches of at most 1,000 records;
-Stage 3's default and the Census service maximum remain 10,000. This software change
-requires the new preparation above. Preserve the original frozen
-`stage6_ita_assignment_20261014` run and its acquisition controls with their original
-software contract. The measured 1,113,538 distinct requests imply 1,114 batches
-(1,113 of 1,000 plus 538); confirm the actual new preparation files before acquiring.
-Diagnostic subset responses must never populate production acquisition evidence.
-There is no automatic retry; acquisition still requires the explicit command.
+Stage 6 preparation partitions requests into batches of at most 1,000 records;
+Stage 3's default and the Census service maximum remain 10,000. Execution correction
+D5 adds backslash escaping to Stage 6's headerless UTF-8 CSV while retaining doubled
+quotes and field order (ID, street, city, state, ZIP). Logical submitted strings,
+request IDs and source-row mappings are unchanged. The wire bytes double literal
+backslashes; requests without them remain byte-identical. The measured prior request
+inventory contains 42 literal backslashes across 29 batches.
+
+The new software requires the fresh `_1000_csv` preparation above after review.
+Preserve both `stage6_ita_assignment_20261014` and
+`stage6_ita_assignment_20261014_1000`, including the latter's 283 completed raw batches,
+with their original software and bytes. Never edit or reinterpret those frozen runs,
+or import cached or diagnostic responses into the new acquisition. The measured
+1,113,538 distinct requests imply 1,114 expected batches (1,113 of 1,000 plus 538),
+not completed calls; verify the new preparation before acquiring. Sequential execution,
+Current options, the 600-second timeout and explicit verified resume are unchanged.
+Production acceptance, full ordered replay, QA and the measured finding remain pending.
 
 Run IDs are immutable: occupied final or `.part` names fail. Inspect interrupted
 staging and choose an explicit fresh ID; never overwrite an existing run. Selected

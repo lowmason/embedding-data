@@ -139,7 +139,8 @@ string fields, and `n_source_rows: UInt64`. Include every distinct submitted tup
 including partial/blank and delivered-state-excluded tuples, as Stage 3 did;
 incomplete addresses remain diagnostic, not invented complete addresses. Sort by
 request ID and write headerless UTF-8 CSV batches of at most 1,000 rows using
-the existing CSV quoting/order contract: ID, street, city, state, ZIP. Response
+the existing field/order contract: ID, street, city, state, ZIP. Stage 6 uses
+backslash escaping with doubled quotes (execution correction D5 below). Response
 IDs must exactly cover these requests, even where the service reports no match.
 
 Preparation's `inputs.json` records source/bundle inventories, exact source-index,
@@ -164,6 +165,29 @@ one of 538); verify the actual files. Selected upstream runs, Current options,
 sequential execution, 600-second timeout and explicit verified resume are retained.
 Acceptance uses new target IDs `stage6_ita_area_mix_20261014_1000` and
 `stage6_ita_area_mix_20261014_1000_replay`.
+
+Execution correction D5 (2026-10-14; implementation correction, not a new owner
+decision): a measured Census reproducer isolated a literal-backslash/quote wire
+interaction. The unchanged single record returned HTTP 500; escaping backslashes
+returned HTTP 200 with its original ID and street/city punctuation preserved. The
+full 1,000-record controlled diagnostic returned HTTP 200 in 28.4518 seconds with
+all original IDs: 838 Match, 151 No_Match and 11 Tie. This is evidence for this
+wire correction, not a universal claim about the service parser. Diagnostic responses
+remain outside production evidence.
+
+Use explicit backslash escaping and doubled quotes for the Stage 6 batch writer and
+validator. Retain UTF-8, headerless CSV, newlines, field order, logical tuples, IDs,
+source-row order/multiplicity, and the 1,000 default / 10,000 service limit. Only
+literal backslashes gain wire escaping; the prior inventory contains 42 across
+29 batches. Stage 3, clients, options, timeout and assignment methods are unchanged.
+The frozen module hash requires fresh preparation `stage6_ita_assignment_20261014_1000_csv`
+after independent review. Preserve both earlier preparations and all controls/responses,
+including the 283 completed batches of the `_1000` run; do not reuse their caches.
+Current acceptance targets are `stage6_ita_area_mix_20261014_1000_csv` and
+`stage6_ita_area_mix_20261014_1000_csv_replay`, superseding the D4 execution names
+above without changing its historical decision. Expect 1,114 batches; verify new
+inventories and identical ordered logical indexes before acquisition. All original
+production acceptance, QA, replay, finding and completion-review gates remain required.
 
 The read-only design workload estimate was 1,113,538 distinct submitted tuples
 across 3,206,055 source rows, before any request filtering. It is a planning bound,

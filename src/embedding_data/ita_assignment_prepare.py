@@ -24,6 +24,7 @@ ZIP_VERSION = 'ita-verification-zip-v1'
 SOFTWARE_VERSION = 'ita-assignment-software-v1'
 BATCH_LIMIT = 1000
 SERVICE_BATCH_LIMIT = 10_000
+CSV_ESCAPECHAR = '\\'
 SUBMITTED = ['street', 'city', 'state', 'zip']
 SOURCE_INDEX_SCHEMA = {'source_row': pl.UInt64, 'request_id': pl.String}
 REQUEST_INDEX_SCHEMA = {
@@ -95,7 +96,8 @@ def write_batches(directory: Path, requests: pl.DataFrame, batch_limit: int) -> 
         file = directory / name
         batch = requests.slice(start, batch_limit)
         with file.open('w', newline='', encoding='utf-8') as stream:
-            csv.writer(stream).writerows(batch.select('request_id', *SUBMITTED).iter_rows())
+            csv.writer(stream, escapechar=CSV_ESCAPECHAR, doublequote=True).writerows(
+                batch.select('request_id', *SUBMITTED).iter_rows())
         validate_batch(file, batch)
         records.append({'path': name, **target_io.file_record(file), 'rows': batch.height})
     return records
@@ -106,7 +108,7 @@ def validate_batch(file: Path, request_index: pl.DataFrame) -> list[str]:
     if list(request_index.schema.items()) != list(REQUEST_INDEX_SCHEMA.items()):
         raise ValueError('request index schema differs')
     with file.open(newline='', encoding='utf-8') as stream:
-        rows = list(csv.reader(stream, strict=True))
+        rows = list(csv.reader(stream, escapechar=CSV_ESCAPECHAR, doublequote=True, strict=True))
     if not rows or len(rows) > SERVICE_BATCH_LIMIT:
         raise ValueError('empty or oversized Census batch')
     ids = []

@@ -60,7 +60,7 @@ def test_submitted_edge_cases_preserve_source_and_csv(tmp_path):
     file = tmp_path / records[0]['path']
     assert 'Café'.encode() in file.read_bytes()
     with file.open(newline='', encoding='utf-8') as stream:
-        rows = list(csv.reader(stream))
+        rows = list(csv.reader(stream, escapechar='\\', doublequote=True, strict=True))
     assert rows == [list(row) for row in requests.select(
         'request_id', 'street', 'city', 'state', 'zip').iter_rows()]
     assert validate_batch(file, requests) == requests['request_id'].to_list()
@@ -102,7 +102,7 @@ def test_public_prepare_defaults_to_thousand_record_batches(tmp_path, monkeypatc
     years[2023] = [record(
         2023, id=str(23000 + number), establishment_id=str(23000 + number),
         naics_code='111111', naics_year='2022',
-        street_address='Exact A' if number == 0 else f'{number} Café "A", Floor 2',
+        street_address='Exact A' if number == 0 else f'{number} Café \\ "A", Floor 2',
         city='Fixture Town', state='AL', zip_code='00001') for number in range(1001)]
     years[2023].append(years[2023][0].copy())
     monkeypatch.setattr(target_fixtures, 'golden_source_rows', lambda: years)
@@ -133,7 +133,7 @@ def test_public_prepare_defaults_to_thousand_record_batches(tmp_path, monkeypatc
     for start, file in zip((0, 1000), prepared.batches, strict=True):
         expected = requests.slice(start, 1000)
         with file.open(newline='', encoding='utf-8') as stream:
-            rows = list(csv.reader(stream))
+            rows = list(csv.reader(stream, escapechar='\\', doublequote=True, strict=True))
         assert rows == [list(row) for row in expected.select(
             'request_id', 'street', 'city', 'state', 'zip').iter_rows()]
         assert preparation.validate_batch(file, expected) == expected['request_id'].to_list()
@@ -339,3 +339,59 @@ def test_frozen_batch_limit_cannot_exceed_service_boundary(tmp_path, limit):
     repin_preparation(prepared)
     with pytest.raises(ValueError, match='batch limit'):
         check_preparation(tmp_path, 'requests')
+
+
+@pytest.mark.parametrize('street,city', [
+    ('A\\B\\"C"', 'Town'),
+    ('A\\B', 'Town\\Center'),
+    ('Café, "A"\\B', 'Town'),
+    ('Line 1\nLine 2\\', 'Town\r\nCenter'),
+    ('Plain, "quoted"', 'Café'),
+    (None, None),
+])
+def test_census_escape_reader_receives_exact_submitted_strings(tmp_path, street, city):
+    import hashlib
+    import io
+
+    from embedding_data import ita_assignment_prepare as preparation
+
+    source = pl.DataFrame({'street_address': [street, street], 'city': [city, city],
+                          'state': [None, None], 'zip_code': [None, None]},
+                         schema={name: pl.String for name in
+                                 ['street_address', 'city', 'state', 'zip_code']})
+    before = source.clone()
+    fields = [street or '', city or '', '', '']
+    payload = json.dumps(fields, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+    identifier = hashlib.sha256(b'ita-request-v1\0' + payload).hexdigest()
+    index, requests = preparation.request_frames(source.lazy())
+    requests = requests.collect()
+    assert index.collect().to_dicts() == [
+        {'source_row': 0, 'request_id': identifier},
+        {'source_row': 1, 'request_id': identifier}]
+    assert requests['n_source_rows'].to_list() == [2]
+    records = preparation.write_batches(tmp_path, requests, 1000)
+    file = tmp_path / records[0]['path']
+    # External wire contract is independent of the production dialect constant.
+    with file.open(newline='', encoding='utf-8') as stream:
+        delivered = list(csv.reader(stream, escapechar='\\', doublequote=True, strict=True))
+    assert delivered == [[identifier, *fields]]
+    original = io.StringIO(newline='')
+    csv.writer(original).writerow([identifier, *fields])
+    assert file.read_bytes() == original.getvalue().encode().replace(b'\\', b'\\\\')
+    assert preparation.validate_batch(file, requests) == [identifier]
+    assert source.equals(before)
+
+
+@pytest.mark.parametrize('street', ['A\\B', 'A\\B\\"C"'])
+def test_validator_rejects_unescaped_backslashes_contradicting_id(tmp_path, street):
+    from embedding_data import ita_assignment_prepare as preparation
+
+    source = pl.DataFrame({'street_address': [street], 'city': ['Town'],
+                          'state': ['AL'], 'zip_code': ['00001']})
+    _, requests = preparation.request_frames(source.lazy())
+    requests = requests.collect()
+    file = tmp_path / 'old.csv'
+    with file.open('w', newline='', encoding='utf-8') as stream:
+        csv.writer(stream).writerows(requests.select('request_id', *preparation.SUBMITTED).rows())
+    with pytest.raises((ValueError, csv.Error)):
+        preparation.validate_batch(file, requests)
