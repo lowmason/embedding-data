@@ -18,7 +18,8 @@ LEVEL_SCHEMA = {
     'units': pl.String, 'universe': pl.String, 'geography_basis': pl.String,
     'geography_scope': pl.String, 'weight': pl.String, 'measured': pl.Float64,
     'weight_sum_exact': pl.String, 'annual_divisor': pl.UInt32,
-    **{name: pl.UInt64 for name in COUNT_COLUMNS}, 'unexpected_statuses': pl.List(pl.String),
+    **{name: pl.UInt64 for name in COUNT_COLUMNS}, 'unexpected_statuses': pl.List(
+        pl.Struct({'field': pl.String, 'value': pl.String})),
 }
 
 
@@ -42,18 +43,23 @@ def _validate_input(frame, weight, temporal):
             raise ValueError('employment Decimal38 aggregate precision bound exceeded')
 
 
-def _aggregate(frame, keys, weight, eligible, military, unexpected, status):
+def _aggregate(frame, keys, weight, eligible, military, unexpected):
+    status_values = pl.concat_list([
+        pl.when(condition).then(pl.struct(
+            pl.lit(name).alias('field'), pl.col(name).cast(pl.String).alias('value'),
+        )).otherwise(None) for name, condition in unexpected.items()
+    ]).list.drop_nulls()
     return frame.group_by(keys).agg(
         pl.len().cast(pl.UInt64).alias('rows'),
         eligible.fill_null(False).sum().cast(pl.UInt64).alias('eligible_rows'),
         eligible.and_(pl.col(weight).is_null()).fill_null(False).sum()
             .cast(pl.UInt64).alias('missing_weight_rows'),
-        unexpected.sum().cast(pl.UInt64).alias('unexpected_status_rows'),
+        pl.any_horizontal(list(unexpected.values())).sum().cast(pl.UInt64)
+            .alias('unexpected_status_rows'),
         military.fill_null(False).sum().cast(pl.UInt64).alias('military_rows'),
         pl.col('AGE').lt(16).sum().cast(pl.UInt64).alias('under16_rows'),
         pl.col('AGE').is_null().sum().cast(pl.UInt64).alias('missing_age_rows'),
-        pl.col(status).filter(unexpected).cast(pl.String).unique().sort()
-            .alias('unexpected_statuses'),
+        status_values.explode().drop_nulls().unique().sort().alias('unexpected_statuses'),
         pl.col(weight).filter(eligible).sum().alias('_weight_sum'),
     )
 
@@ -76,6 +82,8 @@ def acs_employment(frame: pl.LazyFrame) -> pl.DataFrame:
     50-state/DC comparison scope. Pooled rows use all input component years, recording
     the exact summed numerator, divisor and missing years; incomplete states have null levels.
     Task4 must separately verify the global set of delivered/requested component years.
+    Unexpected or missing status diagnostics retain both field and value; affected
+    records count once even when both EMPSTAT and EMPSTATD are unexpected.
     '''
     _validate_input(frame, 'PERWT', ['YEAR'])
     schema = frame.collect_schema()
@@ -92,9 +100,12 @@ def acs_employment(frame: pl.LazyFrame) -> pl.DataFrame:
         pl.col('EMPSTATD').is_in([10, 11, 12]))
     military = pl.col('EMPSTATD').is_in([13, 14, 15])
     known = [0, 10, 11, 12, 13, 14, 15, 20, 30]
-    unexpected = pl.col('EMPSTATD').is_in(known).fill_null(False).not_()
+    unexpected = {
+        'EMPSTAT': pl.col('EMPSTAT').is_in([0, 1, 2, 3]).fill_null(False).not_(),
+        'EMPSTATD': pl.col('EMPSTATD').is_in(known).fill_null(False).not_(),
+    }
     annual = _aggregate(frame, ['YEAR', 'state_fips'], 'PERWT', eligible, military,
-                        unexpected, 'EMPSTATD').rename({'YEAR': 'year'}).with_columns(
+                        unexpected).rename({'YEAR': 'year'}).with_columns(
         pl.lit(None, dtype=pl.Int64).alias('month'), pl.lit('annual').alias('period'),
         pl.col('year').alias('period_start'), pl.col('year').alias('period_end'),
         pl.lit(1, dtype=pl.UInt32).alias('annual_divisor'),
@@ -134,9 +145,9 @@ def cps_employment(frame: pl.LazyFrame) -> pl.DataFrame:
     eligible = pl.col('AGE').ge(16).and_(pl.col('EMPSTAT').is_in([10, 12]))
     military = pl.col('EMPSTAT').eq(1)
     known = [0, 1, 10, 12, 20, 21, 22, 30, 31, 32, 33, 34, 35, 36]
-    unexpected = pl.col('EMPSTAT').is_in(known).fill_null(False).not_()
+    unexpected = {'EMPSTAT': pl.col('EMPSTAT').is_in(known).fill_null(False).not_()}
     monthly = _aggregate(frame, ['YEAR', 'MONTH'], 'WTFINL', eligible, military,
-                         unexpected, 'EMPSTAT').rename({'YEAR': 'year', 'MONTH': 'month'})
+                         unexpected).rename({'YEAR': 'year', 'MONTH': 'month'})
     monthly = monthly.with_columns(
         pl.lit(None, dtype=pl.String).alias('state_fips'), pl.lit('monthly').alias('period'),
         pl.col('year').mul(100).add(pl.col('month')).alias('period_start'),

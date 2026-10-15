@@ -17,7 +17,8 @@ def test_acs_civilian_annual_average_and_diagnostics():
     assert annual['measured'].to_list() == [100.0, 140.0]
     assert annual['state_fips'].to_list() == ['01', '01']
     assert annual['unexpected_status_rows'].to_list() == [1, 0]
-    assert annual['unexpected_statuses'].to_list() == [['99'], []]
+    assert annual['unexpected_statuses'].to_list() == [
+        [{'field': 'EMPSTATD', 'value': '99'}], []]
     assert result.filter(pl.col('period').eq('annual_average'))['measured'].item() == 120
     assert annual['eligible_rows'].to_list() == [3, 1]
 
@@ -126,7 +127,7 @@ def test_cps_reproducibility_and_empty_schema():
         'rows': pl.UInt64, 'eligible_rows': pl.UInt64, 'missing_weight_rows': pl.UInt64,
         'unexpected_status_rows': pl.UInt64, 'military_rows': pl.UInt64,
         'under16_rows': pl.UInt64, 'missing_age_rows': pl.UInt64,
-        'unexpected_statuses': pl.List(pl.String),
+        'unexpected_statuses': pl.List(pl.Struct({'field': pl.String, 'value': pl.String})),
     }
 
 
@@ -146,6 +147,7 @@ def test_null_status_is_diagnostic_and_null_metadata_is_not_comparable():
     levels = cps_employment(cps_frame().with_columns(
         EMPSTAT=pl.lit(None, dtype=pl.Int64)).lazy())
     assert levels['unexpected_status_rows'].item() == 5
+    assert levels['unexpected_statuses'].to_list() == [[{'field': 'EMPSTAT', 'value': None}]]
     assert levels['measured'].item() == 0
     published = reference(levels).with_columns(universe=pl.lit(None, dtype=pl.String))
     assert compare_levels(levels, published, ['year', 'month'])['comparison_status'].item() == (
@@ -171,3 +173,39 @@ def test_published_only_rows_keep_canonical_context_and_original_units():
     assert result['period'].item() == 'monthly'
     assert result['universe'].item() == 'civilian_noninstitutional_employed_age_16_plus'
     assert result['published_original_units'].item() == 'thousands of persons'
+
+
+@pytest.mark.parametrize('general_status', [99, None])
+def test_acs_unexpected_general_status_retains_field_and_value(general_status):
+    frame = pl.DataFrame({'YEAR': [2023, 2023], 'STATEFIP': ['01', '01'],
+                          'AGE': [30, 30], 'EMPSTAT': [general_status, 1],
+                          'EMPSTATD': [10, 10],
+                          'PERWT': [Decimal('900.0000'), Decimal('100.0001')]},
+                         schema_overrides={'EMPSTAT': pl.Int64})
+    result = acs_employment(frame.lazy())
+    assert result['unexpected_status_rows'].to_list() == [1, 1]
+    value = None if general_status is None else '99'
+    assert result['unexpected_statuses'].to_list() == [
+        [{'field': 'EMPSTAT', 'value': value}], [{'field': 'EMPSTAT', 'value': value}]]
+    assert result['eligible_rows'].to_list() == [1, 1]
+    assert result['measured'].to_list() == [100.0001, 100.0001]
+    assert result['weight_sum_exact'].to_list() == ['100.0001', '100.0001']
+
+
+def test_acs_status_diagnostics_distinguish_both_fields_and_count_rows_once():
+    frame = pl.DataFrame({'YEAR': [2023, 2023, 2024], 'STATEFIP': ['01'] * 3,
+                          'AGE': [30] * 3, 'EMPSTAT': [99, 1, None],
+                          'EMPSTATD': [99, None, 10], 'PERWT': [Decimal('100')] * 3})
+    result = acs_employment(frame.lazy())
+    annual = result.filter(pl.col('period').eq('annual')).sort('year')
+    assert annual['unexpected_status_rows'].to_list() == [2, 1]
+    assert annual['unexpected_statuses'].to_list() == [
+        [{'field': 'EMPSTAT', 'value': '99'}, {'field': 'EMPSTATD', 'value': None},
+         {'field': 'EMPSTATD', 'value': '99'}], [{'field': 'EMPSTAT', 'value': None}]]
+    pooled = result.filter(pl.col('period').eq('annual_average'))
+    assert pooled['unexpected_status_rows'].item() == 3
+    assert pooled['unexpected_statuses'].to_list() == [[
+        {'field': 'EMPSTAT', 'value': None}, {'field': 'EMPSTAT', 'value': '99'},
+        {'field': 'EMPSTATD', 'value': None}, {'field': 'EMPSTATD', 'value': '99'}]]
+    assert result['eligible_rows'].to_list() == [0, 0, 0]
+    assert result['measured'].to_list() == [0, 0, 0]
