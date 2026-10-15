@@ -1,5 +1,7 @@
 # Target contract and ITA area-mix slice Implementation Plan
 
+**Status: COMPLETE (2026-10-15)** — executed via subagent-driven-development; nothing deferred
+
 > **For agentic workers:** REQUIRED SUB-SKILL: implement this plan task-by-task via subagent-driven-development (the default) — or executing-plans when your human partner chose inline execution at the handoff. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Publish verified county assignments for all 2016–2025 ITA source rows and a conditional 2023 county-by-native-NAICS-2022 establishment-share target, with a reusable target writer and an offline V12 fixture path.
@@ -8,7 +10,7 @@
 
 **Tech Stack:** Python >=3.14; existing Polars >=2.0.0, httpx >=0.28.1, Typer >=0.27.3 and fastexcel >=0.21.0; pytest/Hypothesis; standard-library hashlib, json, csv, pathlib and dataclasses. No dependency or lockfile changes.
 
-**Spec:** [specs/target-contract-ita-area-mix.md](../target-contract-ita-area-mix.md). Read it alongside the [source spec](../embedding-evaluation-data-spec.md), the [Stage 4 finding](../findings/v11-ita-naics-mapping.md), the [Stage 5 finding](../findings/stage-5-geography-reference-build.md), and completed plans 3–5's Handoff sections.
+**Spec:** [specs/completed/target-contract-ita-area-mix.md](../../completed/target-contract-ita-area-mix.md). Read it alongside the [source spec](../../embedding-evaluation-data-spec.md), the [Stage 4 finding](../../findings/v11-ita-naics-mapping.md), the [Stage 5 finding](../../findings/stage-5-geography-reference-build.md), and completed plans 3–5's Handoff sections.
 
 > Roadmap: specs/embedding-evaluation-data-spec-roadmap.md, Stage 6 — on plan completion, tick the stage and re-validate later stages against what shipped.
 
@@ -53,6 +55,8 @@ Source-spec R9.1 also applies: "Transformations are lazy polars with method-styl
 This plan creates no ACS/CPS transformations, extra target years/families, geographic/industry rollup targets, employment weighting, crosswalk-included variants, establishment linkage/deduplication, historical geography, or V9 gate. No evaluation target enters embedder training, architecture tuning or model selection. Every test command supplies a temporary data root; no default test reads the real data tree or root `.env`.
 
 ## Decisions
+
+These entries retain their approval-time execution state. The completion record below gives the final accepted selection and resolved gates.
 
 - **D1** (owner, plan review, 2026-10-14): Approve plan 6 as written, including its five implementation defaults. Applied in: Tasks 1–8 and Global Constraints. The owner's design decisions remain recorded in the stage spec; no spec amendment is introduced.
 - **D2** (owner, plan review, 2026-10-14): Execute the approved plan via subagent-driven-development in a fresh session. Applied in: Tasks 1–8 and Plan review and execution boundary.
@@ -154,7 +158,7 @@ No CI exists. Run the full group at Tasks 3, 7 and 8, recording observed results
 - `target_inputs.validate_native(canonical: pl.LazyFrame, nodes: pl.DataFrame) -> None` rejects contradictory native states, scalar/candidate/node assertions and missing/wrong typed nodes, including on rows outside 2023.
 - Fixture seam: `seed_code_tree(data_dir: Path, *, include_summary: bool = True)`; default behavior unchanged. `target_fixtures.seed_inputs(data_dir: Path) -> SelectedInputs` writes all ten raw summary years/dictionaries, builds fixture Stage 4/5 bundles through their real builders, and calls `select` with explicit fixture detached hashes.
 
-- [ ] **Step 1: Add the fixture-only split and the failing selected-input tests.** Move the existing source-writing loop and `build_summary_table` call under `if include_summary:`; keep all reference construction intact. Use this concrete fixture composition. `golden_source_rows` is defined by Task 6's complete fixture recipe and must be present now because the earlier tests consume it; Task 6 adds the estimator assertions, not the source fixture for the first time.
+- [x] **Step 1: Add the fixture-only split and the failing selected-input tests.** Move the existing source-writing loop and `build_summary_table` call under `if include_summary:`; keep all reference construction intact. Use this concrete fixture composition. `golden_source_rows` is defined by Task 6's complete fixture recipe and must be present now because the earlier tests consume it; Task 6 adds the estimator assertions, not the source fixture for the first time.
 
 ```python
 def seed_inputs(data_dir: Path) -> SelectedInputs:
@@ -212,13 +216,13 @@ def test_selected_input_defects_are_refused(tmp_path, defect):
 
 `corrupt_selected(data_dir, selected, defect) -> None` owns exact test mutations: alter the named pin/file/stat/schema/report/raw/source/canonical/graph property, recomputing lower-level inventories only when testing a higher-level semantic defect. Preserve the original expected detached checksum except where a test deliberately supplies a new checksum to reach semantic validation. Add direct tests that unrelated raw manifest appends succeed, cited entry changes fail, fixture checksum omission fails, symlink/unsafe/occupied paths fail, and round-trip inventory order is stable.
 
-- [ ] **Step 2: Run red.**
+- [x] **Step 2: Run red.**
 
 Run: `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_target_io.py tests/test_target_inputs.py -q`.
 
 Expected: import/API failure for the new target modules; existing code/geography tests still collect. A fixture setup failure unrelated to the proposed API is not the intended red signal.
 
-- [ ] **Step 3: Implement strict I/O and selected-input verification.** The inventory primitives are:
+- [x] **Step 3: Implement strict I/O and selected-input verification.** The inventory primitives are:
 
 ```python
 def file_record(file: Path) -> dict:
@@ -272,13 +276,13 @@ Verify every raw citation from both bundles plus the documentary dictionaries; d
 
 Validate selected classification forests/paths and concordance endpoint membership with existing validators; validate the geography graph with `validate_graph`, typed county/CBSA reference memberships against its edges/nodes, and exact HUD lookup equality to `geography_hud.lookup(hud_zip_county)`. This verifies both all-positive cardinality and eligible fallback membership. Do not call the classification forest validator on geography. Reconstruct small reference expectations if necessary; do not rebuild or rewrite any selected bundle. `SelectedInputs.verify` repeats pinned byte and semantic checks at preparation/build publication boundaries.
 
-- [ ] **Step 4: Run green and the upstream fixture regressions.**
+- [x] **Step 4: Run green and the upstream fixture regressions.**
 
 Run: `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_target_io.py tests/test_target_inputs.py tests/test_code_build.py tests/test_geography_build.py -q`.
 
 Expected: all selected-input mutations fail before any publication; all unchanged upstream tests pass. Record actual test count/output.
 
-- [ ] **Step 5: Commit.**
+- [x] **Step 5: Commit.**
 
 ```bash
 git add src/embedding_data/target_io.py src/embedding_data/target_inputs.py tests/code_fixtures.py tests/target_fixtures.py tests/test_target_io.py tests/test_target_inputs.py
@@ -293,7 +297,9 @@ git commit -m "feat(targets): verify selected code and geography inputs"
 
 `PreparedInputs` is a frozen dataclass with `directory: Path`, `selected: SelectedInputs`, `inputs: dict`, `source_index: Path`, `request_index: Path`, `batches: tuple[Path, ...]`. `check_preparation` is read-only and returns only after inventory, software, selected input, row/request and CSV validation. Both acquisition and offline build call it. Fixture helper `prepared_tree(data_dir: Path, *, batch_limit: int = 10_000) -> PreparedInputs` composes `seed_inputs` and preparation. For small boundary tests it uses `unittest.mock.patch.object` around preparation's batch-limit constant only during creation, recording that limit in preparation metadata; verification reconstructs slices from that frozen limit and still enforces the service maximum of 10,000.
 
-- [ ] **Step 1: Write identity and batching failures.**
+- [x] **Step 1: Write identity and batching failures.**
+
+> Deviation: Owner D3 uses the shared install_implemented_software_boundary helper with explicit local autouse wrappers in the two unit modules; global conftest, V12 and production retain the full registry.
 
 Preparation fingerprints acquisition/assignment implementation files that land in Tasks 3–4. Keep this task independently testable without adding placeholder production modules: put the shared implementation-registry helper in `tests/target_fixtures.py` and install its local autouse wrapper **only in `tests/test_ita_assignment_prepare.py`** (D3). Its record uses the exact test registry and actual hashes; `check_preparation` compares against that same registry. Once the files exist, the fixture naturally includes them. Production always requires the complete constant tuple; Task 7's tests do not install this fixture.
 
@@ -352,13 +358,15 @@ def test_linkage_equivalent_delivered_strings_have_distinct_requests():
 
 Add tests for null→empty submission equivalence while source nulls survive, Unicode/quotes/newlines, ZIP+4 and invalid ZIP normalization, incomplete and delivered-excluded tuples still requested, forced request-hash collision, 10,001 distinct tuples yielding 10,000+1 requests, headerless UTF-8 CSV exact field order, and corrupted/missing/index/batch/software/lock/dependency inputs. Inject a constant hash function to prove collision detection compares tuples, not just request counts. A change confined to estimator implementation is allowed; change to assignment/preparation dependencies fails. A later unrelated manifest append succeeds.
 
-- [ ] **Step 2: Run red.**
+- [x] **Step 2: Run red.**
 
 Run: `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_ita_assignment_prepare.py -q`.
 
 Expected: new preparation API missing; no Census request and no source rebuild.
 
-- [ ] **Step 3: Implement identity/index preparation and complete frozen inventories.** Use these exact physical schemas/serialization:
+- [x] **Step 3: Implement identity/index preparation and complete frozen inventories.** Use these exact physical schemas/serialization:
+
+> Deviation: Owner D4 changed only the Stage 6 operational default to 1,000; necessary correction D5 added value-preserving backslash escaping with doubled quotes. Each correction froze a new preparation; both older runs remain byte-identical.
 
 ```python
 IDENTITY_VERSION = 'ita-request-v1'
@@ -423,13 +431,13 @@ Target-run provenance hashes the union of both groups. Resume/build compare the 
 
 `check_preparation` verifies the detached inventory and all indexes/CSV contracts, software dependency/lock versions, selected input bytes and hashes on every call. It recomputes the source-to-submitted mapping against the canonical source without modifying it. Reject unsupported versions or a source-year inventory other than exactly 2016–2025. Before rename, repeat selected/cited/software checks and confirm no occupied final name appeared. Leave failed staging intact.
 
-- [ ] **Step 4: Run green.**
+- [x] **Step 4: Run green.**
 
 Run: `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_ita_assignment_prepare.py tests/test_target_inputs.py -q`.
 
 Expected: exact identity/order/count checks pass; every corrupted or mixed-software preparation refuses resume/build; no HTTP client is called.
 
-- [ ] **Step 5: Commit.**
+- [x] **Step 5: Commit.**
 
 ```bash
 git add src/embedding_data/ita_assignment_prepare.py tests/test_ita_assignment_prepare.py tests/target_fixtures.py
@@ -444,7 +452,9 @@ git commit -m "feat(ita): freeze full-table Census request identities"
 
 `Evidence` is a frozen dataclass with `responses: pl.LazyFrame` (nonnull unique `request_id`, `geocode_status`, nullable `match_type`, `geocode_county_geoid`, all String), `provenance: dict`, and `verify() -> None`. `responses` is formed from verified batch-sized parsed frames, concatenated without a source-row join; the builder joins it m:1 to the row index. Record methods/options/times separately in provenance.
 
-- [ ] **Step 1: Write acquisition, cache/resume and malformed-response tests.** `target_fixtures.census_client(requests: list[dict], *, fail_batch: int | None = None) -> httpx.Client` serves catalogs with deliberately nonhistorical IDs (benchmark `7`, vintage `999`) and generates valid original response CSVs from uploaded request IDs. It chooses fixture outcomes by exact submitted street strings. Patch the acquisition module's `make_client`; exercise the real form construction, parser and receipts.
+- [x] **Step 1: Write acquisition, cache/resume and malformed-response tests.** `target_fixtures.census_client(requests: list[dict], *, fail_batch: int | None = None) -> httpx.Client` serves catalogs with deliberately nonhistorical IDs (benchmark `7`, vintage `999`) and generates valid original response CSVs from uploaded request IDs. It chooses fixture outcomes by exact submitted street strings. Patch the acquisition module's `make_client`; exercise the real form construction, parser and receipts.
+
+> Deviation: D3 local wrappers share one helper, and acquisition fixtures use the actual prepared.directory.name rather than the illustrative fixture_assignment literal.
 
 This test module also needs the local software boundary until Task 4's assignment implementation exists. Add the explicit local wrapper directly in `tests/test_ita_assignment_acquire.py` using the shared helper from Task 2 (D3); do not install it in global conftest or invoke it from the V12 fixture path:
 
@@ -500,13 +510,15 @@ Add missing/ambiguous catalog-name cases, no assumed historical option IDs, extr
 
 Test the publication crash windows explicitly: a manifested valid response with a missing receipt may complete its receipt from the already frozen selection and original manifest time; an unrecorded published response or receipt is refused, never overwritten/re-downloaded. Missing or changed previously manifested bytes are refused. A recorded receipt absent from disk also fails. Earlier Stage 3 verification files are never used as an implicit cache.
 
-- [ ] **Step 2: Run red.**
+- [x] **Step 2: Run red.**
 
 Run: `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_ita_assignment_acquire.py -q`.
 
 Expected: missing acquisition API. MockTransport handles explicit fixture acquisition only; preparation remains offline.
 
-- [ ] **Step 3: Implement the protocol adapter and per-batch receipt state machine.**
+- [x] **Step 3: Implement the protocol adapter and per-batch receipt state machine.**
+
+> Deviation: Receipt checks pass the exact sorted contiguous batch slice to validate_batch; immutable manifested acquisition-start.json additionally preserves the original start through catalog-only interruptions and all later provenance.
 
 ```python
 def parse_response(text: str, expected_ids: list[str]) -> pl.DataFrame:
@@ -556,13 +568,13 @@ On resume, validate preparation/software first, then all present catalogs/select
 
 When all batches verify, publish manifest-covered `acquisition.json` containing sorted request/receipt/catalog/selection/response inventories, min/max original response acquisition times, original selection's acquisition start and successful completion end. Do not rewrite it on cached calls. A failed invocation may leave valid completed batches; no completion inventory claims missing batches. `read_evidence` requires completion, verifies every hash/size/citation/option/request ID afresh, reparses responses offline, and proves union coverage is exactly the distinct request index. It exposes no-match/tie as retained parser states. Record the mutable Current-frame limit verbatim from the spec in acquisition and target provenance.
 
-- [ ] **Step 4: Run green and the first full milestone checkpoint.**
+- [x] **Step 4: Run green and the first full milestone checkpoint.**
 
 Run: `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_ita_assignment_acquire.py tests/test_ita_assignment_prepare.py tests/test_ita_verification_run.py -q`, then the full pytest/Behave/ruff/lock command group above.
 
 Expected: fixture acquisitions/resume/replay pass, invalid batches never publish an original response/receipt as valid, and all Stage 3 tests remain unchanged/passing. Record results and any deviations before proceeding.
 
-- [ ] **Step 5: Commit.**
+- [x] **Step 5: Commit.**
 
 ```bash
 git add src/embedding_data/ita_assignment_acquire.py tests/test_ita_assignment_acquire.py tests/target_fixtures.py
@@ -575,7 +587,7 @@ git commit -m "feat(ita): acquire resumable Census assignment evidence"
 
 **Interfaces:** Consumes canonical LazyFrame, frozen `source_index`, unique parsed evidence, selected HUD lookup and county references. Produces `assign(canonical: pl.LazyFrame, source_index: pl.LazyFrame, responses: pl.LazyFrame, hud_lookup: pl.DataFrame, counties: pl.DataFrame) -> pl.LazyFrame`; `assignment_schema(canonical_schema: pl.Schema) -> dict`; `validate_assignments(frame: pl.LazyFrame, canonical: pl.LazyFrame, counties: pl.DataFrame) -> None`; `assignment_report(frame: pl.LazyFrame) -> dict`. Contract version is `ita-assignment-v1`.
 
-- [ ] **Step 1: Write the explicit rule matrix and row/schema preservation tests.** The fixture helper `assignment_case(census_status, match_type, returned_county, zip_code, state)` returns the actual assigned single row using selected fixture references. The following expected outcomes are handwritten:
+- [x] **Step 1: Write the explicit rule matrix and row/schema preservation tests.** The fixture helper `assignment_case(census_status, match_type, returned_county, zip_code, state)` returns the actual assigned single row using selected fixture references. The following expected outcomes are handwritten:
 
 ```python
 @pytest.mark.parametrize('status,kind,returned,zip_code,state,method,chosen', [
@@ -604,13 +616,13 @@ def test_adopted_county_precedence(status, kind, returned, zip_code, state, meth
 
 Also assert all six territory prefixes, returned-county flags independent of exactness, usable Census despite excluded/ambiguous HUD, original candidate lists/flags preserved, tied maxima never choose, zero-business versus absent defaults, legacy CT independent from incompatibility, unexpected in-scope county, complete/partial/blank requests, metro/micro/non-CBSA and cross-state CBSA attributes. Exact source-prefix equality/order, UInt64 index continuity and row counts must survive duplicate source rows and repeated establishment IDs. Overlapping schema names, response/index fanout or missing request coverage fail rather than manufacturing `No_Match`.
 
-- [ ] **Step 2: Run red.**
+- [x] **Step 2: Run red.**
 
 Run: `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_ita_assignment.py -q`.
 
 Expected: assignment API missing; existing Stage 3 report behavior is not patched to satisfy these tests.
 
-- [ ] **Step 3: Implement lazy joins and the exact precedence.** Establish the schema in this order: all 38 canonical fields; `source_row`, `request_id`; `zip_key`, `geocode_status`, `match_type`, `geocode_county_geoid`; all `LOOKUP_SCHEMA` fields except `zip_key`; all `COUNTY_SCHEMA` fields; `assignment_method`, `assignment_reason`; the six new flags in spec order. Detect overlaps before joining.
+- [x] **Step 3: Implement lazy joins and the exact precedence.** Establish the schema in this order: all 38 canonical fields; `source_row`, `request_id`; `zip_key`, `geocode_status`, `match_type`, `geocode_county_geoid`; all `LOOKUP_SCHEMA` fields except `zip_key`; all `COUNTY_SCHEMA` fields; `assignment_method`, `assignment_reason`; the six new flags in spec order. Detect overlaps before joining.
 
 Add a temporary contiguous row index to the canonical scan, cast UInt64 and join the frozen source index `1:1`; join responses `m:1` on request ID with full expected-coverage checks. Normalize ZIP only through existing `zip_key`. Left join the selected HUD table `m:1`. For absent joins, fill lookup counts with typed Int64 zero, list fields with `pl.lit([], dtype=pl.List(pl.String))`, lookup Boolean flags with false, status with `'absent'`, and scalar candidate/max/fallback fields with null. Do not fill other source Boolean nulls.
 
@@ -646,13 +658,13 @@ Join the chosen geoid to selected `county_reference` with `validate='m:1'`, drop
 
 `assignment_report` returns top-level `input_rows`, year-by-reason/method partitions summing exactly to source rows; separate raw geocode status/match-type coverage; separate delivered and returned scope partitions; and true/null counts for every Boolean diagnostic by year. Label reason partitions as disjoint and flags as overlapping. Include compatible exact, non-exact, tie, no-match and legacy/incompatible/out-of-scope diagnostics without interpreting them as county accuracy.
 
-- [ ] **Step 4: Run green and retained geography regressions.**
+- [x] **Step 4: Run green and retained geography regressions.**
 
 Run: `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_ita_assignment.py tests/test_geography_hud.py tests/test_geography_tables.py tests/test_ita_county_verification.py -q`.
 
 Expected: the rule matrix, exact 38-column prefix, appended schema/order and all independent flags pass; source row counts/multiplicity/order remain exact.
 
-- [ ] **Step 5: Commit.**
+- [x] **Step 5: Commit.**
 
 ```bash
 git add src/embedding_data/ita_assignment.py tests/test_ita_assignment.py tests/target_fixtures.py
@@ -665,7 +677,9 @@ git commit -m "feat(ita): assign all source rows under adopted county rules"
 
 **Interfaces:** Consumes an exact-schema `pl.LazyFrame` or `pl.DataFrame`. Produces ordered constants `TARGET_SCHEMA`, `TARGET_KEY_COLUMNS`, `SCHEMA_VERSION='targets-v1'`; `validate_targets(frame: pl.LazyFrame) -> None`; `write_targets(frame: pl.LazyFrame, destination: Path) -> dict`, returning the published Parquet file record. This writes only a file within the caller's staging directory; Task 7 owns run publication and manifest construction.
 
-- [ ] **Step 1: Write general contract tests independent of ITA eligibility.** Define `target_fixtures.target_rows() -> pl.DataFrame` with this valid exact typed fixture. Test every required column/type/order, null/blank metadata, invalid/mismatched typed IDs, null/nonfinite value/count, nonfinite/negative SE, duplicate keys even when estimate/count/flags differ, null flags/list elements, blank flag strings, and unsorted/duplicate flags. The validator rejects noncanonical flag lists; producers must supply sorted/distinct lists before writing.
+- [x] **Step 1: Write general contract tests independent of ITA eligibility.** Define `target_fixtures.target_rows() -> pl.DataFrame` with this valid exact typed fixture. Test every required column/type/order, null/blank metadata, invalid/mismatched typed IDs, null/nonfinite value/count, nonfinite/negative SE, duplicate keys even when estimate/count/flags differ, null flags/list elements, blank flag strings, and unsorted/duplicate flags. The validator rejects noncanonical flag lists; producers must supply sorted/distinct lists before writing.
+
+> Deviation: The target_rows helper stays local to tests/test_target_contract.py within its approved ownership; no consumer requires a shared fixture API.
 
 ```python
 def target_rows() -> pl.DataFrame:
@@ -727,13 +741,13 @@ def test_shared_se_contract(method, se, valid):
 
 The profile-like row above tests a generic writer interface only; it is not a profile estimator or evidence that a later family exists. Add shuffled-input deterministic sort and serialized read-back tests. Do not impose a [0,1] range, integer weighted counts, observed-leaf lookup or minimum support in this shared module.
 
-- [ ] **Step 2: Run red.**
+- [x] **Step 2: Run red.**
 
 Run: `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_target_contract.py -q`.
 
 Expected: target contract missing.
 
-- [ ] **Step 3: Implement the exact long schema and generic checks.**
+- [x] **Step 3: Implement the exact long schema and generic checks.**
 
 ```python
 SCHEMA_VERSION = 'targets-v1'
@@ -774,13 +788,13 @@ def write_targets(frame: pl.LazyFrame, destination: Path) -> dict:
 
 `validate_targets` first compares exact ordered schema to `TARGET_SCHEMA` and rejects unexpected/missing/reordered/cast columns. All columns except `se` are nonnull, including the flags list and its elements. Every String metadata field has nonempty `.str.strip_chars()`. Apply `valid_unit` once per distinct `(unit_a_type, unit_a)` and `(unit_b_type, unit_b)` pair; this syntax/type check is intentionally independent of selected node membership. Family validators own actual systems/vintages/levels and reference membership. Check finite `value`, finite/nonnegative `n_weighted`, permitted methods and the exact SE nullability/domain rules. UInt64 enforces the physical unweighted-count domain. Check flags equal list-sort/list-unique canonical form and contain only nonempty strings. Group by all `TARGET_KEY_COLUMNS`, fail on any count above one. The writer must not silently cast types, repair metadata, merge duplicate rows or compute SEs. Return inventory of the actual serialized file and validate read-back order/schema/count.
 
-- [ ] **Step 4: Run green.**
+- [x] **Step 4: Run green.**
 
 Run: `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_target_contract.py -q`.
 
 Expected: exact schema/keys/SE/flags and future feature syntax pass; invalid cases fail for the stated contract, not an accidental exception.
 
-- [ ] **Step 5: Commit.**
+- [x] **Step 5: Commit.**
 
 ```bash
 git add src/embedding_data/target_contract.py tests/test_target_contract.py tests/target_fixtures.py
@@ -844,7 +858,9 @@ def golden_source_rows() -> dict[int, list[dict[str, str]]]:
 
 The old raw formats omit delivered `naics_year` and real harmonization supplies 2012. Fixture helper `assigned_tree(data_dir: Path) -> tuple[pl.LazyFrame, pl.DataFrame, pl.DataFrame]` prepares requests, acquires fixture responses through MockTransport and calls the actual assignment API, returning `(assignments, selected_naics_nodes, selected_county_reference)`. It is available for estimator unit integration; focused rule-matrix tests use the smaller `assignment_case` instead.
 
-- [ ] **Step 1: Write hand-calculated estimator tests and the full diagnostic matrix.**
+- [x] **Step 1: Write hand-calculated estimator tests and the full diagnostic matrix.**
+
+> Deviation: The inherited Exact-C fixture county was corrected from 51059 to the prescribed 51001; the handwritten golden recipe and production rule were unchanged.
 
 ```python
 def test_county_conditioned_shares_count_duplicate_submissions(tmp_path):
@@ -883,13 +899,13 @@ def test_county_conditioned_shares_count_duplicate_submissions(tmp_path):
 
 Add tests for true/null flags in both scopes, denominator-only flags carried by every target cell in that county, `naics_year_from_dictionary` discovery, no Boolean coercion, exact typed empty flag-count output, source anomaly retention, outside-rule and null filing-decision retention, crosswalk/unknown/mismatch exclusions, node type/vintage/level failures, contradictory native scalar/flags rejected, invalid year rejected, no eligible rows refused before target publication, zero-eligible counties retained, no zero/supportless synthetic cells, and `1e-12` normalization tolerance. A small property test repeats or permutes source rows and verifies exact support preservation or invariance of logical sorted results, respectively; do not copy the estimator into the expected-value calculation.
 
-- [ ] **Step 2: Run red.**
+- [x] **Step 2: Run red.**
 
 Run: `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_ita_area_mix.py -q`.
 
 Expected: missing estimator API; no employment-weighted estimator or code-ancestor fallback is introduced.
 
-- [ ] **Step 3: Implement the lazy eligibility, observed-cell counts and companion tables.**
+- [x] **Step 3: Implement the lazy eligibility, observed-cell counts and companion tables.**
 
 ```python
 ESTIMATOR_VERSION = 'ita-area-mix-v1'
@@ -951,13 +967,15 @@ Emit target metadata exactly as in the spec: `osha_ita`, `area_mix`, `county`, s
 
 Report all-year source/assigned/eligible/excluded counts, selected-year mapping-status × assignment-status, exact full-canonical-record duplicate **excess** `sum(group_size-1)` and duplicate-group counts (exclude appended row identity from grouping), repeated nonnull `id` and `establishment_id` group/row/excess counts separately, county D and cell C distributions (`min, p25, median, p75, p95, max`, total count), method coverage and true/null counts by year. All-year eligibility is a coverage diagnostic under the same native industry/county rule, not an extra target-year build. Do not label repeated IDs as confirmed duplicate establishments. Source, unassigned, assigned-ineligible and eligible totals must reconcile exactly; overlapping flags/cross-tabs are separate.
 
-- [ ] **Step 4: Run green.**
+- [x] **Step 4: Run green.**
+
+> Deviation: Focused checks included acquisition regressions for the shared fixture; the subsequently closed M1 added independent report, quantile, method, flag and repeated-ID assertions in test-only commit 4aa6b55.
 
 Run: `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_ita_area_mix.py tests/test_target_contract.py tests/test_ita_assignment.py -q`.
 
 Expected: the three target rows and three county denominators above match exactly, anomaly row remains included, all exclusions reconcile, positive true/null supports and flags agree, and no size gate is imposed.
 
-- [ ] **Step 5: Commit.**
+- [x] **Step 5: Commit.**
 
 ```bash
 git add src/embedding_data/ita_area_mix.py tests/test_ita_area_mix.py tests/target_fixtures.py
@@ -970,7 +988,9 @@ git commit -m "feat(ita): estimate 2023 county establishment shares"
 
 **Interfaces:** Consumes Tasks 1–6. Produces `ita_target_build.build(data_dir: Path, assignment_run_id: str, target_run_id: str, *, year: int = 2023) -> Path`; `ita_target_build.verify_bundle(directory: Path, data_dir: Path) -> dict` (offline, returns verified report); and the three spec commands. `target_fixtures.run_ita_v12(data_dir: Path, monkeypatch) -> Path` is the later-family harness extension point, not a registry/framework for unimplemented estimators.
 
-- [ ] **Step 1: Write publication and CLI tests before implementing orchestration.**
+- [x] **Step 1: Write publication and CLI tests before implementing orchestration.**
+
+> Deviation: Integration uses actual fixture IDs and raw-relative ZIP/CSV citations. Software-change tests copy real source/lock/pyproject bytes into a separate Git checkout; repository-local Git environment isolation fixes the initial hook-context failure, with core.bare restored and verified.
 
 ```python
 def test_build_manifest_and_cached_replay(tmp_path, monkeypatch):
@@ -1017,13 +1037,15 @@ Add parameterized build refusals: unsupported year, no eligible 2023 rows, unsaf
 
 Assert that the unpatched production software registry is complete and every named file exists in the Task 7/V12 tests. Change the recorded assignment implementation checksum and require resume/build refusal; change only estimator implementation and require a new target-run inventory with the same verified preparation. Earlier Tasks 2–3's partial-development test registry must not leak into these tests or any command.
 
-- [ ] **Step 2: Run red.**
+- [x] **Step 2: Run red.**
 
 Run: `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_ita_target_build.py tests/test_targets_cli.py tests/test_target_contract_v12.py -q`.
 
 Expected: new orchestration/group missing; the V12 test must fail until the real production functions are connected, not pass through mocked transforms.
 
-- [ ] **Step 3: Implement offline staged orchestration and exact output provenance.** `build` validates year and safe IDs first, calls `check_preparation` and `read_evidence`, selects already frozen code/geography inputs, calls `assign`, sinks/revalidates the all-year assignment, calls `estimate`/`validate_area_mix`, writes target through `write_targets`, and writes the two typed companion Parquets. Reopen every serialized file for exact schema/order, row counts and family/assignment validation. Only temporary work owned by this staging directory may be removed before inventory; failed `.part` stays inspectable.
+- [x] **Step 3: Implement offline staged orchestration and exact output provenance.** `build` validates year and safe IDs first, calls `check_preparation` and `read_evidence`, selects already frozen code/geography inputs, calls `assign`, sinks/revalidates the all-year assignment, calls `estimate`/`validate_area_mix`, writes target through `write_targets`, and writes the two typed companion Parquets. Reopen every serialized file for exact schema/order, row counts and family/assignment validation. Only temporary work owned by this staging directory may be removed before inventory; failed `.part` stays inspectable.
+
+> Deviation: The public verifier checks serialized canonical/index, parsed Census, ZIP/HUD/reference, scope and precedence fields directly instead of calling assign a second time; it recomputes estimates and reports independently.
 
 The output file set and their ordering keys are:
 
@@ -1055,7 +1077,9 @@ Also record assignment/target run IDs/year, execution commit and clean/dirty sta
 
 Use `assignment_report` plus `AreaMix.report` for `report.json`, with exact table inventories and coverage limits. Recheck preparation, evidence, selected inputs, cited raw entries and current target software/lock after writing, immediately before final publication. Check exact file set/inventory plus final path safety/occupancy, then rename staging to final. No raw manifest append is performed by an offline build. `verify_bundle` runs these byte/schema/row/estimate/provenance checks on the published bundle; it does not acquire/rebuild anything.
 
-- [ ] **Step 4: Add the command group and offline V12 harness.** Follow the existing codes/geography CLI exception style; do not print local variables or submitted addresses. Use this command signature surface:
+- [x] **Step 4: Add the command group and offline V12 harness.** Follow the existing codes/geography CLI exception style; do not print local variables or submitted addresses. Use this command signature surface:
+
+> Deviation: V12 uses the actual requests preparation name and raw-relative source_file values; these sample corrections add no public alias or source transformation.
 
 ```python
 app = typer.Typer(add_completion=False, pretty_exceptions_show_locals=False)
@@ -1129,13 +1153,15 @@ def test_ita_raw_to_target_contract_offline(tmp_path, monkeypatch):
 
 `run_ita_v12` composes `seed_inputs`, real offline preparation, fixture-only MockTransport acquisition, then client/socket/dotenv barriers and real offline build. Assert original summaries/dictionaries/code/geography/Census bytes appear in verified provenance and source order/multiplicity survives. Do not mock harmonization, canonical mapping, geography parsing, assignment, estimator, writer or manifest. Later family stages add their own raw-to-target test beside this test, reusing generic writer/inventory checks; they do not make this test pretend to cover all eight families.
 
-- [ ] **Step 5: Run green and the second full checkpoint.**
+- [x] **Step 5: Run green and the second full checkpoint.**
+
+> Deviation: An isolated V12 pass plus the full 870-test checkpoint covered final Task 7 cases; after the Git-fixture regression, four focused cases and the normal full coverage hook supplied final verification. The final Task 8 group later passed 883 tests.
 
 Run: `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_ita_target_build.py tests/test_targets_cli.py tests/test_target_contract_v12.py -q`, then the full pytest/Behave/ruff/lock group. Run `uv run --offline --locked embedding-data targets --help` and all three subcommand helps with the cache override; they must not access data/network.
 
 Expected: all focused/full checks pass with observed counts recorded; fixture V12 is complete for this family only. Run task review and a whole-branch code review before production preparation so required software changes land before its identity is frozen. Review/fix code now; if later code changes affect the frozen preparation/assignment contract, create new preparation rather than bypassing its version gate.
 
-- [ ] **Step 6: Commit.**
+- [x] **Step 6: Commit.**
 
 ```bash
 git add src/embedding_data/ita_target_build.py src/embedding_data/targets_cli.py src/embedding_data/cli.py tests/test_ita_target_build.py tests/test_targets_cli.py tests/test_target_contract_v12.py tests/target_fixtures.py
@@ -1148,7 +1174,9 @@ git commit -m "feat(targets): publish offline ITA bundles and seed V12"
 
 **Interfaces:** Consumes reviewed shipped APIs from Tasks 1–7 and the explicit selected real inputs. Produces the measured finding, selected immutable assignment/target inventories and a consumer Handoff identifying the actual shipped APIs and their limits. This task is a production acceptance gate, not another estimator task. Do not mark it complete if acquisition/build is incomplete or blocked externally.
 
-- [ ] **Step 1: Document the reviewed command surface before freezing production software.** Put these concrete examples in README, explaining one-time full-table preparation/acquisition, cached resume, offline replay, all-year assignment versus 2023-only target and where files live:
+- [x] **Step 1: Document the reviewed command surface before freezing production software.** Put these concrete examples in README, explaining one-time full-table preparation/acquisition, cached resume, offline replay, all-year assignment versus 2023-only target and where files live:
+
+> Deviation: Workflow documentation was frozen at 0cedb8a before the original preparation; separately reviewed D4/D5 corrections created explicit new execution freezes, ending at 301ee6296070df4c7143413c2e2a7da24a5a5da1.
 
 ```bash
 UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embedding-data targets prepare-ita stage6_ita_assignment_20261014_1000_csv --codes-run stage4_v11_20261013_r2 --geography-run stage5_geography_20261014 --data-dir /Users/lowell/Projects/embedding-data/data
@@ -1160,7 +1188,9 @@ UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embe
 
 Update CLAUDE.md's architecture/status to describe verified shipped commands and protected-input constraints. Link the new production finding only after it exists. Keep planned later ACS/CPS/family work described as planned. Commit docs with `git add README.md CLAUDE.md` and `git commit -m "docs(targets): describe reviewed ITA build workflow"` before production preparation; record that commit as execution provenance. No further relevant software edits may slip into a cached resume.
 
-- [ ] **Step 2: Capture protected inventories and verify real inputs read-only.** From the execution checkout, keep the real data root explicit. For D5, retain and verify the already captured before snapshots without overwriting them. If capturing a new baseline for a later explicitly named execution, choose unused snapshot paths first. The inventory script redirects its JSON to `/private/tmp/embedding-data-stage6-csv-protected-before.json` (outside git). It must cover the whole Stage 3 verification tree, source table and complete Stage 4/5 bundle trees, including raw prior reference bytes via their cited manifest entries:
+- [x] **Step 2: Capture protected inventories and verify real inputs read-only.** From the execution checkout, keep the real data root explicit. For D5, retain and verify the already captured before snapshots without overwriting them. If capturing a new baseline for a later explicitly named execution, choose unused snapshot paths first. The inventory script redirects its JSON to `/private/tmp/embedding-data-stage6-csv-protected-before.json` (outside git). It must cover the whole Stage 3 verification tree, source table and complete Stage 4/5 bundle trees, including raw prior reference bytes via their cited manifest entries:
+
+> Deviation: Original snapshots were retained; final D5 protection expanded to both earlier preparations and acquisition namespaces: 1,938 files, 631 original citations and the exact 317,417-byte manifest prefix.
 
 ```bash
 UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked python - <<'PY' > /private/tmp/embedding-data-stage6-csv-protected-before.json
@@ -1191,11 +1221,15 @@ cp /Users/lowell/Projects/embedding-data/data/raw/manifest.jsonl /private/tmp/em
 
 The before-inventory includes only files present now; new Stage 6 files later under the raw Census parent are allowed. It is not a requirement that the raw manifest's whole-file hash remain constant during acquisition. Also run `target_inputs.select` on the real root with the two explicit selected runs and confirm detached hashes match the spec. Inspect the returned source year counts (2016–2025), total **3,206,055**, unchanged source/canonical physical parity, valid upstream inventories and raw dictionary citations. No builder/sample/download runs in this preflight.
 
-- [ ] **Step 3: Run real offline preparation and record the observed workload.** Run README's exact `prepare-ita` command. Record its source/index/request inventories, software/dependency/commit/lock inventories, rows and actual distinct tuple/batch counts. Compare the actual count to the design estimate **1,113,538 tuples**, explaining any measured difference rather than asserting the estimate is a completed-call count. Under D4 and execution correction D5, at 1,000/request batch the estimate implies 1,114 batches (1,113 full plus 538 records); use the actual new frozen files to count work. Verify the source and request indexes are logically identical to the preserved original preparation, and include both preserved preparation directories, all raw controls and the 283 completed `_1000` responses/receipts in the protected before/after inventory. D5 starts with 1,938 protected files and the exact 317,417-byte / 631-entry manifest prefix; preserve those bytes. Only CSVs containing literal backslashes should change wire hashes; verify exact escape-aware logical equality and unchanged source-row/request mappings. Include incomplete and delivered-excluded requests as required. Verify prepared file hashes before acquiring.
+- [x] **Step 3: Run real offline preparation and record the observed workload.** Run README's exact `prepare-ita` command. Record its source/index/request inventories, software/dependency/commit/lock inventories, rows and actual distinct tuple/batch counts. Compare the actual count to the design estimate **1,113,538 tuples**, explaining any measured difference rather than asserting the estimate is a completed-call count. Under D4 and execution correction D5, at 1,000/request batch the estimate implies 1,114 batches (1,113 full plus 538 records); use the actual new frozen files to count work. Verify the source and request indexes are logically identical to the preserved original preparation, and include both preserved preparation directories, all raw controls and the 283 completed `_1000` responses/receipts in the protected before/after inventory. D5 starts with 1,938 protected files and the exact 317,417-byte / 631-entry manifest prefix; preserve those bytes. Only CSVs containing literal backslashes should change wire hashes; verify exact escape-aware logical equality and unchanged source-row/request mappings. Include incomplete and delivered-excluded requests as required. Verify prepared file hashes before acquiring.
+
+> Deviation: Final selection is stage6_ita_assignment_20261014_1000_csv: 1,113,538 tuples in 1,114 batches. Three-preparation ordered index/tuple equality and the 42-backslash-only wire differences were verified; old requests were never edited.
 
 If planned run names already exist, verify their contents and either resume a matching preparation or choose an explicit new safe suffixed run ID and record that actual selection everywhere. Never remove/overwrite an occupied final or `.part` to force the example names through. A leftover `.part` remains an inspection task; it is not evidence of successful preparation.
 
-- [ ] **Step 4: Acquire all frozen batches, then perform offline build and cached replay.** Run README's exact `acquire-ita` command (the only live service step). Keep progress at batch granularity and preserve completed receipt evidence. A transport/validation failure stops; rerun that same command explicitly to resume verified missing work. No blind retries, alternate options or edits to frozen request files. If the required catalog option is missing, stop and report the requirement as blocked pending evidence/owner direction; do not substitute another frame or claim Stage 6 complete.
+- [x] **Step 4: Acquire all frozen batches, then perform offline build and cached replay.** Run README's exact `acquire-ita` command (the only live service step). Keep progress at batch granularity and preserve completed receipt evidence. A transport/validation failure stops; rerun that same command explicitly to resume verified missing work. No blind retries, alternate options or edits to frozen request files. If the required catalog option is missing, stop and report the requirement as blocked pending evidence/owner direction; do not substitute another frame or claim Stage 6 complete.
+
+> Deviation: Preserved-state diagnosis led to reviewed fresh preparations. Final acquisition completed through 18 explicit invocations and 17 inspected resumes after 12 peer resets/five HTTP 502s, with unchanged frozen requests, options, sequential client and 600-second timeout; diagnostic results were never imported.
 
 Once acquisition verifies every batch, run README's exact `build-ita` command. Run a second offline build from the same assignment inputs:
 
@@ -1205,7 +1239,9 @@ UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embe
 
 Prove replay equality for all four Parquets by schema, ordered logical rows and exact counts. Compare JSON after removing only the documented target-run IDs/execution times and the consequential inventories/checksums of those files. Catalog/receipt/response acquisition times, options and hashes must remain identical. Report physical Parquet checksums as per-run inventories; do not claim them stable across future library versions. Run `verify_bundle` on both outputs and record detached `outputs.json` SHA-256 checksums.
 
-- [ ] **Step 5: Reconcile production evidence and protected bytes.** Use a read-only verification script against the selected target bundle to assert:
+- [x] **Step 5: Reconcile production evidence and protected bytes.** Use a read-only verification script against the selected target bundle to assert:
+
+> Deviation: Independently reviewed temporary QA helpers performed exact ordered lazy comparisons, independent eligibility/support/share checks, protected-byte and manifest-prefix checks, and the zero-discrepancy audit in place of the illustrative inline script.
 
 ```python
 assert assignments.select(pl.len()).collect().item() == 3_206_055
@@ -1234,7 +1270,9 @@ UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embe
 
 Expected: exit 0 with zero discrepancies. Inspect actual output; a failed audit is not waived by target validation.
 
-- [ ] **Step 6: Commit the measured finding and fresh repository checks.** The finding must contain actual selected run IDs, input/preparation/catalog/response/receipt/software inventories and execution commit, returned Census options/acquisition start/end, output inventories and detached checksum, all-ten-year row accounting and immutable-input comparison, 2023 coverage/eligibility/denominators/flag/duplicate/cell distributions, V12 fixture scope and real cached replay evidence. Distinguish conditional coverage from county accuracy and representativeness. State Current-service variability, common-frame historical limit, native-only/year-only slice, retained diagnostics and pending V9 gate. Never title fixture results or native source counts as completed production targets.
+- [x] **Step 6: Commit the measured finding and fresh repository checks.** The finding must contain actual selected run IDs, input/preparation/catalog/response/receipt/software inventories and execution commit, returned Census options/acquisition start/end, output inventories and detached checksum, all-ten-year row accounting and immutable-input comparison, 2023 coverage/eligibility/denominators/flag/duplicate/cell distributions, V12 fixture scope and real cached replay evidence. Distinguish conditional coverage from county accuracy and representativeness. State Current-service variability, common-frame historical limit, native-only/year-only slice, retained diagnostics and pending V9 gate. Never title fixture results or native source counts as completed production targets.
+
+> Deviation: The measured finding was committed as 56ce059 for the required committed-diff task and whole-branch reviews; actual clean review results are recorded by this completion commit. No relevant production software changed after 301ee62.
 
 Run the full pytest/Behave/ruff/lock group once more after final code/docs/review fixes, recording fresh results. Run final requesting-code-review against the actual branch/spec/plan and resolve findings. Required changes to frozen preparation/assignment software require a new preparation/acquisition selection; estimator-only changes can use a new target run with explicit new code provenance. Update the finding to the final verified selection. Then:
 
@@ -1243,7 +1281,7 @@ git add README.md CLAUDE.md specs/findings/stage-6-ita-area-mix-build.md
 git commit -m "docs(targets): record measured Stage 6 ITA build"
 ```
 
-- [ ] **Step 7: Run completion protocol and prepare the later-stage handoff.** Before marking anything complete, apply writing-plans' resolve-before-defer gate. Ask about genuinely owner-blocked leftovers; implement those unblocked by answers; consciously defer only qualifying independent leftovers with closure conditions. Do not defer the required real production milestone and label Stage 6 complete.
+- [x] **Step 7: Run completion protocol and prepare the later-stage handoff.** Before marking anything complete, apply writing-plans' resolve-before-defer gate. Ask about genuinely owner-blocked leftovers; implement those unblocked by answers; consciously defer only qualifying independent leftovers with closure conditions. Do not defer the required real production milestone and label Stage 6 complete.
 
 When Tasks 1–8 and review/evidence are actually complete, tick plan steps and annotate deviations, update/tick qualifying deferred items, and write `## Handoff to later stages` with actual selected bundles/inventories and shipped APIs. Identify what Stages 9–13 consume: generic target schema/validation/writer; per-family unit membership/estimator/uncertainty responsibilities; denominator/flag support meanings; V12 extension point; ITA assignment identity and duplicate multiplicity; separation from Stage 10 text pairs/linkage; pending V9 gate and all-family coverage. Cite the stage spec and actual deviations/traps rather than restating requirements. Never invent a next-stage design.
 
@@ -1251,7 +1289,7 @@ Tick only Stage 6 and add its exact completion stamp in the roadmap. Run backlog
 
 ## Plan review and execution boundary
 
-The owner approved this plan as written on 2026-10-14 (D1) and selected subagent-driven-development in a fresh session (D2). No checklist is marked complete at handoff because these are implementation steps, not planning accomplishments; the receiving execution session records subsequent progress in its durable ledger.
+The owner approved this plan as written on 2026-10-14 (D1) and selected subagent-driven-development in a fresh session (D2). At the original planning handoff, execution checkboxes were intentionally unchecked; this completed record now reflects verified execution.
 
 Execute in the selected fresh session with subagent-driven-development: Tasks 1–7 have distinct artifacts and reviewable contract boundaries, while dependencies still require ordered execution. Read this plan and the stage spec afresh; model selection follows the host's available models and the user's project preferences.
 
@@ -1270,3 +1308,33 @@ Execute in the selected fresh session with subagent-driven-development: Tasks 1�
 | Rollout/later-stage handoff | Task 8 Step 7; only Stage 6 closes, actual APIs feed later families, R7.3 count reporting only and V9 pending |
 
 No uncovered stage requirement identified. Planning verification checks the verbatim header stamp, eight ordered tasks, unchecked execution steps, Python-listing syntax, local links and absence of prose placeholders; it does not claim that the future implementation or production outputs exist.
+
+## Completion record
+
+All Tasks 1–8 passed their implementation and review gates. The final whole-branch review covered `2035d1f8d91bf68b2a004a9d96be1c5a558ecfaf..56ce05909f8069ab21d76fc4df844bb1e95c2608`: spec/plan alignment, quality and production readiness PASS; no outstanding Critical, Important or Minor findings. Task 8's separate review covered `4aa6b55..56ce059` and passed. The earlier M1 was fixed and re-reviewed rather than deferred. A separate Codex CLI second opinion was skipped under its recipe because the controller is Codex; no completed second-opinion run is claimed.
+
+Resolve-before-defer found no skipped requirement, unresolved review finding or owner-blocked question. Nothing new was deferred. The earlier-item ticking pass found no existing open backlog item implemented by this plan. Actual backlog statistics: **13 open, 2 ever closed (closure rate 13%), aged >45d: 0**; oldest open three days. The read-only triage threshold was not reached.
+
+Fresh checks after the measured documentation: **883 pytest passed, 1 deselected**; Behave **1 feature / 2 scenarios / 10 steps passed**; Ruff and offline lock check passed (63 packages). Normal applicable commit hooks, including full pytest Coverage Check, passed on measured documentation commit `56ce059`; its successful hook output suppresses test count/time, so none is inferred. The [measured finding](../../findings/stage-6-ita-area-mix-build.md) records real acquisition, both offline builds, exact ordered replay, independent reconciliation, protected bytes and the zero-discrepancy raw audit, separately from fixture readiness.
+
+The original untracked planning copy in the primary checkout is preserved; it is not a distinct competing implementation plan and was not removed by retirement. Integration follows the completed-branch workflow; this execution does not resume or design another stage.
+
+Review report identities before retiring the ignored execution workspace: Task 8 SHA-256 `afe8ea4c95d6eb37e97d3b8ae31171cdddc9d8f9aa6584f67e5350683cfd0b7e`; final whole-branch SHA-256 `a9ccfa3cde8f921d6f03a7a8756cc09ba11ad022e19a72d0bfdde32662f25107`. Their accepted scope and outcomes are recorded here and in the finding; Git history is the durable implementation record.
+
+## Handoff to later stages
+
+See the [completed stage spec](../../completed/target-contract-ita-area-mix.md) for contract requirements and the [measured finding](../../findings/stage-6-ita-area-mix-build.md) for complete inventories, diagnostic meanings and limits. The explicit root is `/Users/lowell/Projects/embedding-data/data`; preparation is under `derived/osha/assignment-inputs/`, raw evidence under `raw/references/census-geocoder/ita-assignment/`, and targets under `derived/targets/`.
+
+| Selected artifact | Immutable run ID | Detached outputs SHA-256 |
+| --- | --- | --- |
+| Preparation | `stage6_ita_assignment_20261014_1000_csv` | `84b29be17bae26e4cd7bb372108f95641936be4b73b794667957ed39de990d48` |
+| First target | `stage6_ita_area_mix_20261014_1000_csv` | `084292b6835eb09ce27ecc4a3aef03a6f43bfe7b39b815665c29190a431e2473` |
+| Replay | `stage6_ita_area_mix_20261014_1000_csv_replay` | `78fd21e37ba0c5b1cd396ff0961b557650788fdccd3c84a911e8c6c3b7fabe71` |
+
+The finding also pins the selected Stage 4/5 bundles, unchanged source/canonical bytes, all 1,114 fresh request/response/receipt batches, execution commit `301ee62`, lock/dependencies and 31 target implementation modules. Preparation freezes 26 modules; the target adds `target_contract`, `ita_area_mix`, `ita_target_build`, `targets_cli` and `cli`. Frozen preparation/acquisition/assignment/shared dependency changes require a new preparation; permitted estimator/writer-only changes require a new target run with fresh provenance. Entry-point hashes remain provenance, not a silent compatibility alias. Both earlier preparations and all 283 old completed response/receipt pairs remain byte-identical; no diagnostic response became production evidence.
+
+- **Stage 9 — ACS targets:** consume `target_contract.TARGET_SCHEMA`, `TARGET_KEY_COLUMNS`, `validate_targets` and `write_targets(frame, destination) -> serialized inventory` from `src/embedding_data/target_contract.py`, plus the real raw-to-target extension example `tests.target_fixtures.run_ita_v12(data_dir, monkeypatch) -> Path`. The writer owns one sorted file in caller-owned staging, with general typed syntax and metadata/SE checks. Each ACS family still supplies selected-node membership, estimator, eligibility, weights, allocation and uncertainty; ITA unit weights/null SE/native-only filing universe are not ACS defaults. The selected ITA first/replay bundles above are reference evidence, not ACS outputs. No new backlog item is deferred into Stage 9.
+- **Stage 10 — ITA establishment targets:** consume the shared writer/V12 seam and, where its design needs them, the selected all-year `ita_county_assignments.parquet`, exact 38-column canonical prefix and `(canonical_sha256, source_row)` identity. Preserve all 3,206,055 source positions, original strings and duplicate multiplicity. Actual imports are `ita_assignment_prepare.check_preparation`, `ita_assignment_acquire.read_evidence(...).verify()` and `ita_target_build.verify_bundle`; proposed descriptive inputs/acquisition module aliases were never shipped. These records are not a confirmed-establishment link table or deduplicated text pairs. Stage 3 linkage rules and this consumer's own inclusion/linkage/V12 work remain separate. No new backlog item is deferred into Stage 10.
+- **Stage 11 — CPS panel linkage and job-change flows:** consume the generic schema/validator/writer and extend the V12 raw-to-target pattern, anchored by the immutable measured example above. Stage 6 supplies no CPS parser, person-month linkage, job-change guard, weight or uncertainty estimate. Family-specific membership/support/SE choices and source allocation/dependent-coding flags remain this consumer's responsibility; ITA `se_method='none'` is not a CPS precision rule. No new backlog item is deferred into Stage 11.
+- **Stage 12 — Worker profiles and CPS cross-sections:** consume the shared feature `unit_b_type`/`unit_b` syntax, sorted-key writer, required metadata/SE validation and V12 extension seam; consume Stage 9/11 helpers only when those stages ship. Generic finite values are not restricted to ITA shares. Each family owns its estimand, universe, selected membership, weights and uncertainty. No profile estimator, metro eligibility, topcode rule or ASEC replicate behavior was implemented here. No new backlog item is deferred into Stage 12.
+- **Stage 13 — Full build, size gate and comparators:** consume the explicit preparation/target/replay pins and inventories above, `ita_target_build.verify_bundle`, generic writer and seeded V12 path. Four-table ordered logical replay is exact; physical Parquet hashes are per-run inventories. Keep cell counts (`n_unweighted`/`n_weighted`), county eligible denominators and positive true/null flag support separate: 126,958 cells / 324,191 eligible records, 3,069 denominator counties (four zero-eligible/no cells), and 256,743 support rows. A support label means positive support, not unanimity. Preserve common county-2025, CBSA-July-2023, HUD-2025Q4 and mutable Current frames and all-year multiplicity; coverage is not accuracy or representativeness. R7.3 closes count reporting only. V9, comparators, IPUMS verification/citations and all-eight-family V12 remain future work; null SE/none and `size_gate_pending` remain explicit. No new backlog item is deferred into Stage 13, and no target enters training or model selection.

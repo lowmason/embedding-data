@@ -1,10 +1,11 @@
 # Measured Stage 6 ITA assignment and 2023 area-mix build
 
-Measured 2026-10-15. The selected full-data preparation, fresh Census acquisition,
-offline target build and cached replay passed production data acceptance with
-**PASS-WITH-WARNINGS**. Both public bundle verifiers passed. This records actual
-nonfixture outputs; fresh repository checks passed. Normal commit hooks, code
-reviews and the Stage 6 completion protocol are tracked separately below.
+Measured 2026-10-15. Stage 6 is complete on `codex/stage6-ita-area-mix`.
+The selected full-data preparation, fresh Census acquisition, offline target build
+and cached replay passed production data acceptance with **PASS-WITH-WARNINGS**.
+Both public bundle verifiers, fresh repository checks, normal commit hooks and
+independent task/whole-branch reviews passed. Plan/spec retirement and the Stage 6
+roadmap stamp are recorded below; repository integration remains a separate choice.
 
 The all-year assignment preserves all **3,206,055 submitted 2016–2025 records**.
 The 2023 target has **126,958 observed county/industry cells**, supported by
@@ -589,7 +590,7 @@ profiles/cross-sections may reuse writer/V12 contracts while supplying their own
 family assumptions; Stage 13 consumes prior targets/helpers with their inventories.
 This identifies consumers, not a new design for them. ITA `source_row` identity
 and duplicate multiplicity are not Stage 10 linkage evidence. All-family coverage,
-uncertainty choices and V9 size-gate work remain future scope under the live stage
+uncertainty choices and V9 size-gate work remain future scope under the source
 spec and roadmap; this finding does not complete those items.
 
 ## Verification and completion status
@@ -603,10 +604,24 @@ spec and roadmap; this finding does not complete those items.
 | Final fresh full pytest | Passed; 883 passed, 1 deselected, 183.49 seconds; exit 0 |
 | Final fresh Behave | Passed; 1 feature, 2 scenarios, 10 steps; exit 0 |
 | Final fresh Ruff | Passed; `All checks passed!`, exit 0 |
-| Final fresh lock check / normal commit hooks | Lock passed; 63 packages, exit 0. Normal commit hooks pending this documentation commit |
-| Independent Task 8 review and final whole-branch review | **Pending root review and resolution** |
-| Plan/roadmap/spec completion protocol and integration decision | **Pending root completion protocol** |
+| Final fresh lock check / normal commit hooks | Lock passed; 63 packages, exit 0. Normal applicable hooks, including full Coverage Check, passed on measured documentation commit `56ce059` |
+| Independent Task 8 review and final whole-branch review | Both passed through `56ce059`; no outstanding Critical, Important or Minor findings |
+| Plan/roadmap/spec completion protocol and integration decision | Plan/spec retired; only Stage 6 stamped complete; nothing deferred. Branch remains unmerged pending the integration choice |
 
-The data gates above are measured successes with the stated scientific limits.
-They do not stand in for the pending repository/review gates. No plan or roadmap
-completion is recorded by this documentation update.
+Task 8 review covered `4aa6b55..56ce059`; final whole-branch review covered
+`2035d1f8d91bf68b2a004a9d96be1c5a558ecfaf..56ce05909f8069ab21d76fc4df844bb1e95c2608`.
+Both returned spec/quality approval without unresolved findings. Their report
+SHA-256 identities were `afe8ea4c95d6eb37e97d3b8ae31171cdddc9d8f9aa6584f67e5350683cfd0b7e` and
+`a9ccfa3cde8f921d6f03a7a8756cc09ba11ad022e19a72d0bfdde32662f25107`, respectively. A separate Codex CLI
+second opinion was skipped because the controller is Codex, as its review recipe
+requires; no completed second-opinion run is claimed.
+
+The [completed plan and consumer handoff](../plans/completed/6-target-contract-ita-area-mix.md#handoff-to-later-stages)
+and [completed stage spec](../completed/target-contract-ita-area-mix.md) record the
+resolved D3/D4/D5 execution, all 43 completed steps and retirement. Resolve-before-defer
+found no leftover requiring an owner decision and nothing to defer; no earlier
+open backlog item was closed by this stage. Actual backlog statistics were
+13 open, 2 ever closed (closure rate 13%), aged >45d: 0; oldest open three days.
+The scientific warnings above remain interpretation limits. Stage 6 is complete
+on its feature branch; integration is deliberate and the branch/worktree stay
+preserved until that choice.

@@ -185,7 +185,7 @@ placements:
 > Stage 5: COMPLETE (2026-10-14) — implemented by plan 5 (specs/plans/completed/5-geography-hierarchy-county-reference.md). Its [Handoff section](plans/completed/5-geography-hierarchy-county-reference.md#handoff-to-later-stages) revalidates Stages 6–13.
 > Next: resume the roadmap.
 
-- [ ] Stage 6: Target contract and ITA area-mix slice
+- [x] Stage 6: Target contract and ITA area-mix slice
       Objective: One ITA year runs end to end into an area-mix target in the shared output schema, with its manifest.
       Spec: R7.1, R7.2 (area mix, ITA), R7.3, R7.4, R2.2, R2.8, V12, Rollout
       Gap closed: R7.1; R7.3 (counts reported); R7.4; R2.2; R2.8; R7.2 area mix (ITA); V12 (seeded)
@@ -193,6 +193,9 @@ placements:
       Produces: target writer (long schema, flags, output manifest with raw hashes and code, crosswalk, and transformation versions); full-table establishment county assignment beyond Stage 3's sample (plan 3, Handoff; Resolved at resume, 2026-10-13), including Census acquisition while Stage 4 canonical data stays separate (plan 5, [Handoff](plans/completed/5-geography-hierarchy-county-reference.md#handoff-to-later-stages)) (Resolved at resume, 2026-10-14); V12 offline contract-test harness that each later family stage extends
       Exit: area-mix Parquet for one ITA year in the R7.4 schema, every row carrying `se_method`, `n_unweighted`, `n_weighted`, and the ITA universe statement; its manifest lists the `source_file` values it read, each with its SHA-256 (plan 2, Handoff; Resolved at resume, 2026-10-13); V12 passes for this family from fixtures, offline, without credentials; no target is labeled as passing a size gate
       ROUTING: brainstorming
+
+> Stage 6: COMPLETE (2026-10-15) — implemented by plan 6 (specs/plans/completed/6-target-contract-ita-area-mix.md). Its [Handoff section](plans/completed/6-target-contract-ita-area-mix.md#handoff-to-later-stages) names what Stages 9–13 consume.
+> Next: resume the roadmap.
 
 - [ ] Stage 7: IPUMS extract verification
       Objective: The five delivered IPUMS extracts are verified before any ACS or CPS transformation reads them.

@@ -1,13 +1,12 @@
 # Target contract and ITA area-mix slice
 
-> For agentic workers: REQUIRED NEXT SKILL: writing-plans — plan this stage
-> specification in a fresh session; do not plan the source spec or roadmap wholesale.
+**Status: COMPLETE (2026-10-15)** — implemented by [plan 6](../plans/completed/6-target-contract-ita-area-mix.md); production evidence in the [measured finding](../findings/stage-6-ita-area-mix-build.md).
 
 ## Scope and adopted design
 
-Stage 6 of [the roadmap](embedding-evaluation-data-spec-roadmap.md) implements
+Stage 6 of [the roadmap](../embedding-evaluation-data-spec-roadmap.md) implements
 R7.1, R7.4, R7.3's count reporting, the ITA part of R7.2 area mix, R2.2 and
-R2.8, and seeds V12 from [the source spec](embedding-evaluation-data-spec.md).
+R2.8, and seeds V12 from [the source spec](../embedding-evaluation-data-spec.md).
 The owner approved these decisions on 2026-10-14:
 
 - Assign counties across the entire ten-year ITA establishment table, 2016–2025.
@@ -52,12 +51,12 @@ not a latest-run lookup or an implicit alias:
 | Geography bundle | `data/derived/geography/stage5_geography_20261014/` | `geography-v1`; all six table schemas and inventories |
 | Raw provenance | `data/raw/manifest.jsonl` | Hash-and-size-verified citations through `manifest.entry_for` |
 
-The authoritative consumer details are the [Stage 4 handoff](plans/completed/4-code-tables-ita-naics-mapping.md#handoff-to-later-stages),
-[V11 inventory and measurement](findings/v11-ita-naics-mapping.md),
-[Stage 5 handoff](plans/completed/5-geography-hierarchy-county-reference.md#handoff-to-later-stages),
-[geography production finding](findings/stage-5-geography-reference-build.md),
-[Stage 3 handoff](plans/completed/3-ita-verification.md#handoff-to-later-stages),
-and [adopted county finding](findings/v1-v3-ita-verification.md).
+The authoritative consumer details are the [Stage 4 handoff](../plans/completed/4-code-tables-ita-naics-mapping.md#handoff-to-later-stages),
+[V11 inventory and measurement](../findings/v11-ita-naics-mapping.md),
+[Stage 5 handoff](../plans/completed/5-geography-hierarchy-county-reference.md#handoff-to-later-stages),
+[geography production finding](../findings/stage-5-geography-reference-build.md),
+[Stage 3 handoff](../plans/completed/3-ita-verification.md#handoff-to-later-stages),
+and [adopted county finding](../findings/v1-v3-ita-verification.md).
 Carry their exact schemas, nullable fields, independent flags and provenance
 limits forward. The current detached `outputs.json` hashes are:
 
@@ -84,7 +83,7 @@ harmonized `size_class`; annual-average employment does not reconstruct peak siz
 
 The recorded V11 inputs contain 358,294 `native_2022` records in 2023 and 222,166
 in 2024 before geography eligibility. This motivated 2023; these are upstream
-measurements, not completed targets. The Stage 2 [V10 finding](findings/v10-ita-300a-totals.md)
+measurements, not completed targets. The Stage 2 [V10 finding](../findings/v10-ita-300a-totals.md)
 records submission-count gaps and source defects; do not tune counts to published
 levels or infer that filings outside a nominal rule were improper.
 
@@ -92,7 +91,7 @@ levels or infer that filings outside a nominal rule were improper.
 
 Expose a `targets` command group under the existing `embedding-data` entry point:
 
-| Planned command | Behavior |
+| Command | Behavior |
 | --- | --- |
 | `targets prepare-ita ASSIGNMENT_RUN_ID --codes-run CODES_RUN_ID --geography-run GEOGRAPHY_RUN_ID --data-dir ROOT` | Offline verification and frozen full-table requests/mapping |
 | `targets acquire-ita ASSIGNMENT_RUN_ID --data-dir ROOT` | Explicit acquisition/resume of the frozen Census requests |
@@ -480,17 +479,17 @@ chooses task boundaries and exact test commands.
    counts, cell-count distributions and cached replay evidence. Verify protected
    prior artifacts remain unchanged and run the whole-tree manifest audit.
 
-The pipeline commands are planned, not existing capabilities. A fixture result
-cannot satisfy the production milestone. Run repository pytest, Behave, ruff and
-lock checks at implementation completion and record their observed outputs.
+The pipeline commands and measured production milestone are complete. Fixture
+readiness remains separate from production acceptance. Repository pytest, Behave,
+Ruff and lock checks passed; their observed results are in the measured finding.
 The finding must distinguish conditional coverage from county accuracy and from
 representativeness of all establishments. Current-service variability remains a
 recorded limit even after a successful cached replay.
 
 ## Rollout and later-stage handoff
 
-The owner approved this design on 2026-10-14. Planning follows review of this
-written spec; implementation and production acquisition belong to that plan.
+The owner approved this design on 2026-10-14. Completed plan 6 records execution
+deviations, verified production acceptance and the actual later-stage handoff.
 
 > Roadmap: specs/embedding-evaluation-data-spec-roadmap.md, Stage 6 — on plan completion, tick the stage and re-validate later stages against what shipped.
 
