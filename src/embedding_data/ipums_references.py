@@ -16,7 +16,7 @@ import httpx
 import polars as pl
 
 from embedding_data import geography_references as gr
-from embedding_data import manifest, paths, target_io
+from embedding_data import ipums_census_access, manifest, paths, target_io
 from embedding_data.osha_benchmark_download import USER_AGENT
 
 PARSER_VERSION = 'ipums-public-references-v1'
@@ -499,7 +499,8 @@ def make_client():
                         trust_env=False)
 
 
-def acquire(data_dir: Path, reference_id: str) -> Path:
+def acquire(data_dir: Path, reference_id: str, *,
+            census_env_file: Path | None = None) -> Path:
     data_dir = Path(data_dir)
     final, staging = _snapshot_paths(data_dir, reference_id)
     if gr.occupied(staging):
@@ -508,11 +509,21 @@ def acquire(data_dir: Path, reference_id: str) -> Path:
         check_references(data_dir, reference_id)
         return final
     _require_unrecorded_snapshot(data_dir, final)
+    census_kinds = set(REGISTRY) & ipums_census_access.ACS_QUERIES.keys()
+    census_credential = (ipums_census_access.read_credential(
+        env_file=census_env_file) if census_kinds else None)
     _, staging = target_io.stage(final.parent, reference_id, data_dir)
     originals = {}
     with make_client() as client:
         for kind, reference in REGISTRY.items():
             file = staging / reference.filename
+            if kind in census_kinds:
+                body = ipums_census_access.fetch_original(kind, reference.url, census_credential)
+                _write_exclusive(file, body)
+                _validate_original(kind, file)
+                originals[kind] = _request_record(
+                    kind, datetime.now(UTC).isoformat(timespec='seconds'), imported=False)
+                continue
             headers = {'Content-Type': 'application/json'} if reference.request_body else {}
             with client.stream(reference.method, reference.url, content=reference.request_body,
                                headers=headers) as response:

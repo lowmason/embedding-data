@@ -56,12 +56,16 @@ Stage boundaries:
   All other public references remain unauthenticated. Offline commands neither
   read Census credentials, load the root .env nor create an IPUMS client.
 - D3 secret handling: accept Census credentials only at explicit acquisition
-  runtime through CENSUS_API_KEY or a hidden local prompt. Do not put key values
+  runtime through CENSUS_API_KEY, an explicitly supplied local .env file,
+  or a hidden local prompt. Do not put key values
   in chat, command arguments, files, logs, exception output, manifests, receipts,
   request inventories or hashes. Provenance retains the exact registered query
   without its authentication parameter. Disable credential-bearing HTTP logging,
   suppress unsanitized transport exception chains, refuse redirects and reject
-  any response that echoes the key before writing bytes. No root .env loading.
+  any response that echoes the key before writing bytes. Explicit acquisition
+  alone may parse the owner-supplied .env path with interpolation disabled to
+  obtain CENSUS_API_KEY; do not populate process environment from that file or
+  invoke IPUMS authentication. Cached/offline commands never read that file.
   A standalone public-only preflight helper may acquire the two original JSON
   responses into exclusively owned temporary storage for actual layout inspection;
   this does not satisfy full-registry or production acceptance gates.
@@ -100,6 +104,9 @@ Stage boundaries:
   as needed; inspect actual successful originals before implementing the ACS
   parser. Add safe local-entry documentation. Preserve all earlier raw/data,
   offline verification, source inspection and measured adoption requirements.
+  Owner follow-up (2026-10-15): "I already have an activated key" and "It is
+  saved in .env" authorizes acquisition-only runtime lookup of CENSUS_API_KEY
+  from the explicitly supplied local file, without printing/copying it.
   Applied in: Global Constraints, Task 3 acquisition and Task 6 CLI isolation.
 
 ---
@@ -874,7 +881,7 @@ embedding-data ipums compare-runs FIRST_ID SECOND_ID --data-dir ROOT
   Mutate one raw byte, existing Parquet, selected reference, software inventory,
   output schema, output count, output byte and detached checksum separately.
   Each verifier must fail. A new unrelated valid manifest append must pass.
-  Extra/missing output files fail. Verify callbacks never require credentials
+  Extra/missing output files fail. Verify offline callbacks never require credentials
   and all CLI errors exit cleanly without microdata in tracebacks.
   Replay under identical inputs must equal the first run's ordered aggregate
   outputs. Different run metadata need not have equal physical hashes.

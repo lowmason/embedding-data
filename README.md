@@ -247,6 +247,49 @@ Use the root `.env`, even if another `.env` exists under `src/embedding_data/`.
 Both commands load the root file with `python-dotenv`; an exported
 `IPUMS_API_KEY` takes precedence.
 
+## Public ACS reference access
+
+Stage 7's two public aggregate queries need a Census API key, separate from the
+IPUMS key. Use the [official Census key registration page](https://api.census.gov/data/key_signup.html)
+and follow the activation instructions sent by Census. Keep the value out of
+chat, shell command arguments, shell history and saved command output.
+
+After the D3 security review, run the public-original preflight in a local
+terminal. An existing local `.env` containing `CENSUS_API_KEY` can be supplied
+explicitly; this helper reads only that field with interpolation disabled and
+never modifies or copies the file. An exported `CENSUS_API_KEY` takes precedence.
+There is no automatic root `.env` discovery. Use a fresh private temporary output
+directory; the directory must not exist yet and its parent must already exist:
+
+```sh
+UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked \
+  python -m embedding_data.ipums_census_access \
+  --env-file /Users/lowell/Projects/embedding-data/.env \
+  --output-dir /private/tmp/stage7-acs-originals-review
+```
+
+Alternatively, replace `--env-file ...` with `--prompt` to enter the key through
+hidden terminal input. If hidden input is unavailable or cancelled, the command
+fails without accepting echoed input. Do not supply a key value as an argument.
+
+This explicit command makes exactly the registered 2023 and 2024 ACS1
+`NAME,B23025_004E` / `state:*` requests. It saves the unmodified response bytes
+and credential-free URL, hash, size and retrieval time in the new directory.
+It prints only output paths and public-original hashes. Redirects are refused;
+a response echoing the credential is rejected before its bytes are written.
+An interrupted output directory remains occupied: inspect it and choose a fresh
+path for another attempt. A preflight download provides evidence for actual
+layout inspection; full-registry reference readiness and production acceptance
+remain separate gates. ACS level parsing remains blocked until that inspection.
+
+Normal explicit reference acquisition accepts the same existing local file via
+`acquire(data_dir, reference_id, census_env_file=Path(...))`. Only uncached
+acquisition of the two ACS query identities resolves Census credentials.
+Imports, cached checks, offline measurement and module imports never read that
+file or the Census environment key. Other public references remain unauthenticated.
+`uv --offline` controls dependency fetching; the explicit preflight still makes
+HTTP requests.
+
 ## ITA verification commands
 
 Audit the raw manifest without changing files:
