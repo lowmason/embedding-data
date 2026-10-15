@@ -29,8 +29,77 @@ families remain planned. Raw downloads are recorded in
 The OSHA case-detail files are acquired but feed no target; the specification's
 establishment data are the Form 300A summaries.
 
-The extract workflows have been checked with offline definitions and synthetic
-fixtures. Live IPUMS sample and variable acceptance remains to be verified.
+The five 2026-10-12 deliveries have now been measured in full, with exact ordered
+CSV-to-Parquet parity and aggregate replay. The [Stage 7 finding](specs/findings/stage-7-ipums-extract-verification.md)
+records sample/variable acceptance, literal CSV weight storage, the ASEC industry
+scheme matrix, missing flag/metadata limits and published employment gaps.
+Bundle integrity is verified; conservative machine interpretation fields remain
+unresolved where the finding must supply external source review.
+
+## IPUMS recovery and delivered-data verification
+
+`--convert-only` recovers missing Parquets from complete, manifested deliveries
+without loading credentials, contacting IPUMS or resubmitting extracts. Pass the
+intended root explicitly, particularly in a worktree:
+
+```sh
+UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embedding-data acs core --convert-only --data-dir /Users/lowell/Projects/embedding-data/data
+UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked embedding-data cps monthly --convert-only --data-dir /Users/lowell/Projects/embedding-data/data
+```
+
+Select one or more existing sets, or omit sets to select all for that source.
+Recovery preflights every selected raw triple and manifest identity before writing.
+Existing final Parquets are retained; occupied `.part` paths and symlinks fail.
+A unique decompression scratch directory and exclusive `.part` output precede
+validated, no-replacement publication. Only owned scratch/partial files are cleaned
+on failure. `--dry-run` and CPS `--start` cannot be combined with recovery.
+Normal acquisition still submits a new immutable delivery. Recovery was fixture
+tested; the Stage 7 production verification used all five existing Parquets.
+
+Public references have a closed registry. Explicit acquisition/import is separate
+from offline measurement:
+
+```sh
+uv run --locked embedding-data ipums acquire-references NEW_REFERENCE_ID --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked embedding-data ipums import-reference NEW_REFERENCE_ID KIND /path/to/exact-official-original --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked embedding-data ipums measure NEW_RUN_ID --references COMPLETE_REFERENCE_ID --selection /path/to/selection.json --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked embedding-data ipums verify NEW_RUN_ID --outputs-sha256 PRINTED_OUTPUTS_SHA256 --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked embedding-data ipums measure NEW_REPLAY_ID --references COMPLETE_REFERENCE_ID --selection /path/to/selection.json --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked embedding-data ipums compare-runs NEW_RUN_ID NEW_REPLAY_ID --data-dir /Users/lowell/Projects/embedding-data/data
+```
+
+The public command `acquire-references` verifies a complete cache without network;
+missing originals require explicit acquisition. Only the two registered ACS1
+queries use Census credentials (see Public ACS reference access). Other identities
+are unauthenticated. The v3 registry contains 27 originals; the exact BLS POST body
+is the 28th receipt input, and the generated receipt is the 29th separately
+manifested file. Imports preserve original bytes and record local import time as
+a retrieval-time proxy. Do not resave workbooks or import HTML challenge pages.
+
+Selection JSON maps all five profile keys to `delivery` and root-relative `parquet`:
+`{"acs/core":{"delivery":"usa_00001","parquet":"derived/acs/core/usa_00001.parquet"}}`
+is one entry; measurement requires all five. The selected complete example is
+`data/derived/ipums/stage7-selection.json`. The finding records both selected r2
+runs and their actual detached pins. Verify each run with its own printed pin;
+comparison alone does not establish external detached trust.
+
+`measure` checks raw manifest provenance, full delivered schema/value parity,
+required names, every numbered replicate, sample/flag coverage, exact decimal
+weights, industry membership and published employment gaps. It writes eight
+aggregate Parquets and four JSON files in a fresh immutable verification directory.
+A full-file mismatch fails publication; failed measurement staging remains for
+inspection. Occupied final/staging IDs require a fresh ID, never historical repair.
+Changed relevant software or reference schema requires a new snapshot/run selection.
+`verify` reports integrity separately from the measurement's `pass`, `fail` or
+`unresolved` interpretation status. Do not translate unresolved metadata into success.
+
+For these deliveries, use literal CSV weights without applying DDI decimal
+exponents again. ASEC IND/INDLY use the verified 2022 industry scheme in both
+2025 and 2026, with 9890 retained outside official lists and its 2026 meaning
+unresolved. Raw short codes and Parquet zero-padding, unknown legacy API versions,
+QMIGRAT1 gaps/types, guard NIU categories and missing linkage weights remain
+explicit. The finding supplies source-backed interpretation; parsers, concordance
+mapping, linkage rates, SEs, PUMA allocation and new targets remain later work.
 
 ## Classification references and canonical ITA bundles
 
@@ -281,11 +350,12 @@ An interrupted output directory remains occupied: inspect it and choose a fresh
 path for another attempt. A preflight download provides evidence for actual
 layout inspection; full-registry reference readiness and production acceptance
 remain separate gates. ACS level parsing now validates the inspected official
-response layout; production reference adoption and delivery acceptance remain
-unmeasured.
+response layout; the selected complete v3 snapshot and actual delivery verification are now
+recorded in the [Stage 7 finding](specs/findings/stage-7-ipums-extract-verification.md).
 
 Normal explicit reference acquisition accepts the same existing local file via
-`acquire(data_dir, reference_id, census_env_file=Path(...))`. Only uncached
+`ipums acquire-references REFERENCE_ID --census-env-file /path/to/existing.env`
+(or `acquire(data_dir, reference_id, census_env_file=Path(...))`). Only uncached
 acquisition of the two ACS query identities resolves Census credentials.
 Imports, cached checks, offline measurement and module imports never read that
 file or the Census environment key. Other public references remain unauthenticated.

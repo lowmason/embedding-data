@@ -27,8 +27,8 @@ documentation during the session.
 | Locator | Source | Standing |
 | --- | --- | --- |
 | **D** | Design session, 2026-10-12 | Binding for the choices made there: sources, samples, variables, universes. |
-| **XA** | `acs_benchmark_extract.py`, with `acs_benchmark_samples_variables.xlsx` | Executable ACS extract definition. Dry-run tested; first submitted 2026-10-12 *(owner, plan 1, 2026-10-12)*. |
-| **XC** | `cps_benchmark_extract.py`, with `cps_benchmark_samples_variables.xlsx` | Executable CPS extract definition. Sample selection tested against a mocked catalog; first submitted 2026-10-12 *(owner, plan 1, 2026-10-12)*. |
+| **XA** | `acs_benchmark_extract.py`, with `acs_benchmark_samples_variables.xlsx` | Executable ACS extract definition. First submitted 2026-10-12; actual three-delivery sample/variable and full-file parity verification recorded 2026-10-15 in the [Stage 7 finding](findings/stage-7-ipums-extract-verification.md), including flag/metadata limits. *(owner, plan 1, 2026-10-12; verified, plan 7, 2026-10-15)*. |
+| **XC** | `cps_benchmark_extract.py`, with `cps_benchmark_samples_variables.xlsx` | Executable CPS extract definition. First submitted 2026-10-12; actual monthly/ASEC variable and full-file parity verification recorded 2026-10-15 in the [Stage 7 finding](findings/stage-7-ipums-extract-verification.md), including source-scheme and flag/metadata limits. *(owner, plan 1, 2026-10-12; verified, plan 7, 2026-10-15)*. |
 | **ITA** | OSHA ITA data page and Summary Data Dictionary (`osha.gov/itadata`) | Primary documentation for R2. |
 | **USA** | IPUMS USA variable, geography, and terms pages (`usa.ipums.org`) | Primary documentation for R3. |
 | **CPS** | IPUMS CPS variable and code pages (`cps.ipums.org`) | Primary documentation for R4. |
@@ -282,8 +282,9 @@ year's scheme, and since the 2023 5-year file it assigns pre-2022 respondents a
 2020 PUMA by an undocumented method. Use it only for cells the core cannot
 support, keep `MULTYEAR`, and report every result built on it next to the same
 result on its 2023–2024 records. *(chosen; D; verified USA)* The IPUMS sample
-ID, expected to be `us2024c`, is *(open — resolved by verification, not
-argument, discharged by V4)*.
+ID is `us2024c`, with delivered SAMPLE=202403, YEAR=2024 and all five
+MULTYEAR components. *(verified V4, plan 7, 2026-10-15;
+[measured finding](findings/stage-7-ipums-extract-verification.md#v4-and-v5-observed-sample-and-variable-acceptance))*
 
 **R3.3** **Vintage comparator, optional: 2022 ACS (`us2022a`).** It shares the
 core's SOC and PUMA vintages but uses 2017 NAICS, which makes it a test of
@@ -307,9 +308,11 @@ as CSV with IPUMS data quality flags and an inflation-adjusted wage,
 | Workplace geography | `PWSTATE2`, `PWPUMA00`, `PWMET23`, `PWMET23ERR`, `TRANWORK`, `TRANTIME` |
 | Migration geography | `MIGRATE1`, `MIGPLAC1`, `MIGPUMA1`, `MIGMET23` |
 
-*(chosen; D; implemented XA)* Whether the IPUMS API accepts every name,
-including the replicate-weight request, is *(open — resolved by verification,
-not argument, discharged by V5)*.
+*(chosen; D; implemented XA)* API acceptance of every requested name,
+including the replicate-weight request, is verified for the three measured ACS
+deliveries: every requested name and all 80 numbered replicates are present.
+*(verified V5, plan 7, 2026-10-15;
+[measured finding](findings/stage-7-ipums-extract-verification.md#v4-and-v5-observed-sample-and-variable-acceptance))*
 
 **R3.6** The headline universe is civilian employed persons at their current
 job, all classes of worker; `EMPSTATD` removes the armed forces, which general
@@ -380,9 +383,11 @@ six digits of `CPSIDP` — is May 2025 or later. *(verified; CPS)*
 | Geography | `STATEFIP`, `REGION`, `METFIPS`, `COUNTY` | `STATEFIP`, `REGION`, `METFIPS`, `COUNTY` |
 | Migration | — | `MIGRATE1`, `MIGSTA1`, `WHYMOVE` |
 
-*(chosen; D; implemented XC)* Whether the API accepts `CLASSWLY` and `REGION`,
-the two names not confirmed in the CPS documentation, is *(open — resolved by
-verification, not argument, discharged by V5)*.
+*(chosen; D; implemented XC)* API acceptance of `CLASSWLY` and `REGION`,
+the two names not previously confirmed in the CPS documentation, is verified:
+CLASSWLY is delivered in ASEC and REGION in both CPS extracts, with all required
+names and 160 ASEC replicates. *(verified V5, plan 7, 2026-10-15;
+[measured finding](findings/stage-7-ipums-extract-verification.md#v4-and-v5-observed-sample-and-variable-acceptance))*
 
 **R4.6** IPUMS CPS carries Census codes, not NAICS or SOC strings. Store `IND`,
 `OCC`, `INDLY`, and `OCCLY` as zero-padded four-character strings and map them
@@ -412,8 +417,12 @@ unemployed report for their last job. *(verified; CPS)*
 
 **R4.9** ASEC transitions run from the longest job in the previous calendar year
 (`INDLY`, `OCCLY`) to the current job (`IND`, `OCC`) among the currently
-employed. Whether `INDLY` in the 2025 ASEC uses the same 2022 scheme as `IND` is
-*(open — resolved by verification, not argument, discharged by V6)*.
+employed. `INDLY` uses the same 2022 scheme as `IND` in both measured ASEC years,
+2025 and 2026;
+source documentation, original-code retention and 33 discriminators per field/year
+support the 2022 scheme. Special-code 9890 remains outside-list, with 2026 meaning
+unresolved. *(verified V6, plan 7, 2026-10-15;
+[measured field/year matrix](findings/stage-7-ipums-extract-verification.md#v6-field--and-year-specific-asec-industry-evidence))*
 
 **R4.10** Migration targets are state-to-state flows from `MIGSTA1` to
 `STATEFIP`, with a job-related subset defined by `WHYMOVE`: new job or transfer,
@@ -426,8 +435,11 @@ variables, and `ASECWT` for the ASEC. Replicate weights exist only for the ASEC:
 160 of them, with successive-difference factor 4/160. Basic monthly files carry
 no design variables, so monthly standard errors come from a household-cluster
 bootstrap and are labeled approximate. *(verified; CPS — bootstrap added at
-synthesis)* How the CSV files store weights that carry implied decimals in the
-DDI is *(open — resolved by verification, not argument, discharged by V7)*.
+synthesis)* CSV storage for weights that carry implied decimals in the
+DDI is verified as literal numeric values (factor 1) for every delivered
+weight family and numbered replicate; do not apply the fixed-width exponent a
+second time. *(verified V7, plan 7, 2026-10-15;
+[measured storage rule](findings/stage-7-ipums-extract-verification.md#v7-csvddiparquet-weight-interpretation))*
 
 **R4.12** Earnings after March 2023 are released only rounded, so use
 `EARNWEEK2` and `HOURWAGE2` throughout. `HOURWAGE2` topcodes change monthly;
@@ -646,7 +658,10 @@ is scored.
 
 XA and XC were tested offline (dry runs, a mocked sample catalog, and synthetic
 conversions) before their first live submissions on 2026-10-12. Those
-submissions are V5's evidence; V4 and V5 stay open until their results are
-recorded, and no delivered extract is trusted before then. *(owner, plan 1,
-2026-10-12)* Planned targets are never described as built, and no result from a
+submissions supplied V5's evidence. The five complete deliveries were measured
+on 2026-10-15; [Stage 7's finding](findings/stage-7-ipums-extract-verification.md)
+records V4/V5 acceptance, full ordered parity, V6/V7 source interpretation and
+the ACS/CPS V10 gaps, with missing metadata/flags and special codes retained.
+*(owner, plan 1, 2026-10-12; verified, plan 7, 2026-10-15)* Planned targets are
+never described as built, and no result from a
 fixture or a partial extract is reported as a benchmark.
