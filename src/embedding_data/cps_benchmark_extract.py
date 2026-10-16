@@ -29,19 +29,16 @@ IND, OCC, INDLY, and OCCLY are written as zero-padded 4-character strings so
 they join cleanly to the Census code lists that give NAICS and SOC equivalents.
 '''
 
-import gzip
 import os
 import re
-import shutil
 from pathlib import Path
 from typing import Annotated
 
-import polars as pl
 import typer
 from dotenv import load_dotenv
 from ipumspy import IpumsApiClient, MicrodataExtract
 
-from embedding_data import ipums_delivery, paths
+from embedding_data import ipums_conversion, ipums_delivery, paths
 
 DOTENV_PATH = paths.PROJECT_ROOT / '.env'
 
@@ -75,8 +72,8 @@ VARIABLES = {
     ],
 }
 
-CODE_COLUMNS = ['IND', 'OCC', 'INDLY', 'OCCLY']
-SCHEMA_OVERRIDES = {'INCWAGE_CPIU_2010': pl.Float64}
+CODE_COLUMNS = ipums_conversion.CODE_COLUMNS
+SCHEMA_OVERRIDES = ipums_conversion.CPS_SCHEMA_OVERRIDES
 
 
 def parse_month(text: str) -> tuple[int, int]:
@@ -125,20 +122,8 @@ def build_extract(name: str, samples: list[str]) -> MicrodataExtract:
 
 
 def csv_to_parquet(csv_gz: Path, parquet_path: Path) -> Path:
-    '''Stream-decompress an IPUMS .csv.gz beside parquet_path, then sink it to Parquet lazily.'''
-    parquet_path.parent.mkdir(parents=True, exist_ok=True)
-    csv_path = parquet_path.with_suffix('.csv')
-    try:
-        with gzip.open(csv_gz, 'rb') as src, csv_path.open('wb') as dst:
-            shutil.copyfileobj(src, dst, length=16 * 1024 * 1024)
-        lf = pl.scan_csv(csv_path, schema_overrides=SCHEMA_OVERRIDES, infer_schema_length=100_000)
-        codes = [c for c in CODE_COLUMNS if c in lf.collect_schema().names()]
-        if codes:
-            lf = lf.with_columns(pl.col(codes).cast(pl.String).str.zfill(4))
-        lf.sink_parquet(parquet_path)
-    finally:
-        csv_path.unlink(missing_ok=True)
-    return parquet_path
+    '''Convert a delivered gzip CSV without replacing an existing Parquet.'''
+    return ipums_conversion.convert(csv_gz, parquet_path, 'cps')
 
 
 @app.command(help=__doc__.splitlines()[0])
@@ -159,6 +144,10 @@ def main(
         bool,
         typer.Option('--dry-run', help='Write definitions to preview/ without submitting.'),
     ] = False,
+    convert_only: Annotated[
+        bool,
+        typer.Option('--convert-only', help='Recover missing Parquet offline.'),
+    ] = False,
 ) -> None:
     extracts = extracts or ['monthly', 'asec']
 
@@ -167,6 +156,15 @@ def main(
         raise typer.BadParameter(
             'unknown extract(s): ' + ', '.join(unknown), param_hint='extracts'
         )
+
+    if convert_only:
+        if dry_run:
+            raise typer.BadParameter('--convert-only cannot be combined with --dry-run')
+        if start != MONTHLY_FIRST:
+            raise typer.BadParameter('--start cannot be combined with --convert-only')
+        for parquet in ipums_conversion.recover(data_dir, 'cps', extracts):
+            typer.echo(f'wrote {parquet}')
+        return
 
     start_month = parse_month(start)
     if 'monthly' in extracts and start_month < parse_month(MONTHLY_FIRST):

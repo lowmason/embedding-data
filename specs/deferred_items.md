@@ -1,7 +1,7 @@
 # Deferred items
 
 ## 1-raw-provenance — 2026-10-12
-- [ ] ACS and CPS convert-if-absent (manifest audit sibling, final review Minor): if
+- [x] ACS and CPS convert-if-absent (manifest audit sibling, final review Minor): if
       `csv_to_parquet` fails after `ipums_delivery.deliver()` has recorded a delivery (a Polars
       error, out of memory on the five-year extract), the only recovery is to resubmit, which
       can take hours; `osha` converts when the Parquet is absent, ACS and CPS do not. Their
@@ -10,7 +10,13 @@
       `.part` file, unlike `osha_benchmark_download.csv_to_parquet`. See
       specs/plans/completed/1-raw-provenance.md. Size: quick-fix. Done when: both modules write
       Parquet through a `.part` rename and a re-run converts any delivered `.csv.gz` that lacks
-      its Parquet without submitting a new extract. Target: Stage 7.
+      its Parquet without submitting a new extract. Target: Stage 7. → done in [plan 7](plans/completed/7-ipums-extract-verification.md):
+      explicit offline `--convert-only` verifies all selected raw triples, retains existing
+      Parquets and publishes validated exclusive `.part` output with no-replacement hard
+      linking (stronger than overwriting rename). `tests/test_ipums_conversion.py` covers
+      repeatability, offline credentials/client boundaries, failure cleanup and occupied
+      paths. The [actual finding](findings/stage-7-ipums-extract-verification.md) measures
+      existing Parquets; no production recovery was necessary.
 - [x] Manifest audit (final review recommendation) → done in plan 3: nothing checks that every file under
       `data/raw` has an entry or that each entry's hash still matches its file, and
       `manifest.entry_for` (`src/embedding_data/manifest.py`) returns an entry without
@@ -19,11 +25,15 @@
       such an audit. Size: plan. Done when: an audit command or function lists unrecorded raw
       files and hash mismatches, and `entry_for` (or the output-manifest writer) verifies the
       hash before citing it. Target: Stage 3.
-- [ ] Legacy `extract.json` version (final review Minor): the five backfilled
+- [x] Legacy `extract.json` version (final review Minor): the five backfilled
       `data/raw/*/*/*/extract.json` files carry `"version": null` because they were written
       before submission, while deliveries made after Stage 1 carry the API version. Size:
       quick-fix. Revisit if: a stage reads the `version` field of `extract.json`; until then
-      readers must not rely on it. Target: Stage 7.
+      readers must not rely on it. Target: Stage 7. → done in [plan 7](plans/completed/7-ipums-extract-verification.md):
+      `ipums_ddi.read_definition` explicitly preserves null/absent versions, covered by
+      `tests/test_ipums_ddi.py`; the [actual finding](findings/stage-7-ipums-extract-verification.md)
+      records all five API versions as unknown, independently of citation/DDI/client
+      versions. Immutable historical definitions were not rewritten.
 - [ ] `raw_backfill` hardening (Codex P2, review Minors): the pre-move checks accept a
       destination whose ancestor is a regular file (for example `derived/acs`), so files can
       move before `mkdir` fails and the retry then skips them; a set directory without a
@@ -114,3 +124,17 @@
       `tests/test_ita_summary.py`, `tests/test_ita_catalog.py`,
       `tests/test_manifest.py`, `tests/test_osha_benchmark_download.py`. Size: quick-fix.
       Done when: each gap has a test or a recorded decision to accept it.
+
+## 7-ipums-extract-verification — 2026-10-15
+- [ ] Clarify the 2026 ASEC industry code `9890` before Stage 11 mapping. The
+      actual IND/INDLY counts are 13/286 in 2026 and 7/339 in 2025. The frozen
+      2025 source appendix labels it Military, while both full Census lists,
+      the 2025-onward IPUMS codebook and the 2026 appendix omit it. Do not infer
+      its 2026 meaning or invent a valid native leaf. See
+      `specs/findings/stage-7-ipums-extract-verification.md` (V6) and
+      `specs/plans/completed/7-ipums-extract-verification.md` (Handoff, Stage 11).
+      Touches the later CPS category/parser and mapping work under R4/R5/V11;
+      no Stage 7 microdata parser was built. Size: plan. Done when: authoritative
+      field/year-specific evidence resolves the 2026 category and Stage 11 has
+      regression-tested explicit special/mapping behavior retaining original
+      values and provenance, with no silent leaf assignment or headline inclusion.

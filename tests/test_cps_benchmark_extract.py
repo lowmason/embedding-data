@@ -241,3 +241,20 @@ def test_an_asec_only_run_ignores_the_monthly_floor(run_cli, data_directory):
     client_factory.assert_called_once_with('dotenv-test-key')
     assert list(preview(data_directory, 'asec')['samples']) == ['cps2025_03s', 'cps2026_03s']
     assert not (data_directory / 'preview/cps/monthly').exists()
+
+
+@pytest.mark.parametrize('set_name', ['monthly', 'asec'])
+def test_convert_only_rejects_a_nondefault_start_before_credentials(
+    cli_runner, tmp_path, set_name,
+):
+    with (
+        patch.object(benchmark, 'DOTENV_PATH', tmp_path / 'absent.env'),
+        patch.object(benchmark, 'load_dotenv', side_effect=AssertionError('dotenv loaded')),
+        patch.object(benchmark, 'IpumsApiClient', side_effect=AssertionError('client created')),
+    ):
+        result = cli_runner.invoke(benchmark.app, [
+            set_name, '--convert-only', '--start', '2026-08', '--data-dir', str(tmp_path),
+        ])
+    assert result.exit_code == 2, result.output
+    assert '--start cannot be combined with --convert-only' in result.output
+    assert list(tmp_path.iterdir()) == []

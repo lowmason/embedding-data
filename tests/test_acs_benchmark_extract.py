@@ -332,3 +332,17 @@ def test_the_api_key_reaches_no_file_and_no_output(run_live, data_directory):
     assert 'dotenv-test-key' not in result.output
     for path, contents in tree(data_directory).items():
         assert b'dotenv-test-key' not in contents, path
+
+
+def test_convert_only_validates_set_names_before_credentials(cli_runner, tmp_path):
+    with (
+        patch.object(benchmark, 'DOTENV_PATH', tmp_path / 'absent.env'),
+        patch.object(benchmark, 'load_dotenv', side_effect=AssertionError('dotenv loaded')),
+        patch.object(benchmark, 'IpumsApiClient', side_effect=AssertionError('client created')),
+    ):
+        result = cli_runner.invoke(benchmark.app, [
+            'unknown', '--convert-only', '--data-dir', str(tmp_path),
+        ])
+    assert result.exit_code == 2, result.output
+    assert 'unknown extract(s): unknown' in result.output
+    assert list(tmp_path.iterdir()) == []
