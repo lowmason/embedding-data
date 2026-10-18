@@ -701,3 +701,63 @@ data/preview/                                Dry-run extract definitions
 pyproject.toml                               Project dependencies and Python requirement
 uv.lock                                      Project dependency lockfile
 ```
+
+
+### ACS classification and population allocation (Stage 8 software)
+
+The separate module commands use explicit run IDs, an explicit local data root and
+external control pins. They consume selected Stage 4, 5 and 7 bundles in place.
+Only `acquire-references` retrieves public originals; `import-reference` registers
+local public original bytes. A complete cached reference snapshot is checked without
+constructing an HTTP client. Build, verification and comparison are offline; none
+loads `.env`, requests credentials or constructs an IPUMS API client.
+
+```bash
+uv run --offline --locked python -m embedding_data.acs_mapping acquire-references REFERENCE_ID --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked python -m embedding_data.acs_mapping import-reference REFERENCE_ID KIND ORIGINAL --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked python -m embedding_data.acs_mapping build RUN_ID --references REFERENCE_ID --references-sha256 RECEIPT_PIN --codes-run CODES_ID --codes-outputs-sha256 CODES_PIN --geography-run GEOGRAPHY_ID --geography-outputs-sha256 GEOGRAPHY_PIN --ipums-run IPUMS_ID --ipums-outputs-sha256 IPUMS_PIN --ipums-references-sha256 IPUMS_RECEIPT_PIN --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked python -m embedding_data.acs_mapping verify RUN_ID --outputs-sha256 EXTERNAL_PIN --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked python -m embedding_data.acs_mapping compare-runs FIRST_ID SECOND_ID --data-dir /Users/lowell/Projects/embedding-data/data
+```
+
+Uppercase tokens are required selections, supplied by the later production execution
+step. `uv --offline` restricts package fetching; the acquisition command itself can
+retrieve public references. Reference receipts and upstream `outputs.json` files need
+independently captured pins. Build emits JSON with `run_id`, `directory` and
+`outputs_sha256`; save this response outside the bundle in a gitignored control
+receipt. Verification requires that external output pin before trusting local records.
+Owner decision D5 preserves the selected historical Stage 5 creator CLI record only
+for `stage5_geography_20261014` and its exact approved detached output pin. The
+current CLI hash must also agree with strictly verified Stage 7 and frozen
+Stage 8 executing software. The original upstream inventory
+is retained with explicit compatibility diagnostics; every other software,
+dependency, Python/lock, source/reference and table check stays strict.
+Comparison checks ordered logical contents of all eight tables and substantive report
+content; it does not establish trust. Verify both runs separately before adopting a
+replay. Exit codes are 0 for success, 1 for logical mismatch and 2 for validation or
+acquisition failure, with metadata-only error output.
+
+Each run under `data/derived/acs/mapping/RUN_ID/` has eight Parquets plus
+`inputs.json`, `report.json` and `outputs.json`. The inventory covers the other ten
+files. The three companions preserve original columns, strings, delivery-specific
+Q flags, types, duplicate multiplicity and person row order, followed by a typed
+annotation suffix. Reference tables retain sorted distinct unweighted classification
+possibilities, root-to-leaf candidate paths and cited geography statuses. Factors use
+2020 population and PUMA definitions, 2022 county composition, the 2025 county inventory
+and July 2023 MSA delineations as separate frames. Geographic allocation and fractional
+splits remain explicit; allocation does not infer an individual's county or MSA.
+
+Existing final or `.part` names are refused. Inspect caller-owned interrupted paths
+and choose a fresh explicit run ID; do not overwrite an earlier bundle or repair it
+in place. Failed builds clean only their owned staging. The public verifier reconstructs
+mappings, factors and all companion annotations from pinned originals and selected
+sources, and checks current executing software and dependencies.
+
+Fixture software readiness is separate from Stage 8 full-data acceptance. The
+raw-to-converter-to-authenticated-upstreams fixture exercises replay, preservation and
+integrity gates; it does not establish V9 or complete eight-family V12 acceptance.
+Mapping outputs are evaluation inputs, never embedder training or model-selection
+data. ACS universes, headline inclusion, target families, employment-weighted code
+allocation, pooling and replicate standard errors remain later-stage work. Full-data
+measurements, independent reconciliation and review are still required before retiring
+Stage 8.

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-Builds aggregate evaluation targets for industry (NAICS), occupation (SOC), and geography embeddings from three sources: OSHA ITA Form 300A summaries, ACS via IPUMS USA, and CPS via IPUMS CPS. `specs/embedding-evaluation-data-spec.md` is the source of truth. So far the IPUMS extract scripts (define → submit → download → CSV-to-Parquet), the OSHA Form 300A summary acquisition with its stacked establishment-year table, and an OSHA case-detail download (download → CSV-to-Parquet) exist; every raw file is recorded in an append-only manifest (`data/raw/manifest.jsonl`); canonical NAICS/SOC graphs, NAICS concordances, ITA candidate mapping and filing-universe diagnostics are built. Geography reference bundles now supply the complete 2025 county inventory, July 2023 metropolitan/micropolitan membership and 2025Q4 HUD eligibility; the Stage 6 commands have measured full-data ITA assignment, a 2023 ITA area-mix target and exact cached replay through the shared target writer; the selected data acceptance is recorded in `specs/findings/stage-6-ita-area-mix-build.md`. Stage 7 now measures the five delivered IPUMS extracts with full-file parity, exact aggregate replay and frozen public references; its source-backed decisions and limits are in `specs/findings/stage-7-ipums-extract-verification.md`. PUMA allocation, ACS/CPS code parsers and other target families remain planned.
+Builds aggregate evaluation targets for industry (NAICS), occupation (SOC), and geography embeddings from three sources: OSHA ITA Form 300A summaries, ACS via IPUMS USA, and CPS via IPUMS CPS. `specs/embedding-evaluation-data-spec.md` is the source of truth. So far the IPUMS extract scripts (define → submit → download → CSV-to-Parquet), the OSHA Form 300A summary acquisition with its stacked establishment-year table, and an OSHA case-detail download (download → CSV-to-Parquet) exist; every raw file is recorded in an append-only manifest (`data/raw/manifest.jsonl`); canonical NAICS/SOC graphs, NAICS concordances, ITA candidate mapping and filing-universe diagnostics are built. Geography reference bundles now supply the complete 2025 county inventory, July 2023 metropolitan/micropolitan membership and 2025Q4 HUD eligibility; the Stage 6 commands have measured full-data ITA assignment, a 2023 ITA area-mix target and exact cached replay through the shared target writer; the selected data acceptance is recorded in `specs/findings/stage-6-ita-area-mix-build.md`. Stage 7 now measures the five delivered IPUMS extracts with full-file parity, exact aggregate replay and frozen public references; its source-backed decisions and limits are in `specs/findings/stage-7-ipums-extract-verification.md`. Stage 8 ACS mapping software now supplies offline code parsing, population allocation and immutable companion bundles; full-data acceptance, CPS mapping and other target families remain planned.
 
 ## Commands
 
@@ -232,3 +232,44 @@ Invariants for new code (details in the spec):
 ## Conventions
 
 Single-quoted strings and `'''` docstrings. Indentation differs by file — the CPS module and all tests use 4 spaces, the ACS module uses 2 — so match the file being edited.
+
+
+**ACS mapping software (Stage 8).** The independent `python -m
+embedding_data.acs_mapping` command group exposes exactly `acquire-references`,
+`import-reference`, `build`, `verify` and `compare-runs`; it is intentionally separate
+from the frozen top-level CLI. Always pass `--data-dir`, explicit upstream run IDs,
+detached upstream/output pins and the pinned Stage 8 reference receipt. README shows
+the full invocation contract. Only public acquisition retrieves bytes. Build/verify/
+comparison never load environment files or credentials and consume selected upstreams
+in place. An occupied final or partial requires inspection and a fresh run ID.
+
+The eleven-file bundle freezes all selected raw/reference/source bytes, ordered
+schemas, rules, frames and explicit executing software/dependency identities. Public
+verification authenticates the external inventory pin first and reconstructs all
+five reference tables and all three ordered companion annotations. Comparison checks
+eight logical tables and report content, omitting only top-level run ID/time; it does
+not authenticate either run. Preserve Q columns, source order, duplicate multiplicity,
+raw strings and delivery-specific evidence. Unweighted classification possibilities
+retain aggregate/partial/crosswalk provenance; population allocation is not individual
+location inference. Keep 2020 population/PUMAs, 2022 county composition, 2025 inventory
+and July 2023 MSAs distinct, with Puerto Rico reference exclusions measured.
+
+The authenticated V12 extension fixture starts with synthetic manifested delivery
+triples and unchanged CSV conversion, imports committed exact public Stage 4 originals,
+builds real Stage 4/5 bundles and measures real Stage 7 evidence before actual Stage 8
+selection/build/replay/verification. Its synthetic Stage 5 originals retain all nine
+Connecticut planning regions and Puerto Rico controls. No production fixture input,
+mocked selector or copied finished classification graph supplies this chain. This is
+software readiness; Stage 8 stays unticked until full-data measurement, independent
+reconciliation, preservation checks and review. No ACS universe, headline inclusion,
+Stage 9–13, V9 or full eight-family V12 acceptance follows from it.
+
+
+Owner decision D5 permits only the exact selected historical Stage 5 run/output pin
+and approved old/current `cli.py` hashes. The current CLI must match strictly
+verified selected Stage 7 software and frozen Stage 8 executing software. Preserve
+the old inventory and explicit compatibility diagnostics; this is historical
+entrypoint provenance, with no general stale-software exception. All other files,
+dependencies, Python/lock identities, inventories, citations and tables stay strict.
+The approved run/pins/hashes and registration-only source commits are recorded in
+the Stage 8 plan's D5 decision and selector constants.

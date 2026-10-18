@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 import pytest
 from code_fixtures import seed_code_tree
 from geography_fixtures import seed_geography_tree
-from target_fixtures import forbid_external_access
 from test_ipums_verification_run import complete_inputs
 
 from embedding_data import code_build, geography_build, ipums_verification_run, manifest
@@ -155,15 +154,18 @@ def write_public_layout(file: Path, record: dict) -> None:
         archive.writestr('xl/_rels/workbook.xml.rels', tostring(relationships))
 
 
-def seed_mapping_references(tmp_path, monkeypatch, *, original_overrides=None):
+def seed_mapping_references(tmp_path, monkeypatch, *, original_overrides=None, data_dir=None):
     '''Use every registered kind, with explicit independently computed excerpt pins.'''
     import json
     from dataclasses import replace
     from types import SimpleNamespace
 
+    from target_fixtures import forbid_external_access as forbid_fixture_access
+
     from embedding_data import acs_mapping_references as refs
 
-    forbid_external_access(monkeypatch)
+    # Shared raw setup also serves mocked acquisition; strict callers keep their guard.
+    forbid_fixture_access(monkeypatch)
     layouts = json.loads(
         (Path(__file__).parent / 'fixtures/acs_mapping/reference-layouts.json').read_text()
     )['originals']
@@ -182,7 +184,7 @@ def seed_mapping_references(tmp_path, monkeypatch, *, original_overrides=None):
         files[kind] = file
         registry[kind] = replace(reference, sha256=manifest.sha256_file(file))
     monkeypatch.setattr(refs, 'REGISTRY', registry)
-    root = tmp_path / 'data'
+    root = data_dir if data_dir is not None else tmp_path / 'data'
     for kind, file in files.items():
         refs.import_reference(root, 'fixture_references', kind, file)
     receipt = refs.reference_directory(root, 'fixture_references') / 'receipt.json'
@@ -678,3 +680,259 @@ def companion_case(tmp_path, role_case, evidence, selected):
     for case in profiles.values():
         case.codes, case.areas, case.factors = codes, areas, role_case.factors
     return SimpleNamespace(**vars(profiles['core']), profiles=profiles)
+
+
+def forbid_external_access(monkeypatch):
+    '''Deny client construction as well as network, dotenv and credential seams.'''
+    import dotenv
+    import httpx
+    import ipumspy
+    from target_fixtures import forbid_external_access as forbid_base
+
+    from embedding_data import acs_mapping_references, ipums_census_access, ipums_references
+
+    forbid_base(monkeypatch)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError('offline ACS mapping attempted external access')
+
+    for owner, names in (
+        (httpx, ('Client', 'AsyncClient')),
+        (dotenv, ('load_dotenv', 'dotenv_values')),
+        (ipumspy, ('IpumsApiClient',)),
+        (ipums_census_access, ('dotenv_values', 'read_credential')),
+        (ipums_references, ('make_client',)),
+        (acs_mapping_references, ('make_client',)),
+    ):
+        for name in names:
+            monkeypatch.setattr(owner, name, forbidden)
+
+
+def _authenticated_deliveries(data_dir, directory, monkeypatch):
+    '''Manifest definitions/DDI/gzip CSV before the unchanged converter is invoked.'''
+    import gzip
+    import json
+    from dataclasses import replace
+    from datetime import UTC, datetime
+    from xml.etree import ElementTree as ET
+
+    import polars as pl
+    from ipums_fixtures import bls_response, reference_originals
+    from test_ipums_acceptance import PROFILES, delivery
+
+    from embedding_data import ipums_conversion, ipums_references, paths
+
+    originals = reference_originals(directory / 'stage7-originals', ipums_references.REGISTRY)
+    public = Path(__file__).parent / 'fixtures/acs_mapping/classification'
+    for year in (2017, 2022):
+        originals[f'census_industry_{year}'].write_bytes(
+            (public / f'census_industry_{year}.xlsx').read_bytes())
+    originals['cps_employment'].write_text(json.dumps(bls_response()))
+    originals['usa_samples'].write_text(
+        '<table><tr><th>Sample ID</th><th>Description</th></tr>'
+        + ''.join(f'<tr><td>{key}</td><td>{label}</td></tr>' for key, label in
+                  delivery()[-1].items()) + '</table>')
+    for year in (2023, 2024):
+        file = originals[f'acs_{year}_b23025_metadata']
+        file.write_text(file.read_text().replace(
+            '<td>B23025_004E</td>', '<td>B23025_004E</td>'
+            '<td>Estimate!!Civilian labor force:!!Employed</td>')
+            + '<p>Population 16 years and over</p>')
+    monkeypatch.setattr(ipums_references, 'REGISTRY', {
+        kind: replace(reference, sha256=manifest.sha256_file(originals[kind]))
+        if reference.sha256 else reference
+        for kind, reference in ipums_references.REGISTRY.items()})
+    for kind, file in originals.items():
+        ipums_references.import_reference(data_dir, 'references', kind, file)
+    selections = {}
+    for index, (source, profile) in enumerate(PROFILES, 1):
+        definition, ddi, frame, _, _, _ = delivery(source, profile)
+        frame = frame.with_columns(pl.lit(30).alias('AGE'))
+        if source == 'acs':
+            frame = frame.with_columns(
+                pl.lit(10).alias('EMPSTATD'), pl.lit('113M').alias('INDNAICS'),
+                pl.lit(190).alias('IND'), pl.lit('559830').alias('OCCSOC'),
+                pl.lit(9830).alias('OCC'), pl.lit('100.25').alias('PERWT'),
+                pl.lit(100).alias('PUMA'), pl.lit(1).alias('PWSTATE2'),
+                pl.lit(100).alias('PWPUMA00'), pl.lit(1).alias('MIGPLAC1'),
+                pl.lit(100).alias('MIGPUMA1'))
+            states = [('01', 'Alabama'), ('09', 'Connecticut'), ('72', 'Puerto Rico')]
+            categories = {
+                'STATEFIP': states, 'PUMA': [], 'PWPUMA00': [], 'MIGPUMA1': [],
+                'PWSTATE2': [*states, ('00', 'N/A'), ('80', 'Abroad'), ('99', 'Not reported')],
+                'MIGPLAC1': [('001', 'Alabama'), ('009', 'Connecticut'), ('000', 'N/A'),
+                             ('110', 'Puerto Rico'), ('150', 'Canada'), ('997', 'Unknown value'),
+                             ('999', 'Missing'), ('988', 'Suppressed for data year 2022')],
+            }
+            for variable in ddi['variables']:
+                name = variable['name']
+                if name in categories:
+                    variable['categories'] = [{'value': code, 'label': label}
+                                              for code, label in categories[name]]
+        else:
+            frame = frame.with_columns(pl.lit(10).alias('EMPSTAT'),
+                                       pl.lit('0170').alias('IND'), pl.lit('0010').alias('OCC'))
+            if profile == 'monthly':
+                frame = frame.with_columns(pl.lit('123.5').alias('WTFINL'))
+            else:
+                frame = frame.with_columns(pl.lit('0180').alias('INDLY'),
+                                           pl.lit('0010').alias('OCCLY'))
+        if source == 'acs' and profile == 'core':
+            frame = pl.concat([frame, frame.head(1)])  # Genuine duplicate in manifested CSV.
+        collection = 'usa' if source == 'acs' else 'cps'
+        name = f'{collection}_{index}'
+        raw = data_dir / 'raw' / source / profile / name
+        raw.mkdir(parents=True)
+        (raw / 'extract.json').write_text(json.dumps(definition))
+        xml = ET.Element('codeBook', version='2.5')
+        info = ET.SubElement(ET.SubElement(xml, 'stdyDscr'), 'stdyInfo')
+        for note in ddi['study_notes']:
+            ET.SubElement(info, 'notes').text = note
+        summary = ET.SubElement(info, 'sumDscr')
+        for note in ddi['time_notes']:
+            ET.SubElement(summary, 'timePrd', date=note['date']).text = note['text']
+        data = ET.SubElement(xml, 'dataDscr')
+        for variable in ddi['variables']:
+            element = ET.SubElement(data, 'var', name=variable['name'], dcml='2')
+            ET.SubElement(element, 'labl').text = variable['label']
+            for category in variable['categories']:
+                item = ET.SubElement(element, 'catgry')
+                ET.SubElement(item, 'catValu').text = category['value']
+                ET.SubElement(item, 'labl').text = category['label']
+        ET.ElementTree(xml).write(raw / f'{name}.xml')
+        with gzip.open(raw / f'{name}.csv.gz', 'wt') as output:
+            output.write(frame.collect().write_csv())
+        for file in raw.iterdir():
+            manifest.append_entries(paths.manifest_path(data_dir), [manifest.describe_file(
+                file, data_dir / 'raw', retrieved_at=datetime.now(UTC), client='fixture',
+                client_version='1', collection=collection, extract_number=index,
+                samples=list(definition['samples']))])
+        parquet = data_dir / f'derived/{source}/{profile}/{name}.parquet'
+        parquet.parent.mkdir(parents=True)
+        ipums_conversion.convert(raw / f'{name}.csv.gz', parquet, source)
+        selections[f'{source}/{profile}'] = {
+            'delivery': name, 'parquet': parquet.relative_to(data_dir).as_posix()}
+    selection = directory / 'selection.json'
+    selection.write_text(json.dumps(selections))
+    return selection
+
+
+def _authenticated_codes(data_dir, directory):
+    import hashlib
+    import json
+    import shutil
+    from zipfile import ZipFile
+
+    from embedding_data import code_references, paths
+
+    # The existing synthetic summary is created by the genuine fixture builder.
+    summary_root = directory / 'summary-seed'
+    seed_code_tree(summary_root)
+    for file in (summary_root / 'raw/osha').rglob('*'):
+        if file.is_file():
+            target = data_dir / 'raw' / file.relative_to(summary_root / 'raw')
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(file, target)
+            entry = manifest.recorded_entry_for(paths.manifest_path(summary_root), file)
+            manifest.append_entries(paths.manifest_path(data_dir), [entry])
+    summary = data_dir / 'derived/osha/ita_300a_summary.parquet'
+    summary.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(summary_root / 'derived/osha/ita_300a_summary.parquet', summary)
+    assets = Path(__file__).parent / 'fixtures/acs_mapping/upstream'
+    records = json.loads((assets / 'provenance.json').read_text())['originals']
+    with ZipFile(assets / 'stage4-originals.zip') as archive:
+        for record in records:
+            body = archive.read(record['path'])
+            assert len(body) == record['size']
+            assert hashlib.sha256(body).hexdigest() == record['sha256']
+            file = directory / Path(record['path']).name
+            file.write_bytes(body)
+            code_references.import_reference(data_dir, record['kind'], file)
+    return code_build.build(data_dir, 'fixture_codes')
+
+
+def _authenticated_geography(data_dir, directory):
+    import json
+
+    from code_fixtures import write_xlsx
+    from geography_fixtures import MEMBER_HEADER, fixture_registry, originals, write_counties
+
+    from embedding_data import geography_references
+
+    files = originals(directory / 'stage5-originals')
+    ct = json.loads((Path(__file__).parent / 'fixtures/acs_mapping/geography/ct-inventory.json')
+                    .read_text())['rows']
+    write_counties(files['counties_2025'], [
+        ['AL', '01001', 'Autauga County'], ['AL', '01003', 'Baldwin County'], *ct,
+        ['VA', '51001', 'Accomack County'], ['VA', '51510', 'Alexandria city'],
+        ['PR', '72001', 'Adjuntas Municipio']])
+    rows = [
+        ['Table with row headers in column A and column headers in row 3'] + [None] * 11,
+        ['List 1. Synthetic July 2023 delineations'] + [None] * 11, MEMBER_HEADER,
+    ]
+    for code, title, kind, county, state, sf, cf, role in [
+        ('10000', 'Synthetic metro', 'Metropolitan', 'Autauga County', 'Alabama',
+         '01', '001', 'Central'),
+        ('10000', 'Synthetic metro', 'Metropolitan', 'Capitol Planning Region', 'Connecticut',
+         '09', '110', 'Outlying'),
+        ('20000', 'Synthetic micro', 'Micropolitan', 'Baldwin County', 'Alabama',
+         '01', '003', 'Central'),
+    ]:
+        rows.append([code, None, None, title, kind + ' Statistical Area', None, None,
+                     county, state, sf, cf, role])
+    write_xlsx(files['cbsa_2023'], rows)
+    registry = fixture_registry(files)
+    for kind, file in files.items():
+        geography_references.import_reference(data_dir, kind, file, registry=registry)
+    return geography_build.build(data_dir, 'fixture_geography', registry=registry)
+
+
+def run_acs_mapping_v12(data_dir: Path, monkeypatch) -> dict[str, Path]:
+    '''Genuine fixture-only raw→conversion→Stage4/5/7→selected→Stage8 replay chain.'''
+    import json
+
+    from embedding_data import acs_mapping_bundle as bundle
+    from embedding_data.acs_mapping_contract import SelectionRequest
+    from embedding_data.acs_mapping_inputs import select_inputs
+
+    forbid_external_access(monkeypatch)
+    directory = data_dir.parent / 'authenticated-setup'
+    directory.mkdir()
+    selection = _authenticated_deliveries(data_dir, directory, monkeypatch)
+    codes = _authenticated_codes(data_dir, directory)
+    geography = _authenticated_geography(data_dir, directory)
+    ipums = ipums_verification_run.measure(data_dir, 'fixture_ipums', 'references', selection)
+    request = SelectionRequest(
+        'fixture_codes', manifest.sha256_file(codes / 'outputs.json'),
+        'fixture_geography', manifest.sha256_file(geography / 'outputs.json'),
+        'fixture_ipums', manifest.sha256_file(ipums / 'outputs.json'),
+        manifest.sha256_file(
+            data_dir / 'raw/references/ipums-verification/references/receipt.json'))
+    selected = select_inputs(data_dir, request)
+    selected.verify()
+    # Reuse synthetic raw geographic originals, never its assembled unit-test tables.
+    population = population_case.__wrapped__(directory, monkeypatch)
+    public = Path(__file__).parent / 'fixtures/acs_mapping/classification'
+    overrides = {f.stem: f for f in public.glob('*.xlsx')
+                 if not f.stem.startswith('census_industry_')}
+    release = directory / 'release-excerpts'
+    release.mkdir()
+    for kind, record in json.loads((public / 'release-layouts.json').read_text()).items():
+        file = release / (kind + '.xlsx')
+        write_public_layout(file, record)
+        overrides[kind] = file
+    overrides.update(population.snapshot.files)
+    references = seed_mapping_references(
+        data_dir.parent, monkeypatch, original_overrides=overrides, data_dir=data_dir)
+    assert references.data_dir == data_dir
+    results = {'data_dir': data_dir}
+    for name in ('first', 'replay'):
+        response = bundle.build(data_dir, name, request, references.reference_id,
+                                 expected_reference_receipt_sha256=references.receipt_sha256)
+        results[name] = Path(response['directory'])
+        control = directory / (name + '-build-response.json')
+        control.write_text(json.dumps(response, sort_keys=True) + '\n')
+        results[name + '_control'] = control
+        bundle.verify_bundle(results[name], data_dir,
+                             expected_outputs_sha256=response['outputs_sha256'])
+    return results

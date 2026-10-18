@@ -16,13 +16,15 @@ from embedding_data.acs_mapping_io import safe_path
 from embedding_data.target_inputs import CODE_SCHEMAS, REFERENCE_FRAMES
 
 SOFTWARE_ROOT = Path(__file__).resolve().parents[2]
-# Task 8 expands this explicit boundary before any production mapping freeze.
 SOFTWARE_FILES = tuple(dict.fromkeys((*ipums_verification_run.SOFTWARE_FILES, *(
     f'src/embedding_data/{name}.py' for name in (
         'acs_mapping_contract', 'acs_mapping_inputs', 'acs_mapping_io',
+        'acs_mapping_references', 'acs_code_references', 'acs_code_mapping',
+        'acs_area_references', 'acs_geography_factors', 'acs_area_mapping',
+        'acs_mapping_companions', 'acs_mapping_bundle', 'acs_mapping',
         'target_inputs', 'code_build', 'classification_tables', 'naics_relationships',
         'filing_rules', 'ita_naics_mapping', 'ita_summary', 'ita_references', 'ita_catalog',
-        'osha_encoding', 'geography_build', 'geography_tables', 'geography_hud',
+        'osha_encoding', 'geography_build', 'geography_tables', 'geography_hud', 'geography_cli',
     )))))
 ACS_PROFILES = ('acs/core', 'acs/five_year', 'acs/vintage')
 
@@ -90,19 +92,66 @@ def _run_directory(data_dir: Path, family: str, run_id: str) -> Path:
     return directory
 
 
-def _upstream_software(inputs: dict) -> None:
+CLI_FILE = 'src/embedding_data/cli.py'
+HISTORICAL_GEOGRAPHY_RUN = 'stage5_geography_20261014'
+HISTORICAL_GEOGRAPHY_PIN = '5584b122d45a3617e731f7179d53e9625eb67fd15515d0cd7a5dab366132290d'
+HISTORICAL_CLI_SHA256 = '68778e16b7cc051745c1e34d3dee6a9fc044fd12b1f78103773984503e9f9742'
+EXECUTING_CLI_SHA256 = '32a86b3d07bf112fabc1edb01fd10a966e840c185642e55d00f35dfd435220b3'
+
+
+def _historical_cli_compatibility(name, recorded, actual, context):
+    # D5 binds this historical creator record to authenticated current executing bytes.
+    if (name != CLI_FILE or recorded != HISTORICAL_CLI_SHA256
+            or actual != EXECUTING_CLI_SHA256 or context is None
+            or context.get('family') != 'geography'
+            or context.get('run_id') != HISTORICAL_GEOGRAPHY_RUN
+            or context.get('outputs_sha256') != HISTORICAL_GEOGRAPHY_PIN):
+        return None
+    for stage in ('stage7', 'stage8'):
+        record = context.get(stage + '_software', {}).get('files', {}).get(CLI_FILE, {})
+        if record.get('sha256') != EXECUTING_CLI_SHA256:
+            return None
+    return {
+        'rule': 'stage8-owner-d5-historical-geography-cli',
+        'run_id': HISTORICAL_GEOGRAPHY_RUN,
+        'outputs_sha256': HISTORICAL_GEOGRAPHY_PIN,
+        'file': CLI_FILE, 'historical_creator_sha256': HISTORICAL_CLI_SHA256,
+        'executing_sha256': EXECUTING_CLI_SHA256,
+        'stage7_run_id': context['stage7_run_id'],
+        'stage7_outputs_sha256': context['stage7_outputs_sha256'],
+        'stage7_cli_sha256': EXECUTING_CLI_SHA256,
+        'stage8_cli_sha256': EXECUTING_CLI_SHA256,
+        'historical_cli_commit': '2f1ca20',
+        'registration_only_commits': ['5d8e055', 'a1d12e5'],
+        'historical_entrypoint_executed': False,
+        'reason': 'Owner D5: complete later CLI delta only imports/registers targets_cli '
+                  'and ipums_cli; historical creator entrypoint is not used to consume '
+                  'the authenticated geography tables.',
+        'historical_inventory_locator': 'derived/geography/' + HISTORICAL_GEOGRAPHY_RUN
+                                        + '/inputs.json#implementation/' + CLI_FILE,
+    }
+
+
+def _upstream_software(inputs: dict, *, context=None) -> list[dict]:
+    compatibility = []
     for name, checksum in inputs['implementation'].items():
         file = target_io.relative_file(SOFTWARE_ROOT, name)
-        if manifest.sha256_file(file) != checksum:
-            raise ValueError('upstream executing implementation changed')
+        actual = manifest.sha256_file(file)
+        if actual != checksum:
+            diagnostic = _historical_cli_compatibility(name, checksum, actual, context)
+            if diagnostic is None:
+                raise ValueError('upstream executing implementation changed')
+            compatibility.append(diagnostic)
     if any(version(name) != expected for name, expected in inputs['dependencies'].items()):
         raise ValueError('upstream dependency identity changed')
     if (inputs['python'] != sys.version or inputs['uv_lock_sha256'] !=
             manifest.sha256_file(SOFTWARE_ROOT / 'uv.lock')):
         raise ValueError('upstream Python or lock identity changed')
+    return compatibility
 
 
-def _reference_bundle(data_dir, family, run_id, pin, schemas, schema_version):
+def _reference_bundle(data_dir, family, run_id, pin, schemas, schema_version,
+                      *, software_context=None):
     directory = _run_directory(data_dir, family, run_id)
     require_detached(directory / 'outputs.json', pin)
     names = {f'{name}.parquet' for name in schemas} | {'inputs.json', 'report.json'}
@@ -130,7 +179,9 @@ def _reference_bundle(data_dir, family, run_id, pin, schemas, schema_version):
             raise ValueError(f'{name}: rows or ordered schema differs')
         files[name], records[name] = file, record
     raw = target_io.verify_raw(data_dir, inputs['raw'])
-    _upstream_software(inputs)
+    compatibility = _upstream_software(inputs, context={
+        **(software_context or {}), 'family': family, 'run_id': run_id,
+        'outputs_sha256': pin})
     source_record = None
     if family == 'codes':
         source = inputs['source_parquet']
@@ -139,10 +190,11 @@ def _reference_bundle(data_dir, family, run_id, pin, schemas, schema_version):
         if any(source_record[key] != source[key] for key in ('sha256', 'size')):
             raise ValueError('selected source hash or size differs')
     return files, {'run_id': run_id, 'outputs_sha256': pin, 'inputs': inputs,
-                   'tables': records, 'raw': raw, 'source_parquet': source_record}
+                   'tables': records, 'raw': raw, 'source_parquet': source_record,
+                   'software_compatibility': compatibility}
 
 
-def _select_snapshot(data_dir: Path, request: SelectionRequest):
+def _select_snapshot(data_dir: Path, request: SelectionRequest, software: dict):
     directory = _run_directory(data_dir, 'ipums/verification', request.ipums_run)
     # Stage 7 authenticates all five deliveries and current software before selection.
     verified = ipums_verification_run.verify_bundle(
@@ -172,7 +224,10 @@ def _select_snapshot(data_dir: Path, request: SelectionRequest):
         CODE_SCHEMAS, code_build.SCHEMA_VERSION)
     geography, geo_provenance = _reference_bundle(
         data_dir, 'geography', request.geography_run, request.geography_outputs_sha256,
-        geography_build.SCHEMAS, geography_build.SCHEMA_VERSION)
+        geography_build.SCHEMAS, geography_build.SCHEMA_VERSION, software_context={
+            'stage7_run_id': request.ipums_run,
+            'stage7_outputs_sha256': request.ipums_outputs_sha256,
+            'stage7_software': upstream['software'], 'stage8_software': software})
     return sources, codes, geography, {
         'codes': code_provenance, 'geography': geo_provenance,
         'ipums': {**verified, 'inputs': upstream,
@@ -187,8 +242,8 @@ def select_inputs(data_dir: Path, request: SelectionRequest) -> SelectedInputs:
     safe_path(data_dir)
     software = freeze_software()
     try:
-        selected = _select_snapshot(data_dir, request)
-        if _select_snapshot(data_dir, request) != selected:
+        selected = _select_snapshot(data_dir, request, software)
+        if _select_snapshot(data_dir, request, software) != selected:
             raise ValueError('selected inputs changed during validation')
     except pl.exceptions.PolarsError as error:
         raise ValueError('selected Parquet cannot satisfy its frozen schema') from error

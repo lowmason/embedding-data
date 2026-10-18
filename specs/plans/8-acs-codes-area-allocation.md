@@ -91,6 +91,8 @@ Additional binding execution constraints:
 
 ## Decisions
 
+- **D5** (owner, execution software-provenance review, 2026-10-18): “Approve this narrow historical CLI rule.” Only selected geography run `stage5_geography_20261014` with detached output pin `5584b122d45a3617e731f7179d53e9625eb67fd15515d0cd7a5dab366132290d` may retain its historical `src/embedding_data/cli.py` creator hash `68778e16b7cc051745c1e34d3dee6a9fc044fd12b1f78103773984503e9f9742` while current CLI is exactly `32a86b3d07bf112fabc1edb01fd10a966e840c185642e55d00f35dfd435220b3`. The current hash must also match the strictly verified selected Stage 7 software and frozen Stage 8 executing inventory. Git Stage 5 blob `2f1ca20` matches the old hash; the complete later CLI delta only imports/registers `targets_cli` (`5d8e055`) and `ipums_cli` (`a1d12e5`). This historical entrypoint is not executed to consume geography tables. Preserve the original Stage 5 inventory and record explicit compatibility diagnostics with old/new hashes and the bounded rule. Every other implementation, dependency, Python/lock, inventory, raw/source and table check remains strict; unknown run/pin/hash combinations fail. No upstream file, artifact, status or measurement is edited, rebuilt or rewritten. Applied in: Task 8 selector compatibility, bundle provenance/verification and Task 9 independent acceptance.
+
 - **D4** (owner, execution source review, 2026-10-18): “Approve this narrow Census correspondence rule.” For PUMS category `7640` / `49-90XX`, resolve its explicitly named Census constituent `7550` through the full Census occupation list to official SOC `49-9095`. Preserve the erroneous published PUMS `40-9095` assertion and every original locator in rejected-reference diagnostics. This bound applies only to that identified constituent assertion in the registered PUMS occupation editions; it changes no raw/reference/source value, creates no new special code and grants no general source-precedence rule. Every other unexplained occupation contradiction still fails. Applied in: Task 3 classification evidence and its downstream mapping diagnostics.
 
 - **D3** (owner, brief, 2026-10-17): “Plan 8 is approved, including the bounded Census PUMS authority. Prepare a fresh-session execution handoff from c632b34 for Stage 8 only. Do not start implementation here.” Applied in: fresh receiving-session execution of Tasks 1–10; the bounded authority and fail-on-new-conflict requirements remain binding. The planning-session stop applies to the sender.
@@ -1635,6 +1637,7 @@ this plan.
 - Create: `tests/test_acs_mapping_bundle.py`
 - Create: `tests/test_acs_mapping_cli.py`
 - Create: `tests/test_acs_mapping_v12.py`
+- Create as required for authenticated fixture integration: `tests/fixtures/acs_mapping/upstream/` (public originals or genuine-layout excerpts with exact provenance; no person data).
 - Modify: `src/embedding_data/acs_mapping_inputs.py` (final executing-file inventory)
 - Modify: `tests/acs_mapping_fixtures.py`
 - Modify: `README.md` (new Stage 8 commands and interpretation limits)
