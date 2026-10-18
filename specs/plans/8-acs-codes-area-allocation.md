@@ -94,6 +94,10 @@ Additional binding execution constraints:
 - **D1** (owner, brief, 2026-10-16): The written spec is approved. Plan Stage 8
   only, commit the reviewable plan, and stop before implementation. Applied in:
   Global Constraints and the execution handoff.
+- **D2** (owner, plan review, 2026-10-17): Separate append-only manifest
+  preservation from immutable whole-file checks. Require explicit regressions
+  for a fully accounted append passing and a prior-byte mutation failing.
+  Applied in: Task 9 and the measured acceptance matrix.
 
 ---
 
@@ -1817,13 +1821,27 @@ receipts. No default selection of a latest run is permitted.
 
 - Independent script `freeze(data_dir: Path, control_dir: Path) -> dict` records
   every existing regular raw/derived file's relative path, SHA-256 and size,
-  excluding only the new caller-owned controls directory, plus an exact saved
-  manifest prefix and software/reconciler identities. Refuse symlinks and an
-  occupied control ID; never read root `.env` or any credential store.
+  excluding the new caller-owned controls directory and `raw/manifest.jsonl`
+  from the immutable whole-file inventory. Save the manifest's exact bytes,
+  original byte length and SHA-256 as a separate prefix control, plus
+  software/reconciler identities. The saved manifest hash authenticates those
+  prefix bytes; it is not an expected hash of the entire post-acquisition
+  manifest. Refuse symlinks and an occupied control ID; never read root `.env`
+  or any credential store.
 - `reconcile(data_dir: Path, run_id: str, outputs_sha256: str, control_dir: Path) -> dict` independently authenticates the supplied pin and calculates source
   code frequencies, status/flag counts, populations and preservation checks.
-- `preservation(data_dir: Path, control_dir: Path) -> dict` verifies every frozen
-  file and exact manifest byte prefix, then inventories every appended path.
+- `preservation(data_dir: Path, control_dir: Path) -> dict` verifies every file
+  in the immutable inventory against its frozen whole-file hash and size.
+  Separately authenticate the saved manifest prefix's length/hash and require
+  the current manifest to begin with exactly those bytes, checking this before
+  parsing records. Reject truncation or any prior-byte mutation with
+  `ValueError` containing `manifest prefix`. Inventory and account for every
+  suffix record and new raw path against the complete Stage 8 snapshot receipt,
+  independently checking hashes, sizes, unique paths and exact record counts.
+  On success return `manifest_prefix_equal:bool`, `protected_files_equal:bool`,
+  `manifest_appends_accounted:bool` (all true) and `appended_record_count:int`.
+  Any mismatch raises `ValueError`; legitimate accounted appends do not fail
+  because the manifest's current whole-file size or SHA-256 differs.
 - CLI subcommands `freeze`, `reconcile`, `preservation`, each with explicit
   `--data-dir` and `--control-dir`; reconcile also requires `--run-id` and
   `--outputs-sha256`. Commands emit aggregate JSON and nonzero exit on mismatch.
@@ -1855,14 +1873,66 @@ receipts. No default selection of a latest run is permitted.
       preserved = reconciliation_module.preservation(fixture.data_dir, controls)
       assert preserved['manifest_prefix_equal'] is True
       assert preserved['protected_files_equal'] is True
+
+  def test_legitimate_manifest_append_passes_preservation(
+          reconciliation_module, tmp_path, monkeypatch):
+      from acs_mapping_fixtures import seed_selected_inputs, build_fixture_mapping
+
+      fixture = seed_selected_inputs(tmp_path, monkeypatch)
+      manifest_path = fixture.data_dir / 'raw/manifest.jsonl'
+      prefix = manifest_path.read_bytes()
+      assert prefix
+      controls = tmp_path / 'controls'
+      reconciliation_module.freeze(fixture.data_dir, controls)
+      build_fixture_mapping(fixture, 'accounted_append')
+      current = manifest_path.read_bytes()
+      assert current.startswith(prefix)
+      appended = current[len(prefix):]
+      assert appended
+      preserved = reconciliation_module.preservation(fixture.data_dir, controls)
+      assert preserved['manifest_prefix_equal'] is True
+      assert preserved['protected_files_equal'] is True
+      assert preserved['manifest_appends_accounted'] is True
+      assert preserved['appended_record_count'] == len(appended.splitlines())
+
+  def test_manifest_prior_byte_mutation_fails_preservation(
+          reconciliation_module, tmp_path, monkeypatch):
+      import json
+      import pytest
+      from acs_mapping_fixtures import seed_selected_inputs, build_fixture_mapping
+
+      fixture = seed_selected_inputs(tmp_path, monkeypatch)
+      manifest_path = fixture.data_dir / 'raw/manifest.jsonl'
+      prefix = manifest_path.read_bytes()
+      controls = tmp_path / 'controls'
+      reconciliation_module.freeze(fixture.data_dir, controls)
+      build_fixture_mapping(fixture, 'prior_byte_mutation')
+      current = manifest_path.read_bytes()
+      assert current.startswith(prefix) and len(current) > len(prefix)
+      changed = bytearray(current)
+      changed[prefix.index(b': ') + 1] = ord('\t')
+      assert len(changed) == len(current)
+      assert changed[:len(prefix)] != prefix
+      assert changed[len(prefix):] == current[len(prefix):]
+      assert [json.loads(line) for line in changed[:len(prefix)].splitlines()] == [
+          json.loads(line) for line in prefix.splitlines()]
+      manifest_path.write_bytes(changed)
+      with pytest.raises(ValueError, match='manifest prefix'):
+          reconciliation_module.preservation(fixture.data_dir, controls)
   ```
 
   `build_fixture_mapping(fixture: FixtureInputs, run_id: str) -> dict` is a plain
-  helper in `tests/acs_mapping_fixtures.py` that calls the real Stage 8 build with
-  that fixture's complete imported references and independently captured receipt
-  pin. It performs no monkeypatched acceptance or source bypass. Add wrong
-  external pin, changed manifest prefix, appended unaccounted raw record,
-  omitted county intersection and altered special/unknown reason counts.
+  helper in `tests/acs_mapping_fixtures.py` that imports the complete registered
+  fixture reference set through Task 2's real lifecycle into a fresh snapshot
+  named `<run_id>_references`, captures its receipt pin independently and calls
+  the real Stage 8 build with it. Those reference/receipt manifest appends occur
+  during this helper call, after `freeze`; `seed_selected_inputs` supplies only
+  the earlier upstream inputs. It performs no monkeypatched acceptance or source
+  bypass. The mutation case changes one JSON whitespace byte in the old prefix
+  while preserving parsed records, total length and the legitimate suffix;
+  semantic JSON equality cannot satisfy exact-byte preservation. Add wrong
+  external pin, truncated manifest, appended unaccounted raw record, omitted
+  county intersection and altered special/unknown reason counts.
 
 - [ ] **Step 2: Run reconciler tests red.**
 
@@ -1875,11 +1945,17 @@ receipts. No default selection of a latest run is permitted.
 
 - [ ] **Step 3: Implement independent calculations, then test them green.**
   Freeze controls before any production acquisition. Use streaming SHA-256 and
-  exact original manifest bytes; after acquisition, require every new raw entry
-  to correspond to a registered Stage 8 original, request, response or generated
-  receipt. Do not treat expected manifest append as a change to its old prefix.
-  Hash newly appended files independently and reconcile the exact path set and
-  record count to the snapshot receipt.
+  keep `raw/manifest.jsonl` out of the immutable whole-file comparisons. Verify
+  its saved prefix bytes against their frozen length/hash, require the current
+  manifest to be at least that long and compare its first saved-length bytes
+  exactly before parsing any records. A truncation or prior-byte change fails;
+  a larger current manifest is allowed when its suffix is fully accounted.
+  After acquisition, require every appended record to correspond to a registered
+  Stage 8 original, request, response or generated receipt. Independently hash
+  and size every new raw file; reconcile unique paths and the exact file set and
+  record count to the snapshot receipt, including the separately manifested
+  receipt itself. Do not compare the current whole-manifest hash/size with the
+  saved prefix hash/length or relax whole-file checks for any other frozen file.
 
   Independent source code frequency calculation, retaining source profile and
   sample/component partition, begins with:
@@ -1917,8 +1993,10 @@ receipts. No default selection of a latest run is permitted.
   UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_stage8_reconciliation.py -q
   ```
 
-  Expected: all pass, including deliberately wrong but internally self-consistent
-  writer outputs. Review/commit the independent script/tests before measuring:
+  Expected: all pass, including acceptance of the legitimate append, rejection
+  of the prior-byte mutation and deliberately wrong but internally
+  self-consistent writer outputs. Review/commit the independent script/tests
+  before measuring:
 
   ```bash
   git add scripts/reconcile_stage8.py tests/test_stage8_reconciliation.py tests/acs_mapping_fixtures.py
@@ -2184,7 +2262,7 @@ candidate set, zero population or successful exclusion.
 | Offline chain | Actual fixture raw CSV/DDI/definitions → unchanged converter → three companions and inventories; network/credentials denied; no target-family closure claimed | 8 |
 | Detached trust / replay | Two public verifiers use external control pins; all eight ordered logical tables and substantive reports exactly equal; physical-byte equality not required | 8–9 |
 | Independent reconciliation | Independent source code/flag/status frequencies, population controls/group/MSA/residual arithmetic agree; script/evidence identities recorded | 9 |
-| Preservation / repository | Every earlier protected file unchanged; manifest exact prefix with every append accounted; whole-tree audit zero; pytest/Behave/Ruff/lock/hooks/reviews pass | 9–10 |
+| Preservation / repository | Immutable inventory excludes `raw/manifest.jsonl`; every other earlier protected file unchanged; saved manifest bytes remain an exact prefix with every append accounted; legitimate-append and prior-byte-mutation regressions pass; whole-tree audit zero; pytest/Behave/Ruff/lock/hooks/reviews pass | 9–10 |
 
 ## Self-review and execution handoff
 
