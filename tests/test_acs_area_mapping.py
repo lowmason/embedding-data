@@ -242,3 +242,35 @@ def test_non_pr_territory_outside_us_pr_retains_territory_status(role_case, role
     assert row['area_status'] == 'territory'
     assert row['factor_key'] is None
     assert label in row['status_reason']
+
+
+@pytest.mark.parametrize('year,recoded', [(2020, True), (2021, True), (2022, False)])
+@pytest.mark.parametrize('role,state', [('residence', '72'), ('workplace', '72'),
+                                        ('migration', '110')])
+def test_defined_pr_source_frame_reassignment_survives_scope_exclusion(
+        role_case, year, recoded, role, state):
+    from embedding_data.acs_area_mapping import build_area_lookup
+
+    observed = role_case.observed(role, state, '00100').with_columns(
+        pl.lit('acs/five_year').alias('profile'), pl.lit('us2024c').alias('sample_id'),
+        pl.lit(year).cast(pl.Int64).alias('component_year'))
+    row = build_area_lookup(observed, role_case.rules, role_case.evidence,
+                            role_case.factors).row(0, named=True)
+    assert row['area_status'] == 'territory'
+    assert row['factor_key'] is None
+    assert row['flag_source_geography_recoded'] is recoded
+    assert row['source_allocation_evidence_status'] == 'unavailable'
+
+
+@pytest.mark.parametrize('year', [2020, 2021, 2022])
+def test_pr_migration_special_does_not_claim_defined_source_frame(role_case, year):
+    from embedding_data.acs_area_mapping import build_area_lookup
+
+    observed = role_case.observed('migration', '110', '00002').with_columns(
+        pl.lit('acs/five_year').alias('profile'), pl.lit('us2024c').alias('sample_id'),
+        pl.lit(year).cast(pl.Int64).alias('component_year'))
+    row = build_area_lookup(observed, role_case.rules, role_case.evidence,
+                            role_case.factors).row(0, named=True)
+    assert row['area_status'] == 'territory'
+    assert row['factor_key'] is None
+    assert row['flag_source_geography_recoded'] is False

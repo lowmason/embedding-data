@@ -171,6 +171,13 @@ def _verify_evidence_factors(evidence, factors):
     if actual != expected:
         raise ValueError('county factors differ from complete original integer relations')
 
+def _source_frame_recoded(profile, component_year, area_status, area_code):
+    # Frame assignment concerns source geography, independently of domestic scope.
+    defined = (area_status == 'applicable' or area_status == 'territory'
+               and area_code not in {'00000', '00001', '00002'})
+    return defined and profile.removeprefix('acs/') == 'five_year' and component_year < 2022
+
+
 def _interpret(row, rules):
     role = row['role']
     if role not in ROLE_COLUMNS:
@@ -223,10 +230,8 @@ def _interpret(row, rules):
         puma_vintage=2020,
         area_status=status,
         status_reason=reason,
-        flag_source_geography_recoded=(
-            status == 'applicable' and row['profile'].removeprefix('acs/') == 'five_year'
-            and row['component_year'] < 2022
-        ),
+        flag_source_geography_recoded=_source_frame_recoded(
+            row['profile'], row['component_year'], status, area),
         source_allocation_evidence_status='unavailable',
         reference_ids=sorted({v
                               for r in references
@@ -318,9 +323,8 @@ def validate_area_lookup(
         scheme_for(row['profile'], row['sample_id'], row['release_year'], row['component_year'])
         area = normalized_role_code(row['source_area_code'], 5)
         normalized_role_code(row['source_state_code'], ROLE_COLUMNS[role][2])
-        applicable = row['area_status'] == 'applicable'
-        recoded = (applicable and row['profile'].removeprefix('acs/') == 'five_year'
-                   and row['component_year'] < 2022)
+        recoded = _source_frame_recoded(
+            row['profile'], row['component_year'], row['area_status'], area)
         if (row['area_code'] != area or row['puma_vintage'] != 2020
                 or row['area_type'] != ('residence' if role == 'residence' else 'work_migration')
                 or row['flag_source_geography_recoded'] != recoded
