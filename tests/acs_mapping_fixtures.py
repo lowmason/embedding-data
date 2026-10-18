@@ -154,7 +154,8 @@ def write_public_layout(file: Path, record: dict) -> None:
         archive.writestr('xl/_rels/workbook.xml.rels', tostring(relationships))
 
 
-def seed_mapping_references(tmp_path, monkeypatch, *, original_overrides=None, data_dir=None):
+def seed_mapping_references(tmp_path, monkeypatch, *, original_overrides=None, data_dir=None,
+                            reference_id='fixture_references'):
     '''Use every registered kind, with explicit independently computed excerpt pins.'''
     import json
     from dataclasses import replace
@@ -186,11 +187,11 @@ def seed_mapping_references(tmp_path, monkeypatch, *, original_overrides=None, d
     monkeypatch.setattr(refs, 'REGISTRY', registry)
     root = data_dir if data_dir is not None else tmp_path / 'data'
     for kind, file in files.items():
-        refs.import_reference(root, 'fixture_references', kind, file)
-    receipt = refs.reference_directory(root, 'fixture_references') / 'receipt.json'
+        refs.import_reference(root, reference_id, kind, file)
+    receipt = refs.reference_directory(root, reference_id) / 'receipt.json'
     return SimpleNamespace(
         data_dir=root,
-        reference_id='fixture_references',
+        reference_id=reference_id,
         receipt_sha256=manifest.sha256_file(receipt),
         originals=files,
     )
@@ -936,3 +937,56 @@ def run_acs_mapping_v12(data_dir: Path, monkeypatch) -> dict[str, Path]:
         bundle.verify_bundle(results[name], data_dir,
                              expected_outputs_sha256=response['outputs_sha256'])
     return results
+
+
+def seed_reconciliation_inputs(tmp_path, monkeypatch):
+    '''Freeze-ready authenticated upstreams; no Stage 8 snapshot exists yet.'''
+    import json
+
+    from embedding_data.acs_mapping_contract import SelectionRequest
+    from embedding_data.acs_mapping_inputs import select_inputs
+
+    forbid_external_access(monkeypatch)
+    data_dir = tmp_path / 'data'
+    directory = tmp_path / 'authenticated-setup'
+    directory.mkdir()
+    selection = _authenticated_deliveries(data_dir, directory, monkeypatch)
+    codes = _authenticated_codes(data_dir, directory)
+    geography = _authenticated_geography(data_dir, directory)
+    ipums = ipums_verification_run.measure(data_dir, 'fixture_ipums', 'references', selection)
+    pins = {name: manifest.sha256_file(path / 'outputs.json') for name, path in (
+        ('codes', codes), ('geography', geography), ('ipums', ipums))}
+    request = SelectionRequest(
+        'fixture_codes', pins['codes'], 'fixture_geography', pins['geography'],
+        'fixture_ipums', pins['ipums'], manifest.sha256_file(
+            data_dir / 'raw/references/ipums-verification/references/receipt.json'))
+    select_inputs(data_dir, request).verify()
+    return FixtureInputs(data_dir, request,
+                         json.loads((ipums / 'inputs.json').read_text())['deliveries'], pins)
+
+
+def build_fixture_mapping(fixture, run_id, monkeypatch):
+    '''Import originals only after callers freeze their independent before-state.'''
+    import json
+
+    from embedding_data import acs_mapping_bundle as bundle
+
+    directory = fixture.data_dir.parent / ('mapping-setup-' + run_id)
+    directory.mkdir()
+    population = population_case.__wrapped__(directory, monkeypatch)
+    public = Path(__file__).parent / 'fixtures/acs_mapping/classification'
+    overrides = {f.stem: f for f in public.glob('*.xlsx')
+                 if not f.stem.startswith('census_industry_')}
+    release = directory / 'release-excerpts'
+    release.mkdir()
+    for kind, record in json.loads((public / 'release-layouts.json').read_text()).items():
+        file = release / (kind + '.xlsx')
+        write_public_layout(file, record)
+        overrides[kind] = file
+    overrides.update(population.snapshot.files)
+    references = seed_mapping_references(
+        directory, monkeypatch, original_overrides=overrides, data_dir=fixture.data_dir,
+        reference_id=run_id + '_references')
+    forbid_external_access(monkeypatch)
+    return bundle.build(fixture.data_dir, run_id, fixture.request, references.reference_id,
+                        expected_reference_receipt_sha256=references.receipt_sha256)
