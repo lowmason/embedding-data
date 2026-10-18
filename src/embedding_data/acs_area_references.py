@@ -11,6 +11,7 @@ import polars as pl
 
 from embedding_data import geography_parsers as gp
 from embedding_data import manifest, target_io
+from embedding_data.acs_mapping_contract import SourceInput
 from embedding_data.acs_mapping_inputs import SelectedInputs
 from embedding_data.acs_mapping_io import safe_path
 from embedding_data.acs_mapping_references import (
@@ -441,3 +442,214 @@ def validate_area_evidence(evidence: AreaEvidence) -> None:
         check_rounding(row['published_percent_msa'], pop, row['msa_population'], 100)
     if msa_sums != msa_totals or any(puma_sums[k] > pumas[k] for k in puma_sums):
         raise ValueError('MSA population intersections do not close exactly')
+
+ROLE_RULE_SCHEMA = {
+    'profile': S,
+    'role': S,
+    'rule_kind': S,
+    'source_code': S,
+    'state_fips': S,
+    'status': S,
+    'label': S,
+    'reference_ids': LS,
+    'reference_locators': LS,
+}
+ROLE_COLUMNS = {
+    'residence': ('STATEFIP', 'PUMA', 2),
+    'workplace': ('PWSTATE2', 'PWPUMA00', 2),
+    'migration': ('MIGPLAC1', 'MIGPUMA1', 3)
+}
+# Exact positive country/foreign-region labels in the selected public DDI. Unknown,
+# suppressed, confidential and historical aggregate categories have no fallback.
+FOREIGN_PLACE_LABELS = frozenset(
+    """Canada|English Canada|French Canada|Atlantic Islands|Mexico|
+Belize/British Honduras|Costa Rica|El Salvador|Guatemala|Honduras|Nicaragua|Panama|
+Central America, nec|Cuba|Dominican Republic|Haiti|Jamaica|British West Indies|
+Other West Indies|Other Caribbean and North America|Argentina|Bolivia|Brazil|Chile|
+Colombia|Ecuador|Paraguay|Peru|Uruguay|Venezuela|South America, nec|Denmark|Finland|
+Iceland|Norway|Sweden|England|Scotland|Wales|Ireland|Northern Ireland|Other Northern Europe|
+Belgium|France|Luxembourg|Netherlands|Switzerland|Other Western Europe|Albania|Greece|
+Italy|Portugal|Azores|Spain|Austria|Bulgaria|Germany|Hungary|Poland|Romania|
+Bosnia and Herzegovinia|Other Eastern Europe|Estonia|Latvia|Lithuania|
+Other Northern or Eastern Europe|Ukraine|Europe, ns|China|Japan|Korea|Taiwan|Philippines|
+Thailand|Vietnam|Other South East Asia|Nepal|India|Iran|Iraq|Pakistan|Israel/Palestine|
+Jordan|Lebanon|United Arab Emirates|Saudi Arabia|Syria|Turkey|Afghanistan|Other Western Asia|
+Asia, nec|Africa|Northern Africa|Egypt|Nigeria|Western Africa|Eastern Africa|Ethiopia|Kenya|
+South Africa (Union of)|Africa, nec|Australia|New Zealand|Abroad (unknown) or at sea|
+Pacific Islands (Australia and New Zealand Subregions, not specified, Oceania and at Sea: ACS)
+""".replace('\n', '').split('|')
+)
+FOREIGN_WORK_LABELS = frozenset(
+    {
+        'Abroad', 'Europe', 'Eastern Asia', 'South Central, South East, and Western Asia',
+        'Mexico', 'Other Americas', 'Other, nec', 'Iraq', 'Canada'
+    }
+)
+TERRITORY_LABELS = frozenset(
+    {'Puerto Rico', 'Guam', 'Virgin Islands', 'Other US Possessions', 'U.S. outlying area'}
+)
+
+def _role_document(snapshot, kind, phrases):
+    file = snapshot.files[kind]
+    safe_path(file)
+    if manifest.sha256_file(file) != snapshot.receipt['originals'][kind]['sha256']:
+        raise ValueError('role original differs from authenticated receipt')
+    import html
+
+    text = html.unescape(re.sub('<[^>]+>', ' ', file.read_text()))
+    text = re.sub(r'\s+', ' ', text)
+    if any(phrase not in text for phrase in phrases):
+        raise ValueError(f'role documentation lacks registered rule evidence: {kind}')
+    return text
+
+def _ddi_categories(source, variable, width):
+    variables = [v for v in source.ddi['variables'] if v['name'] == variable]
+    if len(variables) != 1:
+        raise ValueError('missing or ambiguous delivered DDI role variable')
+    result = {}
+    for category in variables[0].get('categories', []):
+        code, label = category['value'], category['label']
+        if not isinstance(code, str) or not re.fullmatch('[0-9]{' + str(width) + '}', code):
+            raise ValueError('malformed delivered DDI geographic category width')
+        if code in result or not isinstance(label, str) or not label:
+            raise ValueError('conflicting delivered DDI geographic categories')
+        result[code] = label
+    if not result:
+        raise ValueError('missing delivered DDI geographic categories')
+    return result
+
+def read_role_rules(snapshot: ReferenceSnapshot, sources: dict[str, SourceInput]) -> pl.DataFrame:
+    '''Combine authenticated public role meanings with each delivered DDI encoding.'''
+    if (
+        manifest.sha256_file(snapshot.directory / 'receipt.json') != snapshot.receipt_sha256
+        or json.loads((snapshot.directory / 'receipt.json').read_text()) != snapshot.receipt
+    ):
+        raise ValueError('role reference receipt changed')
+    documents = {}
+    for role, (_, area, _) in ROLE_COLUMNS.items():
+        kind = 'usa_' + area.lower()
+        documents[role] = _role_document(
+            snapshot, kind, ['2020 PUMAs', 'pre-2022 respondents', 'state-dependent']
+        )
+    _role_document(snapshot, 'usa_pwstate2', ['If the person worked abroad', 'other, n.e.c.'])
+    _role_document(snapshot, 'usa_migplac1', ['foreign country', '988'])
+    _role_document(snapshot, 'usa_multyear', ['MULTYEAR'])
+    specials = {
+        'workplace': [
+            ('00000', 'niu_or_unidentifiable', 'N/A or not identifiable'),
+            ('00001', 'foreign', 'Did not work in the United States or in Puerto Rico')
+        ],
+        'migration': [
+            (
+                '00000', 'niu_or_unidentifiable',
+                'N/A (less than 1 year old or lived in same residence 1 year ago)'
+            ),
+            (
+                '00001', 'foreign',
+                'Did not live in the United States or in Puerto Rico one year ago'
+            ),
+            (
+                '00002', 'territory',
+                'Lived in Puerto Rico one year ago and current residence is in the U.S.'
+            )
+        ],
+    }
+    rows = []
+    for source in sources.values():
+        categories = _ddi_categories(source, 'STATEFIP', 2)
+        domestic = {label: code for code, label in categories.items() if code in gp.SCOPE | {'72'}}
+        if len(domestic) != len([c for c in categories if c in gp.SCOPE | {'72'}]):
+            raise ValueError('ambiguous delivered DDI domestic state labels')
+        citations = [c for c in source.raw_citations if c['path'].endswith('.xml')]
+        if len(citations) != 1:
+            raise ValueError('role rules require one delivered DDI raw citation')
+        ddi_id = f"ddi:{source.delivery_id}:{citations[0]['sha256']}"
+        for role, (state, area, width) in ROLE_COLUMNS.items():
+            kind = 'usa_' + area.lower()
+            if len([v for v in source.ddi['variables'] if v['name'] == area]) != 1:
+                raise ValueError('missing or ambiguous delivered DDI area variable')
+            state_kind = 'usa_' + state.lower() if role != 'residence' else None
+            ids = sorted(
+                [
+                    f'{snapshot.reference_id}:{kind}', ddi_id, *(
+                        [f'{snapshot.reference_id}:{state_kind}'] if state_kind else []
+                    )
+                ]
+            )
+            base = [
+                f"{citations[0]['path']}#variables/{area}", f'{kind}#description_section',
+                f'{kind}#codes_section', f'{kind}#comparability_section', *(
+                    [f'{state_kind}#description_section', f'{state_kind}#comparability_section']
+                    if state_kind else []
+                )
+            ]
+            for code, label in _ddi_categories(source, state, width).items():
+                fips = domestic.get(label)
+                status = (
+                    'territory' if fips == '72' or label in TERRITORY_LABELS else 'domestic'
+                    if fips is not None else 'niu' if label == 'N/A' else 'foreign' if label in (
+                        FOREIGN_WORK_LABELS if role == 'workplace' else FOREIGN_PLACE_LABELS
+                    ) else 'unsupported'
+                )
+                locators = [
+                    *base, f"{citations[0]['path']}#variables/{state}/categories/{code}={label}"
+                ]
+                if fips is not None:
+                    locators.append(
+                        f"{citations[0]['path']}#variables/STATEFIP/categories/{fips}={label}"
+                    )
+                rows.append(
+                    dict(
+                        profile=source.profile,
+                        role=role,
+                        rule_kind='state',
+                        source_code=code,
+                        state_fips=fips,
+                        status=status,
+                        label=label,
+                        reference_ids=ids,
+                        reference_locators=sorted(set(locators))
+                    )
+                )
+            for code, status, meaning in specials.get(role, []):
+                if f'{code} = {meaning}' not in documents[role]:
+                    raise ValueError('area special lacks exact public meaning')
+                rows.append(
+                    dict(
+                        profile=source.profile,
+                        role=role,
+                        rule_kind='area_special',
+                        source_code=code,
+                        state_fips=None,
+                        status=status,
+                        label=meaning,
+                        reference_ids=[f'{snapshot.reference_id}:{kind}'],
+                        reference_locators=[f'{kind}#codes_section']
+                    )
+                )
+            rows.append(
+                dict(
+                    profile=source.profile,
+                    role=role,
+                    rule_kind='frame',
+                    source_code='2020',
+                    state_fips=None,
+                    status='2020_definitions',
+                    label='Pre-2022 components in 2024 five-year source assigned 2020 geography',
+                    reference_ids=sorted(
+                        [
+                            f'{snapshot.reference_id}:{kind}',
+                            f'{snapshot.reference_id}:usa_multyear'
+                        ]
+                    ),
+                    reference_locators=sorted(
+                        [f'{kind}#description_section', 'usa_multyear#description_section']
+                    )
+                )
+            )
+    frame = pl.DataFrame(rows, schema=ROLE_RULE_SCHEMA).sort(
+        ['profile', 'role', 'rule_kind', 'source_code'], nulls_last=False
+    )
+    if frame.select('profile', 'role', 'rule_kind', 'source_code').is_duplicated().any():
+        raise ValueError('conflicting role rules')
+    return frame

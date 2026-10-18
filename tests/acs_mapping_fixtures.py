@@ -431,3 +431,127 @@ def population_case(tmp_path, monkeypatch):
         mutate_csv=mutate_csv,
         repin=snapshot,
     )
+
+
+@pytest.fixture
+def role_case(population_case):
+    '''Role evidence uses public excerpts and clearly synthetic delivered keys.'''
+    import json
+    from types import SimpleNamespace
+
+    import polars as pl
+
+    from embedding_data.acs_area_mapping import OBSERVED_AREA_SCHEMA
+    from embedding_data.acs_area_references import read_role_rules
+    from embedding_data.acs_geography_factors import build_factor_tables
+    from embedding_data.acs_mapping_contract import SourceInput
+    from embedding_data.acs_mapping_references import ReferenceSnapshot
+
+    case = population_case
+    originals = json.loads(
+        (Path(__file__).parent / 'fixtures/acs_mapping/reference-layouts.json').read_text()
+    )['originals']
+    files = dict(case.snapshot.files)
+    for kind in [
+        'usa_puma', 'usa_pwpuma00', 'usa_migpuma1', 'usa_pwstate2', 'usa_migplac1', 'usa_multyear'
+    ]:
+        file = case.snapshot.directory / (kind + '.html')
+        file.write_text(originals[kind]['body'])
+        files[kind] = file
+    receipt = {'originals': {k: {'sha256': manifest.sha256_file(p)} for k, p in files.items()}}
+    receipt_file = case.snapshot.directory / 'receipt.json'
+    receipt_file.write_text(json.dumps(receipt, sort_keys=True))
+    snapshot = ReferenceSnapshot(
+        'role_fixture', case.snapshot.directory, files, receipt, manifest.sha256_file(
+            receipt_file
+        )
+    )
+    states = [('01', 'Alabama'), ('09', 'Connecticut'), ('72', 'Puerto Rico')]
+    categories = {
+        'PUMA': [],
+        'PWPUMA00': [],
+        'MIGPUMA1': [],
+        'STATEFIP': states,
+        'PWSTATE2': [*states, ('00', 'N/A'), ('80', 'Abroad'), ('99', 'Not reported')],
+        'MIGPLAC1': [
+            ('001', 'Alabama'), ('009', 'Connecticut'), ('000', 'N/A'), ('110', 'Puerto Rico'),
+            ('150', 'Canada'), ('997', 'Unknown value'), ('999', 'Missing'),
+            ('988', 'Suppressed for data year 2022 for select cases')
+        ],
+        'SAMPLE': [('202301', '2023 ACS'), ('202401', '2024 ACS')],
+    }
+    file = case.snapshot.directory / 'source.parquet'
+    pl.DataFrame(
+        {
+            'YEAR': [2024] * 3,
+            'SAMPLE': [202401] * 3,
+            'STATEFIP': [1] * 3,
+            'PUMA': [100] * 3,
+            'PWSTATE2': [1] * 3,
+            'PWPUMA00': [100] * 3,
+            'MIGPLAC1': [1] * 3,
+            'MIGPUMA1': [100] * 3
+        }
+    ).write_parquet(file)
+    ddi_file = case.snapshot.directory / 'synthetic.xml'
+    ddi_file.write_text('<synthetic-ddi>' + json.dumps(categories) + '</synthetic-ddi>')
+    source = SourceInput(
+        'acs/core', 'synthetic', file, {}, [
+            {
+                'path': ddi_file.name,
+                'sha256': manifest.sha256_file(ddi_file)
+            }
+        ], {'samples': {
+            'us2023a': {},
+            'us2024a': {}
+        }}, {
+            'variables': [
+                {
+                    'name': name,
+                    'categories': [{
+                        'value': code,
+                        'label': label
+                    } for code, label in values]
+                } for name, values in categories.items()
+            ]
+        }
+    )
+    five = SourceInput(
+        'acs/five_year', 'synthetic_five', file, {}, source.raw_citations, {
+            'samples': {
+                'us2024c': {}
+            }
+        }, source.ddi
+    )
+    rules = read_role_rules(snapshot, {'core': source, 'five_year': five})
+
+    def observed(role, state, area):
+        return pl.DataFrame(
+            [
+                dict(
+                    profile='acs/core',
+                    sample_id='us2024a',
+                    release_year=2024,
+                    component_year=2024,
+                    role=role,
+                    source_state_code=state,
+                    source_area_code=area,
+                    rows=1
+                )
+            ],
+            schema=OBSERVED_AREA_SCHEMA
+        )
+
+    return SimpleNamespace(
+        observed=observed,
+        rules=rules,
+        evidence=case.evidence,
+        factors=build_factor_tables(case.evidence, case.selected),
+        source=source,
+        snapshot=snapshot,
+        source_columns={
+            'residence': 'PUMA',
+            'workplace': 'PWPUMA00',
+            'migration': 'MIGPUMA1'
+        }
+    )

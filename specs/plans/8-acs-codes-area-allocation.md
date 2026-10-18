@@ -1378,10 +1378,17 @@ this plan.
 
 **Interfaces:**
 
-- `read_role_rules(snapshot: ReferenceSnapshot) -> pl.DataFrame` in
+- `read_role_rules(snapshot: ReferenceSnapshot, sources: dict[str, SourceInput]) -> pl.DataFrame` in
   `acs_area_references.py`: one explicit rule per registered role/state/area
   special or domestic state correspondence, with reference IDs/locators and
   applicability/frame conditions. Conflicting rules fail.
+  Execution clarification: the captured public state/place HTML has empty dynamic
+  code tables. Resolve explicit state/place correspondences through each selected
+  source's delivered DDI, including its STATEFIP correspondence and raw citations;
+  public snapshot originals still govern role specials and frame conditions.
+  Missing, ambiguous or unsupported DDI interpretations fail. No unmatched label
+  becomes foreign by default. This adds the selected sources argument without
+  modifying any frozen upstream interface.
 - `observed_area_keys(sources: dict[str, SourceInput]) -> pl.DataFrame` collects
   only distinct profile/sample/release/component/role/raw-state/raw-area keys
   and source counts, using each role's own documented normalization.
