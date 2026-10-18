@@ -555,3 +555,126 @@ def role_case(population_case):
             'migration': 'MIGPUMA1'
         }
     )
+
+
+@pytest.fixture
+def companion_case(tmp_path, role_case, evidence, selected):
+    '''Converted synthetic deliveries plus real reader-unit lookup/factor builders.
+
+    These are honest unit evidence objects, not selector-authenticated bundles.
+    The vintage concordance is an explicitly synthetic identity relation restricted
+    to the selected public 113M members. Task8 owns the authenticated build chain.
+    '''
+    import csv
+    import gzip
+    import io
+    import json
+    from dataclasses import replace
+    from types import SimpleNamespace
+    from xml.etree.ElementTree import Element, SubElement, tostring
+
+    import polars as pl
+    from code_fixtures import pair_sheet
+
+    from embedding_data import ipums_conversion, ipums_ddi, target_io
+    from embedding_data.acs_area_mapping import build_area_lookup, observed_area_keys
+    from embedding_data.acs_area_references import read_role_rules
+    from embedding_data.acs_code_mapping import build_code_lookup, observed_code_keys
+    from embedding_data.acs_mapping_contract import SourceInput
+    from embedding_data.naics_relationships import parse_concordance
+
+    native = evidence.metadata.filter(
+        pl.col('source_scheme').eq('naics2017').and_(pl.col('source_token').eq('113M'))
+    ).row(0, named=True)
+    relation = parse_concordance(
+        pair_sheet(2017, 2022, [(c, c) for c in native['native_finest_candidates']]),
+        2017, 2022, 'synthetic-companion-identity.xlsx'
+    )
+    relation_path = tmp_path / 'synthetic-concordance.parquet'
+    relation.write_parquet(relation_path)
+    selected = replace(selected, codes={**selected.codes, 'naics_concordance': relation_path})
+    profiles = {}
+    for profile, years in [('core', [2023, 2024, 2024, 2024, 2024, 2024]),
+                           ('vintage', [2022] * 6), ('five_year', [2024] * 6)]:
+        directory = tmp_path / ('converted-' + profile)
+        directory.mkdir()
+        product = 'acs/' + profile
+        samples = {'core': {'us2023a': {}, 'us2024a': {}},
+                   'vintage': {'us2022a': {}}, 'five_year': {'us2024c': {}}}[profile]
+        categories = {
+            'SAMPLE': [(s[2:6] + '01', f'{s[2:6]} ACS') for s in samples],
+            'STATEFIP': [('01', 'Alabama'), ('09', 'Connecticut'), ('72', 'Puerto Rico')],
+            'PUMA': [], 'PWPUMA00': [], 'MIGPUMA1': [],
+            'PWSTATE2': [('01', 'Alabama'), ('09', 'Connecticut'), ('72', 'Puerto Rico'),
+                         ('00', 'N/A'), ('80', 'Abroad'), ('99', 'Not reported')],
+            'MIGPLAC1': [('001', 'Alabama'), ('009', 'Connecticut'), ('000', 'N/A'),
+                         ('110', 'Puerto Rico'), ('150', 'Canada'), ('997', 'Unknown value'),
+                         ('999', 'Missing'),
+                         ('988', 'Suppressed for data year 2022 for select cases')],
+            'QIND': [('0', 'Original entry or Inapplicable (not in universe)'),
+                     ('1', 'Failed edit'), ('4', 'Allocated')],
+            'QOCC': [('0', 'Entered as written'), ('4', 'Allocated'), ('8',
+                      'Original entry missing or failed edit')],
+        }
+        if profile == 'five_year':
+            categories['SAMPLE'] = [('202401', '2020-2024, ACS 5-year')]
+        if profile != 'vintage':
+            categories['QMIGRAT1'] = [('0', 'Not allocated'), ('4', 'Allocated')]
+        metadata = Element('codeBook')
+        variables = SubElement(metadata, 'dataDscr')
+        for name, values in categories.items():
+            var = SubElement(variables, 'var', name=name)
+            for value, label in values:
+                category = SubElement(var, 'catgry')
+                SubElement(category, 'catValu').text = value
+                SubElement(category, 'labl').text = label
+        ddi_path = directory / 'delivery.xml'
+        ddi_path.write_bytes(tostring(metadata))
+        definition = {'collection': 'usa', 'dataFormat': 'csv', 'samples': samples,
+                      'variables': {'IND': {}, 'OCC': {}}, 'dataQualityFlags': True}
+        definition_path = directory / 'extract.json'
+        definition_path.write_text(json.dumps(definition))
+        token = '113M' if profile == 'vintage' else '2212P'
+        ind = evidence.metadata.filter(pl.col('source_scheme').eq(
+            'naics2017' if profile == 'vintage' else 'naics2022'
+        ).and_(pl.col('source_token').eq(token))).row(0, named=True)
+        rows = []
+        for index, year in enumerate(years):
+            row = dict(YEAR=year, SAMPLE=year * 100 + 1, IND=ind['paired_census_code'],
+                       INDNAICS=' ' + token + ' ', OCC='9830', OCCSOC='559830',
+                       STATEFIP=1, PUMA=200 if index == 1 else 100,
+                       PWSTATE2=[1, 1, 0, 80, 72, 1][index],
+                       PWPUMA00=[100, 100, 0, 1, 100, 100][index],
+                       MIGPLAC1=[1, 1, 0, 150, 110, 1][index],
+                       MIGPUMA1=[100, 100, 0, 1, 100, 100][index],
+                       QIND=[4, 0, 1, None, 0, 4][index],
+                       QOCC=[0, 4, 8, None, 0, 0][index])
+            if profile == 'five_year':
+                row['MULTYEAR'] = [2020, 2021, 2022, 2023, 2024, 2020][index]
+            if profile != 'vintage':
+                row['QMIGRAT1'] = None if profile == 'core' else [0, 4, 0, None, 0, 0][index]
+            rows.append(row)
+        rows[-1] = rows[0].copy()  # Deliberate exact duplicate retained by conversion.
+        text = io.StringIO()
+        writer = csv.DictWriter(text, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+        raw = directory / 'delivery.csv.gz'
+        with gzip.open(raw, 'wt') as output:
+            output.write(text.getvalue())
+        parquet = directory / 'delivery.parquet'
+        ipums_conversion.convert(raw, parquet, 'acs')
+        citations = [{'path': f'{directory.name}/{p.name}',
+                      'sha256': manifest.sha256_file(p)} for p in [raw, ddi_path, definition_path]]
+        profiles[profile] = SimpleNamespace(source=SourceInput(
+            product, profile + '-fixture', parquet, target_io.file_record(parquet), citations,
+            ipums_ddi.read_definition(definition_path), ipums_ddi.read_ddi(ddi_path)
+        ))
+    sources = {k: v.source for k, v in profiles.items()}
+    codes = build_code_lookup(observed_code_keys(sources), evidence, selected)
+    rules = read_role_rules(role_case.snapshot, sources)
+    areas = build_area_lookup(observed_area_keys(sources), rules, role_case.evidence,
+                              role_case.factors)
+    for case in profiles.values():
+        case.codes, case.areas, case.factors = codes, areas, role_case.factors
+    return SimpleNamespace(**vars(profiles['core']), profiles=profiles)

@@ -4,8 +4,8 @@ from dataclasses import replace
 
 import polars as pl
 import pytest
-
-pytest_plugins = ['acs_mapping_fixtures']
+from acs_mapping_fixtures import population_case as population_case  # noqa: F401
+from acs_mapping_fixtures import role_case as role_case
 
 @pytest.mark.parametrize(
     'role,state,area,status', [
