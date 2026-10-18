@@ -1,6 +1,7 @@
 '''Synthetic complete Stage 4/5/7 bundles with independent detached pins.'''
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from code_fixtures import seed_code_tree
 from geography_fixtures import seed_geography_tree
@@ -8,6 +9,12 @@ from target_fixtures import forbid_external_access
 from test_ipums_verification_run import complete_inputs
 
 from embedding_data import code_build, geography_build, ipums_verification_run, manifest
+
+if TYPE_CHECKING:
+    import polars as pl
+
+    from embedding_data.acs_code_references import CodeEvidence
+    from embedding_data.acs_mapping_inputs import SelectedInputs
 
 @dataclass(frozen=True)
 class FixtureInputs:
@@ -184,3 +191,15 @@ def seed_mapping_references(tmp_path, monkeypatch, *, original_overrides=None):
         receipt_sha256=manifest.sha256_file(receipt),
         originals=files,
     )
+
+
+@dataclass(frozen=True)
+class FixtureCodeCase:
+    '''Native-membership fixture calling the production lookup builder.'''
+    observed: 'pl.DataFrame'
+    evidence: 'CodeEvidence'
+    selected: 'SelectedInputs'
+
+    def build_lookup(self):
+        from embedding_data.acs_code_mapping import build_code_lookup
+        return build_code_lookup(self.observed, self.evidence, self.selected)
