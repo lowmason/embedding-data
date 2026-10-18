@@ -79,6 +79,101 @@ KNOWN_INDUSTRY_CONFLICTS = {
     },
 }
 
+# Exact structural key/scope signatures from the registered complete Census editions.
+# These rows describe headings, not membership; unexpected body keys never become headings.
+_FULL_OCCUPATION_SECTIONS = {
+    9: ('0010-3550', '11-0000 - 29-0000'),
+    11: ('0010-0960', '11-0000 - 13-0000'),
+    13: ('0010-0440', '11-0000'),
+    49: ('0500-0960', '13-0000'),
+    81: ('1005-1980', '15-0000 - 19-0000'),
+    83: ('1005-1240', '15-0000'),
+    104: ('1305-1560', '17-0000'),
+    131: ('1600-1980', '19-0000'),
+    161: ('2001-2970', '21-0000 - 27-0000'),
+    163: ('2001-2060', '21-0000'),
+    182: ('2100-2180', '23-0000'),
+    191: ('2205-2555', '25-0000'),
+    206: ('2600-2970', '27-0000'),
+    240: ('3000-3550', '29-0000'),
+    289: ('3601-4655', '31-0000 - 39-0000'),
+    291: ('3601-3655', '31-0000'),
+    308: ('3700-3960', '33-0000'),
+    331: ('4000-4160', '35-0000'),
+    346: ('4200-4255', '37-0000'),
+    357: ('4330-4655', '39-0000'),
+    380: ('4700-5940', '41-0000 - 43-0000'),
+    382: ('4700-4965', '41-0000'),
+    403: ('5000-5940', '43-0000'),
+    460: ('6005-7640', '45-0000 - 49-0000'),
+    462: ('6005-6130', '45-0000'),
+    473: ('6200-6950', '47-0000'),
+    513: ('7000-7640', '49-0000'),
+    552: ('7700-9760', '51-0000 - 53-0000'),
+    554: ('7700-8990', '51-0000'),
+    620: ('9005-9760', '53-0000'),
+    622: ('9005-9430', '53-1000 - 53-6000'),
+    647: ('9510-9760', '53-7000'),
+    661: ('9800-9830', '55-0000'),
+}
+_FULL_INDUSTRY_SECTIONS = {
+    2017: {
+        8: ('0170-0490', '11-21'),
+        10: ('0170-0290', '11'),
+        19: ('0370-0490', '21'),
+        32: ('1070-3990', '31-33'),
+        114: ('4070-4590', '42'),
+        138: ('4670-5790', '44-45'),
+        176: ('6070-6390, 0570-0690', '48-49, 22'),
+        178: ('6070-6390', '48-49'),
+        193: ('0570-0690', '22'),
+        202: ('6470-6780', '51'),
+        217: ('6870-7190', '52-53'),
+        219: ('6870-6992', '52'),
+        228: ('7071-7190', '53'),
+        237: ('7270-7790', '54-56'),
+        240: ('7270-7490', '54'),
+        257: ('7580-7790', '56'),
+        268: ('7860-8470', '61-62'),
+        270: ('7860-7890', '61'),
+        277: ('7970-8470', '62'),
+        296: ('8561-8690', '71-72'),
+        298: ('8561-8590', '71'),
+        308: ('8660-8690', '72'),
+        315: ('8770-9290', '81'),
+        334: ('9370-9590', '92'),
+        345: ('9670-9870', '928110'),
+    },
+    2022: {
+        8: ('0170-0490', '11-21'),
+        10: ('0170-0290', '11'),
+        19: ('0370-0490', '21'),
+        32: ('1070-3990', '31-33'),
+        114: ('4070-4590', '42'),
+        138: ('4670-5791', '44-45'),
+        172: ('6070-6390, 0570-0690', '48-49, 22'),
+        174: ('6070-6390', '48-49'),
+        189: ('0570-0690', '22'),
+        198: ('6471-6781', '51'),
+        213: ('6871-7190', '52-53'),
+        215: ('6871-6992', '52'),
+        224: ('7071-7190', '53'),
+        233: ('7270-7790', '54-56'),
+        236: ('7270-7490', '54'),
+        253: ('7580-7790', '56'),
+        264: (None, '61-62'),
+        265: ('7860-8470', None),
+        267: ('7860-7890', '61'),
+        274: ('7970-8470', '62'),
+        294: ('8561-8690', '71-72'),
+        296: ('8561-8590', '71'),
+        306: ('8660-8690', '72'),
+        314: ('8770-9290', '81'),
+        334: ('9370-9590', '92'),
+        346: ('9670-9870', 'pt. 92811'),
+    },
+}
+
 
 @dataclass(frozen=True)
 class CodeEvidence:
@@ -190,8 +285,12 @@ def _industry_rows(snapshot, kind, sheet, vintage):
             raise ValueError('contradictory paired or malformed industry row')
         seen[code] = (expression, token)
         result.append(
-            (code, token.strip(), expression,
-             _locator(kind, sheet, number, 'C:E') + ':source_token_raw=' + repr(token))
+            (
+                code,
+                token.strip(),
+                expression,
+                _locator(kind, sheet, number, 'C:E') + ':source_token_raw=' + repr(token),
+            )
         )
     if not result:
         raise ValueError('empty authoritative industry list')
@@ -223,9 +322,10 @@ def _occupation_rows(snapshot, kind, sheet, full, rejected):
             raise ValueError('unsupported occupation source token')
         # Nested Combines blocks are flattened only through their explicit terminal rows.
         # A letter token must be followed by its own Combines block; never use a wildcard.
-        constituents = []
-        locators = [_locator(kind, sheet, index + 1, 'A:C') +
-                    ':source_token_raw=' + repr(original_token)]
+        constituents, full_constituents = [], set()
+        locators = [
+            _locator(kind, sheet, index + 1, 'A:C') + ':source_token_raw=' + repr(original_token)
+        ]
         cursor = index + 1
         while cursor < len(rows) and rows[cursor][0] is None:
             value = rows[cursor][1].strip() if rows[cursor][1] else None
@@ -239,6 +339,8 @@ def _occupation_rows(snapshot, kind, sheet, full, rejected):
                     if full_code not in full:
                         raise ValueError('missing explicit full Census constituent')
                     full_token, full_locator = full[full_code]
+                    full_constituents.add(full_code)
+                    locators.append(full_locator)
                     if value.replace('-', '') != full_token:
                         # D4 is exactly one independently named constituent in three editions.
                         if not (
@@ -272,12 +374,25 @@ def _occupation_rows(snapshot, kind, sheet, full, rejected):
                     constituents.append(value.strip())
                 elif cursor + 1 >= len(rows) or (rows[cursor + 1][1] or '').strip() != 'Combines:':
                     raise ValueError('unsupported occupation collapse without explicit members')
-                locators.append(_locator(kind, sheet, cursor + 1, 'B:C') +
-                                ':asserted_soc_raw=' + repr(rows[cursor][1]))
+                locators.append(
+                    _locator(kind, sheet, cursor + 1, 'B:C')
+                    + ':asserted_soc_raw='
+                    + repr(rows[cursor][1])
+                )
             cursor += 1
         if re.search('[XY]', token) and not constituents:
             raise ValueError('unsupported occupation collapse without explicit members')
-        # Numeric PUMS scopes can themselves be further collapsed; the explicit block wins.
+        if not full_constituents:
+            expected = full.get(code)
+            full_token = (
+                'none'
+                if (code, token) in (('9830', '55-9830'), ('9920', '999920'))
+                else token.replace('-', '')
+            )
+            if expected is None or expected[0] != full_token:
+                raise ValueError('contradictory paired full Census occupation correspondence')
+            locators.append(expected[1])
+        # Explicit named collapses use their full Census constituents, not a same-key guess.
         result.append((code, token.replace('-', ''), constituents or [token], locators))
     if not result:
         raise ValueError('empty authoritative occupation list')
@@ -316,21 +431,48 @@ def _occupation_styles(file):
         raise ValueError('missing occupation styles or legend') from error
 
 
+def _complete_reference_rows(rows, key_column, expression_column, header_row, sections, label):
+    '''Only exact registered structural signatures may bypass complete data-key validation.'''
+    for number, row in enumerate(rows, 1):
+        if number <= header_row:
+            continue
+        code, expression = row[key_column], row[expression_column]
+        if number in sections:
+            if (code, expression) != sections[number]:
+                raise ValueError(f'malformed {label} structural key/scope at row {number}')
+            continue
+        if code is None and expression is None:
+            continue
+        if code is None or not re.fullmatch(r'\d{4}', code):
+            raise ValueError(f'malformed {label} reference key at row {number}')
+        yield number, row
+
+
+def _paired_reference_key(code, locator, *, numeric_padding=False):
+    if code in (None, '', '-'):
+        return None
+    pattern = r'\d{1,4}' if numeric_padding else r'(?:\d{4}|0)'
+    if not re.fullmatch(pattern, code):
+        raise ValueError(f'malformed paired reference key: {locator}')
+    return code.zfill(4) if numeric_padding else code
+
+
 def _full_occupation(snapshot):
     rows, result = _rows(snapshot, 'census_occupation_2018', '2018 Census Occ Code List'), {}
-    for number, row in enumerate(rows, 1):
+    for number, row in _complete_reference_rows(
+        rows, 2, 3, 5, _FULL_OCCUPATION_SECTIONS, 'full Census occupation'
+    ):
         code, expression = row[2:4]
-        if code and re.fullmatch(r'\d{4}', code):
-            if (
-                code in result
-                or not expression
-                or not re.fullmatch(r'(?:\d{2}-[0-9X]{4}|none)', expression)
-            ):
-                raise ValueError('contradictory full Census occupation category')
-            result[code] = (
-                expression.replace('-', ''),
-                _locator('census_occupation_2018', '2018 Census Occ Code List', number, 'C:D'),
-            )
+        if (
+            code in result
+            or not expression
+            or not re.fullmatch(r'(?:\d{2}-[0-9X]{4}|none)', expression)
+        ):
+            raise ValueError('contradictory full Census occupation category')
+        result[code] = (
+            expression.replace('-', ''),
+            _locator('census_occupation_2018', '2018 Census Occ Code List', number, 'C:D'),
+        )
     return result
 
 
@@ -466,28 +608,28 @@ def _selected_full_industry(selected):
         ):
             raise ValueError('selected full Census industry layout changed')
         current = {}
-        for number, row in enumerate(rows, 1):
+        for number, row in _complete_reference_rows(
+            rows, 3, 4, 4, _FULL_INDUSTRY_SECTIONS[vintage], f'full Census industry {vintage}'
+        ):
             code, expression = row[3:5]
-            if code and re.fullmatch(r'\d{4}', code) and row[0] is None:
-                if (
-                    code == '9920'
-                    and expression is None
-                    and row[1]
-                    == ('Unemployed, last worked 5 years ago or earlier or never worked')
-                ):
-                    excluded.append(
-                        dict(
-                            kind=kind,
-                            code=code,
-                            token=None,
-                            locators=[_locator(kind, sheet, number, 'D:E')],
-                            reason='unemployed_no_work_experience',
-                        )
+            if (
+                code == '9920'
+                and expression is None
+                and row[1] == ('Unemployed, last worked 5 years ago or earlier or never worked')
+            ):
+                excluded.append(
+                    dict(
+                        kind=kind,
+                        code=code,
+                        token=None,
+                        locators=[_locator(kind, sheet, number, 'D:E')],
+                        reason='unemployed_no_work_experience',
                     )
-                    continue
-                if not expression or (code in current and current[code][0] != expression.strip()):
-                    raise ValueError('contradictory full Census industry category')
-                current[code] = (expression.strip(), _locator(kind, sheet, number, 'D:E'))
+                )
+                continue
+            if not expression or (code in current and current[code][0] != expression.strip()):
+                raise ValueError('contradictory full Census industry category')
+            current[code] = (expression.strip(), _locator(kind, sheet, number, 'D:E'))
         by_vintage[vintage], files[vintage] = current, file
     workbook = fastexcel.read_excel(files[2022].read_bytes())
     rows = (
@@ -522,6 +664,8 @@ def _industry_diagnostics(snapshot, admitted, legacy, excluded):
     diagnostics = []
     assertions = []
     for number, row in enumerate(_rows(snapshot, 'ipums_ind_pairs', 'Sheet1'), 1):
+        if number == 1:
+            continue
         assertions.extend(
             (v, row[c], row[t], _locator('ipums_ind_pairs', 'Sheet1', number, 'F:O'))
             for v, c, t in [(2017, 5, 13), (2022, 6, 14)]
@@ -535,7 +679,8 @@ def _industry_diagnostics(snapshot, admitted, legacy, excluded):
                 for v, c, t in [(2017, 4, 12), (2022, 5, 13)]
             )
     for vintage, code, token, locator in assertions:
-        if not code or not re.fullmatch(r'\d{4}|0', code):
+        code = _paired_reference_key(code, locator)
+        if code is None:
             continue
         if code == '9920':
             if token != '999920':
@@ -591,6 +736,8 @@ def _validate_occ_pairs(snapshot, admitted, excluded):
         ('Codes with Descriptions', 13, 27),
     ]:
         for number, row in enumerate(_rows(snapshot, 'ipums_occ_pairs', sheet), 1):
+            if number == 1:
+                continue
             assertions.append((row[c], row[t], _locator('ipums_occ_pairs', sheet, number, 'H:AB')))
     table = _Tables()
     table.feed(snapshot.files['occupation_pairs_html'].read_text())
@@ -598,9 +745,8 @@ def _validate_occ_pairs(snapshot, admitted, excluded):
         if len(row) == 15:
             assertions.append((row[6], row[13], f'occupation_pairs_html:tr={number}'))
     for code, token, locator in assertions:
-        if code and re.fullmatch(r'\d{1,4}', code):
-            code = code.zfill(4)
-        if not code or not re.fullmatch(r'\d{4}|0', code):
+        code = _paired_reference_key(code, locator, numeric_padding=True)
+        if code is None:
             continue
         if code == '9920':
             if token != '999920':
@@ -765,8 +911,6 @@ def read_code_evidence(snapshot: refs.ReferenceSnapshot, selected: SelectedInput
                 elif code in full and full[code][0] == token and re.search('[XY]', token):
                     reasons = ['category_design']
             ids = [kind, 'census_occupation_2018']
-            if code in full:
-                locators.append(full[code][1])
             if special:
                 ids += ['pums_annual_guide', 'pums_five_year_guide']
                 locators += [

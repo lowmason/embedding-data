@@ -1,6 +1,7 @@
 '''Public reader/grammar fixtures; not selector-accepted mapping bundles.'''
 
 import json
+from copy import deepcopy
 from dataclasses import replace
 from itertools import count
 from pathlib import Path
@@ -25,6 +26,47 @@ from embedding_data.acs_mapping_inputs import SelectedInputs
 from embedding_data.acs_mapping_references import check_cached_snapshot
 
 PUBLIC = Path(__file__).parent / 'fixtures/acs_mapping/classification'
+
+
+def rewrite_public_cell(source, destination, sheet, address, value):
+    '''Re-pin synthetic fixture mutations without changing any public source file.'''
+    row, column = address
+    address_text = chr(65 + column) + str(row)
+    namespace = {'m': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
+    with ZipFile(source) as original, ZipFile(destination, 'w') as output:
+        workbook = ET.fromstring(original.read('xl/workbook.xml'))
+        names = [node.attrib['name'] for node in workbook.find('m:sheets', namespace)]
+        target = f'xl/worksheets/sheet{names.index(sheet) + 1}.xml'
+        for part in original.namelist():
+            body = original.read(part)
+            if part == target:
+                document = ET.fromstring(body)
+                cell = document.find(f'.//m:c[@r="{address_text}"]', namespace)
+                assert cell is not None
+                for child in list(cell):
+                    cell.remove(child)
+                cell.set('t', 'inlineStr')
+                text = ET.SubElement(
+                    ET.SubElement(cell, '{' + namespace['m'] + '}is'), '{' + namespace['m'] + '}t'
+                )
+                text.text = value
+                body = ET.tostring(document)
+            output.writestr(part, body)
+
+
+def selected_with_full_cell(selected, tmp_path, kind, sheet, address, value):
+    root, provenance = tmp_path / 'selected-variant', deepcopy(selected.provenance)
+    originals = provenance['ipums']['inputs']['references']['receipt']['originals']
+    for name, record in originals.items():
+        file = root / 'raw' / record['citation']['path']
+        file.parent.mkdir(parents=True, exist_ok=True)
+        file.write_bytes((selected.data_dir / 'raw' / record['citation']['path']).read_bytes())
+        if name == kind:
+            altered = root / 'synthetic-mutated-original.xlsx'
+            rewrite_public_cell(file, altered, sheet, address, value)
+            file.write_bytes(altered.read_bytes())
+            record['citation'].update(sha256=manifest.sha256_file(file), size=file.stat().st_size)
+    return replace(selected, data_dir=root, provenance=provenance)
 
 
 @pytest.fixture(autouse=True)
@@ -101,36 +143,14 @@ def code_originals(tmp_path_factory, public_monkeypatch):
         overrides[kind] = file
     sequence = count()
 
-    def make(directory, changes=None, part_change=None):
+    def make(directory, changes=None, part_change=None, html_change=None):
         directory.mkdir()
         values = dict(overrides)
         if changes:
             kind, sheet, address, value = changes
             altered = directory / 'synthetic-conflict.xlsx'
             if kind in overrides:
-                row, col = address
-                address_text = chr(65 + col) + str(row)
-                namespace = {'m': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
-                with ZipFile(overrides[kind]) as original, ZipFile(altered, 'w') as output:
-                    workbook = ET.fromstring(original.read('xl/workbook.xml'))
-                    names = [node.attrib['name'] for node in workbook.find('m:sheets', namespace)]
-                    target = f'xl/worksheets/sheet{names.index(sheet) + 1}.xml'
-                    for part in original.namelist():
-                        body = original.read(part)
-                        if part == target:
-                            document = ET.fromstring(body)
-                            cell = document.find(f'.//m:c[@r="{address_text}"]', namespace)
-                            assert cell is not None
-                            for child in list(cell):
-                                cell.remove(child)
-                            cell.set('t', 'inlineStr')
-                            text = ET.SubElement(
-                                ET.SubElement(cell, '{' + namespace['m'] + '}is'),
-                                '{' + namespace['m'] + '}t',
-                            )
-                            text.text = value
-                            body = ET.tostring(document)
-                        output.writestr(part, body)
+                rewrite_public_cell(overrides[kind], altered, sheet, address, value)
             else:
                 record = json.loads(
                     (
@@ -151,6 +171,24 @@ def code_originals(tmp_path_factory, public_monkeypatch):
                     elif replacement is not None:
                         output.writestr(name, replacement)
             values[kind] = altered
+        if html_change:
+            kind, column, old, new = html_change
+            import re
+
+            body = snapshot.files[kind].read_text()
+            changed = False
+            for row in re.finditer(r'<tr\b[^>]*>.*?</tr>', body, re.S):
+                cells = list(re.finditer(r'<t[dh]\b[^>]*>(.*?)</t[dh]>', row[0], re.S))
+                if len(cells) == 15 and cells[column][1].strip() == old:
+                    start, stop = cells[column].span(1)
+                    altered_row = row[0][:start] + new + row[0][stop:]
+                    body = body[: row.start()] + altered_row + body[row.end() :]
+                    changed = True
+                    break
+            assert changed
+            altered = directory / 'synthetic-key.html'
+            altered.write_text(body)
+            values[kind] = altered
         seeded = seed_mapping_references(directory, monkeypatch, original_overrides=values)
         return check_cached_snapshot(seeded.data_dir, seeded.reference_id)
 
@@ -158,6 +196,9 @@ def code_originals(tmp_path_factory, public_monkeypatch):
     return SimpleNamespace(
         snapshot=snapshot,
         changed=lambda *change: make(tmp_path / f'mutation-{next(sequence)}', change),
+        changed_html=lambda *change: make(
+            tmp_path / f'mutation-{next(sequence)}', html_change=change
+        ),
         changed_part=lambda *change: make(
             tmp_path / f'mutation-{next(sequence)}', part_change=change
         ),
@@ -580,6 +621,100 @@ def test_nonworking_diagnostics_cover_full_census_originals(evidence):
 
 
 def test_original_expression_padding_remains_in_exact_locator(evidence):
-    row = evidence.metadata.filter(pl.col('source_scheme').eq('naics2017')
-        .and_(pl.col('source_token').eq('22S'))).row(0,named=True)
+    row = evidence.metadata.filter(
+        pl.col('source_scheme').eq('naics2017').and_(pl.col('source_token').eq('22S'))
+    ).row(0, named=True)
     assert any(locator.endswith('expression=Part of 22 ') for locator in row['reference_locators'])
+
+
+@pytest.mark.parametrize('cell,value', [((16, 3), '11-1011'), ((94, 3), '15-20XX')])
+def test_direct_full_census_occupation_contradiction_fails(code_originals, selected, cell, value):
+    altered = code_originals.changed(
+        'census_occupation_2018', '2018 Census Occ Code List', cell, value
+    )
+    with pytest.raises(ValueError, match='contradictory.*occupation'):
+        read_code_evidence(altered, selected)
+
+
+@pytest.mark.parametrize(
+    'change',
+    [
+        ('census_occupation_2018', '2018 Census Occ Code List', (16, 2), '00A0'),
+        ('ipums_occ_pairs', 'Codes without Descriptions', (6, 7), '00A0'),
+        ('ipums_ind_pairs', 'Sheet1', (4, 5), '01A0'),
+    ],
+)
+def test_full_and_diagnostic_malformed_keys_fail(code_originals, selected, change):
+    with pytest.raises(ValueError, match='malformed.*key'):
+        read_code_evidence(code_originals.changed(*change), selected)
+
+
+@pytest.mark.parametrize(
+    'vintage,sheet,row',
+    [
+        (2017, '2017 Census Industry Code List', 12),
+        (2017, '2017 Census Industry Code List', 25),
+        (2022, '2022 Census Ind Code List ', 12),
+        (2022, '2022 Census Ind Code List ', 25),
+    ],
+)
+def test_selected_full_industry_malformed_key_fails(
+    code_originals, selected, tmp_path, vintage, sheet, row
+):
+    altered = selected_with_full_cell(
+        selected, tmp_path, f'census_industry_{vintage}', sheet, (row, 3), '01A0'
+    )
+    with pytest.raises(ValueError, match='malformed.*key'):
+        read_code_evidence(code_originals.snapshot, altered)
+
+
+@pytest.mark.parametrize(
+    'kind,column,old',
+    [
+        ('industry_pairs_html', 4, '0170'),
+        ('occupation_pairs_html', 6, '20'),
+    ],
+)
+def test_diagnostic_html_malformed_key_fails(code_originals, selected, kind, column, old):
+    with pytest.raises(ValueError, match='malformed.*key'):
+        read_code_evidence(code_originals.changed_html(kind, column, old, '00A0'), selected)
+
+
+def test_synthetic_pums_collapse_does_not_require_aggregate_key_in_full_list(code_originals):
+    '''Synthetic aggregate identifier; only its published named constituents supply support.'''
+    from embedding_data.acs_code_references import _full_occupation, _occupation_rows
+
+    altered = code_originals.changed('pums_occupation_2018', 'ACS', (17, 0), '0001')
+    full = _full_occupation(altered)
+    assert '0001' not in full
+    rows = _occupation_rows(altered, 'pums_occupation_2018', 'ACS', full, [])
+    collapse = next(row for row in rows if row[0] == '0001')
+    assert collapse[1:3] == ('1110XX', ['11-1011', '11-1031'])
+    assert any('row=15' in locator for locator in collapse[3])
+    assert any('row=17' in locator for locator in collapse[3])
+
+
+@pytest.mark.parametrize('cell,key', [((16, 2), '0010-3550'), ((9, 2), '0010-3551')])
+def test_full_census_heading_grammar_cannot_hide_an_unregistered_key(
+    code_originals, selected, cell, key
+):
+    with pytest.raises(ValueError, match='malformed.*key'):
+        read_code_evidence(
+            code_originals.changed(
+                'census_occupation_2018', '2018 Census Occ Code List', cell, key
+            ),
+            selected,
+        )
+
+
+def test_full_industry_body_key_cannot_masquerade_as_section(code_originals, selected, tmp_path):
+    altered = selected_with_full_cell(
+        selected,
+        tmp_path,
+        'census_industry_2022',
+        '2022 Census Ind Code List ',
+        (25, 3),
+        '0170-0490',
+    )
+    with pytest.raises(ValueError, match='malformed.*key'):
+        read_code_evidence(code_originals.snapshot, altered)
