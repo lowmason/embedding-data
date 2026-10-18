@@ -274,3 +274,38 @@ def test_actual_nationwide_geocorr_reader_preserves_single_byte_names(tmp_path):
     assert any('ó' in r['PUMA22name'] or 'ó' in r['CountyName'] for r, _ in rows)
     assert rows[-1][1]['reference_locators'] == ['geocorr_intersections:csv:row:4692']
     assert file.read_bytes() == body
+
+
+def test_d7_rejected_assertion_survives_evidence_validation_without_factor_repair():
+    import csv
+    import hashlib
+    import io
+    from types import SimpleNamespace
+
+    from acs_mapping_fixtures import genuine_geocorr_bytes
+
+    from embedding_data.acs_area_references import (
+        _check_intersection_rounding,
+        geocorr_rounding_assertion,
+    )
+
+    body = genuine_geocorr_bytes()
+    reader = csv.DictReader(io.StringIO(body.decode('cp1252')))
+    next(reader)
+    raw = list(reader)[1136 - 3]
+    pin = hashlib.sha256(body).hexdigest()
+    assertion = geocorr_rounding_assertion(pin, 1136, raw, 'afact', 87018, 130062)
+    evidence = SimpleNamespace(reference_provenance={
+        'originals': {'geocorr_intersections': {'sha256': pin}},
+        'rejected_geocorr_rounding_assertions': [assertion]})
+    row = dict(state_fips=raw['state'], puma_code=raw['puma22'], county_geoid=raw['county'],
+               intersection_population=int(raw['pop20']),
+               published_area_factor=float(raw['afact']),
+               reference_locators=['geocorr_intersections:csv:row:1136'])
+    assert _check_intersection_rounding(
+        evidence, row, 'published_area_factor', 'afact', 130062) == assertion
+    assert row['published_area_factor'] == 0.669
+    assert row['intersection_population'] / 130062 != row['published_area_factor']
+    row['reference_locators'] = ['geocorr_intersections:csv:row:1137']
+    with pytest.raises(ValueError, match='rounding evidence differs'):
+        _check_intersection_rounding(evidence, row, 'published_area_factor', 'afact', 130062)

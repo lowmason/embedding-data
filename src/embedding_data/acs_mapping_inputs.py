@@ -20,12 +20,12 @@ SOFTWARE_FILES = tuple(dict.fromkeys((*ipums_verification_run.SOFTWARE_FILES, *(
     f'src/embedding_data/{name}.py' for name in (
         'acs_mapping_contract', 'acs_mapping_inputs', 'acs_mapping_io',
         'acs_mapping_references', 'acs_code_references', 'acs_code_mapping',
-        'acs_area_references', 'acs_geography_factors', 'acs_area_mapping',
+        'acs_area_references', 'acs_geography_factors', 'acs_area_mapping', 'acs_ct_population',
         'acs_mapping_companions', 'acs_mapping_bundle', 'acs_mapping',
         'target_inputs', 'code_build', 'classification_tables', 'naics_relationships',
         'filing_rules', 'ita_naics_mapping', 'ita_summary', 'ita_references', 'ita_catalog',
         'osha_encoding', 'geography_build', 'geography_tables', 'geography_hud', 'geography_cli',
-    )))))
+    )), 'tests/test_acs_ct_population.py', 'tests/test_acs_source_rules.py')))
 ACS_PROFILES = ('acs/core', 'acs/five_year', 'acs/vintage')
 
 

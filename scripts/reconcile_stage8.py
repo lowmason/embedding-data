@@ -8,6 +8,7 @@ import re
 import sys
 from collections import defaultdict
 from decimal import Decimal
+from html.parser import HTMLParser
 from importlib.metadata import distributions, version
 from pathlib import Path
 
@@ -106,7 +107,25 @@ FOREIGN_WORK_LABELS = frozenset(
         'Other, nec', 'South Central, South East, and Western Asia'
     )
 )
-RECONCILER_VERSION = 'stage8-independent-v1'
+CT_REFERENCE_NAMES = {
+    'ct_tabblock2020': 'tl_2020_09_tabblock20.zip',
+    'ct_block_assignment2020': 'BlockAssign_ST09_CT.zip',
+    'ct_county_crosswalk': 'ct_cou_to_cousub_crosswalk.txt',
+    'tract_puma2020': '2020_Census_Tract_to_2020_PUMA.txt',
+    'census_puma_population2020': 'census-puma2020-pop100.html',
+    'census_ct_mcd_population2020': 'census-ct-cousub2020-pop100.html',
+    'ct_opm_population2020': 'ct-opm-2020-planning-pop.xlsx',
+}
+
+
+def reference_names(version):
+    require(version in ('acs-mapping-references-v1', 'acs-mapping-references-v2'),
+            'unknown reference version')
+    return (dict(REFERENCE_NAMES) if version == 'acs-mapping-references-v1' else
+            {**REFERENCE_NAMES, **CT_REFERENCE_NAMES})
+
+
+RECONCILER_VERSION = 'stage8-independent-v2'
 
 STAGE7_NAMES = (
     'pyproject.toml', 'uv.lock', *(
@@ -128,13 +147,14 @@ EXECUTING_NAMES = tuple(
                     'acs_mapping_contract', 'acs_mapping_inputs', 'acs_mapping_io',
                     'acs_mapping_references', 'acs_code_references', 'acs_code_mapping',
                     'acs_area_references', 'acs_geography_factors', 'acs_area_mapping',
+                    'acs_ct_population',
                     'acs_mapping_companions', 'acs_mapping_bundle', 'acs_mapping', 'target_inputs',
                     'code_build', 'classification_tables', 'naics_relationships', 'filing_rules',
                     'ita_naics_mapping', 'ita_summary', 'ita_references', 'ita_catalog',
                     'osha_encoding', 'geography_build', 'geography_tables', 'geography_hud',
                     'geography_cli'
                 )
-            )
+            ), 'tests/test_acs_ct_population.py', 'tests/test_acs_source_rules.py'
         )
     )
 )
@@ -190,7 +210,9 @@ def read(file):
 def identities():
     names = (
         'scripts/reconcile_stage8.py', 'tests/test_stage8_reconciliation.py',
-        'tests/acs_mapping_fixtures.py', 'pyproject.toml', 'uv.lock'
+        'tests/test_acs_source_rules.py',
+        'tests/acs_mapping_fixtures.py', 'tests/test_acs_ct_population.py',
+        'pyproject.toml', 'uv.lock'
     )
     return {
         'version': RECONCILER_VERSION,
@@ -305,18 +327,23 @@ def _preservation(data_dir: Path, control_dir: Path) -> dict:
         require(root + '/receipt.json' in appended, 'snapshot receipt not separately manifested')
         receipt = read(directory / 'receipt.json')
         require(
-            receipt['reference_id'] == directory.name and receipt['reference_version']
-            == 'acs-mapping-references-v1', 'snapshot receipt identity differs'
+            receipt['reference_id'] == directory.name, 'snapshot receipt identity differs'
         )
         require(
             re.fullmatch('[A-Za-z0-9][A-Za-z0-9_-]*', directory.name),
             'unsafe reference snapshot ID'
         )
+        names = reference_names(receipt['reference_version'])
+        collection = (None if receipt['reference_version'] == 'acs-mapping-references-v1' else
+                      'acs-mapping-references-v2')
+        require(all(appended[root + '/' + name]['collection'] == collection
+                    for name in set(names.values()) | {'receipt.json'}),
+                'snapshot collection/reference version differs')
         requests = receipt['request_files']
-        expected_requests = {kind for kind in REFERENCE_NAMES if kind.endswith('_request')}
+        expected_requests = {kind for kind in names if kind.endswith('_request')}
         require(set(requests) == expected_requests, 'receipt request inventory differs')
         for kind, request in requests.items():
-            filename = REFERENCE_NAMES[kind]
+            filename = names[kind]
             require(
                 request == {
                     'filename': filename,
@@ -331,8 +358,8 @@ def _preservation(data_dir: Path, control_dir: Path) -> dict:
             )
         files = receipt['files']
         require(
-            set(receipt['originals']) == set(REFERENCE_NAMES) and set(files) == set(
-                REFERENCE_NAMES.values()
+            set(receipt['originals']) == set(names) and set(files) == set(
+                names.values()
             ), 'complete registered reference set differs'
         )
         require(
@@ -361,7 +388,7 @@ def _preservation(data_dir: Path, control_dir: Path) -> dict:
             citation = next(r for r in citations if r['path'] == path)
             require(citation == appended[path], 'receipt citation differs from manifest suffix')
         for kind, original in receipt['originals'].items():
-            name = REFERENCE_NAMES[kind]
+            name = names[kind]
             path = root + '/' + name
             require(original['citation']['path'] == path, 'registered original kind/path differs')
             require(
@@ -735,6 +762,32 @@ def rounding(value, numerator, denominator, scale=1):
         'published rounding outside decimal bound'
     )
 
+
+def geocorr_rounding_assertion(pin, number, row, column, numerator, denominator):
+    require(denominator > 0, 'nonpositive population denominator')
+    error = abs(Decimal(row[column]) - Decimal(numerator) / Decimal(denominator))
+    known = {
+        1136: ('16', '01300', '16005', 'afact', '0.669 ', 87018, 130062),
+        2428: ('30', '00500', '30013', 'afact', '0.5432 ', 84414, 155387),
+        2662: ('34', '01404', '34013', 'afact2', '0.1252', 108182, 863728),
+    }
+    observed = (row['state'], row['puma22'], row['county'], column, row[column],
+                numerator, denominator)
+    if (pin == '9d7ef74ba87b2b3bd4b22303c4c0910a4da0bca966721232c0e9b4461737e04d'
+            and number in known and column == known[number][3]):
+        require(known[number] == observed, 'D7 rounding assertion tuple differs')
+    if error <= ROUNDING:
+        return None
+    require(pin == '9d7ef74ba87b2b3bd4b22303c4c0910a4da0bca966721232c0e9b4461737e04d'
+            and known.get(number) == (row['state'], row['puma22'], row['county'],
+                                     column, row[column], numerator, denominator),
+            'published rounding outside decimal bound')
+    return {'original_sha256': pin, 'row': number, 'state_fips': row['state'],
+            'puma_code': row['puma22'], 'county_geoid': row['county'], 'column': column,
+            'literal_token': row[column], 'numerator': numerator, 'denominator': denominator,
+            'absolute_error': str(error), 'cause': 'unknown', 'disposition': 'rejected_assertion',
+            'reference_locator': f'geocorr_intersections:csv:row:{number}'}
+
 def reference_geography(data_dir, upstream, directory):
     '''Authenticate the complete 2025 original before domestic-scope comparisons.'''
     import io
@@ -778,6 +831,274 @@ def reference_geography(data_dir, upstream, directory):
     )
     return counties
 
+def ct_population(files):
+    '''Reconstruct D9 from originals with independent byte/CSV/HTML/workbook checks.'''
+    import stat
+    import struct
+    from zipfile import BadZipFile, ZipFile
+
+    limits = dict(zip(CT_REFERENCE_NAMES, (64 * 1024 * 1024, 2 * 1024 * 1024,
+                      32 * 1024, 2 * 1024 * 1024, 2 * 1024 * 1024, 256 * 1024, 32 * 1024),
+                      strict=True))
+    require(all(0 < files[k].stat().st_size <= v for k, v in limits.items()),
+            'CT original byte bound differs')
+
+    def unsigned(value, width=None):
+        require(isinstance(value, str) and re.fullmatch(
+            '[0-9]+' if width is None else '[0-9]{' + str(width) + '}', value),
+            'invalid CT integer/code token')
+        return int(value) if width is None else value
+
+    def member(file, name, expected, compression, cap):
+        require(0 < file.stat().st_size <= cap, 'CT archive byte bound differs')
+        try:
+            with ZipFile(file) as archive:
+                entries = archive.infolist()
+                require(len(entries) == len(expected)
+                        and {m.filename for m in entries} == expected,
+                        'CT archive exact member inventory differs')
+                for m in entries:
+                    mode = m.external_attr >> 16
+                    require('/' not in m.filename and '\\' not in m.filename and not m.is_dir()
+                            and not stat.S_ISLNK(mode)
+                            and (not stat.S_IFMT(mode) or stat.S_ISREG(mode))
+                            and not m.flag_bits & 1 and m.compress_type == compression
+                            and 0 < m.file_size <= cap
+                            and 0 < m.compress_size <= m.file_size + 1024,
+                            'unsafe CT archive member')
+                require(archive.getinfo(name).file_size <= 8 * 1024 * 1024,
+                        'CT selected member too large')
+                return archive.read(name)
+        except (BadZipFile, OSError, RuntimeError) as error:
+            raise ValueError('invalid CT archive') from error
+
+    def csv_table(body, header, delimiter=','):
+        reader = csv.DictReader(io.StringIO(body.decode('utf-8-sig'), newline=''),
+                                delimiter=delimiter, strict=True)
+        require([c.replace('\n', ' ').strip() for c in reader.fieldnames] == header,
+                'CT source header differs')
+        rows = []
+        for row in reader:
+            require(None not in row, 'CT CSV width differs')
+            rows.append({k.replace('\n', ' ').strip(): v for k, v in row.items()})
+        return rows
+
+    def controls(file, header):
+        parser = OccupationHTMLRows()
+        parser.feed(file.read_text(encoding='utf-8'))
+        require(parser.rows[0] == header, 'Census control header differs')
+        result = {}
+        for values in parser.rows[1:]:
+            require(len(values) == len(header), 'Census control width differs')
+            row = dict(zip(header, values, strict=True))
+            key = unsigned(row['GEOID'], 7 if 'PUMA' in row else 10)
+            expected = unsigned(row['STATE'], 2) + (unsigned(row['PUMA'], 5) if 'PUMA' in row else
+                       unsigned(row['COUNTY'], 3) + unsigned(row['COUSUB'], 5))
+            require(key == expected and key not in result, 'duplicate/inconsistent CT control key')
+            unsigned(row['POP100'])
+            result[key] = row
+        return result
+
+    tiger_names = {f'tl_2020_09_tabblock20.{x}' for x in (
+        'cpg', 'dbf', 'prj', 'shp', 'shp.ea.iso.xml', 'shx', 'shp.iso.xml')}
+    tiger = files['ct_tabblock2020']
+    require(member(tiger, 'tl_2020_09_tabblock20.cpg', tiger_names, 0, 64 * 1024 * 1024)
+            == b'UTF-8', 'CT encoding differs')
+    body = member(tiger, 'tl_2020_09_tabblock20.dbf', tiger_names, 0, 64 * 1024 * 1024)
+    require(len(body) >= 578 and body[0] == 3 and body[29] == 0, 'CT DBF header differs')
+    count, start, size = struct.unpack_from('<IHH', body, 4)
+    require(count == 49926 and (start, size) == (577, 137)
+            and len(body) == start + size * count + 1 and body[start - 1] == 13 and body[-1] == 26,
+            'CT DBF physical bounds differ')
+    expected_fields = (
+        ('STATEFP20', 'C', 2), ('COUNTYFP20', 'C', 3), ('TRACTCE20', 'C', 6),
+        ('BLOCKCE20', 'C', 4), ('GEOID20', 'C', 15), ('NAME20', 'C', 10),
+        ('MTFCC20', 'C', 5), ('UR20', 'C', 5), ('UACE20', 'C', 5), ('UATYPE20', 'C', 5),
+        ('FUNCSTAT20', 'C', 1), ('ALAND20', 'N', 14), ('AWATER20', 'N', 14),
+        ('INTPTLAT20', 'C', 11), ('INTPTLON20', 'C', 12), ('HOUSING20', 'N', 12),
+        ('POP20', 'N', 12))
+    offsets, offset = {}, 1
+    for i, (name, kind, width) in enumerate(expected_fields):
+        field = body[32 + 32 * i:64 + 32 * i]
+        require((field[:11].split(b'\0')[0].decode('ascii'), chr(field[11]), field[16], field[17])
+                == (name, kind, width, 0), 'CT DBF descriptors differ')
+        offsets[name] = slice(offset, offset + width)
+        offset += width
+    blocks = {}
+    for i in range(count):
+        raw = body[start + i * size:start + (i + 1) * size]
+        require(raw[0] == 32, 'CT deleted/invalid record')
+        keys = [raw[offsets[n]].decode('ascii').strip(' ') for n in (
+            'STATEFP20', 'COUNTYFP20', 'TRACTCE20', 'BLOCKCE20', 'GEOID20')]
+        for token, width in zip(keys, (2, 3, 6, 4, 15), strict=True):
+            unsigned(token, width)
+        require(keys[0] == '09' and ''.join(keys[:4]) == keys[4] and keys[4] not in blocks,
+                'CT duplicate/inconsistent block key')
+        blocks[keys[4]] = unsigned(raw[offsets['POP20']].decode('ascii').strip(' '))
+    baf_names = {f'BlockAssign_ST09_CT_{n}.txt' for n in (
+        'INCPLACE_CDP', 'AIANNH', 'VTD', 'MCD', 'CD', 'SLDL', 'SDSEC', 'SLDU', 'SDELM', 'SDUNI')}
+    baf_rows = csv_table(member(files['ct_block_assignment2020'], 'BlockAssign_ST09_CT_MCD.txt',
+                        baf_names, 8, 2 * 1024 * 1024), ['BLOCKID', 'COUNTYFP', 'COUSUBFP'], '|')
+    baf = {}
+    for row in baf_rows:
+        key = unsigned(row['BLOCKID'], 15)
+        town = '09' + unsigned(row['COUNTYFP'], 3) + unsigned(row['COUSUBFP'], 5)
+        require(key.startswith(town[:5]) and key not in baf, 'CT BAF key differs')
+        baf[key] = town
+    require(len(baf) == 49926 and set(baf) == set(blocks), 'CT BAF/block inventories differ')
+    tract_rows = csv_table(files['tract_puma2020'].read_bytes(),
+                           ['STATEFP', 'COUNTYFP', 'TRACTCE', 'PUMA5CE'])
+    tracts = {}
+    for row in tract_rows:
+        key = (unsigned(row['STATEFP'], 2) + unsigned(row['COUNTYFP'], 3)
+               + unsigned(row['TRACTCE'], 6))
+        require(key not in tracts, 'duplicate CT/national tract key')
+        tracts[key] = unsigned(row['PUMA5CE'], 5)
+    require(len(tracts) == 85452 and sum(k.startswith('09') for k in tracts) == 883,
+            'national tract control coverage differs')
+    xheader = ('STATEFP (INCITS38)|OLD_COUNTYFP (INCITS31)|OLD_COUNTY_NAMELSAD|'
+               'NEW_COUNTYFP (INCITS31)|NEW_COUNTY_NAMELSAD|COUSUBFP|OLD_COUSUB_GEOID|'
+               'NEW_COUSUB_GEOID|COUSUB_NAMELSAD|COUSUBNS (INCITS446)|COUSUB_LSAD|'
+               'COUSUB_FUNCSTAT|COUSUB_CLASSFP').split('|')
+    crosswalk, glossary = defaultdict(list), []
+    crosswalk_rows = csv_table(files['ct_county_crosswalk'].read_bytes(), xheader, '|')
+    for row in crosswalk_rows:
+        if row[xheader[0]] != '09':
+            require(all(v is None for k, v in row.items() if k != xheader[0]),
+                    'CT glossary shape differs')
+            glossary.append(row[xheader[0]])
+            continue
+        require(not glossary, 'CT body follows glossary')
+        town = '09' + unsigned(row[xheader[1]], 3) + unsigned(row['COUSUBFP'], 5)
+        county = '09' + unsigned(row[xheader[3]], 3)
+        require(row['OLD_COUSUB_GEOID'] == town and row['NEW_COUSUB_GEOID'] ==
+                county + row['COUSUBFP'] and county not in [r[0] for r in crosswalk[town]],
+                'CT crosswalk duplicate/component key differs')
+        crosswalk[town].append((county, row['NEW_COUNTY_NAMELSAD']))
+    require(len(glossary) == 9 and glossary[0] == 'GLOSSARY', 'CT glossary differs')
+    require(len(crosswalk) == 173 and sum(map(len, crosswalk.values())) == 174,
+            'CT crosswalk coverage differs')
+    pumas, counties, towns, relations = (defaultdict(int) for _ in range(4))
+    excluded = []
+    for block, pop in blocks.items():
+        town = baf[block]
+        towns[town] += pop
+        require(block[:11] in tracts, 'CT block tract unmatched')
+        puma = tracts[block[:11]]
+        targets = crosswalk.get(town, [])
+        if len(targets) != 1:
+            require(pop == 0 and town == '0900100000' and sorted(t[0] for t in targets) ==
+                    ['09120', '09190'], 'positive/unexplained CT ambiguity')
+            excluded.append({'block': block, 'population': pop, 'old_town': town})
+            continue
+        county = targets[0][0]
+        pumas[puma] += pop
+        counties[county] += pop
+        relations[puma, county] += pop
+    require(len(relations) == 26 and all(n > 0 for n in relations.values())
+            and len(excluded) == 9, 'CT relation/zero-exclusion coverage differs')
+    pc = controls(files['census_puma_population2020'],
+                  ('MTFCC OID GEOID STATE PUMA BASENAME NAME LSADC FUNCSTAT POP100 HU100 '
+                   'AREALAND AREAWATER CENTLAT CENTLON INTPTLAT INTPTLON').split())
+    mc = controls(files['census_ct_mcd_population2020'],
+                  ('MTFCC OID GEOID STATE COUNTY COUSUB COUSUBNS BASENAME NAME LSADC FUNCSTAT '
+                   'COUSUBCC POP100 HU100 AREALAND AREAWATER UR CNECTA NECTA NECTADIV '
+                   'CENTLAT CENTLON INTPTLAT INTPTLON').split())
+    require(len(pc) == 2487 and len(mc) == 173 and all(r['STATE'] == '09' for r in mc.values()),
+            'Census control coverage differs')
+    require(dict(pumas) == {k[2:]: unsigned(r['POP100']) for k, r in pc.items()
+                           if r['STATE'] == '09'} and len(pumas) == 25,
+            'CT independent PUMA marginals differ')
+    require(set(towns) <= set(mc)
+            and all(towns[k] == unsigned(r['POP100']) for k, r in mc.items()),
+            'CT independent MCD marginals differ')
+    book = fastexcel.read_excel(files['ct_opm_population2020'].read_bytes())
+    require(book.sheet_names == ['Sheet1'], 'OPM worksheet differs')
+    rows = book.load_sheet(0, header_row=None, dtypes='string').to_polars().rows()
+    require(rows[:3] == [(None, '2020 Census Population By Planning Region', None, None, None),
+                         (None, None, None, None, None),
+                         ('TOWN', 'Planning Region', '2020 Population',
+                          'Population by Planning Region', None)], 'OPM header differs')
+    town_controls, region_controls = {}, {}
+    names = {'Capitol': ('09110', 'Capitol'),
+             'Greater Bridgeport': ('09120', 'Greater Bridgeport'),
+             'Lower Connecticut River Valley': ('09130', 'Lower CT River Valley'),
+             'Naugatuck Valley': ('09140', 'Naugatuck Valley'),
+             'Northeastern Connecticut': ('09150', 'Northeast CT'),
+             'Northwest Hills': ('09160', 'Northwest Hills'),
+             'South Central Connecticut': ('09170', 'South Central'),
+             'Southeastern Connecticut': ('09180', 'Southeastern CT'),
+             'Western Connecticut': ('09190', 'Western CT')}
+    summaries = {label: code for code, label in names.values()}
+    summaries['Northeastern CT'] = summaries.pop('Northeast CT')
+    for name, label, value, total, summary in rows[3:]:
+        if name and label:
+            require(name not in town_controls, 'duplicate OPM town')
+            town_controls[name] = label, unsigned(value)
+        if summary and total:
+            require(summary in summaries and summaries[summary] not in region_controls,
+                    'OPM summary differs')
+            region_controls[summaries[summary]] = unsigned(total)
+    require(len(town_controls) == 169 and len(region_controls) == 9,
+            'OPM control coverage differs')
+    opm_sums = defaultdict(int)
+    for key, row in mc.items():
+        pop = unsigned(row['POP100'])
+        if row['COUSUB'] == '00000':
+            require(pop == 0, 'positive pseudo-MCD control')
+            continue
+        require(row['BASENAME'] in town_controls and len(crosswalk[key]) == 1,
+                'OPM town absent/ambiguous')
+        county, label = crosswalk[key][0]
+        require(label.endswith(' Planning Region') and label[:-16] in names,
+                'Census region title differs')
+        expected_county, expected_label = names[label[:-16]]
+        require(county == expected_county and town_controls[row['BASENAME']] ==
+                (expected_label, pop), 'OPM town population/region differs')
+        opm_sums[county] += pop
+    require(dict(counties) == dict(opm_sums) == region_controls and
+            sum(pumas.values()) == sum(blocks.values()) == 3605944,
+            'CT region/state control differs')
+    outside = {k: unsigned(r['POP100']) for k, r in pc.items() if r['STATE'] == '66'}
+    require(outside == {'6600100': 153836}, 'extra-universe PUMA control differs')
+    national = {(r['STATE'], r['PUMA']): unsigned(r['POP100']) for r in pc.values()
+                if r['STATE'] != '66'}
+    indexes = defaultdict(lambda: defaultdict(set))
+    baf_positions = {r['BLOCKID']: n for n, r in enumerate(baf_rows, 2)}
+    tract_positions = {r['STATEFP'] + r['COUNTYFP'] + r['TRACTCE']: n
+                       for n, r in enumerate(tract_rows, 2)}
+    crosswalk_positions = {(r['OLD_COUSUB_GEOID'], '09' + r[xheader[3]]): n
+                           for n, r in enumerate(crosswalk_rows, 2) if r[xheader[0]] == '09'}
+    for n, block in enumerate(blocks, 1):
+        targets = crosswalk.get(baf[block], [])
+        if len(targets) != 1:
+            continue
+        key = tracts[block[:11]], targets[0][0]
+        for prefix, number in (
+            ('ct_tabblock2020:tl_2020_09_tabblock20.dbf:record', n),
+            ('ct_block_assignment2020:BlockAssign_ST09_CT_MCD.txt:row', baf_positions[block]),
+            ('tract_puma2020:csv:row', tract_positions[block[:11]]),
+            ('ct_county_crosswalk:csv:row', crosswalk_positions[baf[block], targets[0][0]]),
+        ):
+            indexes[key][prefix].add(number)
+    source_locators = {}
+    from itertools import groupby
+    for key, sources in indexes.items():
+        targets = []
+        for prefix, numbers in sorted(sources.items()):
+            ranges = []
+            for _, group in groupby(enumerate(sorted(numbers)), lambda pair: pair[1] - pair[0]):
+                values = [pair[1] for pair in group]
+                ranges.append(str(values[0]) if len(values) == 1 else f'{values[0]}-{values[-1]}')
+            targets.append(prefix + '-ranges=' + ','.join(ranges))
+        source_locators[key] = targets
+    return {'source_locators': source_locators,
+            'relations': dict(relations), 'pumas': dict(pumas), 'counties': dict(counties),
+            'national_pumas': national, 'state_population': sum(pumas.values()),
+            'zero_population_exclusions': sorted(excluded, key=lambda r: r['block']),
+            'block_records': len(blocks), 'mcd_controls': len(mc), 'opm_towns': len(town_controls)}
+
+
 def populations(directory, files, county_inventory):
     intersections = csv_rows(files['geocorr_intersections'])
     pumas = {
@@ -792,6 +1113,43 @@ def populations(directory, files, county_inventory):
             csv_rows(files['geocorr_county_totals']), ('state', 'county'), ('pop20', )
         ).items()
     }
+    original_pumas, original_counties = dict(pumas), dict(counties)
+    ct = ct_population(files) if 'ct_tabblock2020' in files else None
+    ct_assertions = []
+    if ct is not None:
+        keyed(intersections, ('state', 'puma22', 'county'), ('pop20',))
+        original_puma_sums, original_county_sums = defaultdict(int), defaultdict(int)
+        for original in intersections:
+            population = integer(original['pop20'])
+            original_puma_sums[original['state'], original['puma22']] += population
+            original_county_sums[original['state'], original['county']] += population
+        require(dict(original_puma_sums) == original_pumas
+                and dict(original_county_sums) == original_counties
+                and all(n > 0 for n in (*original_pumas.values(), *original_counties.values())),
+                'original Geocorr integer controls differ before CT replacement')
+        require(set(pumas) == set(ct['national_pumas']) and all(
+            pop == ct['national_pumas'][key] for key, pop in pumas.items() if key[0] != '09'),
+            'national PUMA/non-CT controls differ')
+        old_ct = {(r['puma22'], r['county']): r for r in intersections if r['state'] == '09'}
+        require(len(old_ct) == 27 and len(ct['relations']) == 26 and
+                set(ct['relations']) <= set(old_ct), 'CT relation published provenance absent')
+        for key, row in sorted(old_ct.items()):
+            ct_assertions.append({'puma_code': key[0], 'county_geoid': key[1],
+                                  'original_population': integer(row['pop20']),
+                                  'accepted_population': ct['relations'].get(key),
+                                  'literal_afact': row['afact'], 'literal_afact2': row['afact2']})
+        updated = []
+        for number, row in enumerate(intersections, 3):
+            row = dict(row, _source_row=number, _original_population=row['pop20'])
+            if row['state'] == '09':
+                key = row['puma22'], row['county']
+                if key not in ct['relations']:
+                    continue
+                row['pop20'] = str(ct['relations'][key])
+            updated.append(row)
+        intersections = updated
+        pumas = {**pumas, **{('09', k): v for k, v in ct['pumas'].items()}}
+        counties = {**counties, **{('09', k): v for k, v in ct['counties'].items()}}
     require(set(s for s, _ in pumas) <= SCOPE | {'72'}, 'invalid reference state')
     require(
         {c
@@ -839,7 +1197,9 @@ def populations(directory, files, county_inventory):
     require(totals_group == county_group_totals, 'county-to-group totals differ')
     expected, pooled = {}, defaultdict(int)
     published = {}
-    for row in intersections:
+    rejected_rounding = []
+    geocorr_pin = digest(files['geocorr_intersections'])
+    for number, row in enumerate(intersections, 3):
         state, puma, county = row['state'], row['puma22'], row['county']
         pop = integer(row['pop20'])
         require(county[:2] == state, 'county namespace differs')
@@ -848,8 +1208,13 @@ def populations(directory, files, county_inventory):
         )
         sums_puma[state, puma] += pop
         sums_county[state, county] += pop
-        rounding(row['afact'], pop, pumas[state, puma])
-        rounding(row['afact2'], pop, counties[state, county])
+        for column, denominator in [('afact', original_pumas[state, puma]),
+                                    ('afact2', original_counties[state, county])]:
+            assertion = geocorr_rounding_assertion(
+                geocorr_pin, row.get('_source_row', number), row, column,
+                integer(row.get('_original_population', row['pop20'])), denominator)
+            if assertion:
+                rejected_rounding.append(assertion)
         published[state, puma, county] = float(row['afact']), float(row['afact2'])
         if state in SCOPE:
             expected['residence', state, puma, county] = (
@@ -965,6 +1330,11 @@ def populations(directory, files, county_inventory):
     return {
         'closure_max': maximum,
         'published_rounding_decimal_bound': str(ROUNDING),
+        'rejected_geocorr_rounding_assertions': rejected_rounding,
+        'ct_population_basis': (None if ct is None else {
+            'state_population': ct['state_population'], 'block_records': ct['block_records'],
+            'zero_population_exclusions': ct['zero_population_exclusions'],
+            'geocorr_assertions': ct_assertions, 'accepted_basis': 'Census 2020 block POP20'}),
         'geocorr_selected_decoders': {
             kind: geocorr_text(files[kind])[1] for kind in
             ('geocorr_intersections', 'geocorr_puma_totals', 'geocorr_county_totals')
@@ -1537,6 +1907,109 @@ def geographic_identifiers(directory, geographic_directory):
                 in nodes, 'geographic node differs from authenticated natural identity'
             )
 
+D8_OCCUPATION_HTML_PIN = '61862b9ac0e7bfc4500cc28c3664c50adfc8dc51517c7d81f0192fa37e73725c'
+D8_SUPPORT_PINS = {
+    'ipums_occ_pairs': 'f95672c481af85302bc2f445888e2f5e493afffa6d88a5ca042b66a39cfc34f1',
+    'census_occupation_2018': 'fca2818d691c32777a4cd733a9ab77c8c5bd47adcacd7ac3aa149bebd45b5f7f',
+    'pums_occupation_2018': '20cc7112cf96c7a3648b579cc0b2af239bea1c9094885a0d986959888695fe0a',
+    'pums_annual_2024': 'f8c945c383322f123b5d409fd1cd1352f23ace3c0ffff5de0bc1cf414886d40d',
+    'pums_five_year_2024': '634fdd565249d72f09a8f75d82fe4193b20a09d898ef64a4b8e8039348d52994',
+}
+D8_HTML_ASSERTIONS = (
+    (692, '790', '519160', '7905',
+     'Computer Numerically Controlled Tool Operators And Programmers', 683, 568, 736),
+    (789, '9051', '532031', '9050', 'Flight Attendants', 780, 627, 823),
+    (843, '9820', '553010', '9825',
+     'Military Enlisted Tactical Operations and Air/Weapons Specialists and Crew Members',
+     834, 665, 878),
+)
+
+class OccupationHTMLRows(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.rows, self.cell = [], None
+
+    def handle_starttag(self, tag, attrs):
+        if tag == 'tr':
+            self.rows.append([])
+        if tag in ('td', 'th'):
+            self.cell = ''
+
+    def handle_data(self, data):
+        if self.cell is not None:
+            self.cell += data
+
+    def handle_endtag(self, tag):
+        if tag in ('td', 'th') and self.cell is not None:
+            self.rows[-1].append(self.cell.strip())
+            self.cell = None
+
+
+def rejected_occupation_html(files):
+    require(digest(files['occupation_pairs_html']) == D8_OCCUPATION_HTML_PIN,
+            'D8 occupation HTML original pin differs')
+    require(all(digest(files[k]) == v for k, v in D8_SUPPORT_PINS.items()),
+            'D8 occupation supporting original pin differs')
+    parser = OccupationHTMLRows()
+    parser.feed(files['occupation_pairs_html'].read_text())
+    rejected = []
+    for n, literal, token, canonical, title, xr, cr, pr in D8_HTML_ASSERTIONS:
+        require(len(parser.rows[n - 1]) == 15
+                and [parser.rows[n - 1][i] for i in (6, 13, 14)] == [literal, token, title],
+                'D8 occupation HTML assertion differs')
+        support = []
+        for kind, sheet, row, c, t in (
+            ('ipums_occ_pairs', 'Codes without Descriptions', xr, 7, 14),
+            ('ipums_occ_pairs', 'Codes with Descriptions', xr, 13, 27),
+            ('census_occupation_2018', '2018 Census Occ Code List', cr, 2, 3),
+            ('pums_occupation_2018', 'ACS', pr, 0, 1),
+            ('pums_annual_2024', 'Occupation', pr, 0, 1),
+            ('pums_five_year_2024', 'OCCP & SOCP', pr, 0, 1),
+        ):
+            values = workbook(files[kind], sheet)[row - 1]
+            require(values[c] == canonical and values[t].replace('-', '') == token,
+                    'D8 occupation support differs')
+            support.append({'kind': kind, 'original_sha256': D8_SUPPORT_PINS[kind],
+                            'reference_locator': f'{kind}:{sheet}:row={row}:'
+                            f'columns={c + 1},{t + 1}',
+                            'values': list(values)})
+        rejected.append({'row': n, 'literal_code': literal, 'literal_token': token,
+                         'supported_code': canonical, 'title': title,
+                         'original_sha256': D8_OCCUPATION_HTML_PIN,
+                         'reference_locator': f'occupation_pairs_html:tr={n}',
+                         'disposition': 'rejected_assertion', 'supporting_assertions': support})
+    return rejected
+
+
+def occupation_pair_validation(files):
+    admitted = {(r[0], r[1].replace('-', '')) for r in workbook(
+        files['pums_occupation_2018'], 'ACS') if r[0] and r[1] and r[0].isdigit()}
+    parser = OccupationHTMLRows()
+    parser.feed(files['occupation_pairs_html'].read_text())
+    assertions = [(r[6], r[13], f'occupation_pairs_html:tr={n}')
+                  for n, r in enumerate(parser.rows, 1) if len(r) == 15]
+    for sheet, c, t in [('Codes without Descriptions', 7, 14),
+                        ('Codes with Descriptions', 13, 27)]:
+        assertions.extend((r[c], r[t], f'ipums_occ_pairs:{sheet}:row={n}') for n, r in
+                          enumerate(workbook(files['ipums_occ_pairs'], sheet), 1) if n > 1)
+    rejected = []
+    for code, token, locator in assertions:
+        if code in (None, '', '-'):
+            continue
+        require(re.fullmatch('[0-9]{1,4}', code) is not None,
+                'malformed paired occupation reference key')
+        if code.zfill(4) == '0000' or token == '-':
+            continue
+        if (code.zfill(4), token) in admitted:
+            continue
+        if not rejected and locator.startswith('occupation_pairs_html:'):
+            rejected = rejected_occupation_html(files)
+        require(any(r['reference_locator'] == locator and r['literal_code'] == code
+                    and r['literal_token'] == token and (r['supported_code'], token) in admitted
+                    for r in rejected), 'unapproved paired occupation assertion')
+    return rejected
+
+
 def candidate_memberships(codes, files, code_directory):
     native = pl.read_parquet(code_directory / 'naics_native_nodes.parquet').to_dicts()
     soc = pl.read_parquet(code_directory / 'soc_nodes.parquet').to_dicts()
@@ -1629,7 +2102,9 @@ def candidate_memberships(codes, files, code_directory):
             'canonical candidate paths differ from authenticated Stage4 graph'
         )
         scalar_controls(row, members, canonical, expected_paths, forward, kind, partial)
-    return {'D4_rejected_constituents': rejected, 'candidate_memberships_equal': True}
+    return {'D4_rejected_constituents': rejected,
+            'D8_rejected_occupation_html_assertions': occupation_pair_validation(files),
+            'candidate_memberships_equal': True}
 
 def independent_lookup(codes, files):
     '''Check admitted pairs and explicit special/reason semantics against original columns.'''
@@ -1900,13 +2375,36 @@ def geographic_provenance(directory, files, inputs):
         r[0] + r[1]: {target}
         for r, target in original_rows('county_composition_2022', 'MIGPUMA-POWPUMA 2022 Lookup')
     }
+    ct = ct_population(files) if 'ct_tabblock2020' in files else None
+    ct_complete = {kind + ':complete-original' for kind in CT_REFERENCE_NAMES}
+    if ct is not None:
+        for state, puma in pumas:
+            if state == '09':
+                pumas[state, puma].update(ct_complete | {
+                    f'census_puma_population2020:html:GEOID=09{puma}'})
+        labels = dict(zip(('09110', '09120', '09130', '09140', '09150', '09160', '09170',
+                           '09180', '09190'), ('Capitol', 'Greater Bridgeport',
+                           'Lower CT River Valley', 'Naugatuck Valley', 'Northeastern CT',
+                           'Northwest Hills', 'South Central', 'Southeastern CT', 'Western CT'),
+                          strict=True))
+        for county in counties:
+            if county.startswith('09'):
+                counties[county].update(ct_complete | {
+                    'ct_opm_population2020:Sheet1:summary-label=' + labels[county]})
     denominators, numerators, support = defaultdict(set), defaultdict(set), {}
     for key, group in groups.items():
         denominators[group].update(pumas[key] | group_targets[key])
     for r, target in original_rows('geocorr_intersections'):
         key, county = (r['state'], r['puma22']), r['county']
-        support['residence', *key, county] = {target} | pumas[key] | counties[county]
-        numerators[*groups[key], county].update({target} | group_targets[key] | pumas[key])
+        intersection_targets = {target}
+        if ct is not None and key[0] == '09':
+            relation = key[1], county
+            if relation not in ct['relations']:
+                continue
+            intersection_targets.update(ct_complete | set(ct['source_locators'][relation]))
+        support['residence', *key, county] = intersection_targets | pumas[key] | counties[county]
+        numerators[*groups[key], county].update(
+            intersection_targets | group_targets[key] | pumas[key])
     for (state, code, county), targets in numerators.items():
         support['work_migration', state, code, county] = (
             targets | denominators[state, code]

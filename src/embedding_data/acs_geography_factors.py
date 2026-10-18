@@ -264,7 +264,8 @@ def _msa_rows(evidence, cbsas):
                 non_msa_population=whole - allocated,
                 msa_fraction=allocated / whole,
                 non_msa_fraction=(whole - allocated) / whole,
-                population_year=2020,
+                ct_population_basis=evidence.reference_provenance.get('ct_population_basis'),
+        population_year=2020,
                 puma_vintage=2020,
                 msa_delineation='July 2023',
                 **_references(
@@ -306,6 +307,8 @@ def _derive(evidence, selected):
         county_inventory_vintage=2025,
         msa_delineation='July 2023',
         excluded_states=evidence.reference_provenance['excluded_states'],
+        rejected_geocorr_rounding_assertions=evidence.reference_provenance.get(
+            'rejected_geocorr_rounding_assertions', []),
         published_factor_rounding_bound=0.00005 + CLOSURE_TOLERANCE,
         published_percent_scale='0-100',
         closure_tolerance=CLOSURE_TOLERANCE,

@@ -718,3 +718,42 @@ def test_full_industry_body_key_cannot_masquerade_as_section(code_originals, sel
     )
     with pytest.raises(ValueError, match='malformed.*key'):
         read_code_evidence(code_originals.snapshot, altered)
+
+
+def test_authentic_current_html_rejections_reach_complete_evidence(
+    code_originals, selected, tmp_path, monkeypatch
+):
+    import gzip
+    import hashlib
+
+    overrides = dict(code_originals.snapshot.files)
+    records = json.loads((PUBLIC / 'd8-originals.provenance.json').read_text())
+    for kind, record in records.items():
+        archive = (PUBLIC / record['archive']).read_bytes()
+        assert hashlib.sha256(archive).hexdigest() == record['archive_sha256']
+        body = gzip.decompress(archive)
+        assert hashlib.sha256(body).hexdigest() == record['original_sha256']
+        file = tmp_path / record['archive'].removesuffix('.gz')
+        file.write_bytes(body)
+        overrides[kind] = file
+    (tmp_path / 'snapshot').mkdir()
+    seeded = seed_mapping_references(tmp_path / 'snapshot', monkeypatch,
+                                     original_overrides=overrides)
+    snapshot = check_cached_snapshot(seeded.data_dir, seeded.reference_id)
+    evidence = read_code_evidence(snapshot, selected)
+    rejected = evidence.diagnostics['rejected_occupation_html_assertions']
+    assert len(rejected) == 3
+    assert {(r['supported_code'], r['literal_token']) for r in rejected} == {
+        ('7905', '519160'), ('9050', '532031'), ('9825', '553010')}
+    for row in rejected:
+        admitted = evidence.metadata.filter(
+            pl.col('system').eq('soc').and_(pl.col('paired_census_code').eq(row['supported_code'])))
+        assert admitted.height == 1
+        assert row['reference_locator'] not in admitted['reference_locators'][0]
+    validate_paired_keys(pl.DataFrame({'system': ['soc'], 'source_scheme': ['soc2018'],
+                                      'paired_census_code': ['7905'],
+                                      'source_token': ['519160']}), evidence)
+    with pytest.raises(ValueError, match='paired'):
+        validate_paired_keys(pl.DataFrame({'system': ['soc'], 'source_scheme': ['soc2018'],
+                                          'paired_census_code': ['0790'],
+                                          'source_token': ['519160']}), evidence)

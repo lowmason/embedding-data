@@ -16,7 +16,7 @@ import fastexcel
 import httpx
 
 from embedding_data import manifest, paths, target_io
-from embedding_data.acs_mapping_contract import REFERENCE_VERSION
+from embedding_data.acs_mapping_contract import REFERENCE_VERSION, REFERENCE_VERSION_V2
 from embedding_data.acs_mapping_io import safe_path
 from embedding_data.osha_benchmark_download import USER_AGENT
 
@@ -700,8 +700,75 @@ def _json_record(entry):
     return json.loads(json.dumps(asdict(entry)))
 
 
-def _expected_names():
-    names = [reference.filename for reference in REGISTRY.values()]
+CT_REGISTRY = {
+    'ct_tabblock2020': Reference(
+        'ct_tabblock2020', 'tl_2020_09_tabblock20.zip',
+        'https://www2.census.gov/geo/tiger/TIGER2020/TABBLOCK20/tl_2020_09_tabblock20.zip',
+        '2020 Census CT block population D9 inspected 2026-10-18',
+        'ct-population-v1', 'official CT population basis/control',
+        'a935a5a85717389ded782debd15d7019705d7fc0777548d22cc09552208ac6b1'),
+    'ct_block_assignment2020': Reference(
+        'ct_block_assignment2020', 'BlockAssign_ST09_CT.zip',
+        'https://www2.census.gov/geo/docs/maps-data/data/baf2020/BlockAssign_ST09_CT.zip',
+        '2020 Census CT block population D9 inspected 2026-10-18',
+        'ct-population-v1', 'official CT population basis/control',
+        '1125c49564224cced90844ab2345df9a2c191a0084c5029ff53ddc9c320c54ba'),
+    'ct_county_crosswalk': Reference(
+        'ct_county_crosswalk', 'ct_cou_to_cousub_crosswalk.txt',
+        'https://www2.census.gov/geo/docs/reference/ct_change/ct_cou_to_cousub_crosswalk.txt',
+        '2020 Census CT block population D9 inspected 2026-10-18',
+        'ct-population-v1', 'official CT population basis/control',
+        '13ad002564e30e6dcd1df112fdaa985f2cd0cdb908f7f3017cd2723db294cff8'),
+    'tract_puma2020': Reference(
+        'tract_puma2020', '2020_Census_Tract_to_2020_PUMA.txt',
+        'https://www2.census.gov/geo/docs/maps-data/data/rel2020/2020_Census_Tract_to_2020_PUMA.txt',
+        '2020 Census CT block population D9 inspected 2026-10-18',
+        'ct-population-v1', 'official CT population basis/control',
+        '5262f460b2c8dbe86b00549e916317b1791fdc595c9af72ab18f6f6a67040531'),
+    'census_puma_population2020': Reference(
+        'census_puma_population2020', 'census-puma2020-pop100.html',
+        'https://tigerweb.geo.census.gov/tigerwebmain/Files/acs26/tigerweb_acs26_puma_2020_tab20_us.html',
+        '2020 Census CT block population D9 inspected 2026-10-18',
+        'ct-population-v1', 'official CT population basis/control',
+        '70993afd338e51246142432723306fec63b927df15e0537cb388741d1e9d8894'),
+    'census_ct_mcd_population2020': Reference(
+        'census_ct_mcd_population2020', 'census-ct-cousub2020-pop100.html',
+        'https://tigerweb.geo.census.gov/tigerwebmain/Files/acs26/tigerweb_acs26_cousub_2020_tab20_ct.html',
+        '2020 Census CT block population D9 inspected 2026-10-18',
+        'ct-population-v1', 'official CT population basis/control',
+        '475f9509cedaf42fef2d7e2bc59891f732e3233b2158c6b22e71e9dacf865a3f'),
+    'ct_opm_population2020': Reference(
+        'ct_opm_population2020', 'ct-opm-2020-planning-pop.xlsx',
+        'https://portal.ct.gov/opm/-/media/opm/igpp/org/cogs/2020-census-population-by-planning-region.xlsx?hash=CC2974EA5238511D82466EA6757581F8&rev=ac73c0fee0b7449fbc055f0fdde8af17',
+        '2020 Census CT block population D9 inspected 2026-10-18',
+        'ct-population-v1', 'official CT population basis/control',
+        '1a3ba5ff53aa5bb4b3ec68178cfa24a0ba5d1294c15ce4bb03b5e86ee660c391'),
+}
+
+
+def registry_for_version(reference_version=REFERENCE_VERSION):
+    if reference_version == REFERENCE_VERSION:
+        return dict(REGISTRY)
+    if reference_version == REFERENCE_VERSION_V2:
+        return {**REGISTRY, **CT_REGISTRY}
+    raise ValueError('unknown ACS reference version')
+
+
+def _collection(reference_version):
+    registry_for_version(reference_version)
+    return None if reference_version == REFERENCE_VERSION else reference_version
+
+
+def _original_limit(kind):
+    if kind in CT_REGISTRY:
+        from embedding_data.acs_ct_population import CT_ORIGINAL_LIMITS
+        return CT_ORIGINAL_LIMITS[kind]
+    return MAX_ORIGINAL_BYTES
+
+
+def _expected_names(reference_version=REFERENCE_VERSION):
+    registry = registry_for_version(reference_version)
+    names = [reference.filename for reference in registry.values()]
     if len(names) != len(set(names)) or any(
         Path(name).name != name or name.endswith('.part') for name in names
     ):
@@ -722,10 +789,12 @@ def _recorded_snapshot(data_dir, directory):
     return by_name
 
 
-def preflight_destinations(data_dir: Path, reference_id: str) -> None:
+def preflight_destinations(data_dir: Path, reference_id: str, *,
+                           reference_version=REFERENCE_VERSION) -> None:
     '''Check all registered destinations and absent-but-recorded paths before writes.'''
+    registry = registry_for_version(reference_version)
     directory = reference_directory(data_dir, reference_id)
-    names = _expected_names()
+    names = _expected_names(reference_version)
     recorded = _recorded_snapshot(data_dir, directory)
     actual = set()
     if directory.exists():
@@ -748,13 +817,15 @@ def preflight_destinations(data_dir: Path, reference_id: str) -> None:
         raise ValueError(
             'missing recorded file or unrecorded evidence; inspect and choose a fresh reference ID'
         )
-    by_filename = {r.filename: k for k, r in REGISTRY.items()}
+    by_filename = {r.filename: k for k, r in registry.items()}
     for name in sorted(actual):
         entry = manifest.entry_for(paths.manifest_path(data_dir), directory / name)
         kind = by_filename[name]
-        if entry.source_url != REGISTRY[kind].authority_url:
+        if entry.collection != _collection(reference_version):
+            raise ValueError('snapshot collection/reference version differs')
+        if entry.source_url != registry[kind].authority_url:
             raise ValueError('registered source citation differs')
-        _validate_original(kind, directory / name)
+        _validate_original(kind, directory / name, reference_version=reference_version)
 
 
 class _PublicLinks(HTMLParser):
@@ -931,14 +1002,19 @@ def _validate_html(kind, text):
         raise ValueError(f'{kind}: registered public HTML identity/layout differs')
 
 
-def _validate_original(kind, file):
-    reference = REGISTRY[kind]
+def _validate_original(kind, file, *,
+                           reference_version=REFERENCE_VERSION):
+    registry = registry_for_version(reference_version)
+    reference = registry[kind]
     safe_path(file)
-    if not file.is_file() or not 0 < file.stat().st_size <= MAX_ORIGINAL_BYTES:
+    if not file.is_file() or not 0 < file.stat().st_size <= _original_limit(kind):
         raise ValueError('missing/empty/oversized public original')
     if reference.sha256 is not None and manifest.sha256_file(file) != reference.sha256:
         raise ValueError(f'{kind}: original differs from approved inspected edition')
-    if kind in WORKBOOK_LAYOUTS:
+    if kind in CT_REGISTRY:
+        from embedding_data.acs_ct_population import validate_ct_original
+        validate_ct_original(kind, file)
+    elif kind in WORKBOOK_LAYOUTS:
         _validate_workbook(kind, file)
     elif kind in GEOCORR_QUERIES:
         _validate_csv(kind, file)
@@ -963,9 +1039,11 @@ def _validate_original(kind, file):
         _validate_html(kind, file.read_text(encoding='utf-8'))
 
 
-def _publish_original(data_dir, directory, kind, partial, *, imported):
-    reference = REGISTRY[kind]
-    _validate_original(kind, partial)
+def _publish_original(data_dir, directory, kind, partial, *, imported,
+                      reference_version=REFERENCE_VERSION):
+    registry = registry_for_version(reference_version)
+    reference = registry[kind]
+    _validate_original(kind, partial, reference_version=reference_version)
     file = directory / reference.filename
     safe_path(file)
     entry = manifest.describe_file(
@@ -979,7 +1057,8 @@ def _publish_original(data_dir, directory, kind, partial, *, imported):
     )
     from dataclasses import replace
 
-    entry = replace(entry, path=file.relative_to(paths.manifest_path(data_dir).parent).as_posix())
+    entry = replace(entry, path=file.relative_to(paths.manifest_path(data_dir).parent).as_posix(),
+                    collection=_collection(reference_version))
     manifest.check_appendable(paths.manifest_path(data_dir), [entry])
     os.link(partial, file)
     try:
@@ -992,8 +1071,10 @@ def _publish_original(data_dir, directory, kind, partial, *, imported):
     return _json_record(entry)
 
 
-def _import_bytes(data_dir, directory, kind, original, *, imported):
-    partial = directory / (REGISTRY[kind].filename + '.part')
+def _import_bytes(data_dir, directory, kind, original, *, imported,
+                      reference_version=REFERENCE_VERSION):
+    registry = registry_for_version(reference_version)
+    partial = directory / (registry[kind].filename + '.part')
     safe_path(partial)
     with partial.open('xb') as output:
         try:
@@ -1001,12 +1082,15 @@ def _import_bytes(data_dir, directory, kind, original, *, imported):
                 while chunk := source.read(1024 * 1024):
                     output.write(chunk)
             output.flush()
-            return _publish_original(data_dir, directory, kind, partial, imported=imported)
+            return _publish_original(data_dir, directory, kind, partial, imported=imported,
+                                     reference_version=reference_version)
         finally:
             partial.unlink(missing_ok=True)
 
 
-def _original_record(reference, entry):
+def _original_record(reference, entry, reference_version=REFERENCE_VERSION):
+    if entry.collection != _collection(reference_version):
+        raise ValueError('original collection/reference version differs')
     proxy = entry.client == 'manual-import'
     if entry.client not in ('manual-import', 'httpx') or entry.proxies != (
         ('retrieved_at',) if proxy else ()
@@ -1028,15 +1112,17 @@ def _original_record(reference, entry):
     }
 
 
-def _receipt_contents(data_dir, reference_id, directory):
+def _receipt_contents(data_dir, reference_id, directory, *,
+                           reference_version=REFERENCE_VERSION):
+    registry = registry_for_version(reference_version)
     originals, citations, files, requests = {}, [], {}, {}
-    for kind, reference in sorted(REGISTRY.items()):
+    for kind, reference in sorted(registry.items()):
         file = directory / reference.filename
-        _validate_original(kind, file)
+        _validate_original(kind, file, reference_version=reference_version)
         entry = manifest.entry_for(paths.manifest_path(data_dir), file)
         if entry.source_url != reference.authority_url:
             raise ValueError('public reference manifest authority differs')
-        originals[kind] = _original_record(reference, entry)
+        originals[kind] = _original_record(reference, entry, reference_version)
         citations.append(_json_record(entry))
         files[reference.filename] = target_io.file_record(file)
         if kind.endswith('_request'):
@@ -1047,11 +1133,11 @@ def _receipt_contents(data_dir, reference_id, directory):
             }
         if kind in GEOCORR_QUERIES:
             originals[kind]['retrieval_url'] = generated_csv_url(
-                (directory / REGISTRY[kind + '_response'].filename).read_text(encoding='utf-8')
+                (directory / registry[kind + '_response'].filename).read_text(encoding='utf-8')
             )
     return {
         'reference_id': reference_id,
-        'reference_version': REFERENCE_VERSION,
+        'reference_version': reference_version,
         'originals': originals,
         'request_files': requests,
         'raw_citations': citations,
@@ -1059,8 +1145,10 @@ def _receipt_contents(data_dir, reference_id, directory):
     }
 
 
-def _finish_snapshot(data_dir, reference_id, directory):
-    receipt = _receipt_contents(data_dir, reference_id, directory)
+def _finish_snapshot(data_dir, reference_id, directory, *,
+                           reference_version=REFERENCE_VERSION):
+    receipt = _receipt_contents(
+        data_dir, reference_id, directory, reference_version=reference_version)
     file = directory / 'receipt.json'
     partial = directory / 'receipt.json.part'
     body = (json.dumps(receipt, sort_keys=True, indent=2, allow_nan=False) + '\n').encode()
@@ -1079,7 +1167,8 @@ def _finish_snapshot(data_dir, reference_id, directory):
             from dataclasses import replace
 
             entry = replace(
-                entry, path=file.relative_to(paths.manifest_path(data_dir).parent).as_posix()
+                entry, path=file.relative_to(paths.manifest_path(data_dir).parent).as_posix(),
+                collection=_collection(reference_version)
             )
             manifest.check_appendable(paths.manifest_path(data_dir), [entry])
             safe_path(file)
@@ -1098,7 +1187,21 @@ def _finish_snapshot(data_dir, reference_id, directory):
 def check_cached_snapshot(data_dir: Path, reference_id: str) -> ReferenceSnapshot:
     '''Verify a complete immutable snapshot against independently recorded manifest entries.'''
     directory = reference_directory(data_dir, reference_id)
-    expected = _expected_names() | {'receipt.json'}
+    if not directory.is_dir() or not (directory / 'receipt.json').is_file():
+        raise ValueError('reference snapshot is absent or incomplete')
+    file = directory / 'receipt.json'
+    if 'receipt.json' not in _recorded_snapshot(data_dir, directory):
+        raise ValueError('reference snapshot receipt is unrecorded/incomplete')
+    entry = manifest.entry_for(paths.manifest_path(data_dir), file)
+    try:
+        receipt = json.loads(file.read_text(encoding='utf-8'))
+    except (json.JSONDecodeError, UnicodeError) as error:
+        raise ValueError('invalid generated reference receipt') from error
+    reference_version = receipt.get('reference_version')
+    registry = registry_for_version(reference_version)
+    if entry.collection != _collection(reference_version):
+        raise ValueError('receipt collection/reference version differs')
+    expected = _expected_names(reference_version) | {'receipt.json'}
     if not directory.is_dir():
         raise ValueError('reference snapshot is absent or incomplete')
     actual = set()
@@ -1117,13 +1220,14 @@ def check_cached_snapshot(data_dir: Path, reference_id: str) -> ReferenceSnapsho
         receipt = json.loads(file.read_text(encoding='utf-8'))
     except (json.JSONDecodeError, UnicodeError) as error:
         raise ValueError('invalid generated reference receipt') from error
-    expected_receipt = _receipt_contents(data_dir, reference_id, directory)
+    expected_receipt = _receipt_contents(
+        data_dir, reference_id, directory, reference_version=reference_version)
     if receipt != expected_receipt:
         raise ValueError('reference receipt inventory/citations/identity differs')
     return ReferenceSnapshot(
         reference_id,
         directory,
-        {kind: directory / reference.filename for kind, reference in REGISTRY.items()},
+        {kind: directory / reference.filename for kind, reference in registry.items()},
         receipt,
         entry.sha256,
     )
@@ -1143,28 +1247,32 @@ def check_references(
     return snapshot
 
 
-def import_reference(data_dir: Path, reference_id: str, kind: str, original: Path) -> dict:
+def import_reference(data_dir: Path, reference_id: str, kind: str, original: Path, *,
+                           reference_version=REFERENCE_VERSION) -> dict:
     '''Import exact public bytes; only an explicitly incomplete import set may grow.'''
-    if kind not in REGISTRY:
+    registry = registry_for_version(reference_version)
+    if kind not in registry:
         raise ValueError('unknown registered reference kind')
     original = Path(original)
     if any(part.endswith('.part') for part in original.parts):
         raise ValueError('partial import source is not an original')
     safe_path(original)
-    preflight_destinations(data_dir, reference_id)
+    preflight_destinations(data_dir, reference_id, reference_version=reference_version)
     directory = reference_directory(data_dir, reference_id)
     recorded = _recorded_snapshot(data_dir, directory)
     if any(entry.client != 'manual-import' for entry in recorded.values()):
         raise ValueError('failed acquisition is immutable; use a fresh reference ID for import')
-    if REGISTRY[kind].filename in recorded:
+    if registry[kind].filename in recorded:
         raise ValueError('registered original already imported; conflicting import refused')
-    _validate_original(kind, original)
+    _validate_original(kind, original, reference_version=reference_version)
     directory.mkdir(parents=True, exist_ok=True)
     safe_path(directory)
-    citation = _import_bytes(data_dir, directory, kind, original, imported=True)
-    complete = len(recorded) + 1 == len(REGISTRY)
+    citation = _import_bytes(data_dir, directory, kind, original, imported=True,
+                             reference_version=reference_version)
+    complete = len(recorded) + 1 == len(registry)
     if complete:
-        snapshot = _finish_snapshot(data_dir, reference_id, directory)
+        snapshot = _finish_snapshot(
+            data_dir, reference_id, directory, reference_version=reference_version)
         return {'complete': True, 'citation': citation, 'receipt_sha256': snapshot.receipt_sha256}
     return {'complete': False, 'citation': citation, 'receipt_sha256': None}
 
@@ -1180,6 +1288,9 @@ def make_client() -> httpx.Client:
 
 def _content_type(reference, value):
     allowed = {
+        'ct-population-v1': {'application/zip', 'application/x-zip-compressed',
+                             'application/octet-stream', 'text/plain', 'text/html',
+                             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'},
         'workbook-v1': {
             'application/vnd.ms-excel',
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -1192,8 +1303,10 @@ def _content_type(reference, value):
         raise ValueError('public original transport content type differs')
 
 
-def _download_original(data_dir, directory, kind, url, client):
-    reference = REGISTRY[kind]
+def _download_original(data_dir, directory, kind, url, client, *,
+                           reference_version=REFERENCE_VERSION):
+    registry = registry_for_version(reference_version)
+    reference = registry[kind]
     partial = directory / (reference.filename + '.part')
     safe_path(partial)
     # Exclusive open establishes cleanup ownership before contacting transport.
@@ -1204,13 +1317,13 @@ def _download_original(data_dir, directory, kind, url, client):
                 _content_type(reference, response.headers.get('content-type', ''))
                 length = response.headers.get('content-length')
                 if length is not None and (
-                    not length.isdigit() or int(length) > MAX_ORIGINAL_BYTES
+                    not length.isdigit() or int(length) > _original_limit(kind)
                 ):
                     raise ValueError('invalid/oversized public transport content length')
                 size = 0
                 for chunk in response.iter_bytes():
                     size += len(chunk)
-                    if size > MAX_ORIGINAL_BYTES:
+                    if size > _original_limit(kind):
                         raise ValueError('public original exceeds byte bound')
                     output.write(chunk)
                 output.flush()
@@ -1220,49 +1333,62 @@ def _download_original(data_dir, directory, kind, url, client):
                     and size != int(length)
                 ):
                     raise ValueError('public original transport completion differs')
-            _publish_original(data_dir, directory, kind, partial, imported=False)
+            _publish_original(data_dir, directory, kind, partial, imported=False,
+                              reference_version=reference_version)
         finally:
             partial.unlink(missing_ok=True)
 
 
-def acquire_missing(data_dir: Path, reference_id: str, client: httpx.Client) -> ReferenceSnapshot:
-    preflight_destinations(data_dir, reference_id)
+def acquire_missing(data_dir: Path, reference_id: str, client: httpx.Client, *,
+                           reference_version=REFERENCE_VERSION) -> ReferenceSnapshot:
+    registry = registry_for_version(reference_version)
+    preflight_destinations(data_dir, reference_id, reference_version=reference_version)
     directory = reference_directory(data_dir, reference_id)
     directory.mkdir(parents=True, exist_ok=False)
     # A failed acquisition keeps already manifested originals and can never resume silently.
-    for kind, reference in REGISTRY.items():
+    for kind, reference in registry.items():
         if kind in GEOCORR_QUERIES or kind.endswith(('_request', '_response')):
             continue
-        _download_original(data_dir, directory, kind, reference.authority_url, client)
+        _download_original(data_dir, directory, kind, reference.authority_url, client,
+                           reference_version=reference_version)
     for query in GEOCORR_QUERIES:
         request_kind, response_kind = query + '_request', query + '_response'
-        partial = directory / (REGISTRY[request_kind].filename + '.part')
+        partial = directory / (registry[request_kind].filename + '.part')
         with partial.open('xb') as output:
             try:
                 output.write(request_bytes(query))
                 output.flush()
-                _publish_original(data_dir, directory, request_kind, partial, imported=False)
+                _publish_original(data_dir, directory, request_kind, partial, imported=False,
+                                  reference_version=reference_version)
             finally:
                 partial.unlink(missing_ok=True)
         _download_original(
-            data_dir, directory, response_kind, REGISTRY[response_kind].authority_url, client
+            data_dir, directory, response_kind, registry[response_kind].authority_url, client,
+            reference_version=reference_version
         )
         url = generated_csv_url(
-            (directory / REGISTRY[response_kind].filename).read_text(encoding='utf-8')
+            (directory / registry[response_kind].filename).read_text(encoding='utf-8')
         )
-        _download_original(data_dir, directory, query, url, client)
-    return _finish_snapshot(data_dir, reference_id, directory)
+        _download_original(data_dir, directory, query, url, client,
+                           reference_version=reference_version)
+    return _finish_snapshot(data_dir, reference_id, directory, reference_version=reference_version)
 
 
 def acquire_references(
-    data_dir: Path, reference_id: str, *, client: httpx.Client | None = None
+    data_dir: Path, reference_id: str, *, client: httpx.Client | None = None,
+    reference_version=REFERENCE_VERSION
 ) -> ReferenceSnapshot:
     '''Verify cached bytes before any client construction; otherwise acquire a fresh set.'''
+    registry_for_version(reference_version)
     directory = reference_directory(data_dir, reference_id)
     if directory.exists():
-        return check_cached_snapshot(data_dir, reference_id)
-    preflight_destinations(data_dir, reference_id)
+        snapshot = check_cached_snapshot(data_dir, reference_id)
+        if snapshot.receipt['reference_version'] != reference_version:
+            raise ValueError('cached reference version differs from requested version')
+        return snapshot
+    preflight_destinations(data_dir, reference_id, reference_version=reference_version)
     if client is not None:
-        return acquire_missing(data_dir, reference_id, client)
+        return acquire_missing(data_dir, reference_id, client, reference_version=reference_version)
     with make_client() as owned_client:
-        return acquire_missing(data_dir, reference_id, owned_client)
+        return acquire_missing(data_dir, reference_id, owned_client,
+                               reference_version=reference_version)

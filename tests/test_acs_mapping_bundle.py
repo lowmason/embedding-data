@@ -207,7 +207,7 @@ def test_exact_bundle_and_explicit_executing_inventory(authenticated):
     expected_stage8 = {
         'acs_mapping_contract', 'acs_mapping_inputs', 'acs_mapping_io',
         'acs_mapping_references', 'acs_code_references', 'acs_code_mapping',
-        'acs_area_references', 'acs_geography_factors', 'acs_area_mapping',
+        'acs_area_references', 'acs_ct_population', 'acs_geography_factors', 'acs_area_mapping',
         'acs_mapping_companions', 'acs_mapping_bundle', 'acs_mapping'}
     assert {p.removeprefix('src/embedding_data/').removesuffix('.py') for p in SOFTWARE_FILES
             if p.startswith('src/embedding_data/acs_') and

@@ -155,7 +155,8 @@ def write_public_layout(file: Path, record: dict) -> None:
 
 
 def seed_mapping_references(tmp_path, monkeypatch, *, original_overrides=None, data_dir=None,
-                            reference_id='fixture_references'):
+                            reference_id='fixture_references',
+                            reference_version='acs-mapping-references-v1'):
     '''Use every registered kind, with explicit independently computed excerpt pins.'''
     import json
     from dataclasses import replace
@@ -174,7 +175,7 @@ def seed_mapping_references(tmp_path, monkeypatch, *, original_overrides=None, d
     originals.mkdir()
     files = {}
     registry = {}
-    for kind, reference in refs.REGISTRY.items():
+    for kind, reference in refs.registry_for_version(reference_version).items():
         file = originals / reference.filename
         if original_overrides and kind in original_overrides:
             file.write_bytes(original_overrides[kind].read_bytes())
@@ -184,10 +185,15 @@ def seed_mapping_references(tmp_path, monkeypatch, *, original_overrides=None, d
             write_public_layout(file, layouts[kind])
         files[kind] = file
         registry[kind] = replace(reference, sha256=manifest.sha256_file(file))
-    monkeypatch.setattr(refs, 'REGISTRY', registry)
+    monkeypatch.setattr(refs, 'REGISTRY', {k: r for k, r in registry.items()
+                                           if k in refs.REGISTRY})
+    if reference_version == 'acs-mapping-references-v2':
+        monkeypatch.setattr(refs, 'CT_REGISTRY', {k: r for k, r in registry.items()
+                                                  if k in refs.CT_REGISTRY})
     root = data_dir if data_dir is not None else tmp_path / 'data'
     for kind, file in files.items():
-        refs.import_reference(root, reference_id, kind, file)
+        refs.import_reference(root, reference_id, kind, file,
+                              reference_version=reference_version)
     receipt = refs.reference_directory(root, reference_id) / 'receipt.json'
     return SimpleNamespace(
         data_dir=root,
@@ -854,7 +860,7 @@ def _authenticated_codes(data_dir, directory):
     return code_build.build(data_dir, 'fixture_codes')
 
 
-def _authenticated_geography(data_dir, directory):
+def _authenticated_geography(data_dir, directory, *, original_overrides=None):
     import json
 
     from code_fixtures import write_xlsx
@@ -884,7 +890,16 @@ def _authenticated_geography(data_dir, directory):
         rows.append([code, None, None, title, kind + ' Statistical Area', None, None,
                      county, state, sf, cf, role])
     write_xlsx(files['cbsa_2023'], rows)
+    if original_overrides:
+        for kind, original in original_overrides.items():
+            files[kind].write_bytes(original.read_bytes())
     registry = fixture_registry(files)
+    if original_overrides:
+        from dataclasses import replace
+
+        from embedding_data.geography_parsers import SCOPE
+        registry = {kind: replace(reference, state_scope=SCOPE)
+                    for kind, reference in registry.items()}
     for kind, file in files.items():
         geography_references.import_reference(data_dir, kind, file, registry=registry)
     return geography_build.build(data_dir, 'fixture_geography', registry=registry)
@@ -1034,3 +1049,98 @@ def genuine_geocorr_bytes():
         '9d7ef74ba87b2b3bd4b22303c4c0910a4da0bca966721232c0e9b4461737e04d')
     assert len(body) == metadata['original_size']
     return body
+
+
+def national_mapping_originals(directory):
+    '''Unpack complete pinned public geography originals into isolated fixture setup.'''
+    import gzip
+    import hashlib
+    import json
+    root = Path(__file__).parent / 'fixtures/acs_mapping/national'
+    directory.mkdir()
+    files = {}
+    renames = {'2025_Gaz_counties_national.zip': 'counties_2025',
+               'state-geocodes-v2025.xlsx': 'states_2025', 'list1_2023.xlsx': 'cbsa_2023'}
+    for record in json.loads((root / 'provenance.json').read_text())['intake']:
+        archive = (root / (record['name'] + '.gz')).read_bytes()
+        assert hashlib.sha256(archive).hexdigest() == record['gzip_sha256']
+        body = gzip.decompress(archive)
+        assert hashlib.sha256(body).hexdigest() == record['original_sha256']
+        assert len(body) == record['original_bytes']
+        file = directory / record['name']
+        file.write_bytes(body)
+        files[renames.get(record['name'], file.stem)] = file
+    geocorr = directory / 'geocorr_intersections.csv'
+    geocorr.write_bytes(genuine_geocorr_bytes())
+    files['geocorr_intersections'] = geocorr
+    return files
+
+
+def seed_national_reconciliation_inputs(tmp_path, monkeypatch, originals):
+    '''Genuine unchanged upstream builders over national public geography and toy people.'''
+    import json
+
+    import fastexcel
+    import polars as pl
+
+    from embedding_data.acs_mapping_contract import SelectionRequest
+    from embedding_data.acs_mapping_inputs import select_inputs
+
+    forbid_external_access(monkeypatch)
+    data_dir, directory = tmp_path / 'data', tmp_path / 'authenticated-national-setup'
+    directory.mkdir()
+    rows = fastexcel.read_excel(originals['puma_composition_2020'].read_bytes()).load_sheet(
+        'PUMA_POWPUMA_MIGPUMA', header_row=None, dtypes='string').to_polars().rows()
+    ct_group = next(r[3] for r in rows[1:] if r[:2] == ('09', '20201'))
+
+    def prepare(profile, ddi, frame):
+        ddi, frame = _reconciliation_delivery(profile, ddi, frame)
+        expressions = [pl.when(pl.col('STATEFIP').eq(9)).then(pl.lit(20201))
+                       .otherwise(pl.col('PUMA')).alias('PUMA')]
+        for state, area in [('PWSTATE2', 'PWPUMA00'), ('MIGPLAC1', 'MIGPUMA1')]:
+            expressions.append(pl.when(pl.col(state).eq(9)).then(pl.lit(int(ct_group)))
+                               .otherwise(pl.col(area)).alias(area))
+        return ddi, frame.with_columns(expressions)
+
+    selection = _authenticated_deliveries(data_dir, directory, monkeypatch, prepare_acs=prepare)
+    codes = _authenticated_codes(data_dir, directory)
+    geography = _authenticated_geography(data_dir, directory, original_overrides={
+        kind: originals[kind] for kind in ('states_2025', 'counties_2025', 'cbsa_2023')})
+    ipums = ipums_verification_run.measure(data_dir, 'fixture_ipums', 'references', selection)
+    pins = {name: manifest.sha256_file(path / 'outputs.json') for name, path in (
+        ('codes', codes), ('geography', geography), ('ipums', ipums))}
+    request = SelectionRequest(
+        'fixture_codes', pins['codes'], 'fixture_geography', pins['geography'],
+        'fixture_ipums', pins['ipums'], manifest.sha256_file(
+            data_dir / 'raw/references/ipums-verification/references/receipt.json'))
+    select_inputs(data_dir, request).verify()
+    return FixtureInputs(data_dir, request,
+                         json.loads((ipums / 'inputs.json').read_text())['deliveries'], pins)
+
+
+def build_v2_fixture_mapping(fixture, run_id, monkeypatch, originals, ct_files):
+    '''Explicit v2 actual import/select/build chain; no copied graph or validator bypass.'''
+    import json
+
+    from embedding_data import acs_mapping_bundle as bundle
+
+    directory = fixture.data_dir.parent / ('v2-mapping-setup-' + run_id)
+    directory.mkdir()
+    public = Path(__file__).parent / 'fixtures/acs_mapping/classification'
+    overrides = {f.stem: f for f in public.glob('*.xlsx')
+                 if not f.stem.startswith('census_industry_')}
+    release = directory / 'release-excerpts'
+    release.mkdir()
+    for kind, record in json.loads((public / 'release-layouts.json').read_text()).items():
+        file = release / (kind + '.xlsx')
+        write_public_layout(file, record)
+        overrides[kind] = file
+    overrides.update({k: v for k, v in originals.items() if k not in
+                      ('states_2025', 'counties_2025', 'cbsa_2023')})
+    overrides.update(ct_files)
+    references = seed_mapping_references(
+        directory, monkeypatch, original_overrides=overrides, data_dir=fixture.data_dir,
+        reference_id=run_id + '_references', reference_version='acs-mapping-references-v2')
+    forbid_external_access(monkeypatch)
+    return bundle.build(fixture.data_dir, run_id, fixture.request, references.reference_id,
+                        expected_reference_receipt_sha256=references.receipt_sha256)

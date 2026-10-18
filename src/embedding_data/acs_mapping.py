@@ -36,13 +36,19 @@ def _reference_metadata(snapshot):
 
 
 @app.command('acquire-references')
-def acquire(reference_id: str, data_dir: DataRoot):
-    _invoke(lambda: _reference_metadata(references.acquire_references(data_dir, reference_id)))
+def acquire(reference_id: str, data_dir: DataRoot,
+            reference_version: Annotated[str, typer.Option('--reference-version')] =
+            references.REFERENCE_VERSION):
+    _invoke(lambda: _reference_metadata(references.acquire_references(
+        data_dir, reference_id, reference_version=reference_version)))
 
 
 @app.command('import-reference')
-def import_reference(reference_id: str, kind: str, original: Path, data_dir: DataRoot):
-    _invoke(references.import_reference, data_dir, reference_id, kind, original)
+def import_reference(reference_id: str, kind: str, original: Path, data_dir: DataRoot,
+                     reference_version: Annotated[str, typer.Option('--reference-version')] =
+                     references.REFERENCE_VERSION):
+    _invoke(lambda: references.import_reference(
+        data_dir, reference_id, kind, original, reference_version=reference_version))
 
 
 @app.command('build')

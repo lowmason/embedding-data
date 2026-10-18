@@ -98,6 +98,7 @@ for prefix in ('residence', 'workplace', 'migration'):
 
 FORMAT_VERSION = 'acs-mapping-v1'
 REFERENCE_VERSION = 'acs-mapping-references-v1'
+REFERENCE_VERSION_V2 = 'acs-mapping-references-v2'
 CODE_RULE_VERSION = 'acs-code-rules-v1'
 AREA_RULE_VERSION = 'acs-area-rules-v1'
 NATURAL_KEYS = {

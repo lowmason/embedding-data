@@ -729,7 +729,66 @@ def _industry_diagnostics(snapshot, admitted, legacy, excluded):
     return diagnostics
 
 
-def _validate_occ_pairs(snapshot, admitted, excluded):
+D8_OCCUPATION_HTML_PIN = '61862b9ac0e7bfc4500cc28c3664c50adfc8dc51517c7d81f0192fa37e73725c'
+D8_SUPPORT_PINS = {
+    'ipums_occ_pairs': 'f95672c481af85302bc2f445888e2f5e493afffa6d88a5ca042b66a39cfc34f1',
+    'census_occupation_2018': 'fca2818d691c32777a4cd733a9ab77c8c5bd47adcacd7ac3aa149bebd45b5f7f',
+    'pums_occupation_2018': '20cc7112cf96c7a3648b579cc0b2af239bea1c9094885a0d986959888695fe0a',
+    'pums_annual_2024': 'f8c945c383322f123b5d409fd1cd1352f23ace3c0ffff5de0bc1cf414886d40d',
+    'pums_five_year_2024': '634fdd565249d72f09a8f75d82fe4193b20a09d898ef64a4b8e8039348d52994',
+}
+D8_HTML_ASSERTIONS = (
+    (692, '790', '519160', '7905',
+     'Computer Numerically Controlled Tool Operators And Programmers', 683, 568, 736),
+    (789, '9051', '532031', '9050', 'Flight Attendants', 780, 627, 823),
+    (843, '9820', '553010', '9825',
+     'Military Enlisted Tactical Operations and Air/Weapons Specialists and Crew Members',
+     834, 665, 878),
+)
+
+def rejected_occupation_html(files):
+    '''Retain D8 literal assertions only with all six independently pinned supports.'''
+    if manifest.sha256_file(files['occupation_pairs_html']) != D8_OCCUPATION_HTML_PIN:
+        raise ValueError('D8 occupation HTML original pin differs')
+    for kind, pin in D8_SUPPORT_PINS.items():
+        if manifest.sha256_file(files[kind]) != pin:
+            raise ValueError(f'D8 occupation supporting original pin differs: {kind}')
+    table = _Tables()
+    table.feed(files['occupation_pairs_html'].read_text())
+    rejected, cache = [], {}
+    for assertion in D8_HTML_ASSERTIONS:
+        number, literal, token, canonical, title, xls_row, census_row, pums_row = assertion
+        row = table.rows[number - 1]
+        if len(row) != 15 or (row[6], row[13], row[14]) != (literal, token, title):
+            raise ValueError('D8 occupation HTML literal/title/locator differs')
+        supports = []
+        for kind, sheet, source_row, c, t in [
+            ('ipums_occ_pairs', 'Codes without Descriptions', xls_row, 7, 14),
+            ('ipums_occ_pairs', 'Codes with Descriptions', xls_row, 13, 27),
+            ('census_occupation_2018', '2018 Census Occ Code List', census_row, 2, 3),
+            ('pums_occupation_2018', 'ACS', pums_row, 0, 1),
+            ('pums_annual_2024', 'Occupation', pums_row, 0, 1),
+            ('pums_five_year_2024', 'OCCP & SOCP', pums_row, 0, 1),
+        ]:
+            key = kind, sheet
+            if key not in cache:
+                cache[key] = list(fastexcel.read_excel(files[kind].read_bytes()).load_sheet(
+                    sheet, header_row=None, dtypes='string').to_polars().iter_rows())
+            source = cache[key][source_row - 1]
+            if source[c] != canonical or source[t].replace('-', '') != token:
+                raise ValueError('D8 occupation supporting row differs')
+            supports.append(dict(kind=kind, original_sha256=D8_SUPPORT_PINS[kind],
+                                 reference_locator=f'{kind}:{sheet}:row={source_row}:'
+                                 f'columns={c + 1},{t + 1}', values=list(source)))
+        rejected.append(dict(row=number, literal_code=literal, literal_token=token,
+                             title=title, supported_code=canonical,
+                             original_sha256=D8_OCCUPATION_HTML_PIN,
+                             reference_locator=f'occupation_pairs_html:tr={number}',
+                             disposition='rejected_assertion', supporting_assertions=supports))
+    return rejected
+
+
+def _validate_occ_pairs(snapshot, admitted, excluded, rejected_html):
     assertions, citations = [], {}
     for sheet, c, t in [
         ('Codes without Descriptions', 7, 14),
@@ -764,7 +823,14 @@ def _validate_occ_pairs(snapshot, admitted, excluded):
         if not code or not token or code in ('0', '0000') or token == '-':
             continue
         if (code, token) not in admitted:
-            raise ValueError(f'contradictory paired occupation: {locator}')
+            if not rejected_html and locator.startswith('occupation_pairs_html:'):
+                rejected_html.extend(rejected_occupation_html(snapshot.files))
+            if not any(r['reference_locator'] == locator
+                       and r['literal_code'].zfill(4) == code
+                       and r['literal_token'] == token
+                       and (r['supported_code'], token) in admitted for r in rejected_html):
+                raise ValueError(f'contradictory paired occupation: {locator}')
+            continue
         citations.setdefault((code, token), []).append(locator)
     return citations
 
@@ -935,8 +1001,10 @@ def read_code_evidence(snapshot: refs.ReferenceSnapshot, selected: SelectedInput
                 reasons,
                 special,
             )
+    rejected_html = []
     occupation_pair_locators = _validate_occ_pairs(
-        snapshot, {(code, row['source_token']) for code, row in occupations.items()}, exclusions
+        snapshot, {(code, row['source_token']) for code, row in occupations.items()}, exclusions,
+        rejected_html
     )
     for code, row in occupations.items():
         row['reference_ids'].extend(
@@ -991,6 +1059,7 @@ def read_code_evidence(snapshot: refs.ReferenceSnapshot, selected: SelectedInput
             ),
             'excluded_nonworking': exclusions,
             'rejected_occupation_assertions': rejected_occupation,
+            'rejected_occupation_html_assertions': rejected_html,
         },
     )
 

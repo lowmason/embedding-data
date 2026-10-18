@@ -80,6 +80,88 @@ COMPOSITION_STATES = {'0' + state: state for state in gp.SCOPE | {'72'}}
 ROUNDING_BOUND = Decimal('0.00005') + Decimal('0.000000000001')
 
 
+# D7 binds a rejected assertion to original bytes and every published/arithmetic field.
+GEOCORR_ROUNDING_PIN = '9d7ef74ba87b2b3bd4b22303c4c0910a4da0bca966721232c0e9b4461737e04d'
+GEOCORR_REJECTED_ROUNDING = {
+    (1136, '16', '01300', '16005', 'afact', '0.669 ', 87018, 130062),
+    (2428, '30', '00500', '30013', 'afact', '0.5432 ', 84414, 155387),
+    (2662, '34', '01404', '34013', 'afact2', '0.1252', 108182, 863728),
+}
+
+
+def geocorr_rounding_assertion(pin, number, row, column, numerator, denominator):
+    if denominator <= 0:
+        raise ValueError('population denominator must be positive')
+    difference = abs(Decimal(row[column]) - Decimal(numerator) / Decimal(denominator))
+    assertion = (number, row['state'], row['puma22'], row['county'], column,
+                 row[column], numerator, denominator)
+    known_cell = any(r[0] == number and r[4] == column for r in GEOCORR_REJECTED_ROUNDING)
+    if (pin == GEOCORR_ROUNDING_PIN and known_cell
+            and assertion not in GEOCORR_REJECTED_ROUNDING):
+        raise ValueError('D7 rounding assertion tuple differs')
+    if difference <= ROUNDING_BOUND:
+        return None
+    if pin != GEOCORR_ROUNDING_PIN or assertion not in GEOCORR_REJECTED_ROUNDING:
+        raise ValueError('published factor outside four-decimal rounding bound')
+    return dict(original_sha256=pin, row=number, state_fips=row['state'],
+                puma_code=row['puma22'], county_geoid=row['county'], column=column,
+                literal_token=row[column], numerator=numerator, denominator=denominator,
+                absolute_error=str(difference), cause='unknown',
+                disposition='rejected_assertion',
+                reference_locator=f'geocorr_intersections:csv:row:{number}')
+
+
+def _rejected_geocorr_rounding(snapshot, pumas, counties):
+    pumas = {(r['state_fips'], r['puma_code']): r['population'] for r in pumas}
+    counties = {r['county_geoid']: r['population'] for r in counties}
+    pin = snapshot.receipt['originals']['geocorr_intersections']['sha256']
+    rejected = []
+    for number, (row, _) in enumerate(_geocorr(snapshot, 'geocorr_intersections'), 3):
+        for column, denominator in [('afact', pumas.get((row['state'], row['puma22']), 0)),
+                                    ('afact2', counties.get(row['county'], 0))]:
+            assertion = geocorr_rounding_assertion(
+                pin, number, row, column, _population(row['pop20']), denominator)
+            if assertion:
+                rejected.append(assertion)
+    return rejected
+
+
+def _check_intersection_rounding(evidence, row, field, column, denominator):
+    ct_basis = evidence.reference_provenance.get('ct_population_basis')
+    if row['state_fips'] == '09' and ct_basis is not None:
+        originals = [r for r in ct_basis['geocorr_assertions'] if (
+            r['puma_code'], r['county_geoid']) == (row['puma_code'], row['county_geoid'])]
+        if len(originals) != 1:
+            raise ValueError('CT rejected published basis absent or ambiguous')
+        original = originals[0]
+        if (row[field] != original[field]
+                or row['intersection_population'] != original['accepted_population']):
+            raise ValueError('CT published or accepted integer basis differs')
+        old_denominator = original['original_area_population' if column == 'afact'
+                                   else 'original_county_population']
+        check_rounding(original[field], original['intersection_population'], old_denominator)
+        return None
+    assertions = evidence.reference_provenance.get('rejected_geocorr_rounding_assertions', [])
+    matching = [r for r in assertions if (
+        r['state_fips'], r['puma_code'], r['county_geoid'], r['column']) == (
+            row['state_fips'], row['puma_code'], row['county_geoid'], column)]
+    if not matching:
+        check_rounding(row[field], row['intersection_population'], denominator)
+        return None
+    if len(matching) != 1:
+        raise ValueError('duplicate rejected Geocorr rounding assertion')
+    assertion = matching[0]
+    pin = evidence.reference_provenance['originals']['geocorr_intersections']['sha256']
+    raw = dict(state=row['state_fips'], puma22=row['puma_code'], county=row['county_geoid'],
+               **{column: assertion['literal_token']})
+    expected = geocorr_rounding_assertion(
+        pin, assertion['row'], raw, column, row['intersection_population'], denominator)
+    if (assertion != expected or float(assertion['literal_token']) != row[field]
+            or assertion['reference_locator'] not in row['reference_locators']):
+        raise ValueError('rejected Geocorr rounding evidence differs')
+    return assertion
+
+
 class CompositionConflict(ValueError):
     '''V8 requires official population intersections for conflicting source memberships.'''
 
@@ -314,6 +396,16 @@ def read_area_evidence(snapshot: ReferenceSnapshot, selected: SelectedInputs) ->
                 **citation,
             )
         )
+    rejected_rounding = _rejected_geocorr_rounding(snapshot, puma_totals, county_totals)
+    ct_basis = None
+    if snapshot.receipt.get('reference_version') == 'acs-mapping-references-v2':
+        from embedding_data.acs_ct_population import read_ct_population, replace_geocorr_basis
+        literals = {(r['state'], r['puma22'], r['county']):
+                    {'afact': r['afact'], 'afact2': r['afact2']}
+                    for r, _ in _geocorr(snapshot, 'geocorr_intersections')}
+        intersections, puma_totals, county_totals, ct_basis = replace_geocorr_basis(
+            read_ct_population(snapshot.files), intersections, puma_totals, county_totals,
+            snapshot.reference_id, original_literals=literals)
     evidence = AreaEvidence(
         _frame(intersections, INTERSECTION_SCHEMA, [*PUMA_KEY, 'county_geoid']),
         _frame(puma_totals, PUMA_TOTAL_SCHEMA, PUMA_KEY),
@@ -325,6 +417,8 @@ def read_area_evidence(snapshot: ReferenceSnapshot, selected: SelectedInputs) ->
             'reference_id': snapshot.reference_id,
             'receipt_sha256': snapshot.receipt_sha256,
             'originals': snapshot.receipt['originals'],
+            'rejected_geocorr_rounding_assertions': rejected_rounding,
+            'ct_population_basis': ct_basis,
             'geocorr_selected_decoders': {
                 kind: read_geocorr_text(kind, snapshot.files[kind])[1]
                 for kind in ('geocorr_intersections', 'geocorr_puma_totals',
@@ -428,12 +522,18 @@ def validate_area_evidence(evidence: AreaEvidence) -> None:
         for row in evidence.puma_totals.iter_rows(named=True)
     }
     counties = dict(evidence.county_totals.select('county_geoid', 'population').iter_rows())
+    rejected = []
     for row in intersections.iter_rows(named=True):
-        pop = row['intersection_population']
-        check_rounding(
-            row['published_area_factor'], pop, pumas[(row['state_fips'], row['puma_code'])]
-        )
-        check_rounding(row['published_county_factor'], pop, counties[row['county_geoid']])
+        for field, column, denominator in [
+            ('published_area_factor', 'afact', pumas[row['state_fips'], row['puma_code']]),
+            ('published_county_factor', 'afact2', counties[row['county_geoid']]),
+        ]:
+            assertion = _check_intersection_rounding(evidence, row, field, column, denominator)
+            if assertion:
+                rejected.append(assertion)
+    recorded = evidence.reference_provenance.get('rejected_geocorr_rounding_assertions', [])
+    if sorted(rejected, key=lambda r: r['row']) != sorted(recorded, key=lambda r: r['row']):
+        raise ValueError('unmatched rejected Geocorr rounding assertion')
     msa_totals, msa_sums, puma_sums = {}, {}, {}
     for row in evidence.msa_intersections.iter_rows(named=True):
         key, code = (row['state_fips'], row['puma_code']), row['msa_code']
