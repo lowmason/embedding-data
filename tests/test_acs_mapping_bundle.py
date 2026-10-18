@@ -385,3 +385,66 @@ def test_current_fixture_geography_needs_no_compatibility_exception(authenticate
 
     inputs = json.loads((authenticated['first'] / 'inputs.json').read_text())
     assert inputs['selected_upstreams']['provenance']['geography']['software_compatibility'] == []
+
+
+@pytest.mark.parametrize('table,column', [
+    ('acs_code_lookup', 'native_vintage'),
+    ('acs_area_lookup', 'release_year'),
+    ('puma_county_factors', 'intersection_population'),
+    ('puma_msa_factors', 'intersection_population'),
+    ('puma_msa_coverage', 'puma_population'),
+])
+def test_reconstructed_reference_dtypes_reject_self_consistent_local_repin(copied, table, column):
+    import json
+
+    import polars as pl
+
+    from embedding_data import target_io
+    from embedding_data.acs_mapping_bundle import verify_bundle
+
+    root, directory, _ = copied
+    file = directory / (table + '.parquet')
+    expected = pl.read_parquet(file)
+    mutated = expected.with_columns(pl.col(column).cast(pl.Int32))
+    assert mutated.equals(expected)  # Equal numeric values alone cannot enforce the contract.
+    assert list(mutated.schema.items()) != list(expected.schema.items())
+    mutated.write_parquet(file)
+    report_file = directory / 'report.json'
+    report = json.loads(report_file.read_text())
+    record = target_io.file_record(file)
+    report['tables'][table] = {key: record[key] for key in ('columns', 'schema', 'rows')}
+    target_io.write_json(report_file, report)
+    pin = repin(directory)
+    before = {p.name: p.read_bytes() for p in directory.iterdir()}
+    with pytest.raises(ValueError, match='ordered schema'):
+        verify_bundle(directory, root, expected_outputs_sha256=pin)
+    assert before == {p.name: p.read_bytes() for p in directory.iterdir()}
+
+
+def test_reference_write_dtype_corruption_prevents_publication(copied, monkeypatch):
+    import json
+    from pathlib import Path
+
+    import polars as pl
+
+    from embedding_data import acs_mapping_bundle as bundle
+    from embedding_data.acs_mapping_contract import SelectionRequest
+
+    root, first, _ = copied
+    inputs = json.loads((first / 'inputs.json').read_text())
+    original = pl.DataFrame.write_parquet
+    def corrupt(frame, file, *args, **kwargs):
+        if isinstance(file, Path) and file.name == 'puma_county_factors.parquet':
+            frame = frame.with_columns(pl.col('intersection_population').cast(pl.Int32))
+        return original(frame, file, *args, **kwargs)
+
+    monkeypatch.setattr(pl.DataFrame, 'write_parquet', corrupt)
+    before = {p.name: p.read_bytes() for p in first.iterdir()}
+    with pytest.raises(ValueError, match='ordered schema'):
+        bundle.build(root, 'dtype_corruption',
+                     SelectionRequest(**inputs['selected_upstreams']['request']),
+                     inputs['references']['reference_id'],
+                     expected_reference_receipt_sha256=inputs['references']['receipt_sha256'])
+    assert not first.with_name('dtype_corruption').exists()
+    assert not first.with_name('dtype_corruption.part').exists()
+    assert before == {p.name: p.read_bytes() for p in first.iterdir()}

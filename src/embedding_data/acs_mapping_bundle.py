@@ -132,6 +132,8 @@ def _report(directory, selected, tables, factors, codes, geography, run_id, crea
 def _validate_outputs(directory, tables):
     for name, expected in tables.items():
         actual = pl.read_parquet(directory / (name + '.parquet'))
+        if list(actual.schema.items()) != list(expected.schema.items()):
+            raise ValueError('output reference ordered schema differs from reconstructed evidence')
         if not actual.equals(expected):
             raise ValueError('output reference table differs from reconstructed evidence')
 

@@ -4,6 +4,8 @@ from unittest.mock import patch
 import pytest
 from typer.testing import CliRunner
 
+pytest.register_assert_rewrite('acs_mapping_fixtures')
+
 @pytest.fixture
 def cli_runner():
     with patch.dict(os.environ):
