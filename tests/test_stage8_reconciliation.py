@@ -385,3 +385,180 @@ def test_malformed_preservation_evidence_raises_value_error(reconciliation_modul
     manifest.write_bytes(b'{}\n')
     with pytest.raises(ValueError):
         reconciliation_module.preservation(data, controls)
+
+@pytest.mark.parametrize(
+    'defect', [
+        'native_id', 'native_vintage', 'county_id', 'msa_id', 'reference_id', 'code_locator',
+        'county_locator', 'area_reference_id'
+    ]
+)
+def test_review_semantic_bindings_reject_consistent_repin(reconciliation_module, accepted, defect):
+    fixture, controls, result = accepted
+    directory = Path(result['directory'])
+    if defect in {'native_id', 'native_vintage', 'reference_id', 'code_locator'}:
+        field, value = {
+            'native_id': ('native_node_id', 'wrong-native-node'),
+            'native_vintage': ('native_vintage', 2022),
+            'reference_id': ('reference_ids', ['wrong-original']),
+            'code_locator': ('reference_locators', ['pums_industry_2017:ACS!C:E:row=999999'])
+        }[defect]
+        file = directory / 'acs_code_lookup.parquet'
+        codes = pl.read_parquet(file)
+        chosen = codes.filter(pl.col('source_scheme').eq('naics2017')).row(0, named=True)
+        # The fixture's 113M category has unchanged finest memberships across vintages.
+        if defect == 'native_vintage':
+            other = codes.filter(
+                pl.col('source_scheme').eq('naics2022').and_(
+                    pl.col('source_token').eq(chosen['source_token'])
+                )
+            ).row(0, named=True)
+            assert chosen['native_finest_candidates'] == other['native_finest_candidates']
+        key = chosen['code_lookup_id']
+        codes.with_columns(
+            pl.when(pl.col('code_lookup_id').eq(key)).then(pl.lit(value)).otherwise(pl.col(field)
+                                                                                    ).alias(field)
+        ).write_parquet(file)
+        for profile in ('core', 'five_year', 'vintage'):
+            file = directory / ('acs_' + profile + '_canonical.parquet')
+            pl.read_parquet(file).with_columns(
+                pl.when(pl.col('industry_code_lookup_id').eq(key)).then(pl.lit(value)).otherwise(
+                    pl.col('industry_' + field)
+                ).alias('industry_' + field)
+            ).write_parquet(file)
+    elif defect == 'area_reference_id':
+        file = directory / 'acs_area_lookup.parquet'
+        frame = pl.read_parquet(file)
+        frame.with_columns(pl.lit(['wrong:usa_puma']).alias('reference_ids')).write_parquet(file)
+        for profile in ('core', 'five_year', 'vintage'):
+            file = directory / ('acs_' + profile + '_canonical.parquet')
+            pl.read_parquet(file).with_columns(
+                *[
+                    pl.lit(['wrong:usa_puma']).alias(role + '_reference_ids')
+                    for role in ('residence', 'workplace', 'migration')
+                ]
+            ).write_parquet(file)
+    else:
+        name, field, value = {
+            'county_id': ('puma_county_factors', 'county_node_id', 'wrong-county'),
+            'msa_id': ('puma_msa_factors', 'msa_node_id', 'wrong-msa'),
+            'county_locator': (
+                'puma_county_factors', 'reference_locators', [
+                    'geocorr_intersections:csv:row:999999'
+                ]
+            )
+        }[defect]
+        file = directory / (name + '.parquet')
+        pl.read_parquet(file).with_columns(pl.lit(value).alias(field)).write_parquet(file)
+    with pytest.raises(ValueError, match='native|node|reference|locator|provenance'):
+        reconciliation_module.reconcile(
+            fixture.data_dir, 'independent', repin(directory), controls
+        )
+
+def test_review_swapped_receipt_originals_rejected(reconciliation_module, accepted):
+    import hashlib
+    fixture, controls, _ = accepted
+    receipt = fixture.data_dir / 'raw/references/acs-mapping/independent_references/receipt.json'
+    contents = json.loads(receipt.read_text())
+    originals = contents['originals']
+    left, right = 'pums_industry_2017', 'pums_industry_2022'
+    originals[left], originals[right] = originals[right], originals[left]
+    receipt.write_text(json.dumps(contents))
+    manifest = fixture.data_dir / 'raw/manifest.jsonl'
+    prefix = (controls / 'manifest-prefix.jsonl').read_bytes()
+    entries = [json.loads(line) for line in manifest.read_bytes()[len(prefix):].splitlines()]
+    path = receipt.relative_to(fixture.data_dir / 'raw').as_posix()
+    target = next(r for r in entries if r['path'] == path)
+    target.update(
+        sha256=hashlib.sha256(receipt.read_bytes()).hexdigest(), size=receipt.stat().st_size
+    )
+    manifest.write_bytes(prefix + b''.join((json.dumps(r) + '\n').encode() for r in entries))
+    with pytest.raises(ValueError, match='original|registered|citation'):
+        reconciliation_module.preservation(fixture.data_dir, controls)
+
+def test_review_freeze_failure_preserves_unowned_collision(
+    reconciliation_module, tmp_path, monkeypatch
+):
+    data = tmp_path / 'data'
+    (data / 'raw').mkdir(parents=True)
+    (data / 'derived').mkdir()
+    (data / 'raw/manifest.jsonl').write_bytes(b'')
+    controls = tmp_path / 'controls'
+    original_open = Path.open
+
+    def collide(path, mode='r', *args, **kwargs):
+        if path == controls / 'freeze.json' and mode == 'x':
+            with original_open(controls / 'sentinel', 'w') as stream:
+                stream.write('unowned')
+            with original_open(path, 'w') as stream:
+                stream.write('unowned collision')
+        return original_open(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr(Path, 'open', collide)
+    with pytest.raises(FileExistsError):
+        reconciliation_module.freeze(data, controls)
+    assert (controls / 'sentinel').read_text() == 'unowned'
+    assert (controls / 'freeze.json').read_text() == 'unowned collision'
+    assert not (controls / 'manifest-prefix.jsonl').exists()
+
+@pytest.mark.parametrize('kind', ['code', 'county', 'code_columns'])
+def test_review_existing_but_unrelated_locator_is_rejected(reconciliation_module, accepted, kind):
+    import re
+    fixture, controls, result = accepted
+    directory = Path(result['directory'])
+    if kind.startswith('code'):
+        file = directory / 'acs_code_lookup.parquet'
+        frame = pl.read_parquet(file)
+        row = frame.filter(pl.col('source_scheme').eq('naics2017')).row(0, named=True)
+        old = next(t for t in row['reference_locators'] if t.startswith('pums_industry_2017:'))
+        original = fixture.data_dir / (
+            'raw/references/acs-mapping/independent_references/'
+            'pums_industry_2017.xlsx'
+        )
+        rows = reconciliation_module.workbook(original, 'ACS')
+        number = next(
+            n for n, r in enumerate(rows, 1) if len(r) >= 5 and r[2] and re.fullmatch(
+                '[0-9]{4}', r[2]
+            ) and r[2] != row['paired_census_code']
+        )
+        new = (old.replace('!C:E:', '!A:B:') if kind == 'code_columns' else
+               re.sub(r'row=[0-9]+', f'row={number}', old))
+        changed = sorted(new if t == old else t for t in row['reference_locators'])
+        key = row['code_lookup_id']
+        frame.with_columns(
+            pl.when(pl.col('code_lookup_id').eq(key)).then(pl.lit(changed)).otherwise(
+                pl.col('reference_locators')
+            ).alias('reference_locators')
+        ).write_parquet(file)
+        for profile in ('core', 'five_year', 'vintage'):
+            file = directory / ('acs_' + profile + '_canonical.parquet')
+            pl.read_parquet(file).with_columns(
+                pl.when(pl.col('industry_code_lookup_id').eq(key)).then(pl.lit(changed)).otherwise(
+                    pl.col('industry_reference_locators')
+                ).alias('industry_reference_locators')
+            ).write_parquet(file)
+    else:
+        file = directory / 'puma_county_factors.parquet'
+        frame = pl.read_parquet(file)
+        row = frame.filter(pl.col('area_type').eq('residence')).row(0, named=True)
+        old = next(t for t in row['reference_locators'] if t.startswith('geocorr_intersections:'))
+        other = next(
+            r for r in frame.filter(pl.col('area_type').eq('residence')).to_dicts()
+            if r['county_geoid'] != row['county_geoid']
+        )
+        new = next(
+            t for t in other['reference_locators'] if t.startswith('geocorr_intersections:')
+        )
+        changed = sorted(new if t == old else t for t in row['reference_locators'])
+        frame.with_columns(
+            pl.when(
+                pl.col('factor_key').eq(row['factor_key']).and_(
+                    pl.col('county_geoid').eq(row['county_geoid'])
+                )
+            ).then(pl.lit(changed)).otherwise(pl.col('reference_locators')).alias(
+                'reference_locators'
+            )
+        ).write_parquet(file)
+    with pytest.raises(ValueError, match='locator|reference'):
+        reconciliation_module.reconcile(
+            fixture.data_dir, 'independent', repin(directory), controls
+        )

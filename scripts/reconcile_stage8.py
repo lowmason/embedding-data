@@ -185,10 +185,6 @@ def read(file):
     safe(file)
     return loads(file.read_bytes())
 
-def write(file, value):
-    with file.open('x', encoding='utf-8') as stream:
-        stream.write(json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + '\n')
-
 def identities():
     names = (
         'scripts/reconcile_stage8.py', 'tests/test_stage8_reconciliation.py',
@@ -235,14 +231,23 @@ def freeze(data_dir: Path, control_dir: Path) -> dict:
         'reconciler': identities()
     }
     control_dir.mkdir(parents=True)
+    created = []
     try:
-        with (control_dir / 'manifest-prefix.jsonl').open('xb') as stream:
+        prefix_file = control_dir / 'manifest-prefix.jsonl'
+        with prefix_file.open('xb') as stream:
+            created.append(prefix_file)
             stream.write(manifest)
-        write(control_dir / 'freeze.json', result)
+        freeze_file = control_dir / 'freeze.json'
+        with freeze_file.open('x', encoding='utf-8') as stream:
+            created.append(freeze_file)
+            stream.write(json.dumps(result, indent=2, sort_keys=True, allow_nan=False) + '\n')
     except BaseException:
-        for file in control_dir.iterdir():
-            file.unlink()
-        control_dir.rmdir()
+        for file in created:
+            file.unlink(missing_ok=True)
+        try:
+            control_dir.rmdir()
+        except OSError:
+            pass  # Concurrent/unowned entries must survive this invocation's failure.
         raise
     return {'protected_file_count': len(frozen), 'manifest_prefix': result['manifest_prefix']}
 
@@ -353,12 +358,20 @@ def _preservation(data_dir: Path, control_dir: Path) -> dict:
             check_record(relative(directory, name), expected, 'snapshot file hash/size differs')
             citation = next(r for r in citations if r['path'] == path)
             require(citation == appended[path], 'receipt citation differs from manifest suffix')
-        for original in receipt['originals'].values():
-            check_record(
-                relative(directory,
-                         Path(original['citation']['path']).name), original,
-                'original receipt hash/size differs'
+        for kind, original in receipt['originals'].items():
+            name = REFERENCE_NAMES[kind]
+            path = root + '/' + name
+            require(original['citation']['path'] == path, 'registered original kind/path differs')
+            require(
+                original['citation'] == appended[path],
+                'original citation differs from authenticated manifest suffix'
             )
+            require(
+                {k: original[k]
+                 for k in ('sha256', 'size')} == files[name],
+                'registered original/file hash or size differs'
+            )
+            check_record(relative(directory, name), original, 'original receipt hash/size differs')
         accounted.update(expected_paths | {root + '/receipt.json'})
     require(accounted == set(appended), 'manifest appends not fully receipt-accounted')
     return {
@@ -1452,6 +1465,56 @@ def leaf_members(expression, nodes, paths):
     require(negative <= positive and positive - negative, 'invalid original membership exclusion')
     return positive - negative
 
+def native_identifier(nodes, members, token_code, paths):
+    if not members:
+        return None
+    identifiers = {r['code']: r['node_id'] for r in nodes}
+    if token_code in identifiers:
+        return identifiers[token_code]
+    native_paths = []
+    for member in sorted(members):
+        if nodes[0]['system'] == 'soc':
+            native_paths.append(paths[identifiers[member]])
+            continue
+        ancestors = [
+            r for r in nodes if (
+                r['code'][:2] <= member[:2] <= r['code'][-2:]
+                if '-' in r['code'] else member.startswith(r['code'])
+            )
+        ]
+        ancestors.sort(key=lambda r: 2 if '-' in r['code'] else len(r['code']))
+        require(ancestors and ancestors[-1]['code'] == member, 'native hierarchy leaf absent')
+        native_paths.append([r['node_id'] for r in ancestors])
+    common = []
+    for level in zip(*native_paths):
+        if len(set(level)) != 1:
+            break
+        common.append(level[0])
+    return common[-1] if common else None
+
+def geographic_identifiers(directory, geographic_directory):
+    counties = {
+        r['county_geoid']: r['county_id']
+        for r in pl.read_parquet(geographic_directory / 'county_reference.parquet').to_dicts()
+    }
+    msas = {
+        r['cbsa_code']: r['cbsa_id']
+        for r in pl.read_parquet(geographic_directory / 'cbsa_reference.parquet').to_dicts()
+        if r['cbsa_type'] == 'metropolitan'
+    }
+    nodes = set(pl.read_parquet(geographic_directory / 'geography_nodes.parquet')['node_id'])
+    for name, natural, identifier, authority in (
+        ('puma_county_factors', 'county_geoid', 'county_node_id', counties), (
+            'puma_msa_factors', 'msa_code', 'msa_node_id', msas
+        )
+    ):
+        for row in pl.read_parquet(directory / (name + '.parquet')).iter_rows(named=True):
+            require(
+                row[natural] in authority and row[identifier] == authority[row[natural]
+                                                                           ] and row[identifier]
+                in nodes, 'geographic node differs from authenticated natural identity'
+            )
+
 def candidate_memberships(codes, files, code_directory):
     native = pl.read_parquet(code_directory / 'naics_native_nodes.parquet').to_dicts()
     soc = pl.read_parquet(code_directory / 'soc_nodes.parquet').to_dicts()
@@ -1471,7 +1534,14 @@ def candidate_memberships(codes, files, code_directory):
         leaf_members(expression, [r for r in native if r['vintage'] == year], paths)
     occupation, rejected = occupation_authorities(files)
     for row in codes.iter_rows(named=True):
-        year, system = row['native_vintage'], row['system']
+        system = row['system']
+        scheme = row['source_scheme']
+        require(
+            scheme in ({'naics2017', 'naics2022'}
+                       if system == 'naics' else {'soc2018'}), 'native delivered scheme differs'
+        )
+        year = int(scheme[-4:])
+        require(row['native_vintage'] == year, 'native vintage differs from delivered scheme')
         pair, token = row['paired_census_code'], row['source_token']
         if system == 'naics':
             nodes = [r for r in native if r['vintage'] == year]
@@ -1522,6 +1592,12 @@ def candidate_memberships(codes, files, code_directory):
             row['native_finest_candidates'] == sorted(members
                                                       ) and row['canonical_finest_candidates']
             == sorted(canonical), 'candidate membership differs from original reference arithmetic'
+        )
+        native_nodes = soc if system == 'soc' else [r for r in native if r['vintage'] == year]
+        expected_native = native_identifier(native_nodes, members, node_code, paths)
+        require(
+            row['native_node_id'] == expected_native,
+            'native node differs from authenticated native hierarchy'
         )
         nodes = soc if system == 'soc' else [r for r in native if r['vintage'] == 2022]
         identifiers = {r['code']: r['node_id'] for r in nodes}
@@ -1596,6 +1672,294 @@ def independent_lookup(codes, files):
             'vintage crosswalk provenance differs'
         )
 
+def locator_target(locator):
+    '''Compare semantic original targets; raw-token/formatting decorations are not authority.'''
+    match = re.match(r'^([^:]+):(.+?)!([A-Z]+(?::[A-Z]+)?):row=([0-9]+)(?::|$)', locator)
+    if match:
+        return f'{match[1]}:{match[2]}!{match[3]}:row:{int(match[4])}'
+    return locator
+
+def check_provenance(row, targets, reference_ids):
+    require(
+        set(row['reference_ids']) == set(reference_ids),
+        'reference identities differ from selected original evidence'
+    )
+    require(
+        {locator_target(v)
+         for v in row['reference_locators']} == targets,
+        'reference locator targets differ from independent original evidence'
+    )
+
+def code_provenance(codes, files, inputs, selected, data_dir, code_directory):
+    from html.parser import HTMLParser
+
+    class PairRows(HTMLParser):
+
+        def __init__(self):
+            super().__init__()
+            self.rows, self.cell = [], None
+
+        def handle_starttag(self, tag, attrs):
+            if tag == 'tr':
+                self.rows.append([])
+            if tag in ('td', 'th'):
+                self.cell = ''
+
+        def handle_data(self, text):
+            if self.cell is not None:
+                self.cell += text
+
+        def handle_endtag(self, tag):
+            if tag in ('td', 'th') and self.cell is not None:
+                if self.rows:
+                    self.rows[-1].append(self.cell.strip())
+                self.cell = None
+
+    cache = {}
+
+    def rows(kind, sheet):
+        key = kind, sheet
+        if key not in cache:
+            cache[key] = workbook(files[kind], sheet)
+        return cache[key]
+
+    for year in (2017, 2022):
+        kind = f'census_industry_{year}'
+        original = selected['ipums']['references']['receipt']['originals'][kind]
+        file = relative(data_dir / 'raw', original['citation']['path'])
+        check_record(file, original['citation'], 'selected Census original provenance differs')
+        files[kind] = file
+    html_pairs = PairRows()
+    html_pairs.feed(files['occupation_pairs_html'].read_text())
+    highlighted = highlighted_occupation_rows(files['pums_occupation_2018'])
+    for row in codes.iter_rows(named=True):
+        pair, token, system, year = (
+            row[k] for k in ('paired_census_code', 'source_token', 'system', 'native_vintage')
+        )
+        targets = set()
+        if system == 'naics':
+            editions = [(f'pums_industry_{year}', 'ACS')]
+            if year == 2022:
+                editions += [('pums_annual_2024', 'Industry'), ('pums_five_year_2024', 'Industry')]
+            for kind, sheet in editions:
+                matched = [
+                    (n, r) for n, r in enumerate(rows(kind, sheet), 1)
+                    if len(r) >= 5 and r[2] == pair and (r[4] or '').strip() == token
+                ]
+                require(len(matched) == 1, 'reference original industry pair target absent')
+                targets.add(f'{kind}:{sheet}!C:E:row:{matched[0][0]}')
+            kind = f'census_industry_{year}'
+            sheet = ('2017 Census Industry Code List' if year == 2017
+                     else '2022 Census Ind Code List ')
+            matched = [n for n, r in enumerate(rows(kind, sheet), 1) if r[3] == pair]
+            require(len(matched) == 1, 'Census reference industry target absent')
+            targets.add(f'{kind}:{sheet}!D:E:row:{matched[0]}')
+            targets.add('industry_tokens_html:Legend:M,P,S,Z')
+            require(
+                all(
+                    v in document(files['industry_tokens_html']) for v in (
+                        'Multiple NAICS codes', 'Part of a NAICS code', 'Not specified Industry',
+                        'Exception to NAICS code'
+                    )
+                ), 'reference industry legend target absent'
+            )
+            for n, r in enumerate(rows('ipums_ind_tokens', 'Sheet 1'), 1):
+                if n > 1 and (r[7 if year == 2017 else 8] or '').strip() == token:
+                    targets.add(f'ipums_ind_tokens:Sheet 1!H:I:row:{n}')
+            ids = {k for k, _ in editions} | {kind, 'industry_tokens_html'}
+            if any(v.startswith('ipums_ind_tokens:') for v in targets):
+                ids.add('ipums_ind_tokens')
+        else:
+            full_codes = set()
+            editions = [
+                ('pums_occupation_2018', 'ACS'), ('pums_annual_2024', 'Occupation'),
+                ('pums_five_year_2024', 'OCCP & SOCP')
+            ]
+            primary_number = None
+            for kind, sheet in editions:
+                original_rows = rows(kind, sheet)
+                matched = [
+                    (n, r) for n, r in enumerate(original_rows, 1)
+                    if r[0] == pair and (r[1] or '').strip().replace('-', '') == token
+                ]
+                require(len(matched) == 1, 'reference original occupation pair target absent')
+                n, _ = matched[0]
+                if kind == 'pums_occupation_2018':
+                    primary_number = n
+                targets.add(f'{kind}:{sheet}!A:C:row:{n}')
+                constituents = set()
+                cursor = n
+                while cursor < len(original_rows) and original_rows[cursor][0] is None:
+                    value = (original_rows[cursor][1] or '').strip()
+                    if value and value != 'Combines:':
+                        targets.add(f'{kind}:{sheet}!B:C:row:{cursor + 1}')
+                        match = re.match(r'([0-9]{4}) - ', original_rows[cursor][2] or '')
+                        if match:
+                            constituents.add(match[1])
+                    cursor += 1
+                full_codes.update(constituents or {pair})
+            for n, r in enumerate(rows('census_occupation_2018', '2018 Census Occ Code List'), 1):
+                if r[2] in full_codes:
+                    targets.add(f'census_occupation_2018:2018 Census Occ Code List!C:D:row:{n}')
+            for sheet, c, t in [
+                ('Codes without Descriptions', 7, 14), ('Codes with Descriptions', 13, 27)
+            ]:
+                for n, r in enumerate(rows('ipums_occ_pairs', sheet), 1):
+                    if n > 1 and (r[c] or '').zfill(4) == pair and r[t] == token:
+                        targets.add(f'ipums_occ_pairs:{sheet}!H:AB:row:{n}')
+            for n, r in enumerate(html_pairs.rows, 1):
+                if len(r) == 15 and r[6].zfill(4) == pair and r[13] == token:
+                    targets.add(f'occupation_pairs_html:tr={n}')
+            targets.update(
+                {
+                    'soc_tokens_html:aggregate-code-explanation',
+                    'usa_occsoc:description:aggregate-code-explanation'
+                }
+            )
+            require(
+                all(
+                    'confidentiality' in document(files[k])
+                    for k in ('soc_tokens_html', 'usa_occsoc')
+                ), 'reference occupation explanation target absent'
+            )
+            ids = {k
+                   for k, _ in editions} | {
+                       'census_occupation_2018', 'ipums_occ_pairs', 'occupation_pairs_html',
+                       'soc_tokens_html', 'usa_occsoc'
+                   }
+            if row['aggregation_reasons'] == ['disclosure']:
+                require(primary_number in highlighted, 'reference disclosure target absent')
+                targets.update(
+                    {
+                        'pums_occupation_2018:ACS!A884:highlighting-confidentiality',
+                        f'pums_occupation_2018:xl/styles.xml:ACS-row={primary_number}:theme7-tint'
+                    }
+                )
+            if (pair, token) == ('9830', '559830'):
+                for kind, page in [('pums_annual_guide', 17), ('pums_five_year_guide', 18)]:
+                    require(
+                        files[kind].read_bytes().startswith(b'%PDF-'),
+                        'reference selected documentary original absent'
+                    )
+                    ids.add(kind)
+                    targets.add(f'{kind}:physical-page={page}:VIII.I:SOCP=559830')
+        ids.add('stage4_codes:' + inputs['selected_upstreams']['request']['codes_run'])
+        for name in ('naics_native_nodes' if system == 'naics' else 'soc_nodes', 'code_paths'):
+            targets.add(
+                f'stage4_codes:{name}.parquet:sha256=' + digest(
+                    code_directory / (name + '.parquet')
+                )
+            )
+        check_provenance(row, targets, ids)
+
+def geographic_provenance(directory, files, inputs):
+    '''Rebuild citation support unions from original natural keys, separately from factors.'''
+    reference_id = inputs['references']['reference_id']
+
+    def original_rows(kind, sheet=None):
+        if sheet is None:
+            return [(r, f'{kind}:csv:row:{n}') for n, r in enumerate(csv_rows(files[kind]), 3)]
+        return [
+            (r, f'{kind}:{sheet}:row:{n}')
+            for n, r in enumerate(workbook(files[kind], sheet)[1:], 2)
+        ]
+
+    pumas = {
+        (r['state'], r['puma22']): {target}
+        for r, target in original_rows('geocorr_puma_totals')
+    }
+    counties = {r['county']: {target} for r, target in original_rows('geocorr_county_totals')}
+    groups, group_targets = {}, {}
+    for r, target in original_rows('puma_composition_2020', 'PUMA_POWPUMA_MIGPUMA'):
+        key = r[0], r[1]
+        groups[key] = composition_state(r[2]), r[3]
+        group_targets[key] = {target}
+    county_groups = {
+        r[0] + r[1]: {target}
+        for r, target in original_rows('county_composition_2022', 'MIGPUMA-POWPUMA 2022 Lookup')
+    }
+    denominators, numerators, support = defaultdict(set), defaultdict(set), {}
+    for key, group in groups.items():
+        denominators[group].update(pumas[key] | group_targets[key])
+    for r, target in original_rows('geocorr_intersections'):
+        key, county = (r['state'], r['puma22']), r['county']
+        support['residence', *key, county] = {target} | pumas[key] | counties[county]
+        numerators[*groups[key], county].update({target} | group_targets[key] | pumas[key])
+    for (state, code, county), targets in numerators.items():
+        support['work_migration', state, code, county] = (
+            targets | denominators[state, code]
+            | county_groups[county] | counties[county]
+        )
+    factor_support = defaultdict(set)
+    for row in pl.read_parquet(directory / 'puma_county_factors.parquet').to_dicts():
+        key = tuple(row[k] for k in ('area_type', 'state_fips', 'area_code', 'county_geoid'))
+        targets = support[key]
+        ids = {reference_id + ':' + t.split(':', 1)[0] for t in targets}
+        check_provenance(row, targets, ids)
+        factor_support[key[:3]].update(targets)
+    msa_support, coverage = {}, defaultdict(set)
+    for r, target in original_rows('msa_puma_2023_2020', 'MSA2023_PUMA2020_crosswalk'):
+        key = r[2], r[4], r[0]
+        msa_support[key] = {target}
+        coverage[key[:2]].add(target)
+    for name in ('puma_msa_factors', 'puma_msa_coverage'):
+        for row in pl.read_parquet(directory / (name + '.parquet')).to_dicts():
+            key = row['state_fips'], row['puma_code']
+            targets = msa_support[*key, row['msa_code']] if name == 'puma_msa_factors' else (
+                pumas[key] | coverage[key] | {'msa_puma_2023_2020:complete-original'}
+            )
+            check_provenance(
+                row, targets, {reference_id + ':' + t.split(':', 1)[0]
+                               for t in targets}
+            )
+    for row in pl.read_parquet(directory / 'acs_area_lookup.parquet').to_dicts():
+        source = inputs['sources'][row['profile']]
+        role = row['role']
+        state, area, width = {
+            'residence': ('STATEFIP', 'PUMA', 2),
+            'workplace': ('PWSTATE2', 'PWPUMA00', 2),
+            'migration': ('MIGPLAC1', 'MIGPUMA1', 3)
+        }[role]
+        kind = 'usa_' + area.lower()
+        state_kind = 'usa_' + state.lower()
+        ddi = [r for r in source['raw_citations'] if r['path'].endswith('.xml')]
+        require(len(ddi) == 1, 'reference delivered DDI identity ambiguous')
+        ddi = ddi[0]
+        code = str(row['source_state_code']).zfill(width)
+        labels = {str(c).zfill(width): label for c, label in categories(source, state).items()}
+        require(code in labels, 'reference source state target absent')
+        label = labels[code]
+        targets = {
+            f"{ddi['path']}#variables/{area}",
+            f"{ddi['path']}#variables/{state}/categories/{code}={label}",
+            f'{kind}#description_section', f'{kind}#codes_section',
+            f'{kind}#comparability_section', 'usa_multyear#description_section'
+        }
+        kinds = {kind, 'usa_multyear'}
+        if role != 'residence':
+            targets.update(
+                {f'{state_kind}#description_section', f'{state_kind}#comparability_section'}
+            )
+            kinds.add(state_kind)
+        for fips, domestic_label in categories(source, 'STATEFIP').items():
+            if fips in SCOPE | {'72'} and domestic_label == label:
+                targets.add(f"{ddi['path']}#variables/STATEFIP/categories/{fips}={label}")
+        if row['area_status'] == 'applicable':
+            targets.update(factor_support[row['area_type'], row['state_fips'], row['area_code']])
+        for target in targets:
+            if '#' in target and not target.startswith(ddi['path'] + '#'):
+                original_kind, anchor = target.split('#', 1)
+                require(
+                    anchor in files[original_kind].read_text(),
+                    'reference document semantic section absent'
+                )
+                kinds.add(original_kind)
+            elif ':' in target:
+                kinds.add(target.split(':', 1)[0])
+        ids = {reference_id + ':' + k for k in kinds}
+        ids.add(f"ddi:{source['delivery_id']}:{ddi['sha256']}")
+        check_provenance(row, targets, ids)
+
 def reconcile(data_dir: Path, run_id: str, outputs_sha256: str, control_dir: Path) -> dict:
     data_dir, control_dir = safe(data_dir), safe(control_dir)
     require(re.fullmatch('[A-Za-z0-9][A-Za-z0-9_-]*', run_id), 'unsafe run ID')
@@ -1615,6 +1979,7 @@ def reconcile(data_dir: Path, run_id: str, outputs_sha256: str, control_dir: Pat
     counties = reference_geography(data_dir, selected['geography'], geo_directory)
     population, pumas, groups = populations(directory, files, counties)
     table_contracts(directory)
+    geographic_identifiers(directory, geo_directory)
     codes = pl.read_parquet(directory / 'acs_code_lookup.parquet')
     areas = pl.read_parquet(directory / 'acs_area_lookup.parquet')
     independent_lookup(codes, files)
@@ -1622,6 +1987,10 @@ def reconcile(data_dir: Path, run_id: str, outputs_sha256: str, control_dir: Pat
         codes, files,
         data_dir / 'derived/codes' / inputs['selected_upstreams']['request']['codes_run']
     )
+    code_directory = data_dir / 'derived/codes' / inputs['selected_upstreams']['request'][
+        'codes_run']
+    code_provenance(codes, dict(files), inputs, selected, data_dir, code_directory)
+    geographic_provenance(directory, files, inputs)
     require(
         set(codes['system']) <= {'naics', 'soc'}
         and set(areas['profile']) <= set(PROFILES) and set(
