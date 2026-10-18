@@ -91,6 +91,8 @@ Additional binding execution constraints:
 
 ## Decisions
 
+- **D4** (owner, execution source review, 2026-10-18): “Approve this narrow Census correspondence rule.” For PUMS category `7640` / `49-90XX`, resolve its explicitly named Census constituent `7550` through the full Census occupation list to official SOC `49-9095`. Preserve the erroneous published PUMS `40-9095` assertion and every original locator in rejected-reference diagnostics. This bound applies only to that identified constituent assertion in the registered PUMS occupation editions; it changes no raw/reference/source value, creates no new special code and grants no general source-precedence rule. Every other unexplained occupation contradiction still fails. Applied in: Task 3 classification evidence and its downstream mapping diagnostics.
+
 - **D3** (owner, brief, 2026-10-17): “Plan 8 is approved, including the bounded Census PUMS authority. Prepare a fresh-session execution handoff from c632b34 for Stage 8 only. Do not start implementation here.” Applied in: fresh receiving-session execution of Tasks 1–10; the bounded authority and fail-on-new-conflict requirements remain binding. The planning-session stop applies to the sender.
 
 - **D1** (owner, brief, 2026-10-16): The written spec is approved. Plan Stage 8

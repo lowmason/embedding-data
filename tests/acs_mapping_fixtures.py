@@ -147,7 +147,7 @@ def write_public_layout(file: Path, record: dict) -> None:
         archive.writestr('xl/_rels/workbook.xml.rels', tostring(relationships))
 
 
-def seed_mapping_references(tmp_path, monkeypatch):
+def seed_mapping_references(tmp_path, monkeypatch, *, original_overrides=None):
     '''Use every registered kind, with explicit independently computed excerpt pins.'''
     import json
     from dataclasses import replace
@@ -165,7 +165,9 @@ def seed_mapping_references(tmp_path, monkeypatch):
     registry = {}
     for kind, reference in refs.REGISTRY.items():
         file = originals / reference.filename
-        if kind.endswith('_request'):
+        if original_overrides and kind in original_overrides:
+            file.write_bytes(original_overrides[kind].read_bytes())
+        elif kind.endswith('_request'):
             file.write_bytes(refs.request_bytes(kind.removesuffix('_request')))
         else:
             write_public_layout(file, layouts[kind])
