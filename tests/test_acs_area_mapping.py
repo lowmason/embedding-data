@@ -148,19 +148,49 @@ def test_rule_conflicting_categories_fail(role_case):
 
 
 def test_special_meanings_remain_distinct_and_status_counts_reconcile(role_case):
-    from embedding_data.acs_area_mapping import build_area_lookup
+    from embedding_data.acs_area_mapping import AREA_KEY, build_area_lookup
 
-    observed = pl.concat([
-        role_case.observed('workplace', '00', '00000'),
-        role_case.observed('workplace', '80', '00001'),
-        role_case.observed('migration', '000', '00000'),
-        role_case.observed('migration', '150', '00001'),
-        role_case.observed('residence', '01', '00100'),
-    ])
+    observations = [
+        ('workplace', '00', '00000', 5), ('workplace', '80', '00001', 9),
+        ('workplace', '01', '00100', 7), ('migration', '000', '00000', 3),
+        ('migration', '150', '00001', 11), ('migration', '110', '00002', 7),
+        ('residence', '01', '00100', 21),
+    ]
+    core = pl.concat([role_case.observed(role, state, area).with_columns(
+        pl.lit(rows, dtype=pl.UInt64).alias('rows'))
+        for role, state, area, rows in observations])
+    five = core.with_columns(
+        pl.lit('acs/five_year').alias('profile'), pl.lit('us2024c').alias('sample_id'),
+        pl.col('rows').mul(2))
+    observed = pl.concat([core, five])
     result = build_area_lookup(observed, role_case.rules, role_case.evidence, role_case.factors)
     niu = result.filter(pl.col('area_status').eq('niu_or_unidentifiable'))
     assert niu['status_reason'].n_unique() == 2
-    assert result.group_by('area_status').len()['len'].sum() == observed['rows'].sum()
+    represented = result.join(observed, on=AREA_KEY, how='left', validate='1:1')
+    actual = {tuple(row[:3]): row[3] for row in represented.group_by(
+        'profile', 'role', 'area_status').agg(pl.col('rows').sum()).select(
+            'profile', 'role', 'area_status', 'rows').iter_rows()}
+    assert actual == {
+        ('acs/core', 'workplace', 'niu_or_unidentifiable'): 5,
+        ('acs/core', 'workplace', 'foreign'): 9,
+        ('acs/core', 'workplace', 'applicable'): 7,
+        ('acs/core', 'migration', 'niu_or_unidentifiable'): 3,
+        ('acs/core', 'migration', 'foreign'): 11,
+        ('acs/core', 'migration', 'territory'): 7,
+        ('acs/core', 'residence', 'applicable'): 21,
+        ('acs/five_year', 'workplace', 'niu_or_unidentifiable'): 10,
+        ('acs/five_year', 'workplace', 'foreign'): 18,
+        ('acs/five_year', 'workplace', 'applicable'): 14,
+        ('acs/five_year', 'migration', 'niu_or_unidentifiable'): 6,
+        ('acs/five_year', 'migration', 'foreign'): 22,
+        ('acs/five_year', 'migration', 'territory'): 14,
+        ('acs/five_year', 'residence', 'applicable'): 42,
+    }
+    totals = {tuple(row[:2]): row[2] for row in represented.group_by(
+        'profile', 'role').agg(pl.col('rows').sum()).select('profile', 'role', 'rows').iter_rows()}
+    assert totals == {('acs/core', 'residence'): 21, ('acs/core', 'workplace'): 21,
+                      ('acs/core', 'migration'): 21, ('acs/five_year', 'residence'): 42,
+                      ('acs/five_year', 'workplace'): 42, ('acs/five_year', 'migration'): 42}
 
 
 @pytest.mark.parametrize('field,value', [
@@ -274,3 +304,68 @@ def test_pr_migration_special_does_not_claim_defined_source_frame(role_case, yea
     assert row['area_status'] == 'territory'
     assert row['factor_key'] is None
     assert row['flag_source_geography_recoded'] is False
+
+
+@pytest.mark.parametrize('role,state,area', [
+    ('workplace', '72', '00002'), ('residence', '72', '00000'),
+    ('residence', '72', '00001'), ('residence', '72', '00002'),
+])
+def test_territory_digits_require_role_special_or_complete_definition(
+        role_case, role, state, area):
+    from embedding_data.acs_area_mapping import build_area_lookup
+
+    with pytest.raises(ValueError, match='absent from complete reference definitions'):
+        build_area_lookup(role_case.observed(role, state, area), role_case.rules,
+                          role_case.evidence, role_case.factors)
+
+
+def test_missing_migration_pr_special_cannot_borrow_its_raw_digits(role_case):
+    from embedding_data.acs_area_mapping import build_area_lookup
+
+    rules = role_case.rules.filter(pl.col('rule_kind').ne('area_special').or_(
+        pl.col('role').ne('migration')).or_(pl.col('source_code').ne('00002')))
+    with pytest.raises(ValueError, match='absent from complete reference definitions'):
+        build_area_lookup(role_case.observed('migration', '110', '00002'), rules,
+                          role_case.evidence, role_case.factors)
+
+
+@pytest.mark.parametrize('role,state', [('workplace', '72'), ('migration', '110')])
+def test_matched_pr_niu_special_stays_nondefined(role_case, role, state):
+    from embedding_data.acs_area_mapping import build_area_lookup
+
+    observed = role_case.observed(role, state, '00000').with_columns(
+        pl.lit('acs/five_year').alias('profile'), pl.lit('us2024c').alias('sample_id'),
+        pl.lit(2020, dtype=pl.Int64).alias('component_year'))
+    row = build_area_lookup(observed, role_case.rules, role_case.evidence,
+                            role_case.factors).row(0, named=True)
+    assert row['area_status'] == 'niu_or_unidentifiable'
+    assert row['flag_source_geography_recoded'] is False
+    assert row['factor_key'] is None
+
+
+@pytest.mark.parametrize('role,code', [('residence', '00001'), ('workplace', '00002')])
+def test_defined_territory_code_does_not_borrow_another_roles_special(role_case, role, code):
+    from embedding_data.acs_area_mapping import build_area_lookup
+
+    def recode_pr(frame, column):
+        return frame.with_columns(pl.when(pl.col('state_fips').eq('72')).then(
+            pl.lit(code)).otherwise(pl.col(column)).alias(column))
+
+    evidence = role_case.evidence
+    if role == 'residence':
+        evidence = replace(evidence,
+                           intersections=recode_pr(evidence.intersections, 'puma_code'),
+                           puma_totals=recode_pr(evidence.puma_totals, 'puma_code'),
+                           puma_groups=recode_pr(evidence.puma_groups, 'puma_code'))
+    else:
+        evidence = replace(evidence,
+                           puma_groups=recode_pr(evidence.puma_groups, 'group_code'),
+                           county_groups=recode_pr(evidence.county_groups, 'group_code'))
+    observed = role_case.observed(role, '72', code).with_columns(
+        pl.lit('acs/five_year').alias('profile'), pl.lit('us2024c').alias('sample_id'),
+        pl.lit(2020, dtype=pl.Int64).alias('component_year'))
+    row = build_area_lookup(observed, role_case.rules, evidence,
+                            role_case.factors).row(0, named=True)
+    assert row['area_status'] == 'territory'
+    assert row['flag_source_geography_recoded'] is True
+    assert row['factor_key'] is None

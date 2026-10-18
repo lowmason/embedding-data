@@ -171,10 +171,13 @@ def _verify_evidence_factors(evidence, factors):
     if actual != expected:
         raise ValueError('county factors differ from complete original integer relations')
 
-def _source_frame_recoded(profile, component_year, area_status, area_code):
+def _source_frame_recoded(profile, component_year, area_status, area_code, role):
     # Frame assignment concerns source geography, independently of domestic scope.
+    role_specials = {'residence': frozenset(),
+                     'workplace': frozenset({'00000', '00001'}),
+                     'migration': frozenset({'00000', '00001', '00002'})}
     defined = (area_status == 'applicable' or area_status == 'territory'
-               and area_code not in {'00000', '00001', '00002'})
+               and area_code not in role_specials[role])
     return defined and profile.removeprefix('acs/') == 'five_year' and component_year < 2022
 
 
@@ -231,7 +234,7 @@ def _interpret(row, rules):
         area_status=status,
         status_reason=reason,
         flag_source_geography_recoded=_source_frame_recoded(
-            row['profile'], row['component_year'], status, area),
+            row['profile'], row['component_year'], status, area, role),
         source_allocation_evidence_status='unavailable',
         reference_ids=sorted({v
                               for r in references
@@ -240,7 +243,7 @@ def _interpret(row, rules):
                                    for r in references
                                    for v in r['reference_locators']}),
         rule_version=AREA_RULE_VERSION,
-    )
+    ), special.height == 1
 
 def build_area_lookup(
     observed: pl.DataFrame, rules: pl.DataFrame, evidence: AreaEvidence, factors: FactorTables
@@ -261,15 +264,13 @@ def build_area_lookup(
     rows = []
     for observed_row in observed.iter_rows(named=True):
         identity = {key: observed_row[key] for key in AREA_KEY}
-        interpreted = _interpret(observed_row, rules)
+        interpreted, documented_special = _interpret(observed_row, rules)
         key = (
             factor_key(
                 interpreted['area_type'], interpreted['state_fips'], interpreted['area_code']
             ) if interpreted['area_status'] == 'applicable' else None
         )
-        if interpreted['area_status'] == 'territory' and interpreted['area_code'] not in {
-            '00000', '00001', '00002'
-        }:
+        if interpreted['area_status'] == 'territory' and not documented_special:
             residence = observed_row['role'] == 'residence'
             table = evidence.puma_totals if residence else evidence.puma_groups
             state_column = 'state_fips' if residence else 'group_state_fips'
@@ -324,7 +325,7 @@ def validate_area_lookup(
         area = normalized_role_code(row['source_area_code'], 5)
         normalized_role_code(row['source_state_code'], ROLE_COLUMNS[role][2])
         recoded = _source_frame_recoded(
-            row['profile'], row['component_year'], row['area_status'], area)
+            row['profile'], row['component_year'], row['area_status'], area, role)
         if (row['area_code'] != area or row['puma_vintage'] != 2020
                 or row['area_type'] != ('residence' if role == 'residence' else 'work_migration')
                 or row['flag_source_geography_recoded'] != recoded
