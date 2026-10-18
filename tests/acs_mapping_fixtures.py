@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import pytest
 from code_fixtures import seed_code_tree
 from geography_fixtures import seed_geography_tree
 from target_fixtures import forbid_external_access
@@ -203,3 +204,230 @@ class FixtureCodeCase:
     def build_lookup(self):
         from embedding_data.acs_code_mapping import build_code_lookup
         return build_code_lookup(self.observed, self.evidence, self.selected)
+
+
+@pytest.fixture
+def population_case(tmp_path, monkeypatch):
+    '''Genuine-layout synthetic truth; reader-unit boundary, not an authenticated bundle.'''
+    import csv
+    import io
+    import json
+    from dataclasses import asdict
+    from datetime import UTC, datetime
+    from types import SimpleNamespace
+
+    import polars as pl
+    from geography_fixtures import STATE_ROWS, sheet, write_counties
+
+    from embedding_data import geography_parsers as gp
+    from embedding_data import geography_tables as gt
+    from embedding_data import target_io
+    from embedding_data.acs_area_references import read_area_evidence
+    from embedding_data.acs_mapping_contract import SelectionRequest
+    from embedding_data.acs_mapping_inputs import SelectedInputs
+    from embedding_data.acs_mapping_references import WORKBOOK_LAYOUTS, ReferenceSnapshot
+
+    forbid_external_access(monkeypatch)
+    import httpx
+
+    from embedding_data import ipums_census_access
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError('offline population reference attempted external access')
+
+    monkeypatch.setattr(httpx.HTTPTransport, 'handle_request', forbidden)
+    monkeypatch.setattr(httpx.AsyncHTTPTransport, 'handle_async_request', forbidden)
+    monkeypatch.setattr(ipums_census_access, 'read_credential', forbidden)
+
+    root = tmp_path / 'population-data'
+    raw = root / 'raw'
+    raw.mkdir(parents=True)
+    county_file = raw / 'counties.zip'
+    public = Path(__file__).parent / 'fixtures/acs_mapping/geography/ct-inventory.json'
+    ct = json.loads(public.read_text())['rows']
+    write_counties(
+        county_file,
+        [
+            ['AL', '01001', 'Autauga County'],
+            ['AL', '01003', 'Baldwin County'],
+            *ct,
+            ['PR', '72001', 'Adjuntas Municipio'],
+        ],
+    )
+    citation = manifest.describe_file(
+        county_file,
+        raw,
+        retrieved_at=datetime(2026, 1, 1, tzinfo=UTC),
+        client='fixture',
+        client_version='1',
+    )
+    manifest.append_entries(raw / 'manifest.jsonl', [citation])
+    counties = gp.parse_counties(county_file)
+    states = gp.parse_states(sheet(STATE_ROWS), scope=frozenset({'01', '09', '51'}))
+    members = pl.DataFrame(
+        [
+            ['01001', '01', '10000', 'Synthetic metro', 'metropolitan', 'central'],
+            ['09110', '09', '10000', 'Synthetic metro', 'metropolitan', 'outlying'],
+            ['01003', '01', '20000', 'Synthetic micro', 'micropolitan', 'central'],
+        ],
+        schema=gp.MEMBER_SCHEMA,
+        orient='row',
+    )
+    tables = gt.assemble({**states, 'counties': counties, 'members': members})
+    geography = {}
+    for name, frame in tables.items():
+        geography[name] = root / (name + '.parquet')
+        frame.write_parquet(geography[name])
+    selected = SelectedInputs(
+        root,
+        SelectionRequest(*(['fixture'] * 7)),
+        {},
+        {},
+        geography,
+        {
+            'geography': {
+                'tables': {n: target_io.file_record(p) for n, p in geography.items()},
+                'raw': [json.loads(json.dumps(asdict(citation)))],
+                'inputs': {
+                    'raw': [json.loads(json.dumps(asdict(citation)))],
+                    'references': {'counties_2025': {'relative': 'counties.zip'}},
+                },
+            }
+        },
+        {},
+    )
+    directory = root / 'references'
+    directory.mkdir()
+    layouts = json.loads(
+        (Path(__file__).parent / 'fixtures/acs_mapping/reference-layouts.json').read_text()
+    )['originals']
+    files = {}
+    pumas = [('01', '00100', 100), ('01', '00200', 300), ('09', '20100', 200), ('72', '00100', 10)]
+    county_controls = [
+        ('01', '01001', 60),
+        ('01', '01003', 340),
+        ('09', '09110', 200),
+        ('72', '72001', 10),
+    ]
+    groups = [
+        ('01', '00100', '001', '00100'),
+        ('01', '00200', '001', '00100'),
+        ('09', '20100', '009', '20100'),
+        ('72', '00100', '072', '00100'),
+    ]
+    county_groups = [
+        ('01', '001', '001', '00100'),
+        ('01', '003', '001', '00100'),
+        ('09', '110', '009', '20100'),
+        ('72', '001', '072', '00100'),
+    ]
+    msa_rows = [
+        [
+            '10000',
+            'Synthetic metro',
+            '01',
+            'Alabama',
+            '00100',
+            'Synthetic',
+            '260',
+            '100',
+            '60',
+            '23.0769',
+            '60',
+        ],
+        [
+            '10000',
+            'Synthetic metro',
+            '09',
+            'Connecticut',
+            '20100',
+            'Synthetic',
+            '260',
+            '200',
+            '200',
+            '76.9231',
+            '100',
+        ],
+    ]
+    for kind, body in [
+        ('puma_composition_2020', groups),
+        ('county_composition_2022', county_groups),
+        ('msa_puma_2023_2020', msa_rows),
+    ]:
+        name, (_, header) = next(iter(WORKBOOK_LAYOUTS[kind].items()))
+        file = directory / (kind + '.xlsx')
+        write_public_layout(
+            file,
+            {
+                'sheets': {
+                    name: {'rows': {str(i): row for i, row in enumerate([header, *body], 1)}}
+                }
+            },
+        )
+        files[kind] = file
+    intersections = [
+        ('01', '00100', '01001', 60, '1', '.6'),
+        ('01', '00100', '01003', 40, '0.1176', '.4'),
+        ('01', '00200', '01003', 300, '0.8824', '1'),
+        ('09', '20100', '09110', 200, '1', '1'),
+        ('72', '00100', '72001', 10, '1', '1'),
+    ]
+    for kind in ['geocorr_intersections', 'geocorr_puma_totals', 'geocorr_county_totals']:
+        original = list(csv.reader(io.StringIO(layouts[kind]['body'])))
+        headers, labels = original[:2]
+        records = []
+        values = (
+            intersections
+            if kind == 'geocorr_intersections'
+            else (pumas if kind == 'geocorr_puma_totals' else county_controls)
+        )
+        for value in values:
+            record = dict.fromkeys(headers, 'Synthetic')
+            if kind == 'geocorr_intersections':
+                state, puma, county, pop, reverse, forward = value
+                record.update(
+                    state=state,
+                    puma22=puma,
+                    county=county,
+                    pop20=pop,
+                    afact=forward,
+                    afact2=reverse,
+                )
+            else:
+                state, code, pop = value
+                record.update(state=state, pop20=pop, afact='1', afact2='1')
+                record['puma22' if kind == 'geocorr_puma_totals' else 'county'] = code
+            records.append([record[h] for h in headers])
+        file = directory / (kind + '.csv')
+        with file.open('w', newline='') as output:
+            csv.writer(output).writerows([headers, labels, *records])
+        files[kind] = file
+
+    def snapshot():
+        receipt = {'originals': {k: {'sha256': manifest.sha256_file(p)} for k, p in files.items()}}
+        (directory / 'receipt.json').write_text(json.dumps(receipt, sort_keys=True))
+        return ReferenceSnapshot(
+            'population_fixture',
+            directory,
+            files.copy(),
+            receipt,
+            manifest.sha256_file(directory / 'receipt.json'),
+        )
+
+    def mutate_csv(kind, column, value):
+        file = files[kind]
+        with file.open(newline='') as source:
+            rows = list(csv.reader(source))
+        rows[2][rows[0].index(column)] = value
+        with file.open('w', newline='') as output:
+            csv.writer(output).writerows(rows)
+        return snapshot()
+
+    reference = snapshot()
+    return SimpleNamespace(
+        selected=selected,
+        snapshot=reference,
+        evidence=read_area_evidence(reference, selected),
+        mutate_csv=mutate_csv,
+        repin=snapshot,
+    )

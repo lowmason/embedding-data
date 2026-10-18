@@ -1,0 +1,11 @@
+"county","state","stab","CountyName","pop20","afact2","afact"
+"Connecticut planning region","State code","State abbr.","County name","Total population (2020 Census)","state-to-county allocation factor","county-to-state allocation factor"
+"09110","09","CT","Capitol Planning Region, CT",976394,0.2704,1
+"09120","09","CT","Greater Bridgeport Planning Region, CT",325778,0.0902,1
+"09130","09","CT","Lower Connecticut River Valley Planning Region, CT",174225,0.0483,1
+"09140","09","CT","Naugatuck Valley Planning Region, CT",452254,0.1253,1
+"09150","09","CT","Northeastern Connecticut Planning Region, CT",95348,0.0264,1
+"09160","09","CT","Northwest Hills Planning Region, CT",112503,0.0312,1
+"09170","09","CT","South Central Connecticut Planning Region, CT",572265,0.1585,1
+"09180","09","CT","Southeastern Connecticut Planning Region, CT",280946,0.0778,1
+"09190","09","CT","Western Connecticut Planning Region, CT",620549,0.1719,1

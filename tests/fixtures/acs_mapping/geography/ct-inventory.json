@@ -1,0 +1,55 @@
+{
+  "source": "https://mcdc.missouri.edu/cgi-bin/broker",
+  "sha256": "9931fe26b2bb829b3c5a388a8d5fa78812ebcf7d45a7b2d077856d408cce39c0",
+  "transformation": "Public CT-only county-to-state control: retain all nine county codes and CountyName labels, remove literal trailing comma CT; population excluded. Fixture inventory only.",
+  "rows": [
+    [
+      "CT",
+      "09110",
+      "Capitol Planning Region"
+    ],
+    [
+      "CT",
+      "09120",
+      "Greater Bridgeport Planning Region"
+    ],
+    [
+      "CT",
+      "09130",
+      "Lower Connecticut River Valley Planning Region"
+    ],
+    [
+      "CT",
+      "09140",
+      "Naugatuck Valley Planning Region"
+    ],
+    [
+      "CT",
+      "09150",
+      "Northeastern Connecticut Planning Region"
+    ],
+    [
+      "CT",
+      "09160",
+      "Northwest Hills Planning Region"
+    ],
+    [
+      "CT",
+      "09170",
+      "South Central Connecticut Planning Region"
+    ],
+    [
+      "CT",
+      "09180",
+      "Southeastern Connecticut Planning Region"
+    ],
+    [
+      "CT",
+      "09190",
+      "Western Connecticut Planning Region"
+    ]
+  ],
+  "body_base64": "ImNvdW50eSIsInN0YXRlIiwic3RhYiIsIkNvdW50eU5hbWUiLCJwb3AyMCIsImFmYWN0MiIsImFmYWN0IgoiQ29ubmVjdGljdXQgcGxhbm5pbmcgcmVnaW9uIiwiU3RhdGUgY29kZSIsIlN0YXRlIGFiYnIuIiwiQ291bnR5IG5hbWUiLCJUb3RhbCBwb3B1bGF0aW9uICgyMDIwIENlbnN1cykiLCJzdGF0ZS10by1jb3VudHkgYWxsb2NhdGlvbiBmYWN0b3IiLCJjb3VudHktdG8tc3RhdGUgYWxsb2NhdGlvbiBmYWN0b3IiCiIwOTExMCIsIjA5IiwiQ1QiLCJDYXBpdG9sIFBsYW5uaW5nIFJlZ2lvbiwgQ1QiLDk3NjM5NCwwLjI3MDQsMSAKIjA5MTIwIiwiMDkiLCJDVCIsIkdyZWF0ZXIgQnJpZGdlcG9ydCBQbGFubmluZyBSZWdpb24sIENUIiwzMjU3NzgsMC4wOTAyLDEgCiIwOTEzMCIsIjA5IiwiQ1QiLCJMb3dlciBDb25uZWN0aWN1dCBSaXZlciBWYWxsZXkgUGxhbm5pbmcgUmVnaW9uLCBDVCIsMTc0MjI1LDAuMDQ4MywxIAoiMDkxNDAiLCIwOSIsIkNUIiwiTmF1Z2F0dWNrIFZhbGxleSBQbGFubmluZyBSZWdpb24sIENUIiw0NTIyNTQsMC4xMjUzLDEgCiIwOTE1MCIsIjA5IiwiQ1QiLCJOb3J0aGVhc3Rlcm4gQ29ubmVjdGljdXQgUGxhbm5pbmcgUmVnaW9uLCBDVCIsOTUzNDgsMC4wMjY0LDEgCiIwOTE2MCIsIjA5IiwiQ1QiLCJOb3J0aHdlc3QgSGlsbHMgUGxhbm5pbmcgUmVnaW9uLCBDVCIsMTEyNTAzLDAuMDMxMiwxIAoiMDkxNzAiLCIwOSIsIkNUIiwiU291dGggQ2VudHJhbCBDb25uZWN0aWN1dCBQbGFubmluZyBSZWdpb24sIENUIiw1NzIyNjUsMC4xNTg1LDEgCiIwOTE4MCIsIjA5IiwiQ1QiLCJTb3V0aGVhc3Rlcm4gQ29ubmVjdGljdXQgUGxhbm5pbmcgUmVnaW9uLCBDVCIsMjgwOTQ2LDAuMDc3OCwxIAoiMDkxOTAiLCIwOSIsIkNUIiwiV2VzdGVybiBDb25uZWN0aWN1dCBQbGFubmluZyBSZWdpb24sIENUIiw2MjA1NDksMC4xNzE5LDEgCg==",
+  "fixture_sha256": "ec838f3e2945dabe84173bf77ccb50b2a1c3eeedc4028bc004fd80ef30f1425b",
+  "fixture_transformation": "Strip trailing ASCII spaces and tabs from each original CSV line; retain header, descriptive labels and all nine data rows with LF line endings and a final LF. Source original is preserved losslessly in body_base64."
+}
