@@ -98,6 +98,7 @@ FOREIGN_PLACE_LABELS = frozenset(
         'Pakistan', 'Panama', 'Paraguay', 'Peru', 'Philippines', 'Poland', 'Portugal', 'Romania',
         'Saudi Arabia', 'Scotland', 'South Africa (Union of)', 'South America, nec', 'Spain',
         'Sweden', 'Switzerland', 'Syria', 'Taiwan', 'Thailand', 'Turkey', 'Ukraine',
+        'United Kingdom (excluding England: 2005ACS)', 'USSR',
         'United Arab Emirates', 'Uruguay', 'Venezuela', 'Vietnam', 'Wales', 'Western Africa'
     )
 )
@@ -1558,6 +1559,37 @@ def document(file):
     import html
     return re.sub(r'\s+', ' ', html.unescape(re.sub('<[^>]+>', ' ', file.read_text())))
 
+SUPPRESSED_MIGRATION_REASON = (
+    '2022 migration geography suppressed in 2024 five-year source; unavailable')
+
+
+def suppressed_migration(row, label, files):
+    # Separate reconstruction from reviewed complete public originals, never runtime rules.
+    if not (row['area_status'] == 'documented_unavailable'
+            or row['role'] == 'migration' and (row['source_state_code'] == '988'
+                                               or row['source_area_code'] == '88888')):
+        return False
+    require(
+        (row['profile'], row['sample_id'], row['release_year'], row['component_year'],
+         row['role'], row['source_state_code'], row['source_area_code'], label) == (
+             'acs/five_year', 'us2024c', 2024, 2022, 'migration', '988', '88888',
+             'Suppressed for data year 2022 for select cases'),
+        'suppression source tuple/category differs')
+    for kind, pin in {
+        'pums_five_year_guide': '77f9b74efef7cb9d3eb8ffa4dc875df9e15765432d6134ead3691a5fe8b35e1a',
+        'usa_migplac1': '3f8433e2e44807402493690c6f6f50aa8afd3e0ec84338892556baf07d789bab',
+    }.items():
+        require(digest(files[kind]) == pin, 'suppression complete original pin differs')
+    text = document(files['usa_migplac1'])
+    require('Suppressed for data year 2022 for select cases' in text and '988' in text,
+            'suppression IPUMS original meaning absent')
+    require(row['area_status'] == 'documented_unavailable' and row['state_fips'] is None
+            and row['factor_key'] is None
+            and row['status_reason'] == SUPPRESSED_MIGRATION_REASON,
+            'suppression status/reason/factor differs')
+    return True
+
+
 def role_measurements(source, companion, areas, files, pumas, groups, county_factors):
     scan = pl.scan_parquet(companion)
     domestic = categories(source, 'STATEFIP')
@@ -1624,7 +1656,12 @@ def role_measurements(source, companion, areas, files, pumas, groups, county_fac
             label = labels[state]
             fips = by_label.get(label)
             special = specials.get(role, {}).get(area)
-            if special:
+            suppressed = suppressed_migration(row, label, files)
+            if suppressed:
+                status = 'documented_unavailable'
+                reason = SUPPRESSED_MIGRATION_REASON
+                fips = None
+            elif special:
                 status, reason = special
                 require(area + ' = ' + reason in text, 'special lacks original documentation')
                 if status == 'niu_or_unidentifiable':
@@ -1652,7 +1689,7 @@ def role_measurements(source, companion, areas, files, pumas, groups, county_fac
                 status, reason = 'territory', label + ' outside 50-state/DC scope'
             else:
                 raise ValueError('unexplained role state/area pairing')
-            if not special:
+            if not special and not suppressed:
                 require((fips, area) in definitions[role], 'area absent from complete definitions')
             recoded = source['profile'] == 'acs/five_year' and row['component_year'] < 2022 and (
                 status == 'applicable' or status == 'territory' and area not in specials.get(
@@ -2466,6 +2503,9 @@ def geographic_provenance(directory, files, inputs):
         for fips, domestic_label in categories(source, 'STATEFIP').items():
             if fips in SCOPE | {'72'} and domestic_label == label:
                 targets.add(f"{ddi['path']}#variables/STATEFIP/categories/{fips}={label}")
+        if suppressed_migration(row, label, files):
+            targets.add('pums_five_year_guide:physical-page=20:X.M:MIGPUMA=88888;MIGSP=888')
+            kinds.add('pums_five_year_guide')
         if row['area_status'] == 'applicable':
             targets.update(factor_support[row['area_type'], row['state_fips'], row['area_code']])
         for target in targets:
@@ -2476,7 +2516,7 @@ def geographic_provenance(directory, files, inputs):
                     'reference document semantic section absent'
                 )
                 kinds.add(original_kind)
-            elif ':' in target:
+            elif ':' in target and not target.startswith(ddi['path'] + '#'):
                 kinds.add(target.split(':', 1)[0])
         ids = {reference_id + ':' + k for k in kinds}
         ids.add(f"ddi:{source['delivery_id']}:{ddi['sha256']}")

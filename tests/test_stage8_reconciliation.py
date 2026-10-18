@@ -588,3 +588,95 @@ def test_independent_geocorr_decoder_is_reference_scoped(reconciliation_module, 
     file.write_bytes(b'\xf3')
     with pytest.raises(ValueError, match='registered Geocorr'):
         reconciliation_module.geocorr_text(file)
+
+
+@pytest.fixture
+def accepted_source_roles(reconciliation_module, tmp_path, monkeypatch):
+    from acs_mapping_fixtures import _reconciliation_delivery
+
+    def source_roles(profile, ddi, frame):
+        ddi, frame = _reconciliation_delivery(profile, ddi, frame)
+        variable = next(v for v in ddi['variables'] if v['name'] == 'MIGPLAC1')
+        variable['categories'].extend([
+            {'value': '413', 'label': 'United Kingdom (excluding England: 2005ACS)'},
+            {'value': '465', 'label': 'USSR'}])
+        next(c for c in variable['categories'] if c['value'] == '988')['label'] = (
+            'Suppressed for data year 2022 for select cases')
+        if profile == 'core':
+            frame = frame.with_columns(pl.Series('MIGPLAC1', [413, 465, 1]),
+                                       pl.Series('MIGPUMA1', [1, 1, 100]))
+        elif profile == 'five_year':
+            frame = frame.with_columns(pl.Series('MIGPLAC1', [110, 1, 988, 413, 465]),
+                                       pl.Series('MIGPUMA1', [2, 100, 88888, 1, 1]))
+        return ddi, frame
+
+    fixture = seed_reconciliation_inputs(tmp_path, monkeypatch, prepare_acs=source_roles)
+    controls = tmp_path / 'controls'
+    reconciliation_module.freeze(fixture.data_dir, controls)
+    result = build_fixture_mapping(fixture, 'source_roles', monkeypatch)
+    return fixture, controls, result
+
+
+def test_source_roles_genuine_build_verify_replay_and_independent(
+        reconciliation_module, accepted_source_roles, monkeypatch):
+    from embedding_data import acs_mapping_bundle
+
+    fixture, controls, result = accepted_source_roles
+    directory = Path(result['directory'])
+    acs_mapping_bundle.verify_bundle(directory, fixture.data_dir,
+                                    expected_outputs_sha256=result['outputs_sha256'])
+    measured = reconciliation_module.reconcile(
+        fixture.data_dir, 'source_roles', result['outputs_sha256'], controls)
+    assert measured['failure_count'] == 0
+    companion = pl.read_parquet(directory / 'acs_five_year_canonical.parquet')
+    suppressed = companion.filter(pl.col('MIGPLAC1').eq(988))
+    assert suppressed.height == 1
+    row = suppressed.row(0, named=True)
+    assert row['MULTYEAR'] == 2022 and row['STATEFIP'] == 1
+    assert row['migration_area_status'] == 'documented_unavailable'
+    assert row['migration_factor_key'] is None and row['migration_state_fips'] is None
+    for flag in ('geographic_allocation', 'fractional_split', 'source_geography_recoded'):
+        assert row['migration_flag_' + flag] is False
+    assert row['migration_source_allocation_evidence_status'] == 'unavailable'
+    for field in ('PWSTATE2', 'MIGPLAC1', 'MIGPUMA1'):
+        source = pl.read_parquet(fixture.data_dir / fixture.sources['acs/five_year']['parquet'])
+        assert companion[field].equals(source[field])
+    replay = acs_mapping_bundle.build(
+        fixture.data_dir, 'source_roles_replay', fixture.request,
+        'source_roles_references', expected_reference_receipt_sha256=json.loads(
+            (directory / 'inputs.json').read_text())['references']['receipt_sha256'])
+    replay_dir = Path(replay['directory'])
+    for file in directory.glob('*.parquet'):
+        assert pl.read_parquet(file).equals(pl.read_parquet(replay_dir / file.name))
+
+
+@pytest.mark.parametrize('damage', ['locator', 'status', 'reason', 'component', 'raw_pair',
+                                    'ddi_label', 'guide', 'ipums'])
+def test_independent_source_role_semantics_reject_mutations(
+        reconciliation_module, accepted_source_roles, damage):
+    fixture, _, result = accepted_source_roles
+    directory = Path(result['directory'])
+    inputs = json.loads((directory / 'inputs.json').read_text())
+    files = reconciliation_module.reference_files(fixture.data_dir, inputs['references'])
+    if damage in {'guide', 'ipums'}:
+        kind = 'pums_five_year_guide' if damage == 'guide' else 'usa_migplac1'
+        files[kind].write_bytes(files[kind].read_bytes() + b' changed')
+    elif damage == 'ddi_label':
+        variable = next(v for v in inputs['sources']['acs/five_year']['ddi']['variables']
+                        if v['name'] == 'MIGPLAC1')
+        next(c for c in variable['categories'] if c['value'] == '988')['label'] += ' changed'
+    else:
+        file = directory / 'acs_area_lookup.parquet'
+        frame = pl.read_parquet(file)
+        field, value = {
+            'locator': ('reference_locators', ['pums_five_year_guide:physical-page=19:X.M']),
+            'status': ('area_status', 'foreign'), 'reason': ('status_reason', 'No migration'),
+            'component': ('component_year', 2021), 'raw_pair': ('source_area_code', '00001')
+        }[damage]
+        frame = frame.with_columns(pl.when(pl.col('area_status').eq('documented_unavailable'))
+                                   .then(pl.lit(value, dtype=frame.schema[field]))
+                                   .otherwise(pl.col(field)).alias(field))
+        frame.write_parquet(file)
+    expected = ('reference locator targets' if damage == 'locator' else 'suppression')
+    with pytest.raises(ValueError, match=expected):
+        reconciliation_module.geographic_provenance(directory, files, inputs)

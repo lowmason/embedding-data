@@ -369,3 +369,125 @@ def test_defined_territory_code_does_not_borrow_another_roles_special(role_case,
     assert row['area_status'] == 'territory'
     assert row['flag_source_geography_recoded'] is True
     assert row['factor_key'] is None
+
+
+@pytest.mark.parametrize('code,label', [
+    ('413', 'United Kingdom (excluding England: 2005ACS)'), ('465', 'USSR')])
+def test_exact_delivered_positive_foreign_categories(role_case, code, label):
+    from copy import deepcopy
+    from dataclasses import replace
+
+    from embedding_data.acs_area_mapping import build_area_lookup
+    from embedding_data.acs_area_references import read_role_rules
+
+    ddi = deepcopy(role_case.source.ddi)
+    variable = next(v for v in ddi['variables'] if v['name'] == 'MIGPLAC1')
+    variable['categories'].append({'value': code, 'label': label})
+    rules = read_role_rules(role_case.snapshot, {'core': replace(role_case.source, ddi=ddi)})
+    row = build_area_lookup(role_case.observed('migration', code, '00001'), rules,
+                            role_case.evidence, role_case.factors).row(0, named=True)
+    assert row['area_status'] == 'foreign'
+    assert row['state_fips'] is None and row['factor_key'] is None
+    assert any(f'categories/{code}={label}' in loc for loc in row['reference_locators'])
+
+
+def suppressed_observed(role_case):
+    return role_case.observed('migration', '988', '88888').with_columns(
+        pl.lit('acs/five_year').alias('profile'), pl.lit('us2024c').alias('sample_id'),
+        pl.lit(2022).cast(pl.Int64).alias('component_year'))
+
+
+def test_documented_suppression_is_exact_unavailable_pair(role_case):
+    from embedding_data.acs_area_mapping import build_area_lookup
+
+    row = build_area_lookup(suppressed_observed(role_case), role_case.rules,
+                            role_case.evidence, role_case.factors).row(0, named=True)
+    assert row['area_status'] == 'documented_unavailable'
+    assert row['state_fips'] is None and row['factor_key'] is None
+    assert row['area_code'] == '88888' and row['source_state_code'] == '988'
+    assert row['area_type'] == 'work_migration' and row['puma_vintage'] == 2020
+    assert row['flag_source_geography_recoded'] is False
+    assert row['source_allocation_evidence_status'] == 'unavailable'
+    assert 'suppressed' in row['status_reason']
+    assert 'pums_five_year_guide:physical-page=20:X.M:MIGPUMA=88888;MIGSP=888' in (
+        row['reference_locators'])
+
+
+@pytest.mark.parametrize('field,value', [
+    ('profile', 'acs/core'), ('sample_id', 'us2023a'), ('release_year', 2023),
+    ('component_year', 2021), ('role', 'workplace'), ('source_state_code', '997'),
+    ('source_area_code', '00100'), ('source_area_code', '00000'),
+    ('source_area_code', '00001'), ('source_area_code', '00002')])
+def test_suppression_never_generalizes_to_other_context(role_case, field, value):
+    from embedding_data.acs_area_mapping import build_area_lookup
+
+    observed = suppressed_observed(role_case).with_columns(
+        pl.lit(value).cast(suppressed_observed(role_case).schema[field]).alias(field))
+    with pytest.raises(ValueError):
+        build_area_lookup(observed, role_case.rules, role_case.evidence, role_case.factors)
+
+
+@pytest.mark.parametrize('kind', ['pums_five_year_guide', 'usa_migplac1'])
+def test_suppression_rejects_changed_document_even_with_updated_receipt(role_case, kind):
+    import json
+    from dataclasses import replace
+
+    from embedding_data import manifest
+    from embedding_data.acs_area_references import read_role_rules
+
+    snapshot = role_case.snapshot
+    snapshot.files[kind].write_bytes(snapshot.files[kind].read_bytes() + b' altered')
+    receipt = json.loads(json.dumps(snapshot.receipt))
+    receipt['originals'][kind]['sha256'] = manifest.sha256_file(snapshot.files[kind])
+    file = snapshot.directory / 'receipt.json'
+    file.write_text(json.dumps(receipt, sort_keys=True))
+    snapshot = replace(snapshot, receipt=receipt, receipt_sha256=manifest.sha256_file(file))
+    with pytest.raises(ValueError, match='suppression'):
+        read_role_rules(snapshot, {'core': role_case.source})
+
+
+@pytest.mark.parametrize('field,value', [
+    ('reference_ids', ['role_fixture:usa_migplac1']),
+    ('reference_locators', [
+        'pums_five_year_guide:physical-page=20:X.M:MIGPUMA=88888;MIGSP=888'])])
+def test_suppression_validator_requires_guide_and_delivered_category(role_case, field, value):
+    from embedding_data.acs_area_mapping import build_area_lookup, validate_area_lookup
+
+    observed = suppressed_observed(role_case)
+    lookup = build_area_lookup(observed, role_case.rules, role_case.evidence, role_case.factors)
+    broken = lookup.with_columns(pl.lit(value, dtype=lookup.schema[field]).alias(field))
+    with pytest.raises(ValueError, match='suppression'):
+        validate_area_lookup(broken, observed, role_case.factors)
+
+
+@pytest.mark.parametrize('profile,sample,release,component', [
+    ('acs/core', 'us2024a', 2024, 2024), ('acs/vintage', 'us2022a', 2022, 2022)])
+def test_suppression_rejects_other_valid_source_identities(
+        role_case, profile, sample, release, component):
+    from embedding_data.acs_area_mapping import build_area_lookup
+
+    observed = suppressed_observed(role_case).with_columns(
+        pl.lit(profile).alias('profile'), pl.lit(sample).alias('sample_id'),
+        pl.lit(release).cast(pl.Int64).alias('release_year'),
+        pl.lit(component).cast(pl.Int64).alias('component_year'))
+    with pytest.raises(ValueError):
+        build_area_lookup(observed, role_case.rules, role_case.evidence, role_case.factors)
+
+
+@pytest.mark.parametrize('label', ['Suppressed for data year 2022',
+                                  'Suppressed for data year 2022 for select cases changed'])
+def test_suppression_requires_exact_delivered_positive_label(role_case, label):
+    from copy import deepcopy
+    from dataclasses import replace
+
+    from embedding_data.acs_area_mapping import build_area_lookup
+    from embedding_data.acs_area_references import read_role_rules
+
+    ddi = deepcopy(role_case.source.ddi)
+    variable = next(v for v in ddi['variables'] if v['name'] == 'MIGPLAC1')
+    next(c for c in variable['categories'] if c['value'] == '988')['label'] = label
+    source = replace(role_case.source, profile='acs/five_year', ddi=ddi)
+    rules = read_role_rules(role_case.snapshot, {'five_year': source})
+    with pytest.raises(ValueError):
+        build_area_lookup(suppressed_observed(role_case), rules, role_case.evidence,
+                          role_case.factors)

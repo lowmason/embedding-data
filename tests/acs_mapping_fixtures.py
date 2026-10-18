@@ -179,6 +179,10 @@ def seed_mapping_references(tmp_path, monkeypatch, *, original_overrides=None, d
         file = originals / reference.filename
         if original_overrides and kind in original_overrides:
             file.write_bytes(original_overrides[kind].read_bytes())
+        elif kind in {'pums_five_year_guide', 'usa_migplac1'}:
+            import gzip
+            public = Path(__file__).parent / 'fixtures/acs_mapping/roles'
+            file.write_bytes(gzip.decompress((public / (reference.filename + '.gz')).read_bytes()))
         elif kind.endswith('_request'):
             file.write_bytes(refs.request_bytes(kind.removesuffix('_request')))
         else:
@@ -467,6 +471,12 @@ def role_case(population_case):
         file = case.snapshot.directory / (kind + '.html')
         file.write_text(originals[kind]['body'])
         files[kind] = file
+    import gzip
+    public = Path(__file__).parent / 'fixtures/acs_mapping/roles'
+    for name in ('pums_five_year_guide.pdf', 'usa_migplac1.html'):
+        file = case.snapshot.directory / name
+        file.write_bytes(gzip.decompress((public / (name + '.gz')).read_bytes()))
+        files[name.rsplit('.', 1)[0]] = file
     receipt = {'originals': {k: {'sha256': manifest.sha256_file(p)} for k, p in files.items()}}
     receipt_file = case.snapshot.directory / 'receipt.json'
     receipt_file.write_text(json.dumps(receipt, sort_keys=True))
@@ -956,7 +966,7 @@ def run_acs_mapping_v12(data_dir: Path, monkeypatch) -> dict[str, Path]:
     return results
 
 
-def seed_reconciliation_inputs(tmp_path, monkeypatch):
+def seed_reconciliation_inputs(tmp_path, monkeypatch, *, prepare_acs=None):
     '''Freeze-ready authenticated upstreams; no Stage 8 snapshot exists yet.'''
     import json
 
@@ -968,7 +978,7 @@ def seed_reconciliation_inputs(tmp_path, monkeypatch):
     directory = tmp_path / 'authenticated-setup'
     directory.mkdir()
     selection = _authenticated_deliveries(
-        data_dir, directory, monkeypatch, prepare_acs=_reconciliation_delivery)
+        data_dir, directory, monkeypatch, prepare_acs=prepare_acs or _reconciliation_delivery)
     codes = _authenticated_codes(data_dir, directory)
     geography = _authenticated_geography(data_dir, directory)
     ipums = ipums_verification_run.measure(data_dir, 'fixture_ipums', 'references', selection)

@@ -8,6 +8,9 @@ import polars as pl
 from embedding_data.acs_area_references import (
     ROLE_COLUMNS,
     ROLE_RULE_SCHEMA,
+    SUPPRESSION_LABEL,
+    SUPPRESSION_LOCATOR,
+    SUPPRESSION_REASON,
     AreaEvidence,
     validate_area_evidence,
 )
@@ -181,6 +184,24 @@ def _source_frame_recoded(profile, component_year, area_status, area_code, role)
     return defined and profile.removeprefix('acs/') == 'five_year' and component_year < 2022
 
 
+def _suppressed_identity(row):
+    return (row['profile'], row['sample_id'], row['release_year'], row['component_year'],
+            row['role'], row['source_state_code'], row['source_area_code']) == (
+                'acs/five_year', 'us2024c', 2024, 2022, 'migration', '988', '88888')
+
+
+def _suppression_provenance(row):
+    ids, locators = row['reference_ids'], row['reference_locators']
+    guide_ids = [v.removesuffix(':pums_five_year_guide') for v in ids
+                 if v.endswith(':pums_five_year_guide')]
+    return (len(guide_ids) == 1 and guide_ids[0] + ':usa_migplac1' in ids
+            and any(re.fullmatch(r'ddi:.+:[0-9a-f]{64}', v) for v in ids)
+            and SUPPRESSION_LOCATOR in locators
+            and 'usa_migplac1#comparability_section' in locators
+            and any(v.endswith('#variables/MIGPLAC1/categories/988=' + SUPPRESSION_LABEL)
+                    for v in locators))
+
+
 def _interpret(row, rules):
     role = row['role']
     if role not in ROLE_COLUMNS:
@@ -202,7 +223,13 @@ def _interpret(row, rules):
     )
     references = [state_rule, frame_rule]
     fips, status = state_rule['state_fips'], state_rule['status']
-    if special.height:
+    if status == 'documented_unavailable':
+        if (not _suppressed_identity(row) or state_rule['label'] != SUPPRESSION_LABEL
+                or not _suppression_provenance(state_rule)
+                or fips is not None):
+            raise ValueError('incompatible documented suppression source identity')
+        reason = SUPPRESSION_REASON
+    elif special.height:
         if special.height != 1:
             raise ValueError('conflicting area special rules')
         rule = special.row(0, named=True)
@@ -324,6 +351,13 @@ def validate_area_lookup(
         scheme_for(row['profile'], row['sample_id'], row['release_year'], row['component_year'])
         area = normalized_role_code(row['source_area_code'], 5)
         normalized_role_code(row['source_state_code'], ROLE_COLUMNS[role][2])
+        if row['area_status'] == 'documented_unavailable':
+            if (not _suppressed_identity(row) or row['status_reason'] != SUPPRESSION_REASON
+                    or row['state_fips'] is not None or row['factor_key'] is not None
+                    or not _suppression_provenance(row)):
+                raise ValueError('unavailable role contradicts documented suppression identity')
+        elif _suppressed_identity(row):
+            raise ValueError('suppressed migration pair requires documented unavailable status')
         recoded = _source_frame_recoded(
             row['profile'], row['component_year'], row['area_status'], area, role)
         if (row['area_code'] != area or row['puma_vintage'] != 2020

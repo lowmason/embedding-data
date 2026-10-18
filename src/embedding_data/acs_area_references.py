@@ -567,14 +567,15 @@ ROLE_COLUMNS = {
     'migration': ('MIGPLAC1', 'MIGPUMA1', 3)
 }
 # Exact positive country/foreign-region labels in the selected public DDI. Unknown,
-# suppressed, confidential and historical aggregate categories have no fallback.
+# suppressed and confidential categories have no foreign fallback.
 FOREIGN_PLACE_LABELS = frozenset(
     """Canada|English Canada|French Canada|Atlantic Islands|Mexico|
 Belize/British Honduras|Costa Rica|El Salvador|Guatemala|Honduras|Nicaragua|Panama|
 Central America, nec|Cuba|Dominican Republic|Haiti|Jamaica|British West Indies|
 Other West Indies|Other Caribbean and North America|Argentina|Bolivia|Brazil|Chile|
 Colombia|Ecuador|Paraguay|Peru|Uruguay|Venezuela|South America, nec|Denmark|Finland|
-Iceland|Norway|Sweden|England|Scotland|Wales|Ireland|Northern Ireland|Other Northern Europe|
+Iceland|Norway|Sweden|United Kingdom (excluding England: 2005ACS)|USSR|England|Scotland|
+Wales|Ireland|Northern Ireland|Other Northern Europe|
 Belgium|France|Luxembourg|Netherlands|Switzerland|Other Western Europe|Albania|Greece|
 Italy|Portugal|Azores|Spain|Austria|Bulgaria|Germany|Hungary|Poland|Romania|
 Bosnia and Herzegovinia|Other Eastern Europe|Estonia|Latvia|Lithuania|
@@ -595,6 +596,26 @@ FOREIGN_WORK_LABELS = frozenset(
 TERRITORY_LABELS = frozenset(
     {'Puerto Rico', 'Guam', 'Virgin Islands', 'Other US Possessions', 'U.S. outlying area'}
 )
+
+# Reviewed complete originals bind suppression authority without a PDF parser dependency.
+SUPPRESSION_PINS = {
+    'pums_five_year_guide': '77f9b74efef7cb9d3eb8ffa4dc875df9e15765432d6134ead3691a5fe8b35e1a',
+    'usa_migplac1': '3f8433e2e44807402493690c6f6f50aa8afd3e0ec84338892556baf07d789bab',
+}
+SUPPRESSION_LABEL = 'Suppressed for data year 2022 for select cases'
+SUPPRESSION_LOCATOR = 'pums_five_year_guide:physical-page=20:X.M:MIGPUMA=88888;MIGSP=888'
+SUPPRESSION_REASON = '2022 migration geography suppressed in 2024 five-year source; unavailable'
+
+
+def _suppression_authority(snapshot):
+    for kind, pin in SUPPRESSION_PINS.items():
+        file = snapshot.files[kind]
+        safe_path(file)
+        if (manifest.sha256_file(file) != pin
+                or snapshot.receipt['originals'][kind]['sha256'] != pin):
+            raise ValueError('suppression authority differs from reviewed complete original')
+    _role_document(snapshot, 'usa_migplac1', [SUPPRESSION_LABEL, '988'])
+
 
 def _role_document(snapshot, kind, phrases):
     file = snapshot.files[kind]
@@ -640,6 +661,7 @@ def read_role_rules(snapshot: ReferenceSnapshot, sources: dict[str, SourceInput]
         )
     _role_document(snapshot, 'usa_pwstate2', ['If the person worked abroad', 'other, n.e.c.'])
     _role_document(snapshot, 'usa_migplac1', ['foreign country', '988'])
+    _suppression_authority(snapshot)
     _role_document(snapshot, 'usa_multyear', ['MULTYEAR'])
     specials = {
         'workplace': [
@@ -698,9 +720,17 @@ def read_role_rules(snapshot: ReferenceSnapshot, sources: dict[str, SourceInput]
                         FOREIGN_WORK_LABELS if role == 'workplace' else FOREIGN_PLACE_LABELS
                     ) else 'unsupported'
                 )
+                suppressed = (role == 'migration' and code == '988'
+                              and label == SUPPRESSION_LABEL)
+                if suppressed:
+                    status = 'documented_unavailable'
                 locators = [
                     *base, f"{citations[0]['path']}#variables/{state}/categories/{code}={label}"
                 ]
+                state_ids = ids
+                if suppressed:
+                    state_ids = sorted([*ids, f'{snapshot.reference_id}:pums_five_year_guide'])
+                    locators.append(SUPPRESSION_LOCATOR)
                 if fips is not None:
                     locators.append(
                         f"{citations[0]['path']}#variables/STATEFIP/categories/{fips}={label}"
@@ -714,7 +744,7 @@ def read_role_rules(snapshot: ReferenceSnapshot, sources: dict[str, SourceInput]
                         state_fips=fips,
                         status=status,
                         label=label,
-                        reference_ids=ids,
+                        reference_ids=state_ids,
                         reference_locators=sorted(set(locators))
                     )
                 )
