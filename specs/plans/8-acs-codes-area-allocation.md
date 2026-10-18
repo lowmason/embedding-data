@@ -91,6 +91,8 @@ Additional binding execution constraints:
 
 ## Decisions
 
+- **D3** (owner, brief, 2026-10-17): “Plan 8 is approved, including the bounded Census PUMS authority. Prepare a fresh-session execution handoff from c632b34 for Stage 8 only. Do not start implementation here.” Applied in: fresh receiving-session execution of Tasks 1–10; the bounded authority and fail-on-new-conflict requirements remain binding. The planning-session stop applies to the sender.
+
 - **D1** (owner, brief, 2026-10-16): The written spec is approved. Plan Stage 8
   only, commit the reviewable plan, and stop before implementation. Applied in:
   Global Constraints and the execution handoff.
