@@ -1040,9 +1040,9 @@ early years yield almost no confirmed links — none for 2016 to 2017, although
    filing form presents codes.
 5. **An employer's repeated description is one observation.** *If it fails* —
    if repetition carries information — weighting is lost.
-6. **Within-employer co-occurrence is not rule-shaped.** Which of an
-   employer's establishments file is shaped by the filing rule (K2, assumption
-   6). *If it fails:* co-ownership pairs over-represent designated industries.
+6. **Rule-shaped co-occurrence is ignorable.** Which of an employer's
+   establishments file is shaped by the filing rule (K2, assumption 6). *If it
+   fails:* co-ownership pairs over-represent designated industries.
 
 #### Evaluation criteria
 
