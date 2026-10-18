@@ -709,7 +709,7 @@ def forbid_external_access(monkeypatch):
             monkeypatch.setattr(owner, name, forbidden)
 
 
-def _authenticated_deliveries(data_dir, directory, monkeypatch):
+def _authenticated_deliveries(data_dir, directory, monkeypatch, *, prepare_acs=None):
     '''Manifest definitions/DDI/gzip CSV before the unchanged converter is invoked.'''
     import gzip
     import json
@@ -778,6 +778,8 @@ def _authenticated_deliveries(data_dir, directory, monkeypatch):
             else:
                 frame = frame.with_columns(pl.lit('0180').alias('INDLY'),
                                            pl.lit('0010').alias('OCCLY'))
+        if source == 'acs' and prepare_acs is not None:
+            ddi, frame = prepare_acs(profile, ddi, frame)
         if source == 'acs' and profile == 'core':
             frame = pl.concat([frame, frame.head(1)])  # Genuine duplicate in manifested CSV.
         collection = 'usa' if source == 'acs' else 'cps'
@@ -950,7 +952,8 @@ def seed_reconciliation_inputs(tmp_path, monkeypatch):
     data_dir = tmp_path / 'data'
     directory = tmp_path / 'authenticated-setup'
     directory.mkdir()
-    selection = _authenticated_deliveries(data_dir, directory, monkeypatch)
+    selection = _authenticated_deliveries(
+        data_dir, directory, monkeypatch, prepare_acs=_reconciliation_delivery)
     codes = _authenticated_codes(data_dir, directory)
     geography = _authenticated_geography(data_dir, directory)
     ipums = ipums_verification_run.measure(data_dir, 'fixture_ipums', 'references', selection)
@@ -990,3 +993,28 @@ def build_fixture_mapping(fixture, run_id, monkeypatch):
     forbid_external_access(monkeypatch)
     return bundle.build(fixture.data_dir, run_id, fixture.request, references.reference_id,
                         expected_reference_receipt_sha256=references.receipt_sha256)
+
+
+
+def _reconciliation_delivery(profile, ddi, frame):
+    '''Put edge cases in manifested raw originals before any unchanged upstream work.'''
+    import polars as pl
+
+    if profile == 'core':
+        frame = frame.with_columns(
+            pl.Series('OCC', [9830, 10, 20]),
+            pl.Series('OCCSOC', ['559830', '1110XX', '111021']),
+            pl.Series('INDNAICS', ['113M', '113M', None], dtype=pl.String),
+            pl.Series('PWSTATE2', [0, 80, 72]), pl.Series('PWPUMA00', [0, 1, 100]),
+            pl.Series('MIGPLAC1', [110, 150, 1]), pl.Series('MIGPUMA1', [2, 1, 100]),
+            pl.Series('QIND', [0, 1, None], dtype=pl.Int64))
+        ddi['variables'].append({
+            'name': 'QIND', 'label': 'Industry allocation flag', 'implied_decimals': 0,
+            'categories': [
+                {'value': '0', 'label': 'Original entry or Inapplicable (not in universe)'},
+                {'value': '1', 'label': 'Allocated'}]})
+    if profile == 'five_year':
+        frame = frame.with_columns(pl.Series('PWSTATE2', [72, 1, 1, 1, 1]),
+                                   pl.Series('MIGPLAC1', [110, 1, 1, 1, 1]),
+                                   pl.Series('MIGPUMA1', [2, 100, 100, 100, 100]))
+    return ddi, frame

@@ -39,6 +39,38 @@ def test_independent_reconciliation_and_prefix_preservation(reconciliation_modul
     ):
         assert measured[key] is True
     assert measured['failure_count'] == 0
+    core = measured['sources']['acs/core']
+    occupation = {
+        r['occupation_mapping_status']: r['len']
+        for r in core['codes']['occupation']['status']
+    }
+    assert occupation == {'documented_special': 2, 'mapped': 2}
+    industry = {
+        r['industry_mapping_status']: r['len']
+        for r in core['codes']['industry']['status']
+    }
+    assert industry == {'mapped': 3, 'missing': 1}
+    allocation = {
+        r['industry_source_allocation_status']: r['len']
+        for r in core['allocation']['QIND']['status']
+    }
+    assert allocation == {'allocated': 1, 'not_allocated_or_niu': 2, 'unavailable': 1}
+    workplace = {r['workplace_area_status']: r['len'] for r in core['roles']['workplace']}
+    assert workplace == {'foreign': 1, 'niu_or_unidentifiable': 2, 'territory': 1}
+    five = measured['sources']['acs/five_year']['role_allocation_flags']
+    territory = [r for r in five['workplace'] if r['workplace_area_status'] == 'territory']
+    assert territory == [
+        {
+            'workplace_area_status': 'territory',
+            'workplace_flag_source_geography_recoded': True,
+            'workplace_flag_geographic_allocation': False,
+            'workplace_flag_fractional_split': False,
+            'len': 1
+        }
+    ]
+    prior_pr = [r for r in five['migration'] if r['migration_area_status'] == 'territory']
+    assert prior_pr[0]['migration_flag_source_geography_recoded'] is False
+
     assert measured['population']['scoped_puma_population'] == 600
     assert measured['population']['complete_puma_population'] == 610
     assert measured['population']['county_relations'] == 7
@@ -227,6 +259,129 @@ def test_original_prefix_batches_ignore_physical_row_group_layout(reconciliation
     original.with_row_index('source_row').with_columns(
         pl.col('source_row').cast(pl.UInt64),
         pl.lit(hashlib.sha256(source.read_bytes()).hexdigest()).alias('source_parquet_sha256')
-    ).select('value', 'source_row', 'source_parquet_sha256').write_parquet(
-        companion, row_group_size=8192)
+    ).select('value', 'source_row',
+             'source_parquet_sha256').write_parquet(companion, row_group_size=8192)
     assert reconciliation_module.original_prefix(source, companion) == 140001
+
+@pytest.mark.parametrize(
+    'defect', ['factor_key', 'role_flags', 'scalar', 'published_county', 'published_msa']
+)
+def test_independent_annotation_controls_reject_consistent_mutations(
+    reconciliation_module, accepted, defect
+):
+    fixture, controls, result = accepted
+    directory = Path(result['directory'])
+    if defect == 'factor_key':
+        for name in ('acs_area_lookup', 'puma_county_factors'):
+            file = directory / (name + '.parquet')
+            frame = pl.read_parquet(file)
+            frame.with_columns(pl.lit('wrong').alias('factor_key')).write_parquet(file)
+        for profile in ('core', 'five_year', 'vintage'):
+            file = directory / ('acs_' + profile + '_canonical.parquet')
+            pl.read_parquet(file).with_columns(
+                *[
+                    pl.lit('wrong').alias(role + '_factor_key')
+                    for role in ('residence', 'workplace', 'migration')
+                ]
+            ).write_parquet(file)
+    elif defect == 'role_flags':
+        file = directory / 'acs_core_canonical.parquet'
+        pl.read_parquet(file).with_columns(
+            pl.lit(False).alias('residence_flag_geographic_allocation')
+        ).write_parquet(file)
+    elif defect == 'scalar':
+        file = directory / 'acs_code_lookup.parquet'
+        pl.read_parquet(file).with_columns(
+            pl.when(pl.col('system').eq('naics')).then(pl.lit('111110')).otherwise(
+                pl.col('canonical_scalar_code')
+            ).alias('canonical_scalar_code')
+        ).write_parquet(file)
+        for profile in ('core', 'five_year', 'vintage'):
+            file = directory / ('acs_' + profile + '_canonical.parquet')
+            pl.read_parquet(file).with_columns(
+                pl.lit('111110').alias('industry_canonical_scalar_code')
+            ).write_parquet(file)
+    else:
+        name, field = (
+            'puma_county_factors', 'published_area_factor'
+        ) if defect == 'published_county' else ('puma_msa_factors', 'published_percent_msa')
+        file = directory / (name + '.parquet')
+        pl.read_parquet(file).with_columns(pl.col(field).add(0.01)).write_parquet(file)
+    with pytest.raises(ValueError):
+        reconciliation_module.reconcile(
+            fixture.data_dir, 'independent', repin(directory), controls
+        )
+
+def test_cli_failure_is_aggregate_json_and_explicit_paths_are_required(
+    reconciliation_module, tmp_path
+):
+    from typer.testing import CliRunner
+    runner = CliRunner()
+    assert runner.invoke(reconciliation_module.app, ['freeze']).exit_code == 2
+    result = runner.invoke(
+        reconciliation_module.app, [
+            'preservation', '--data-dir',
+            str(tmp_path), '--control-dir',
+            str(tmp_path / 'absent')
+        ]
+    )
+    assert result.exit_code == 1
+    assert json.loads(result.output)['status'] == 'failed'
+    assert 'Traceback' not in result.output
+
+def test_strict_constructors_survive_authenticated_fixture_setup(accepted):
+    import dotenv
+    import httpx
+    import ipumspy
+
+    from embedding_data import acs_mapping_references, ipums_census_access
+    for function in (
+        httpx.Client, httpx.AsyncClient, dotenv.dotenv_values, dotenv.load_dotenv, ipumspy
+        .IpumsApiClient, acs_mapping_references.make_client, ipums_census_access.read_credential
+    ):
+        with pytest.raises(AssertionError):
+            function()
+
+def test_receipt_request_inventory_cannot_be_omitted(reconciliation_module, accepted):
+    import hashlib
+    fixture, controls, _ = accepted
+    receipt = fixture.data_dir / 'raw/references/acs-mapping/independent_references/receipt.json'
+    contents = json.loads(receipt.read_text())
+    contents['request_files'].pop('geocorr_puma_totals_request')
+    receipt.write_text(json.dumps(contents))
+    manifest = fixture.data_dir / 'raw/manifest.jsonl'
+    entries = [json.loads(line) for line in manifest.read_bytes().splitlines()]
+    path = receipt.relative_to(fixture.data_dir / 'raw').as_posix()
+    entries[-1]['sha256'] = hashlib.sha256(receipt.read_bytes()).hexdigest()
+    entries[-1]['size'] = receipt.stat().st_size
+    assert entries[-1]['path'] == path
+    prefix = (controls / 'manifest-prefix.jsonl').read_bytes()
+    old_count = len(prefix.splitlines())
+    manifest.write_bytes(
+        prefix + b''.join((json.dumps(entry) + '\n').encode() for entry in entries[old_count:])
+    )
+    with pytest.raises(ValueError, match='request'):
+        reconciliation_module.preservation(fixture.data_dir, controls)
+
+
+@pytest.mark.parametrize('value,expected', [('001', '01'), ('072', '72'), ('110', None),
+                                          ('1', None), ('099', None), (None, None)])
+def test_composition_state_keeps_its_own_namespace(reconciliation_module, value, expected):
+    if expected is None:
+        with pytest.raises(ValueError):
+            reconciliation_module.composition_state(value)
+    else:
+        assert reconciliation_module.composition_state(value) == expected
+
+
+def test_malformed_preservation_evidence_raises_value_error(reconciliation_module, tmp_path):
+    data = tmp_path / 'data'
+    (data / 'raw').mkdir(parents=True)
+    (data / 'derived').mkdir()
+    manifest = data / 'raw/manifest.jsonl'
+    manifest.write_bytes(b'')
+    controls = tmp_path / 'controls'
+    reconciliation_module.freeze(data, controls)
+    manifest.write_bytes(b'{}\n')
+    with pytest.raises(ValueError):
+        reconciliation_module.preservation(data, controls)

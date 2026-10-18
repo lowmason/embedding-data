@@ -74,6 +74,38 @@ REFERENCE_NAMES = {
     'usa_pwstate2': 'usa_pwstate2.html'
 }
 
+FOREIGN_PLACE_LABELS = frozenset(
+    (
+        'Abroad (unknown) or at sea', 'Afghanistan', 'Africa', 'Africa, nec', 'Albania',
+        'Argentina', 'Asia, nec', 'Atlantic Islands', 'Australia', 'Austria', 'Azores', 'Belgium',
+        'Belize/British Honduras', 'Bolivia', 'Bosnia and Herzegovinia', 'Brazil',
+        'British West Indies', 'Bulgaria', 'Canada', 'Central America, nec', 'Chile', 'China',
+        'Colombia', 'Costa Rica', 'Cuba', 'Denmark', 'Dominican Republic', 'Eastern Africa',
+        'Ecuador', 'Egypt', 'El Salvador', 'England', 'English Canada', 'Estonia', 'Ethiopia',
+        'Europe, ns', 'Finland', 'France', 'French Canada', 'Germany', 'Greece', 'Guatemala',
+        'Haiti',
+        'Honduras', 'Hungary', 'Iceland', 'India', 'Iran', 'Iraq', 'Ireland', 'Israel/Palestine',
+        'Italy', 'Jamaica', 'Japan', 'Jordan', 'Kenya', 'Korea', 'Latvia', 'Lebanon', 'Lithuania',
+        'Luxembourg', 'Mexico', 'Nepal', 'Netherlands', 'New Zealand', 'Nicaragua', 'Nigeria',
+        'Northern Africa', 'Northern Ireland', 'Norway', 'Other Caribbean and North America',
+        'Other Eastern Europe', 'Other Northern Europe', 'Other Northern or Eastern Europe',
+        'Other South East Asia', 'Other West Indies', 'Other Western Asia', 'Other Western Europe',
+        'Pacific Islands (Australia and New Zealand Subregions, not specified, '
+        'Oceania and at Sea: ACS)',
+        'Pakistan', 'Panama', 'Paraguay', 'Peru', 'Philippines', 'Poland', 'Portugal', 'Romania',
+        'Saudi Arabia', 'Scotland', 'South Africa (Union of)', 'South America, nec', 'Spain',
+        'Sweden', 'Switzerland', 'Syria', 'Taiwan', 'Thailand', 'Turkey', 'Ukraine',
+        'United Arab Emirates', 'Uruguay', 'Venezuela', 'Vietnam', 'Wales', 'Western Africa'
+    )
+)
+FOREIGN_WORK_LABELS = frozenset(
+    (
+        'Abroad', 'Canada', 'Eastern Asia', 'Europe', 'Iraq', 'Mexico', 'Other Americas',
+        'Other, nec', 'South Central, South East, and Western Asia'
+    )
+)
+RECONCILER_VERSION = 'stage8-independent-v1'
+
 STAGE7_NAMES = (
     'pyproject.toml', 'uv.lock', *(
         f'src/embedding_data/{name}.py' for name in (
@@ -163,6 +195,7 @@ def identities():
         'tests/acs_mapping_fixtures.py', 'pyproject.toml', 'uv.lock'
     )
     return {
+        'version': RECONCILER_VERSION,
         'files': {
             name: record(ROOT / name)
             for name in names
@@ -235,7 +268,7 @@ def manifest_records(data_dir, control_dir):
     require(len({r['path'] for r in old + suffix}) == len(old + suffix), 'duplicate manifest path')
     return frozen, old, suffix
 
-def preservation(data_dir: Path, control_dir: Path) -> dict:
+def _preservation(data_dir: Path, control_dir: Path) -> dict:
     data_dir, control_dir = safe(data_dir), safe(control_dir)
     frozen, old, suffix = manifest_records(data_dir, control_dir)
     require(frozen['reconciler'] == identities(), 'independent software identity changed')
@@ -268,6 +301,27 @@ def preservation(data_dir: Path, control_dir: Path) -> dict:
             receipt['reference_id'] == directory.name and receipt['reference_version']
             == 'acs-mapping-references-v1', 'snapshot receipt identity differs'
         )
+        require(
+            re.fullmatch('[A-Za-z0-9][A-Za-z0-9_-]*', directory.name),
+            'unsafe reference snapshot ID'
+        )
+        requests = receipt['request_files']
+        expected_requests = {kind for kind in REFERENCE_NAMES if kind.endswith('_request')}
+        require(set(requests) == expected_requests, 'receipt request inventory differs')
+        for kind, request in requests.items():
+            filename = REFERENCE_NAMES[kind]
+            require(
+                request == {
+                    'filename': filename,
+                    'method': 'GET',
+                    **receipt['files'][filename]
+                }, 'receipt request record differs'
+            )
+        for original in receipt['originals'].values():
+            require(
+                original['authority_url'] == original['citation']['source_url'],
+                'receipt original authority/citation differs'
+            )
         files = receipt['files']
         require(
             set(receipt['originals']) == set(REFERENCE_NAMES) and set(files) == set(
@@ -314,15 +368,26 @@ def preservation(data_dir: Path, control_dir: Path) -> dict:
         'appended_record_count': len(suffix)
     }
 
+
+def preservation(data_dir: Path, control_dir: Path) -> dict:
+    try:
+        return _preservation(data_dir, control_dir)
+    except (KeyError, TypeError, AttributeError, IndexError, OSError) as error:
+        raise ValueError('preservation evidence has a malformed record or missing file') from error
+
+
+def composition_state(value):
+    require(isinstance(value, str) and re.fullmatch('0[0-9]{2}', value)
+            and value[1:] in SCOPE | {'72'}, 'unknown composition state namespace/code')
+    return value[1:]
+
+
 def authenticate_bundle(directory, pin):
     require(isinstance(pin, str) and re.fullmatch('[0-9a-f]{64}', pin), 'invalid external pin')
     require(digest(directory / 'outputs.json') == pin, 'external inventory pin differs')
     records = read(directory / 'outputs.json')
-    require(
-        {f.name
-         for f in directory.iterdir()} == set(records) | {'outputs.json'},
-        'bundle file set differs'
-    )
+    actual_names = {f.name for f in directory.iterdir()}
+    require(actual_names == set(records) | {'outputs.json'}, 'bundle file set differs')
     for name, expected in records.items():
         file = relative(directory, name)
         check_record(file, expected, 'bundle hash/size differs')
@@ -364,6 +429,113 @@ def historical_cli_allowed(family, name, recorded, actual, request, stage7, stag
                                                          'files', {}
                                                      ).get(CLI, {}).get('sha256') == NEW_CLI
     )
+
+def key_sha256(values):
+    return hashlib.sha256(
+        json.dumps(values, ensure_ascii=False, separators=(',', ':'), allow_nan=False).encode()
+    ).hexdigest()
+
+def scalar_controls(row, members, canonical, paths, forward, kind, partial):
+    common = []
+    for level in zip(*paths):
+        if len(set(level)) != 1:
+            break
+        common.append(level[0])
+    scalar = None
+    if kind == 'finest' and not partial and len(members) == len(canonical) == 1:
+        candidate = next(iter(canonical))
+        reverse = {left for left, rights in forward.items() if candidate in rights}
+        if row['native_vintage'] != 2017 or reverse == members:
+            scalar = candidate
+    node = paths[0][-1] if scalar else None
+    require(
+        row['canonical_common_node_id'] == (
+            common[-1] if common else None
+        ) and row['canonical_scalar_code'] == scalar and row['canonical_scalar_node_id'] == node,
+        'canonical common/scalar assertion differs from independent membership'
+    )
+
+def missing_code_controls(scan, prefix, token, system):
+    missing = scan.filter(pl.col(token).is_null())
+    strings = (
+        'code_lookup_id', 'native_node_id', 'canonical_common_node_id', 'canonical_scalar_code',
+        'canonical_scalar_node_id', 'special_reason', 'rule_version'
+    )
+    lists = (
+        'native_finest_candidates', 'canonical_finest_candidates', 'canonical_candidate_paths',
+        'aggregation_markers', 'aggregation_reasons', 'reference_ids', 'reference_locators'
+    )
+    flags = (
+        'flag_aggregate', 'flag_partial', 'flag_exception', 'flag_vintage_crosswalk',
+        'flag_reference_ambiguity'
+    )
+    expected_native = pl.col(prefix + '_delivered_scheme').str.extract('([0-9]{4})$',
+                                                                       1).cast(pl.Int64)
+    expressions = [pl.col(prefix + '_' + c).is_null() for c in strings]
+    expressions.extend(pl.col(prefix + '_' + c).list.len().eq(0) for c in lists)
+    expressions.extend(pl.col(prefix + '_' + c).eq(False) for c in flags)
+    expressions.extend(
+        (
+            pl.col(prefix + '_mapping_status').eq('missing'), pl.col(prefix
+                                                                     + '_source_token').is_null(),
+            pl.col(prefix + '_aggregation_type').eq('missing'),
+            pl.col(prefix + '_aggregation_reason_status').eq('not_applicable'),
+            pl.col(prefix + '_native_vintage').eq(expected_native),
+            pl.col(prefix + '_canonical_vintage').eq(2022 if system == 'naics' else 2018)
+        )
+    )
+    all_true(missing, pl.all_horizontal(expressions), 'missing classification annotations differ')
+
+def role_allocation_controls(scan, county_factors, role):
+    support = county_factors.group_by('factor_key').agg(
+        pl.col('intersection_population').gt(0).sum().alias('__positive_support')
+    )
+    joined = scan.join(
+        support.lazy(),
+        left_on=role + '_factor_key',
+        right_on='factor_key',
+        how='left',
+        validate='m:1'
+    )
+    applicable = pl.col(role + '_area_status').eq('applicable')
+    split = pl.when(applicable).then(pl.col('__positive_support').gt(1)).otherwise(False)
+    all_true(
+        joined,
+        pl.col(role + '_flag_geographic_allocation').eq(applicable).and_(
+            pl.col(role + '_flag_fractional_split').eq(split)
+        ), 'role geographic allocation/split flag differs from independent positive support'
+    )
+
+def observed_lookup_coverage(measurements, codes):
+    expected = set()
+    for measured in measurements.values():
+        for prefix, system in (('industry', 'naics'), ('occupation', 'soc')):
+            for row in measured['codes'][prefix]['frequency_partitions']:
+                if row['source_token'] is not None:
+                    scheme = (
+                        'naics2017' if row['YEAR'] == 2022 else 'naics2022'
+                    ) if system == 'naics' else 'soc2018'
+                    expected.add((system, scheme, row['paired_code'], row['source_token']))
+    actual = set(
+        codes.select('system', 'source_scheme', 'paired_census_code', 'source_token').iter_rows()
+    )
+    require(
+        actual == expected, 'code lookup key coverage differs from original source frequencies'
+    )
+
+def emit(operation, *args):
+    try:
+        result = operation(*args)
+    except (ValueError, OSError, KeyError, TypeError) as error:
+        print(
+            json.dumps({
+                'status': 'failed',
+                'error': str(error)
+            }, allow_nan=False),
+            file=sys.stderr
+        )
+        raise typer.Exit(1) from None
+    print(json.dumps(result, sort_keys=True, allow_nan=False))
 
 def table_contracts(directory):
     keys = {
@@ -408,11 +580,23 @@ def table_contracts(directory):
                         value is not None and all(v is not None for v in value),
                         'null reference/candidate list or element'
                     )
+                    if column in ('reference_ids', 'reference_locators'):
+                        require(bool(value), 'reference provenance list is empty')
                     if dtype == pl.List(pl.String):
                         require(
                             value == sorted(set(value)), 'reference/candidate set ordering differs'
                         )
+        if 'factor_key' in frame.columns:
+            for row in frame.iter_rows(named=True):
+                expected = key_sha256(
+                    [row['area_type'], row['state_fips'], row['area_code'], 2020]
+                )
+                if name == 'acs_area_lookup' and row['area_status'] != 'applicable':
+                    expected = None
+                require(row['factor_key'] == expected, 'factor key identity differs')
         if name in ('acs_code_lookup', 'acs_area_lookup'):
+            version = 'acs-code-rules-v1' if name == 'acs_code_lookup' else 'acs-area-rules-v1'
+            require(frame['rule_version'].eq(version).all(), 'mapping rule version differs')
             identity = 'code_lookup_id' if name == 'acs_code_lookup' else 'area_lookup_id'
             for row in frame.iter_rows(named=True):
                 encoded = json.dumps(
@@ -439,13 +623,19 @@ def upstreams(data_dir, inputs):
     receipt = selected['ipums']['references']['receipt_citation']
     receipt_file = relative(data_dir / 'raw', receipt['path'])
     check_record(receipt_file, receipt, 'selected Stage7 reference receipt differs')
-    require(digest(receipt_file) == request['ipums_references_receipt_sha256'],
-            'selected Stage7 reference receipt pin differs')
+    require(
+        digest(receipt_file) == request['ipums_references_receipt_sha256'],
+        'selected Stage7 reference receipt pin differs'
+    )
     current_software(inputs['software'], EXECUTING_NAMES)
     current_software(selected['ipums']['software'], STAGE7_NAMES)
     diagnostics = []
     for key in ('codes', 'geography'):
         upstream = selected[key]
+        require(
+            inputs['selected_upstreams']['provenance'][key]['inputs'] == upstream,
+            'historical upstream inventory copy differs'
+        )
         require(
             upstream['python'] == sys.version and upstream['uv_lock_sha256'] == digest(
                 ROOT / 'uv.lock'
@@ -519,14 +709,17 @@ def reference_geography(data_dir, upstream, directory):
     import io
     from zipfile import ZipFile
     original = upstream['references']['counties_2025']['relative']
-    matches = [r for r in upstream['raw'] if r['path'] == original
-               or r['path'].endswith('/' + original)]
+    matches = [
+        r for r in upstream['raw'] if r['path'] == original or r['path'].endswith('/' + original)
+    ]
     require(len(matches) == 1, 'county original citation missing or ambiguous')
     file = relative(data_dir / 'raw', matches[0]['path'])
     check_record(file, matches[0], 'county original hash/size differs')
     with ZipFile(file) as archive:
-        require(archive.namelist() == ['2025_Gaz_counties_national.txt'],
-                'county original archive member differs')
+        require(
+            archive.namelist() == ['2025_Gaz_counties_national.txt'],
+            'county original archive member differs'
+        )
         body = archive.read('2025_Gaz_counties_national.txt').decode('utf-8-sig')
     rows = csv.DictReader(io.StringIO(body), delimiter='|')
     require({'USPS', 'GEOID', 'NAME'} <= set(rows.fieldnames), 'county original header differs')
@@ -535,16 +728,24 @@ def reference_geography(data_dir, upstream, directory):
         if not any(v and v.strip() for v in row.values()):
             continue
         geoid = row['GEOID'].strip()
-        require(re.fullmatch('[0-9]{5}', geoid) and geoid[:2] in SCOPE | {'72'}
-                and geoid not in counties, 'invalid/duplicate full county inventory code')
+        require(
+            re.fullmatch('[0-9]{5}', geoid) and geoid[:2] in SCOPE | {'72'}
+            and geoid not in counties, 'invalid/duplicate full county inventory code'
+        )
         counties.add(geoid)
-    require({c for c in counties if c.startswith('09')} == {f'091{i}0' for i in range(1, 10)},
-            '2025 county inventory must preserve all nine CT planning regions')
+    require(
+        {c
+         for c in counties if c.startswith('09')} == {f'091{i}0'
+                                                      for i in range(1, 10)},
+        '2025 county inventory must preserve all nine CT planning regions'
+    )
     selected = pl.read_parquet(directory / 'county_reference.parquet')
-    require(set(selected['county_geoid']) == {c for c in counties if c[:2] in SCOPE},
-            'selected county table differs from complete original domestic scope')
+    require(
+        set(selected['county_geoid']) == {c
+                                          for c in counties if c[:2] in SCOPE},
+        'selected county table differs from complete original domestic scope'
+    )
     return counties
-
 
 def populations(directory, files, county_inventory):
     intersections = csv_rows(files['geocorr_intersections'])
@@ -561,8 +762,17 @@ def populations(directory, files, county_inventory):
         ).items()
     }
     require(set(s for s, _ in pumas) <= SCOPE | {'72'}, 'invalid reference state')
-    require({c for _, c in counties} <= county_inventory,
-            'county population control absent from complete 2025 original')
+    require(
+        {c
+         for _, c in counties} <= county_inventory,
+        'county population control absent from complete 2025 original'
+    )
+    require(
+        all(
+            re.fullmatch('[0-9]{2}', st) and re.fullmatch('[0-9]{5}', code)
+            for st, code in set(pumas) | set(counties)
+        ), 'reference code width differs'
+    )
     keyed(intersections, ('state', 'puma22', 'county'), ('pop20', ))
     sums_puma, sums_county = defaultdict(int), defaultdict(int)
     groups = keyed(
@@ -570,7 +780,7 @@ def populations(directory, files, county_inventory):
             {
                 'state': r[0],
                 'puma': r[1],
-                'group_state': r[2][1:],
+                'group_state': composition_state(r[2]),
                 'group': r[3]
             } for r in workbook(files['puma_composition_2020'], 'PUMA_POWPUMA_MIGPUMA')[1:]
         ], ('state', 'puma'), ('group_state', 'group')
@@ -580,7 +790,7 @@ def populations(directory, files, county_inventory):
             {
                 'state': r[0],
                 'county': r[0] + r[1],
-                'group_state': r[2][1:],
+                'group_state': composition_state(r[2]),
                 'group': r[3]
             }
             for r in workbook(files['county_composition_2022'], 'MIGPUMA-POWPUMA 2022 Lookup')[1:]
@@ -597,6 +807,7 @@ def populations(directory, files, county_inventory):
         county_group_totals[county_groups[key]] += pop
     require(totals_group == county_group_totals, 'county-to-group totals differ')
     expected, pooled = {}, defaultdict(int)
+    published = {}
     for row in intersections:
         state, puma, county = row['state'], row['puma22'], row['county']
         pop = integer(row['pop20'])
@@ -608,6 +819,7 @@ def populations(directory, files, county_inventory):
         sums_county[state, county] += pop
         rounding(row['afact'], pop, pumas[state, puma])
         rounding(row['afact2'], pop, counties[state, county])
+        published[state, puma, county] = float(row['afact']), float(row['afact2'])
         if state in SCOPE:
             expected['residence', state, puma, county] = (
                 pop, pumas[state, puma], counties[state, county]
@@ -632,6 +844,12 @@ def populations(directory, files, county_inventory):
     closure = defaultdict(float)
     for row in county_frame.iter_rows(named=True):
         n, total = row['intersection_population'], row['area_population']
+        expected_published = published[row['state_fips'], row['area_code'], row['county_geoid']
+                                       ] if row['area_type'] == 'residence' else (None, None)
+        require(
+            (row['published_area_factor'], row['published_county_factor']) == expected_published,
+            'published county factors differ from original columns'
+        )
         require(
             county_frame.schema['factor'] == pl.Float64 and row['factor'] == n / total,
             'county factor differs from exact integer ratio'
@@ -644,6 +862,7 @@ def populations(directory, files, county_inventory):
     maximum = max(abs(value - 1) for value in closure.values())
     msa_rows = workbook(files['msa_puma_2023_2020'], 'MSA2023_PUMA2020_crosswalk')[1:]
     msa_expected, msa_totals, msa_sum, allocated = {}, {}, defaultdict(int), defaultdict(int)
+    msa_published = {}
     for row in msa_rows:
         state, puma, msa = row[2], row[4], row[0]
         total, whole, pop = integer(row[7]), integer(row[6]), integer(row[8])
@@ -660,6 +879,7 @@ def populations(directory, files, county_inventory):
             key = state, puma, msa
             require(key not in msa_expected, 'duplicate MSA relation')
             msa_expected[key] = total, whole, pop
+            msa_published[key] = float(row[10]), float(row[9])
     require(
         dict(msa_sum) == msa_totals and all(allocated[k] <= pumas[k]
                                             for k in allocated), 'MSA integer closure differs'
@@ -675,6 +895,15 @@ def populations(directory, files, county_inventory):
     reverse = defaultdict(float)
     for row in msa_frame.iter_rows(named=True):
         n, p, m = row['intersection_population'], row['puma_population'], row['msa_population']
+        require(
+            (row['published_percent_puma'], row['published_percent_msa']
+             ) == msa_published[row['state_fips'], row['puma_code'], row['msa_code']],
+            'published MSA percentages differ from original columns'
+        )
+        require(
+            row['flag_geographic_allocation'] and row['flag_fractional_split'] == (n != p),
+            'MSA allocation provenance differs'
+        )
         require(
             all(
                 msa_frame.schema[f] == pl.Float64
@@ -704,6 +933,7 @@ def populations(directory, files, county_inventory):
     require(maximum <= TOLERANCE, 'factor closure exceeds 1e-12')
     return {
         'closure_max': maximum,
+        'published_rounding_decimal_bound': str(ROUNDING),
         'county_relations': len(expected),
         'msa_relations': len(msa_expected),
         'scoped_puma_population': sum(v for k, v in pumas.items() if k[0] in SCOPE),
@@ -743,6 +973,10 @@ def original_prefix(source_file, companion):
         list(actual.items())[:len(schema)] == list(schema.items()),
         'original ordered schema prefix differs'
     )
+    require(
+        actual.get('source_row') == pl.UInt64 and actual.get('source_parquet_sha256') == pl.String,
+        'source identity dtype differs'
+    )
     source_count = source.select(pl.len()).collect().item()
     require(source_count == target.select(pl.len()).collect().item(), 'source row count differs')
     batches = zip(
@@ -766,6 +1000,15 @@ def source_identity(source, companion):
     scan = pl.scan_parquet(companion)
     profile = source['profile']
     five = profile == 'acs/five_year'
+    expected_samples = {
+        'acs/core': {'us2023a', 'us2024a'},
+        'acs/vintage': {'us2022a'},
+        'acs/five_year': {'us2024c'}
+    }
+    require(
+        set(source['definition']['samples']) == expected_samples[profile],
+        'source definition product/sample identity differs'
+    )
     samples = categories(source, 'SAMPLE')
     mapping = {}
     for sample in source['definition']['samples']:
@@ -776,6 +1019,13 @@ def source_identity(source, companion):
                 if scan.collect_schema()['SAMPLE'].is_integer() else matches[0]] = sample
     release = pl.col('YEAR').cast(pl.Int64)
     component = pl.col('MULTYEAR' if five else 'YEAR').cast(pl.Int64)
+    sample = pl.col('SAMPLE').cast(pl.String).replace_strict(mapping)
+    valid_component = component.is_between(2020, 2024) if five else component.eq(release)
+    all_true(
+        scan,
+        sample.str.slice(2, 4).cast(pl.Int64).eq(release).and_(valid_component),
+        'source release/component identity is unsupported'
+    )
     native = pl.when(release.eq(2022)).then(pl.lit('naics2017')).otherwise(pl.lit('naics2022'))
     interview = pl.when(component.lt(2023)).then(pl.lit('naics2017')).otherwise(
         pl.lit('naics2022')
@@ -800,6 +1050,7 @@ def code_measurements(source, companion, codes):
     for prefix, system, pair, token in (
         ('industry', 'naics', 'IND', 'INDNAICS'), ('occupation', 'soc', 'OCC', 'OCCSOC')
     ):
+        missing_code_controls(scan, prefix, token, system)
         expected = source_code_frequencies(source, pair, token)
         require(
             expected.equals(source_code_frequencies(companion, pair, token)),
@@ -847,6 +1098,7 @@ def allocation_measurements(source, companion):
     scan = pl.scan_parquet(companion)
     names = scan.collect_schema()
     result = {}
+    used = False
     zero_labels = {
         'QIND': 'Original entry or Inapplicable (not in universe)',
         'QOCC': 'Entered as written',
@@ -861,6 +1113,7 @@ def allocation_measurements(source, companion):
         available = field in names and bool(labels)
         allocated = pl.lit(False)
         status = pl.lit('unavailable')
+        used = used or available
         if available:
             value = pl.col(field).cast(pl.String)
             allocated = value.is_in([c for c, label in labels.items() if label == 'Allocated'])
@@ -883,16 +1136,29 @@ def allocation_measurements(source, companion):
                 prefix + '_source_allocation_status'
             ).collect().to_dicts()
         }
+    citations = [r for r in source['raw_citations'] if r['path'].endswith('.xml')]
+    require(len(citations) == 1, 'allocation requires one authenticated DDI citation')
+    references = ['ddi:sha256:' + citations[0]['sha256']] if used else []
+    all_true(
+        scan,
+        pl.col('source_flag_reference_ids').eq_missing(
+            pl.lit(references, dtype=pl.List(pl.String))
+        ), 'source flag citation assertion differs'
+    )
     return result
 
 def document(file):
     import html
     return re.sub(r'\s+', ' ', html.unescape(re.sub('<[^>]+>', ' ', file.read_text())))
 
-def role_measurements(source, companion, areas, files, pumas, groups):
+def role_measurements(source, companion, areas, files, pumas, groups, county_factors):
     scan = pl.scan_parquet(companion)
     domestic = categories(source, 'STATEFIP')
     by_label = {label: code for code, label in domestic.items() if code in SCOPE | {'72'}}
+    require(
+        len(by_label) == sum(c in SCOPE | {'72'}
+                             for c in domestic), 'ambiguous domestic DDI labels'
+    )
     definitions = {
         'residence': set(pumas),
         'workplace': set(groups.values()),
@@ -934,8 +1200,19 @@ def role_measurements(source, companion, areas, files, pumas, groups):
         )
         own = areas.filter(pl.col('profile').eq(source['profile']).and_(pl.col('role').eq(role)))
         for row in own.iter_rows(named=True):
+            require(
+                re.fullmatch('[0-9]{1,' + str(width) + '}',
+                             str(row['source_state_code'])) and re.fullmatch(
+                                 '[0-9]{1,5}', str(row['source_area_code'])
+                             ), 'unparseable source geographic role code'
+            )
             state, area = str(row['source_state_code']).zfill(width), str(row['source_area_code']
                                                                           ).zfill(5)
+            require(
+                row['area_type'] == ('residence' if role == 'residence' else
+                                     'work_migration') and row['source_allocation_evidence_status']
+                == 'unavailable', 'role type/source allocation availability differs'
+            )
             require(state in labels, 'unknown DDI source state')
             label = labels[state]
             fips = by_label.get(label)
@@ -952,11 +1229,11 @@ def role_measurements(source, companion, areas, files, pumas, groups):
                     require(label == 'Puerto Rico', 'incompatible PR special')
                 else:
                     require(fips is None and label != 'N/A', 'incompatible foreign special')
-                    state_doc = document(files['usa_' + state_field.lower()])
-                    # Positive DDI label and public document evidence; no numeric-range inference.
+                    positives = (FOREIGN_WORK_LABELS if role == 'workplace'
+                                 else FOREIGN_PLACE_LABELS)
                     require(
-                        label in state_doc or label in {'Abroad', 'Canada', 'Mexico'}
-                        or label in territory, 'foreign label lacks positive evidence'
+                        label in positives or label in territory and label != 'Puerto Rico',
+                        'foreign label lacks positive documented category evidence'
                     )
                     if label in territory:
                         require(label != 'Puerto Rico', 'PR cannot be foreign')
@@ -1005,6 +1282,11 @@ def role_measurements(source, companion, areas, files, pumas, groups):
             grouped.drop('len').join(expected, on=keys + fields, how='anti', nulls_equal=True
                                      ).is_empty(), 'companion role/status key frequencies differ'
         )
+        require(
+            expected.join(grouped.drop('len'), on=keys + fields, how='anti',
+                          nulls_equal=True).is_empty(), 'extra area lookup keys are unobserved'
+        )
+        role_allocation_controls(scan, county_factors, role)
         statuses[role] = scan.group_by(role + '_area_status').len().sort(role + '_area_status'
                                                                          ).collect().to_dicts()
     return statuses
@@ -1071,6 +1353,13 @@ def occupation_authorities(files):
         def finish():
             if root is None or root == '9920':
                 return
+            require(
+                not re.search('[XY]', token) or bool(expressions),
+                'letter occupation category lacks explicit terminal members'
+            )
+            if not expressions:
+                expected = 'none' if (root, token) == ('9830', '55-9830') else token
+                require(full.get(root) == expected, 'full Census occupation pair differs')
             values = expressions or [token]
             marked = bool(re.search('[XY]', token)) or len(values) > 1
             reason = (
@@ -1178,6 +1467,8 @@ def candidate_memberships(codes, files, code_directory):
         for row in workbook(files[f'pums_industry_{year}'], 'ACS'):
             if len(row) >= 5 and row[2] and re.fullmatch('[0-9]{4}', row[2]) and row[2] != '9920':
                 pairs[year, row[2], row[4].strip(' ')] = row[3]
+    for (year, _, _), expression in pairs.items():
+        leaf_members(expression, [r for r in native if r['vintage'] == year], paths)
     occupation, rejected = occupation_authorities(files)
     for row in codes.iter_rows(named=True):
         year, system = row['native_vintage'], row['system']
@@ -1209,12 +1500,22 @@ def candidate_memberships(codes, files, code_directory):
         node_code = token if system == 'naics' else token[:2] + '-' + token[2:]
         aggregate = bool(markers) or len(members) > 1 or bool(members and node_code not in members)
         special = system == 'soc' and (pair, token) == ('9830', '559830')
-        kind = ('special' if special else 'source_aggregate' if markers
-                else 'whole_node' if aggregate else 'finest')
+        kind = (
+            'special' if special else 'source_aggregate'
+            if markers else 'whole_node' if aggregate else 'finest'
+        )
         require(
             row['flag_aggregate'] == aggregate and row['aggregation_type'] == kind and row[
                 'flag_exception'] == ('Z' in markers) and row['flag_reference_ambiguity'] is False,
             'singleton/aggregation/reference provenance differs'
+        )
+        partial = system == 'naics' and (
+            'P' in token or bool(re.search(r'(?:Part of|Pts\.|pt\.)', pairs[year, pair, token]))
+        )
+        require(row['flag_partial'] == partial, 'partial-category provenance differs')
+        require(
+            row['canonical_vintage'] == (2022 if system == 'naics' else 2018),
+            'canonical classification vintage differs'
         )
         canonical = set().union(*(forward[c] for c in members)) if year == 2017 else members
         require(
@@ -1229,6 +1530,7 @@ def candidate_memberships(codes, files, code_directory):
             row['canonical_candidate_paths'] == expected_paths,
             'canonical candidate paths differ from authenticated Stage4 graph'
         )
+        scalar_controls(row, members, canonical, expected_paths, forward, kind, partial)
     return {'D4_rejected_constituents': rejected, 'candidate_memberships_equal': True}
 
 def independent_lookup(codes, files):
@@ -1320,6 +1622,13 @@ def reconcile(data_dir: Path, run_id: str, outputs_sha256: str, control_dir: Pat
         codes, files,
         data_dir / 'derived/codes' / inputs['selected_upstreams']['request']['codes_run']
     )
+    require(
+        set(codes['system']) <= {'naics', 'soc'}
+        and set(areas['profile']) <= set(PROFILES) and set(
+            areas['role']
+        ) <= {'residence', 'workplace', 'migration'}, 'unknown lookup system/profile/role'
+    )
+    county_factors = pl.read_parquet(directory / 'puma_county_factors.parquet')
     measurements = {}
     for profile in PROFILES:
         source = inputs['sources'][profile]
@@ -1333,8 +1642,28 @@ def reconcile(data_dir: Path, run_id: str, outputs_sha256: str, control_dir: Pat
             'rows': rows,
             'codes': code_measurements(file, companion, codes),
             'allocation': allocation_measurements(source, companion),
-            'roles': role_measurements(source, companion, areas, files, pumas, groups)
+            'source_industry_recoding': pl.scan_parquet(companion).group_by(
+                'acs_sample_id', 'acs_component_year', 'flag_source_industry_recoded'
+            ).len().sort('acs_sample_id', 'acs_component_year',
+                         'flag_source_industry_recoded').collect().to_dicts(),
+            'role_allocation_flags': {
+                role: pl.scan_parquet(companion).group_by(
+                    role + '_area_status', role + '_flag_source_geography_recoded',
+                    role + '_flag_geographic_allocation', role + '_flag_fractional_split'
+                ).len().sort(
+                    role + '_area_status',
+                    role + '_flag_source_geography_recoded',
+                    role + '_flag_geographic_allocation',
+                    role + '_flag_fractional_split',
+                    nulls_last=False
+                ).collect().to_dicts()
+                for role in ('residence', 'workplace', 'migration')
+            },
+            'roles': role_measurements(
+                source, companion, areas, files, pumas, groups, county_factors
+            )
         }
+    observed_lookup_coverage(measurements, codes)
     return {
         'code_frequencies_equal': True,
         'population_reconciliation_equal': True,
@@ -1349,13 +1678,13 @@ def reconcile(data_dir: Path, run_id: str, outputs_sha256: str, control_dir: Pat
 
 @app.command('freeze')
 def freeze_command(data_dir: Path = typer.Option(...), control_dir: Path = typer.Option(...)):
-    print(json.dumps(freeze(data_dir, control_dir), sort_keys=True, allow_nan=False))
+    emit(freeze, data_dir, control_dir)
 
 @app.command('preservation')
 def preservation_command(
     data_dir: Path = typer.Option(...), control_dir: Path = typer.Option(...)
 ):
-    print(json.dumps(preservation(data_dir, control_dir), sort_keys=True, allow_nan=False))
+    emit(preservation, data_dir, control_dir)
 
 @app.command('reconcile')
 def reconcile_command(
@@ -1364,13 +1693,7 @@ def reconcile_command(
     run_id: str = typer.Option(...),
     outputs_sha256: str = typer.Option(...)
 ):
-    print(
-        json.dumps(
-            reconcile(data_dir, run_id, outputs_sha256, control_dir),
-            sort_keys=True,
-            allow_nan=False
-        )
-    )
+    emit(reconcile, data_dir, run_id, outputs_sha256, control_dir)
 
 if __name__ == '__main__':
     app()
