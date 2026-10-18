@@ -264,8 +264,7 @@ def _msa_rows(evidence, cbsas):
                 non_msa_population=whole - allocated,
                 msa_fraction=allocated / whole,
                 non_msa_fraction=(whole - allocated) / whole,
-                ct_population_basis=evidence.reference_provenance.get('ct_population_basis'),
-        population_year=2020,
+                population_year=2020,
                 puma_vintage=2020,
                 msa_delineation='July 2023',
                 **_references(

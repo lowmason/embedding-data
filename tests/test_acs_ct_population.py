@@ -249,6 +249,63 @@ def test_independent_ct_reconstructs_originals_without_runtime_import(ct_files):
     assert result['pumas']['20702'] == 177009
 
 
+
+@pytest.mark.parametrize('changed_column', [None, 'afact', 'afact2'])
+def test_independent_checks_complete_original_before_ct_replacement(
+    ct_files, tmp_path, monkeypatch, changed_column
+):
+    import csv
+    import importlib.util
+    import io
+
+    from acs_mapping_fixtures import national_mapping_originals
+
+    script = Path(__file__).resolve().parents[1] / 'scripts/reconcile_stage8.py'
+    spec = importlib.util.spec_from_file_location('independent_complete_original', script)
+    independent = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(independent)
+    files = {**national_mapping_originals(tmp_path / 'national'), **ct_files}
+    file = files['geocorr_intersections']
+    original_pin = independent.digest(file)
+    if changed_column:
+        rows = list(csv.reader(io.StringIO(file.read_bytes().decode('cp1252'), newline='')))
+        target = rows[674]
+        assert [target[rows[0].index(k)] for k in ('state', 'puma22', 'county')] == [
+            '09', '20702', '09170']
+        target[rows[0].index(changed_column)] = '0.5'
+        output = io.StringIO(newline='')
+        csv.writer(output).writerows(rows)
+        file.write_bytes(output.getvalue().encode('cp1252'))
+        assert independent.digest(file) != original_pin
+
+    calls, rejected = [], []
+    real_assertion = independent.geocorr_rounding_assertion
+
+    def record_assertion(pin, number, row, column, numerator, denominator):
+        calls.append((number, column))
+        result = real_assertion(pin, number, row, column, numerator, denominator)
+        if result:
+            rejected.append(result)
+        return result
+
+    monkeypatch.setattr(independent, 'geocorr_rounding_assertion', record_assertion)
+    counties = {r['county'] for r in independent.csv_rows(files['geocorr_county_totals'])}
+    if changed_column:
+        with pytest.raises(ValueError, match='published rounding outside decimal bound'):
+            independent.populations(tmp_path, files, counties)
+        # A later D7 pin rejection must not mask omission of the removed CT row.
+        assert calls[-1] == (675, changed_column)
+    else:
+        # All source arithmetic precedes the first generated-output table read.
+        with pytest.raises(FileNotFoundError):
+            independent.populations(tmp_path, files, counties)
+        assert len(calls) == len(set(calls)) == 9380
+        assert len({row for row, _ in calls}) == 4690
+        assert [(r['row'], r['column']) for r in rejected] == [
+            (1136, 'afact'), (2428, 'afact'), (2662, 'afact2')]
+        assert all(r['cause'] == 'unknown' for r in rejected)
+
+
 def test_v2_national_raw_to_bundle_replay_and_independent_reconciliation(
     ct_files, tmp_path, monkeypatch
 ):

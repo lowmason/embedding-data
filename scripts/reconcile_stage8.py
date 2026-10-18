@@ -1127,6 +1127,17 @@ def populations(directory, files, county_inventory):
                 and dict(original_county_sums) == original_counties
                 and all(n > 0 for n in (*original_pumas.values(), *original_counties.values())),
                 'original Geocorr integer controls differ before CT replacement')
+    rejected_rounding = []
+    geocorr_pin = digest(files['geocorr_intersections'])
+    for number, row in enumerate(intersections, 3):
+        state, puma, county = row['state'], row['puma22'], row['county']
+        for column, denominator in [('afact', original_pumas[state, puma]),
+                                    ('afact2', original_counties[state, county])]:
+            assertion = geocorr_rounding_assertion(
+                geocorr_pin, number, row, column, integer(row['pop20']), denominator)
+            if assertion:
+                rejected_rounding.append(assertion)
+    if ct is not None:
         require(set(pumas) == set(ct['national_pumas']) and all(
             pop == ct['national_pumas'][key] for key, pop in pumas.items() if key[0] != '09'),
             'national PUMA/non-CT controls differ')
@@ -1139,8 +1150,8 @@ def populations(directory, files, county_inventory):
                                   'accepted_population': ct['relations'].get(key),
                                   'literal_afact': row['afact'], 'literal_afact2': row['afact2']})
         updated = []
-        for number, row in enumerate(intersections, 3):
-            row = dict(row, _source_row=number, _original_population=row['pop20'])
+        for row in intersections:
+            row = dict(row)
             if row['state'] == '09':
                 key = row['puma22'], row['county']
                 if key not in ct['relations']:
@@ -1197,9 +1208,7 @@ def populations(directory, files, county_inventory):
     require(totals_group == county_group_totals, 'county-to-group totals differ')
     expected, pooled = {}, defaultdict(int)
     published = {}
-    rejected_rounding = []
-    geocorr_pin = digest(files['geocorr_intersections'])
-    for number, row in enumerate(intersections, 3):
+    for row in intersections:
         state, puma, county = row['state'], row['puma22'], row['county']
         pop = integer(row['pop20'])
         require(county[:2] == state, 'county namespace differs')
@@ -1208,13 +1217,6 @@ def populations(directory, files, county_inventory):
         )
         sums_puma[state, puma] += pop
         sums_county[state, county] += pop
-        for column, denominator in [('afact', original_pumas[state, puma]),
-                                    ('afact2', original_counties[state, county])]:
-            assertion = geocorr_rounding_assertion(
-                geocorr_pin, row.get('_source_row', number), row, column,
-                integer(row.get('_original_population', row['pop20'])), denominator)
-            if assertion:
-                rejected_rounding.append(assertion)
         published[state, puma, county] = float(row['afact']), float(row['afact2'])
         if state in SCOPE:
             expected['residence', state, puma, county] = (
