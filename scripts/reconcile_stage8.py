@@ -1,6 +1,7 @@
 '''Independent offline Stage 8 controls; no mapping implementation imports.'''
 import csv
 import hashlib
+import io
 import json
 import platform
 import re
@@ -26,6 +27,7 @@ OLD_CLI = '68778e16b7cc051745c1e34d3dee6a9fc044fd12b1f78103773984503e9f9742'
 NEW_CLI = '32a86b3d07bf112fabc1edb01fd10a966e840c185642e55d00f35dfd435220b3'
 GEO_PIN = '5584b122d45a3617e731f7179d53e9625eb67fd15515d0cd7a5dab366132290d'
 TOLERANCE = 1e-12
+MAX_GEOCORR_BYTES = 32 * 1024 * 1024
 ROUNDING = Decimal('0.000050000001')
 TABLES = (
     'acs_code_lookup', 'acs_area_lookup', 'puma_county_factors', 'puma_msa_factors',
@@ -691,9 +693,25 @@ def workbook(file, sheet):
         ).to_polars().iter_rows()
     )
 
+def geocorr_text(file):
+    require(file.name in {'geocorr_intersections.csv', 'geocorr_puma_totals.csv',
+                         'geocorr_county_totals.csv'}, 'unknown registered Geocorr CSV')
+    body = safe(file).read_bytes()
+    require(len(body) <= MAX_GEOCORR_BYTES, 'Geocorr original exceeds byte bound')
+    try:
+        text, decoder = body.decode('utf-8-sig'), 'utf-8-sig'
+    except UnicodeDecodeError:
+        try:
+            text, decoder = body.decode('cp1252'), 'cp1252'
+        except UnicodeDecodeError as error:
+            raise ValueError('unsupported Geocorr CSV encoding') from error
+    require('\x00' not in text, 'unsupported Geocorr CSV encoding: NUL text')
+    return text, decoder
+
+
 def csv_rows(file):
-    with file.open(encoding='utf-8-sig', newline='') as stream:
-        rows = list(csv.reader(stream, strict=True))
+    text, _ = geocorr_text(file)
+    rows = list(csv.reader(io.StringIO(text, newline=''), strict=True))
     require(len(rows) > 2, 'empty Geocorr original')
     require(all(len(row) == len(rows[0]) for row in rows), 'Geocorr width differs')
     return [dict(zip(rows[0], row, strict=True)) for row in rows[2:]]
@@ -947,6 +965,10 @@ def populations(directory, files, county_inventory):
     return {
         'closure_max': maximum,
         'published_rounding_decimal_bound': str(ROUNDING),
+        'geocorr_selected_decoders': {
+            kind: geocorr_text(files[kind])[1] for kind in
+            ('geocorr_intersections', 'geocorr_puma_totals', 'geocorr_county_totals')
+        },
         'county_relations': len(expected),
         'msa_relations': len(msa_expected),
         'scoped_puma_population': sum(v for k, v in pumas.items() if k[0] in SCOPE),

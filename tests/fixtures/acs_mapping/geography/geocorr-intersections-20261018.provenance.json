@@ -1,0 +1,21 @@
+{
+  "archive_sha256": "1ca7d930d32270ddf9d565e228436dadac558f417d99653eda8cbcc2029df1c0",
+  "authority_url": "https://mcdc.missouri.edu/cgi-bin/broker",
+  "c1_bytes": 0,
+  "content_type": "text/csv",
+  "data_rows": 4690,
+  "description": "Complete exact public Geocorr generated original; lossless deterministic gzip, never production runtime input. No microdata.",
+  "diagnostic_decoders_equivalent_for_these_bytes": [
+    "cp1252",
+    "iso-8859-1"
+  ],
+  "non_ascii_bytes": 112,
+  "original_sha256": "9d7ef74ba87b2b3bd4b22303c4c0910a4da0bca966721232c0e9b4461737e04d",
+  "original_size": 499769,
+  "retrieval_time": "2026-10-18T19:47:14.262421+00:00",
+  "retrieval_time_is_proxy": true,
+  "retrieval_url": "https://mcdc.missouri.edu/temp/geocorr2022_2629107957.csv",
+  "server_declared_charset": null,
+  "states": 52,
+  "transformation": "gzip only; decompression exactly restores every original byte, including CRLF/spacing and non-UTF8 accents"
+}

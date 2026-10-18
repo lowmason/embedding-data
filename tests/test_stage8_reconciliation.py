@@ -562,3 +562,29 @@ def test_review_existing_but_unrelated_locator_is_rejected(reconciliation_module
         reconciliation_module.reconcile(
             fixture.data_dir, 'independent', repin(directory), controls
         )
+
+
+def test_independent_actual_geocorr_csv_decoding(reconciliation_module, tmp_path):
+    from acs_mapping_fixtures import genuine_geocorr_bytes
+    body = genuine_geocorr_bytes()
+    file = tmp_path / 'geocorr_intersections.csv'
+    file.write_bytes(body)
+    rows = reconciliation_module.csv_rows(file)
+    assert len(rows) == 4690 and len({r['state'] for r in rows}) == 52
+    assert any('ó' in r['PUMA22name'] or 'ó' in r['CountyName'] for r in rows)
+    assert reconciliation_module.geocorr_text(file)[1] == 'cp1252'
+    assert file.read_bytes() == body
+
+@pytest.mark.parametrize('body', [b'\x81', b'\xff\xfea\x00b\x00'])
+def test_independent_geocorr_rejects_unsupported_encoding(reconciliation_module, tmp_path, body):
+    file = tmp_path / 'geocorr_intersections.csv'
+    file.write_bytes(body)
+    with pytest.raises(ValueError, match='encoding'):
+        reconciliation_module.geocorr_text(file)
+
+
+def test_independent_geocorr_decoder_is_reference_scoped(reconciliation_module, tmp_path):
+    file = tmp_path / 'source.csv'
+    file.write_bytes(b'\xf3')
+    with pytest.raises(ValueError, match='registered Geocorr'):
+        reconciliation_module.geocorr_text(file)

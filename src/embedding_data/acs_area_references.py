@@ -1,6 +1,7 @@
 '''Strict complete population originals for the separate Stage 8 geographic frames.'''
 
 import csv
+import io
 import json
 import re
 from dataclasses import dataclass
@@ -20,6 +21,7 @@ from embedding_data.acs_mapping_references import (
     GEOCORR_PUMA_TOTALS_HEADERS,
     WORKBOOK_LAYOUTS,
     ReferenceSnapshot,
+    read_geocorr_text,
 )
 
 S = pl.String
@@ -175,8 +177,8 @@ def _geocorr(snapshot, kind):
         'geocorr_puma_totals': GEOCORR_PUMA_TOTALS_HEADERS,
         'geocorr_county_totals': GEOCORR_COUNTY_TOTALS_HEADERS,
     }[kind]
-    with snapshot.files[kind].open(encoding='utf-8-sig', newline='') as source:
-        rows = list(csv.reader(source, strict=True))
+    text, _ = read_geocorr_text(kind, snapshot.files[kind])
+    rows = list(csv.reader(io.StringIO(text, newline=''), strict=True))
     source, target = {
         'geocorr_intersections': ('puma22', 'county'),
         'geocorr_puma_totals': ('puma22', 'state'),
@@ -323,6 +325,11 @@ def read_area_evidence(snapshot: ReferenceSnapshot, selected: SelectedInputs) ->
             'reference_id': snapshot.reference_id,
             'receipt_sha256': snapshot.receipt_sha256,
             'originals': snapshot.receipt['originals'],
+            'geocorr_selected_decoders': {
+                kind: read_geocorr_text(kind, snapshot.files[kind])[1]
+                for kind in ('geocorr_intersections', 'geocorr_puma_totals',
+                             'geocorr_county_totals')
+            },
             'excluded_states': sorted(set(row['state_fips'] for row in puma_totals) - gp.SCOPE),
         },
         tuple(sorted(gp.SCOPE)),

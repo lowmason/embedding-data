@@ -1018,3 +1018,19 @@ def _reconciliation_delivery(profile, ddi, frame):
                                    pl.Series('MIGPLAC1', [110, 1, 1, 1, 1]),
                                    pl.Series('MIGPUMA1', [2, 100, 100, 100, 100]))
     return ddi, frame
+
+
+def genuine_geocorr_bytes():
+    '''Load the exact captured public CSV; verify archive and original independently.'''
+    import gzip
+    import hashlib
+    import json
+    root = Path(__file__).parent / 'fixtures/acs_mapping/geography'
+    metadata = json.loads((root / 'geocorr-intersections-20261018.provenance.json').read_text())
+    archive = (root / 'geocorr-intersections-20261018.csv.gz').read_bytes()
+    assert hashlib.sha256(archive).hexdigest() == metadata['archive_sha256']
+    body = gzip.decompress(archive)
+    assert hashlib.sha256(body).hexdigest() == metadata['original_sha256'] == (
+        '9d7ef74ba87b2b3bd4b22303c4c0910a4da0bca966721232c0e9b4461737e04d')
+    assert len(body) == metadata['original_size']
+    return body

@@ -1,6 +1,7 @@
 '''Immutable Stage 8 public reference registry and manifest-backed snapshots.'''
 
 import csv
+import io
 import json
 import os
 import re
@@ -813,6 +814,26 @@ def _validate_workbook(kind, file):
         raise ValueError(f'{kind}: malformed workbook or registered layout differs') from error
 
 
+def read_geocorr_text(kind: str, file: Path) -> tuple[str, str]:
+    '''Decode registered public CSV bytes strictly; the selected decoder is not a server claim.'''
+    if kind not in GEOCORR_QUERIES:
+        raise ValueError('unknown registered Geocorr CSV kind')
+    safe_path(file)
+    body = file.read_bytes()
+    if len(body) > MAX_ORIGINAL_BYTES:
+        raise ValueError('Geocorr original exceeds byte bound')
+    try:
+        text, decoder = body.decode('utf-8-sig'), 'utf-8-sig'
+    except UnicodeDecodeError:
+        try:
+            text, decoder = body.decode('cp1252'), 'cp1252'
+        except UnicodeDecodeError as error:
+            raise ValueError('unsupported Geocorr CSV encoding') from error
+    if '\x00' in text:
+        raise ValueError('unsupported Geocorr CSV encoding: NUL text')
+    return text, decoder
+
+
 def _validate_csv(kind, file):
     headers = {
         'geocorr_intersections': GEOCORR_INTERSECTIONS_HEADERS,
@@ -820,8 +841,8 @@ def _validate_csv(kind, file):
         'geocorr_county_totals': GEOCORR_COUNTY_TOTALS_HEADERS,
     }[kind]
     try:
-        with file.open(encoding='utf-8-sig', newline='') as source:
-            rows = list(csv.reader(source, strict=True))
+        text, _ = read_geocorr_text(kind, file)
+        rows = list(csv.reader(io.StringIO(text, newline=''), strict=True))
         if len(rows) < 3 or rows[0] != headers or len(rows[1]) != len(headers):
             raise ValueError('Geocorr header/label/body differs')
         labels = dict(zip(headers, rows[1], strict=True))

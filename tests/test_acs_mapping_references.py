@@ -638,3 +638,48 @@ def test_geocorr_layout_evidence_records_generated_original_url():
         assert originals[kind]['request_url'] == (
             'https://mcdc.missouri.edu/cgi-bin/broker?' +
             originals[kind + '_request']['body'])
+
+
+def test_actual_nationwide_geocorr_original_encoding_is_accepted(tmp_path):
+    from acs_mapping_fixtures import genuine_geocorr_bytes
+    body = genuine_geocorr_bytes()
+    file = tmp_path / 'geocorr_intersections.csv'
+    file.write_bytes(body)
+    with pytest.raises(UnicodeDecodeError):
+        body.decode('utf-8-sig')
+    refs._validate_original('geocorr_intersections', file)
+    text, decoder = refs.read_geocorr_text('geocorr_intersections', file)
+    assert decoder == 'cp1252' and 'ó' in text
+    assert text.encode(decoder) == body == file.read_bytes()
+
+
+@pytest.mark.parametrize('body', [b'\x81', b'\xff\xfea\x00b\x00'])
+def test_geocorr_decoder_refuses_unknown_bytes_and_utf16(tmp_path, body):
+    file = tmp_path / 'geocorr_intersections.csv'
+    file.write_bytes(body)
+    with pytest.raises(ValueError, match='encoding'):
+        refs.read_geocorr_text('geocorr_intersections', file)
+
+
+def test_geocorr_decoder_is_not_a_generic_reference_decoder(tmp_path):
+    file = tmp_path / 'usa_occ.html'
+    file.write_bytes(b'\xf3')
+    with pytest.raises(ValueError, match='registered Geocorr'):
+        refs.read_geocorr_text('usa_occ', file)
+
+@pytest.mark.parametrize('prefix', [b'', b'\xef\xbb\xbf'])
+def test_geocorr_prefers_strict_utf8_without_guessing_server_charset(tmp_path, prefix):
+    file = tmp_path / 'geocorr_intersections.csv'
+    body = prefix + 'names\r\nRegión\r\n'.encode('utf-8')
+    file.write_bytes(body)
+    text, decoder = refs.read_geocorr_text('geocorr_intersections', file)
+    assert decoder == 'utf-8-sig' and text == 'names\r\nRegión\r\n'
+    assert file.read_bytes() == body
+
+
+def test_single_byte_decoding_does_not_accept_corrupt_geocorr_shape(tmp_path):
+    from acs_mapping_fixtures import genuine_geocorr_bytes
+    file = tmp_path / 'geocorr_intersections.csv'
+    file.write_bytes(genuine_geocorr_bytes().replace(b'puma22', b'wrong!', 1))
+    with pytest.raises(ValueError, match='header'):
+        refs._validate_original('geocorr_intersections', file)

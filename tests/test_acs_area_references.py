@@ -254,3 +254,23 @@ def test_null_reference_list_element_fails(population_case):
     )
     with pytest.raises(ValueError, match='reference list'):
         validate_area_evidence(replace(population_case.evidence, intersections=frame))
+
+
+def test_actual_nationwide_geocorr_reader_preserves_single_byte_names(tmp_path):
+    from types import SimpleNamespace
+
+    from acs_mapping_fixtures import genuine_geocorr_bytes
+
+    from embedding_data.acs_area_references import _geocorr
+    body = genuine_geocorr_bytes()
+    file = tmp_path / 'geocorr_intersections.csv'
+    file.write_bytes(body)
+    snapshot = SimpleNamespace(
+        reference_id='actual_encoding', files={'geocorr_intersections': file}
+    )
+    rows = list(_geocorr(snapshot, 'geocorr_intersections'))
+    assert len(rows) == 4690
+    assert len({r['state'] for r, _ in rows}) == 52
+    assert any('ó' in r['PUMA22name'] or 'ó' in r['CountyName'] for r, _ in rows)
+    assert rows[-1][1]['reference_locators'] == ['geocorr_intersections:csv:row:4692']
+    assert file.read_bytes() == body
