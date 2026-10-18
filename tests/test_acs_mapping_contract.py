@@ -22,6 +22,7 @@ def code_row():
     row.update(rule_version=c.CODE_RULE_VERSION, aggregation_reason_status='not_applicable',
                system='naics', source_scheme='naics_2022', paired_census_code='0170',
                source_token='111111', mapping_status='mapped',
+               native_finest_candidates=['111111'],
                canonical_finest_candidates=['111111'],
                canonical_candidate_paths=[['root', 'leaf']])
     row['code_lookup_id'] = lookup_id([row[k] for k in c.NATURAL_KEYS['code']])
@@ -99,7 +100,9 @@ def test_only_approved_documented_special_has_no_candidates():
     row.update(system='soc', source_scheme='soc_2018', source_token='559830',
                mapping_status='documented_special', special_reason='documented',
                canonical_finest_candidates=[], canonical_candidate_paths=[],
-               native_finest_candidates=[])
+               native_finest_candidates=[], native_node_id=None,
+               canonical_common_node_id=None, canonical_scalar_code=None,
+               canonical_scalar_node_id=None)
     row['code_lookup_id'] = lookup_id([row[k] for k in c.NATURAL_KEYS['code']])
     validate_table('code', pl.DataFrame([row], schema=c.CODE_SCHEMA))
     row['source_token'] = '999999'
@@ -110,10 +113,15 @@ def test_only_approved_documented_special_has_no_candidates():
 
 def reference_row(kind):
     c = contract_module
-    return {name: ([] if isinstance(dtype, pl.List) else
-                   True if dtype == pl.Boolean else 2020 if dtype == pl.Int64 else
-                   1.0 if dtype == pl.Float64 else 'x')
-            for name, dtype in c.SCHEMAS[kind].items()}
+    row = {name: ([] if isinstance(dtype, pl.List) else
+                  True if dtype == pl.Boolean else 2020 if dtype == pl.Int64 else
+                  1.0 if dtype == pl.Float64 else 'x')
+           for name, dtype in c.SCHEMAS[kind].items()}
+    row['factor_key'] = c.factor_key(row['area_type'], row['state_fips'], row['area_code'])
+    if kind == 'area':
+        row.update(area_status='applicable', rule_version=c.AREA_RULE_VERSION)
+        row['area_lookup_id'] = lookup_id([row[k] for k in c.NATURAL_KEYS[kind]])
+    return row
 
 
 @pytest.mark.parametrize('status,key', [('applicable', None), ('foreign', 'unexpected')])
@@ -132,4 +140,65 @@ def test_published_county_factor_nullability_depends_on_area_type(column):
     with pytest.raises(ValueError):
         validate_table('county_factor', pl.DataFrame([row], schema=c.COUNTY_FACTOR_SCHEMA))
     row['area_type'] = 'work_migration'
+    row['factor_key'] = c.factor_key(row['area_type'], row['state_fips'], row['area_code'])
     validate_table('county_factor', pl.DataFrame([row], schema=c.COUNTY_FACTOR_SCHEMA))
+
+
+@pytest.mark.parametrize('kind', ['area', 'county_factor'])
+@pytest.mark.parametrize('invalid_key', [
+    'unrelated', lookup_id(['x', 'x', 'different', 2020]), lookup_id(['x', 'x', 'x', 2022])])
+def test_factor_keys_authenticate_complete_area_identity(kind, invalid_key):
+    c, row = contract_module, reference_row(kind)
+    validate_table(kind, pl.DataFrame([row], schema=c.SCHEMAS[kind]))
+    row['factor_key'] = invalid_key
+    with pytest.raises(ValueError, match='factor key'):
+        validate_table(kind, pl.DataFrame([row], schema=c.SCHEMAS[kind]))
+
+
+def test_area_rule_version_is_frozen():
+    c, row = contract_module, reference_row('area')
+    validate_table('area', pl.DataFrame([row], schema=c.AREA_SCHEMA))
+    row['rule_version'] = 'unsupported'
+    with pytest.raises(ValueError, match='rule version'):
+        validate_table('area', pl.DataFrame([row], schema=c.AREA_SCHEMA))
+
+
+@pytest.mark.parametrize('status', ['unknown', 'not_applicable'])
+@pytest.mark.parametrize('reason', ['category_design', 'disclosure'])
+def test_undocumented_aggregation_status_cannot_claim_reasons(status, reason):
+    c, row = contract_module, code_row()
+    row.update(aggregation_reason_status=status, aggregation_reasons=[reason])
+    with pytest.raises(ValueError, match='reason'):
+        validate_table('code', pl.DataFrame([row], schema=c.CODE_SCHEMA))
+
+
+@pytest.mark.parametrize('status,reasons', [
+    ('documented', ['category_design', 'disclosure']), ('unknown', []), ('not_applicable', [])])
+def test_consistent_aggregation_reason_statuses_are_retained(status, reasons):
+    c, row = contract_module, code_row()
+    row.update(aggregation_reason_status=status, aggregation_reasons=reasons)
+    validate_table('code', pl.DataFrame([row], schema=c.CODE_SCHEMA))
+
+
+def test_mapped_code_requires_native_candidates():
+    c, row = contract_module, code_row()
+    row['native_finest_candidates'] = []
+    with pytest.raises(ValueError, match='native'):
+        validate_table('code', pl.DataFrame([row], schema=c.CODE_SCHEMA))
+
+
+@pytest.mark.parametrize('column', ['native_node_id', 'canonical_common_node_id',
+                                   'canonical_scalar_code', 'canonical_scalar_node_id'])
+def test_documented_special_cannot_claim_nodes_or_scalars(column):
+    c, row = contract_module, code_row()
+    row.update(system='soc', source_scheme='soc_2018', source_token='559830',
+               mapping_status='documented_special', special_reason='documented',
+               native_finest_candidates=[], canonical_finest_candidates=[],
+               canonical_candidate_paths=[], native_node_id=None,
+               canonical_common_node_id=None, canonical_scalar_code=None,
+               canonical_scalar_node_id=None)
+    row['code_lookup_id'] = lookup_id([row[k] for k in c.NATURAL_KEYS['code']])
+    validate_table('code', pl.DataFrame([row], schema=c.CODE_SCHEMA))
+    row[column] = 'invented'
+    with pytest.raises(ValueError, match='special'):
+        validate_table('code', pl.DataFrame([row], schema=c.CODE_SCHEMA))

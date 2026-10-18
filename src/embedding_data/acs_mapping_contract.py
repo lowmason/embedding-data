@@ -206,17 +206,26 @@ def validate_table(kind: str, frame: pl.DataFrame) -> None:
                     not in AGGREGATION_REASON_STATUSES or not set(row['aggregation_reasons'])
                     .issubset({'category_design', 'disclosure'})):
                 raise ValueError('unsupported code rule or aggregation reason')
+            if (row['aggregation_reason_status'] != 'documented'
+                    and row['aggregation_reasons']):
+                raise ValueError('undocumented aggregation status cannot claim reasons')
             if row['mapping_status'] == 'documented_special' and (
                     row['system'] != 'soc' or row['source_token'] != '559830'
                     or not row['special_reason'] or row['native_finest_candidates']
-                    or row['canonical_finest_candidates']):
+                    or row['canonical_finest_candidates']
+                    or any(row[name] is not None for name in (
+                        'native_node_id', 'canonical_common_node_id', 'canonical_scalar_code',
+                        'canonical_scalar_node_id'))):
                 raise ValueError('unsupported documented special')
             candidates = row['canonical_finest_candidates']
             if len(candidates) != len(row['canonical_candidate_paths']):
                 raise ValueError('missing canonical candidate paths')
-            if row['mapping_status'] == 'mapped' and not candidates:
-                raise ValueError('mapped code has no canonical candidates')
+            if row['mapping_status'] == 'mapped' and (
+                    not candidates or not row['native_finest_candidates']):
+                raise ValueError('mapped code has no native or canonical candidates')
     if kind == 'area':
+        if frame.filter(pl.col('rule_version').ne(AREA_RULE_VERSION)).height:
+            raise ValueError('unsupported area rule version')
         if not set(frame['area_status']).issubset(AREA_STATUSES):
             raise ValueError('unsupported area status')
         if frame.filter(pl.col('area_status').eq('applicable').ne(
@@ -228,3 +237,10 @@ def validate_table(kind: str, frame: pl.DataFrame) -> None:
             pl.col('published_county_factor').is_null())
         if frame.filter(pl.col('area_type').ne('work_migration').and_(missing_published)).height:
             raise ValueError('published county factors may be null only for work_migration')
+    if kind in ('area', 'county_factor'):
+        applicable = (frame.filter(pl.col('area_status').eq('applicable'))
+                      if kind == 'area' else frame)
+        for row in applicable.iter_rows(named=True):
+            expected = factor_key(row['area_type'], row['state_fips'], row['area_code'])
+            if row['factor_key'] != expected:
+                raise ValueError('factor key contradicts area identity')
