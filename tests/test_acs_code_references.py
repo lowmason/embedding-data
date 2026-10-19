@@ -757,3 +757,112 @@ def test_authentic_current_html_rejections_reach_complete_evidence(
         validate_paired_keys(pl.DataFrame({'system': ['soc'], 'source_scheme': ['soc2018'],
                                           'paired_census_code': ['0790'],
                                           'source_token': ['519160']}), evidence)
+
+
+@pytest.mark.parametrize('year,pair,numbers', [(2017, '0770', (28, 30)),
+                                             (2017, '7570', (253, 255)),
+                                             (2022, '0770', (28, 30)),
+                                             (2022, '7570', (249, 251))])
+def test_full_industry_agreeing_rows_retain_all_locators(evidence, year, pair, numbers):
+    row = evidence.metadata.filter(pl.col('native_vintage').eq(year)
+                                   .and_(pl.col('paired_census_code').eq(pair))).row(0, named=True)
+    kind = f'census_industry_{year}'
+    sheet = '2017 Census Industry Code List' if year == 2017 else '2022 Census Ind Code List '
+    assert {v for v in row['reference_locators'] if v.startswith(kind + ':')} == {
+        f'{kind}:{sheet}!D:E:row={n}' for n in numbers}
+    assert row['reference_locators'] == sorted(set(row['reference_locators']))
+
+
+@pytest.mark.parametrize('year,number', [(2017, 28), (2017, 30), (2017, 253), (2017, 255),
+                                       (2022, 28), (2022, 30), (2022, 249), (2022, 251)])
+def test_full_industry_duplicate_expression_conflict_is_rejected(
+        code_originals, selected, tmp_path, year, number):
+    sheet = '2017 Census Industry Code List' if year == 2017 else '2022 Census Ind Code List '
+    altered = selected_with_full_cell(selected, tmp_path, f'census_industry_{year}',
+                                      sheet, (number, 4), '111')
+    with pytest.raises(ValueError, match='contradictory full Census industry category'):
+        read_code_evidence(code_originals.snapshot, altered)
+
+
+def test_d10_full_detail_disagreement_is_bounded_and_visible(evidence):
+    rejected = evidence.diagnostics['rejected_industry_membership_assertions']
+    assert [(r['native_vintage'], r['paired_census_code'], r['source_token'])
+            for r in rejected] == [
+        (2017, '2970', '33299M'), (2017, '2980', '332MZ')]
+    for record, count2017, count2022, crosswalk_row, detail_row in zip(
+            rejected, (4, 9), (3, 10), (79, 80), (83, 84), strict=True):
+        pair = record['paired_census_code']
+        assert record['cause'] == 'unknown'
+        assert record['disposition'] == 'rejected_membership_assertion'
+        assert record['rejected_assertion']['reference_locator'].endswith(f'row={detail_row}')
+        assert len(record['rejected_assertion']['native_finest_candidates']) == count2022
+        assert len(record['supporting_assertions']) == 2
+        assert all(len(r['native_finest_candidates']) == count2017
+                   for r in record['supporting_assertions'])
+        for year, count_ in ((2017, count2017), (2022, count2022)):
+            row = evidence.metadata.filter(pl.col('native_vintage').eq(year)
+                                           .and_(pl.col('paired_census_code').eq(pair))).row(
+                                               0, named=True)
+            assert len(row['native_finest_candidates']) == count_
+            if year == 2017:
+                assert [v for v in row['reference_locators']
+                        if v.startswith('census_industry_2017:')] == [
+                    'census_industry_2017:2007 - 2017 Industry Crosswalk!I:K:'
+                    f'row={crosswalk_row}']
+    extras = [r for r in evidence.diagnostics['rejected_industry_assertions']
+              if r['status'] == 'not_in_pums_list']
+    assert all(isinstance(v, str) for r in extras
+               for v in r['historical_evidence']['reference_locators'])
+
+
+@pytest.mark.parametrize('kind,sheet,row,column,value', [
+    ('pums_industry_2017', 'ACS', 95, 3, '332992, 332993, 332994'),
+    ('pums_industry_2017', 'ACS', 96, 4, '33299M'),
+    ('census_industry_2017', '2017 Census Industry Code List', 83, 4, '332996'),
+    ('census_industry_2017', '2017 Census Industry Code List', 84, 3, '2981'),
+    ('census_industry_2017', '2007 - 2017 Industry Crosswalk', 79, 8, '2971'),
+    ('census_industry_2017', '2007 - 2017 Industry Crosswalk', 79, 9, '332992'),
+    ('census_industry_2017', '2007 - 2017 Industry Crosswalk', 80, 9, '3325'),
+    ('census_industry_2017', '2007 - 2017 Industry Crosswalk', 9, 8, '2022 Census Code'),
+    ('census_industry_2022', '2022 Census Ind Code List ', 12, 4, '112'),
+])
+def test_d10_support_rejected_and_unrelated_assertions_remain_strict(
+        code_originals, selected, tmp_path, kind, sheet, row, column, value):
+    if kind.startswith('census_'):
+        changed = selected_with_full_cell(selected, tmp_path, kind, sheet, (row, column), value)
+        snapshot = code_originals.snapshot
+    else:
+        changed = selected
+        snapshot = code_originals.changed(kind, sheet, (row, column), value)
+    with pytest.raises(ValueError, match='D10|industry membership|industry support'):
+        read_code_evidence(snapshot, changed)
+
+
+def test_d10_repackaged_manual_receipt_cannot_replace_original_pin(code_originals, selected):
+    import fastexcel
+
+    original = code_originals.snapshot.files['pums_industry_2017']
+    altered = code_originals.changed_part('pums_industry_2017', 'docProps/core.xml', None)
+    changed = altered.files['pums_industry_2017']
+    assert manifest.sha256_file(original) != manifest.sha256_file(changed)
+    before = fastexcel.read_excel(original.read_bytes()).load_sheet(
+        'ACS', header_row=None, dtypes='string').to_polars()
+    after = fastexcel.read_excel(changed.read_bytes()).load_sheet(
+        'ACS', header_row=None, dtypes='string').to_polars()
+    assert before.equals(after)
+    with pytest.raises(ValueError, match='D10 industry original pin'):
+        read_code_evidence(altered, selected)
+
+
+def test_d10_returned_diagnostics_cannot_mutate_fixed_candidate_bounds(code_originals, selected):
+    first = read_code_evidence(code_originals.snapshot, selected)
+    candidates = first.diagnostics['rejected_industry_membership_assertions'][0][
+        'supporting_assertions'][1]['native_finest_candidates']
+    original = candidates.copy()
+    try:
+        candidates.append('999999')
+        second = read_code_evidence(code_originals.snapshot, selected)
+        assert second.diagnostics['rejected_industry_membership_assertions'][0][
+            'supporting_assertions'][1]['native_finest_candidates'] == original
+    finally:
+        candidates[:] = original

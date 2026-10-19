@@ -2226,6 +2226,206 @@ def check_provenance(row, targets, reference_ids):
         'reference locator targets differ from independent original evidence'
     )
 
+INDUSTRY_DETAIL_SECTIONS = {2017: {8: ('0170-0490', '11-21'),
+        10: ('0170-0290', '11'),
+        19: ('0370-0490', '21'),
+        32: ('1070-3990', '31-33'),
+        114: ('4070-4590', '42'),
+        138: ('4670-5790', '44-45'),
+        176: ('6070-6390, 0570-0690', '48-49, 22'),
+        178: ('6070-6390', '48-49'),
+        193: ('0570-0690', '22'),
+        202: ('6470-6780', '51'),
+        217: ('6870-7190', '52-53'),
+        219: ('6870-6992', '52'),
+        228: ('7071-7190', '53'),
+        237: ('7270-7790', '54-56'),
+        240: ('7270-7490', '54'),
+        257: ('7580-7790', '56'),
+        268: ('7860-8470', '61-62'),
+        270: ('7860-7890', '61'),
+        277: ('7970-8470', '62'),
+        296: ('8561-8690', '71-72'),
+        298: ('8561-8590', '71'),
+        308: ('8660-8690', '72'),
+        315: ('8770-9290', '81'),
+        334: ('9370-9590', '92'),
+        345: ('9670-9870', '928110')},
+ 2022: {8: ('0170-0490', '11-21'),
+        10: ('0170-0290', '11'),
+        19: ('0370-0490', '21'),
+        32: ('1070-3990', '31-33'),
+        114: ('4070-4590', '42'),
+        138: ('4670-5791', '44-45'),
+        172: ('6070-6390, 0570-0690', '48-49, 22'),
+        174: ('6070-6390', '48-49'),
+        189: ('0570-0690', '22'),
+        198: ('6471-6781', '51'),
+        213: ('6871-7190', '52-53'),
+        215: ('6871-6992', '52'),
+        224: ('7071-7190', '53'),
+        233: ('7270-7790', '54-56'),
+        236: ('7270-7490', '54'),
+        253: ('7580-7790', '56'),
+        264: (None, '61-62'),
+        265: ('7860-8470', None),
+        267: ('7860-7890', '61'),
+        274: ('7970-8470', '62'),
+        294: ('8561-8690', '71-72'),
+        296: ('8561-8590', '71'),
+        306: ('8660-8690', '72'),
+        314: ('8770-9290', '81'),
+        334: ('9370-9590', '92'),
+        346: ('9670-9870', 'pt. 92811')}}
+
+
+def industry_membership_authorities(files, selected, data_dir, code_directory):
+    '''Independently compare complete original industries and reconstruct bounded D10 evidence.'''
+    native = pl.read_parquet(code_directory / 'naics_native_nodes.parquet').to_dicts()
+    paths = dict(pl.read_parquet(code_directory / 'code_paths.parquet').iter_rows())
+    pins = {
+        'pums_industry_2017': '6f569f8bfcd1955db2f75ed4ec31dc836dea7faebf24375567107b725967f4d2',
+        'census_industry_2017': '479161190aedc0a64529f930d34a21f18e1950609332defe4967e4e3f129c816'}
+    bounds = (
+        ('2970', '33299M', 95, 83, 79, '332992, 332993, 332994, 332996',
+         '332992, 332993, 332994', ['332992', '332993', '332994', '332996']),
+        ('2980', '332MZ', 96, 84, 80,
+         '3325, 3326, 3329 exc. 332992, 332993, 332994, 332996',
+         '3325, 3326, 3329 exc. 332992, 332993, 332994',
+         ['332510', '332613', '332618', '332911', '332912', '332913', '332919',
+          '332991', '332999']))
+    support, rejected = {}, []
+    for year in (2017, 2022):
+        kind = f'census_industry_{year}'
+        citation = selected['ipums']['references']['receipt']['originals'][kind]['citation']
+        files[kind] = relative(data_dir / 'raw', citation['path'])
+        check_record(files[kind], citation, 'selected Census original provenance differs')
+        sheet = '2017 Census Industry Code List' if year == 2017 else '2022 Census Ind Code List '
+        nodes = [r for r in native if r['vintage'] == year]
+        full = {}
+        detail = workbook(files[kind], sheet)
+        census_header = '2017 Census Code' if year == 2017 else '2022 Census Industry Code'
+        require(detail[3] == (None, f'Industry {year} Description', None,
+                              census_header, f'{year} NAICS Code'),
+                'full Census industry header differs')
+        for number, row in enumerate(detail, 1):
+            if number <= 4:
+                continue
+            pair, expression = row[3:5]
+            if number in INDUSTRY_DETAIL_SECTIONS[year]:
+                require((pair, expression) == INDUSTRY_DETAIL_SECTIONS[year][number],
+                        'malformed full Census industry structural assertion')
+                continue
+            if pair is None and expression is None:
+                continue
+            require(pair is not None and re.fullmatch('[0-9]{4}', pair),
+                    'malformed full Census industry key')
+            if pair == '9920' and expression is None:
+                require(row[1] == 'Unemployed, last worked 5 years ago or earlier or never worked',
+                        'full Census nonworking industry differs')
+                continue
+            require(bool(expression and expression.strip()),
+                    'empty full Census industry expression')
+            expression = expression.strip()
+            members = leaf_members(expression, nodes, paths)
+            target = f'{kind}:{sheet}!D:E:row={number}'
+            if pair in full:
+                require(full[pair][0] == expression,
+                        'Census reference industry assertions disagree')
+                full[pair][2].append(target)
+            else:
+                full[pair] = (expression, members, [target])
+        editions = [(f'pums_industry_{year}', 'ACS')]
+        if year == 2022:
+            editions += [('pums_annual_2024', 'Industry'), ('pums_five_year_2024', 'Industry')]
+        admitted = {}
+        for pums_kind, pums_sheet in editions:
+            within = {}
+            original = workbook(files[pums_kind], pums_sheet)
+            require(original[18] == (None, f'Industry {year} Description',
+                                     f'{year} Industry Code', f'{year} NAICS Code',
+                                     f'{year} NAICS Based Code'), 'PUMS industry header differs')
+            for number, row in enumerate(original, 1):
+                pair, expression, token = row[2:5]
+                if pair is None:
+                    continue
+                if not re.fullmatch('[0-9]{4}', pair):
+                    require(pair == f'{year} Industry Code' or re.fullmatch(
+                        r'[0-9]{4}-[0-9]{4}(?:, [0-9]{4}-[0-9]{4})*', pair),
+                            'malformed PUMS industry key')
+                    continue
+                if pair == '9920' and expression is None and token == '999920':
+                    continue
+                require(bool(expression and token), 'empty PUMS industry assertion')
+                require(pair not in within or within[pair] == (expression, token),
+                        'reference original industry paired assertions disagree')
+                within[pair] = expression, token
+                members = leaf_members(expression, nodes, paths)
+                normalized = token.strip()
+                if pair in admitted:
+                    require(admitted[pair][0:2] == (normalized, members),
+                            'contradictory PUMS industry authority')
+                else:
+                    admitted[pair] = normalized, members, expression, number
+                require(pair in full, 'missing full Census industry support')
+                support[year, pair] = full[pair][2]
+                bounded = year == 2017 and pair in {'2970', '2980'}
+                require(bounded or full[pair][1] == members,
+                        'unexplained full Census/PUMS industry membership disagreement')
+        if year != 2017:
+            continue
+        require(all(digest(files[k]) == pin for k, pin in pins.items()),
+                'D10 industry original pin differs')
+        cross_sheet = '2007 - 2017 Industry Crosswalk'
+        cross = workbook(files['census_industry_2017'], cross_sheet)
+        require(cross[8][8:11] == ('2017 Census Code', '2017 NAICS code',
+                                  '2017 Census Industry Description'),
+                'D10 explicit 2017 crosswalk header differs')
+        for number, row in enumerate(cross[9:], 10):
+            pair, expression = row[8:10]
+            if pair is None and expression is None:
+                continue
+            if number == len(cross) and pair == '9920' and expression is None:
+                continue
+            require(pair is not None and re.fullmatch('[0-9]{4}', pair) and expression,
+                    'malformed explicit 2017 industry crosswalk row')
+            leaf_members(expression, nodes, paths)
+        for (pair, token, pums_number, detail_number, crosswalk_number, published,
+             rejected_expression, expected) in bounds:
+            require(admitted.get(pair) == (token, set(expected), published, pums_number),
+                    'D10 PUMS industry assertion differs')
+            rejected_target = ('census_industry_2017:2017 Census Industry Code List!D:E:'
+                               f'row={detail_number}')
+            require(pair in full and full[pair][0] == rejected_expression
+                    and full[pair][2] == [rejected_target],
+                    'D10 rejected industry assertion differs')
+            matched = [(n, r) for n, r in enumerate(cross, 1) if r[8] == pair]
+            require(len(matched) == 1 and matched[0][0] == crosswalk_number
+                    and matched[0][1][8:10] == (pair, published)
+                    and leaf_members(matched[0][1][9], nodes, paths) == set(expected),
+                    'D10 supporting crosswalk assertion differs')
+            positive = f'census_industry_2017:{cross_sheet}!I:K:row={crosswalk_number}'
+            support[2017, pair] = [positive]
+
+            def evidence(kind, locator, literal, members):
+                return {'kind': kind, 'original_sha256': pins[kind],
+                        'reference_locator': locator, 'expression': literal,
+                        'native_finest_candidates': sorted(members)}
+
+            rejected.append({'native_vintage': 2017, 'paired_census_code': pair,
+                             'source_token': token, 'cause': 'unknown',
+                             'disposition': 'rejected_membership_assertion',
+                             'rejected_assertion': evidence(
+                                 'census_industry_2017', rejected_target,
+                                 rejected_expression, full[pair][1]),
+                             'supporting_assertions': [evidence(
+                                 'pums_industry_2017',
+                                 f'pums_industry_2017:ACS!C:E:row={pums_number}',
+                                 published, expected), evidence(
+                                     'census_industry_2017', positive, published, expected)]})
+    return support, rejected
+
+
 def code_provenance(codes, files, inputs, selected, data_dir, code_directory):
     from html.parser import HTMLParser
 
@@ -2251,6 +2451,8 @@ def code_provenance(codes, files, inputs, selected, data_dir, code_directory):
                     self.rows[-1].append(self.cell.strip())
                 self.cell = None
 
+    industry_support, rejected_industry = industry_membership_authorities(
+        files, selected, data_dir, code_directory)
     cache = {}
 
     def rows(kind, sheet):
@@ -2259,12 +2461,6 @@ def code_provenance(codes, files, inputs, selected, data_dir, code_directory):
             cache[key] = workbook(files[kind], sheet)
         return cache[key]
 
-    for year in (2017, 2022):
-        kind = f'census_industry_{year}'
-        original = selected['ipums']['references']['receipt']['originals'][kind]
-        file = relative(data_dir / 'raw', original['citation']['path'])
-        check_record(file, original['citation'], 'selected Census original provenance differs')
-        files[kind] = file
     html_pairs = PairRows()
     html_pairs.feed(files['occupation_pairs_html'].read_text())
     highlighted = highlighted_occupation_rows(files['pums_occupation_2018'])
@@ -2278,18 +2474,20 @@ def code_provenance(codes, files, inputs, selected, data_dir, code_directory):
             if year == 2022:
                 editions += [('pums_annual_2024', 'Industry'), ('pums_five_year_2024', 'Industry')]
             for kind, sheet in editions:
-                matched = [
+                paired_rows = [
                     (n, r) for n, r in enumerate(rows(kind, sheet), 1)
-                    if len(r) >= 5 and r[2] == pair and (r[4] or '').strip() == token
+                    if len(r) >= 5 and r[2] == pair
                 ]
-                require(len(matched) == 1, 'reference original industry pair target absent')
-                targets.add(f'{kind}:{sheet}!C:E:row:{matched[0][0]}')
+                require(bool(paired_rows), 'reference original industry pair target absent')
+                assertions = {(r[3], r[4]) for _, r in paired_rows}
+                require(
+                    len(assertions) == 1 and all(
+                        r[3] and (r[4] or '').strip() == token for _, r in paired_rows
+                    ), 'reference original industry paired assertions disagree'
+                )
+                targets.update(f'{kind}:{sheet}!C:E:row:{n}' for n, _ in paired_rows)
             kind = f'census_industry_{year}'
-            sheet = ('2017 Census Industry Code List' if year == 2017
-                     else '2022 Census Ind Code List ')
-            matched = [n for n, r in enumerate(rows(kind, sheet), 1) if r[3] == pair]
-            require(len(matched) == 1, 'Census reference industry target absent')
-            targets.add(f'{kind}:{sheet}!D:E:row:{matched[0]}')
+            targets.update(locator_target(v) for v in industry_support[year, pair])
             targets.add('industry_tokens_html:Legend:M,P,S,Z')
             require(
                 all(
@@ -2387,6 +2585,7 @@ def code_provenance(codes, files, inputs, selected, data_dir, code_directory):
                 )
             )
         check_provenance(row, targets, ids)
+    return rejected_industry
 
 def geographic_provenance(directory, files, inputs):
     '''Rebuild citation support unions from original natural keys, separately from factors.'''
@@ -2551,7 +2750,16 @@ def reconcile(data_dir: Path, run_id: str, outputs_sha256: str, control_dir: Pat
     )
     code_directory = data_dir / 'derived/codes' / inputs['selected_upstreams']['request'][
         'codes_run']
-    code_provenance(codes, dict(files), inputs, selected, data_dir, code_directory)
+    rejected_industry = code_provenance(
+        codes, dict(files), inputs, selected, data_dir, code_directory)
+    report = read(directory / 'report.json')
+    reported_classification = report.get('classifications') if isinstance(report, dict) else None
+    reported_diagnostics = (reported_classification.get('reference_diagnostics')
+                            if isinstance(reported_classification, dict) else None)
+    require(isinstance(reported_diagnostics, dict) and reported_diagnostics.get(
+        'rejected_industry_membership_assertions') == rejected_industry,
+        'D10 industry rejection diagnostics differ from independent evidence')
+    classification['D10_rejected_industry_membership_assertions'] = rejected_industry
     geographic_provenance(directory, files, inputs)
     require(
         set(codes['system']) <= {'naics', 'soc'}

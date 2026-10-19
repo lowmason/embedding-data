@@ -680,3 +680,390 @@ def test_independent_source_role_semantics_reject_mutations(
     expected = ('reference locator targets' if damage == 'locator' else 'suppression')
     with pytest.raises(ValueError, match=expected):
         reconciliation_module.geographic_provenance(directory, files, inputs)
+
+
+@pytest.fixture
+def accepted_industry_pairs(reconciliation_module, tmp_path, monkeypatch):
+    from acs_mapping_fixtures import _reconciliation_delivery
+
+    def duplicate_pairs(profile, ddi, frame):
+        ddi, frame = _reconciliation_delivery(profile, ddi, frame)
+        if profile == 'vintage':
+            frame = pl.concat([frame] * 4)
+        row_count = frame.select(pl.len()).collect().item()
+        pairs = [[770, 7570, 2970, 2980][n % 4] for n in range(row_count)]
+        tokens = [{770: '23', 7570: '55', 2970: '33299M', 2980: '332MZ'}[pair]
+                  for pair in pairs]
+        return ddi, frame.with_columns(pl.Series('IND', pairs), pl.Series('INDNAICS', tokens))
+
+    fixture = seed_reconciliation_inputs(tmp_path, monkeypatch, prepare_acs=duplicate_pairs)
+    controls = tmp_path / 'controls'
+    reconciliation_module.freeze(fixture.data_dir, controls)
+    result = build_fixture_mapping(fixture, 'industry_pairs', monkeypatch)
+    return fixture, controls, result
+
+
+def industry_pair_cases():
+    for year in (2017, 2022):
+        editions = [(f'pums_industry_{year}', 'ACS')]
+        if year == 2022:
+            editions += [('pums_annual_2024', 'Industry'), ('pums_five_year_2024', 'Industry')]
+        for kind, sheet in editions:
+            management_rows = (265, 267) if year == 2017 else (259, 261)
+            for pair, token, numbers in [('0770', '23', (40, 42)),
+                                         ('7570', '55', management_rows)]:
+                yield year, kind, sheet, pair, token, numbers
+
+
+def canonical_industry_pair_cases():
+    for year in (2017, 2022):
+        sheet = '2017 Census Industry Code List' if year == 2017 else '2022 Census Ind Code List '
+        for pair, token, numbers in [('0770', '23', (28, 30)),
+                                     ('7570', '55', (253, 255) if year == 2017 else (249, 251))]:
+            yield year, f'census_industry_{year}', sheet, pair, token, numbers
+
+
+def industry_provenance_inputs(module, fixture, result):
+    directory = Path(result['directory'])
+    inputs = json.loads((directory / 'inputs.json').read_text())
+    selected, _ = module.upstreams(fixture.data_dir, inputs)
+    files = module.reference_files(fixture.data_dir, inputs['references'])
+    code_directory = fixture.data_dir / 'derived/codes' / fixture.request.codes_run
+    codes = pl.read_parquet(directory / 'acs_code_lookup.parquet')
+    return codes, files, inputs, selected, fixture.data_dir, code_directory
+
+
+def test_industry_agreeing_duplicate_rows_build_verify_replay_and_independent(
+        reconciliation_module, accepted_industry_pairs):
+    from embedding_data import acs_mapping_bundle
+
+    fixture, controls, result = accepted_industry_pairs
+    module = reconciliation_module
+    directory = Path(result['directory'])
+    arguments = industry_provenance_inputs(module, fixture, result)
+    codes, files = arguments[:2]
+    for year, kind, sheet, pair, _, numbers in canonical_industry_pair_cases():
+        row = codes.filter(pl.col('native_vintage').eq(year)
+                           .and_(pl.col('paired_census_code').eq(pair))).row(0, named=True)
+        assert {module.locator_target(v) for v in row['reference_locators']
+                if v.startswith(kind + ':')} == {
+                    f'{kind}:{sheet}!D:E:row:{n}' for n in numbers}
+    for year, kind, sheet, pair, token, numbers in industry_pair_cases():
+        row = codes.filter(pl.col('native_vintage').eq(year)
+                           .and_(pl.col('paired_census_code').eq(pair))).row(0, named=True)
+        assert row['source_token'] == token
+        original = module.workbook(files[kind], sheet)
+        assert [n for n, r in enumerate(original, 1) if r[2:5] == (pair, token, token)] == list(
+            numbers)
+        targets = [module.locator_target(v) for v in row['reference_locators']]
+        assert {v for v in targets if v.startswith(kind + ':')} == {
+            f'{kind}:{sheet}!C:E:row:{n}' for n in numbers}
+        assert row['reference_locators'] == sorted(set(row['reference_locators']))
+    rejected = module.code_provenance(*arguments)
+    report = json.loads((directory / 'report.json').read_text())
+    assert report['classifications']['reference_diagnostics'][
+        'rejected_industry_membership_assertions'] == rejected
+    assert len(rejected) == 2
+    for pair, count_ in [('2970', 4), ('2980', 9)]:
+        row = codes.filter(pl.col('native_vintage').eq(2017)
+                           .and_(pl.col('paired_census_code').eq(pair))).row(0, named=True)
+        assert len(row['native_finest_candidates']) == count_
+        assert row['flag_vintage_crosswalk'] is True
+    acs_mapping_bundle.verify_bundle(directory, fixture.data_dir,
+                                    expected_outputs_sha256=result['outputs_sha256'])
+    measured = module.reconcile(fixture.data_dir, 'industry_pairs', result['outputs_sha256'],
+                               controls)
+    assert measured['failure_count'] == 0
+    replay = acs_mapping_bundle.build(
+        fixture.data_dir, 'industry_pairs_replay', fixture.request, 'industry_pairs_references',
+        expected_reference_receipt_sha256=arguments[2]['references']['receipt_sha256'])
+    replay_dir = Path(replay['directory'])
+    acs_mapping_bundle.verify_bundle(replay_dir, fixture.data_dir,
+                                    expected_outputs_sha256=replay['outputs_sha256'])
+    for file in directory.glob('*.parquet'):
+        assert pl.read_parquet(file).equals(pl.read_parquet(replay_dir / file.name))
+    compared = acs_mapping_bundle.compare_runs(directory, replay_dir)
+    assert compared['equal'] is True and compared['substantive_report_equal'] is True
+    assert module.reconcile(fixture.data_dir, 'industry_pairs_replay',
+                            replay['outputs_sha256'], controls)['failure_count'] == 0
+
+
+def test_industry_duplicate_provenance_rejects_incomplete_or_unrelated_locators(
+        reconciliation_module, accepted_industry_pairs):
+    fixture, _, result = accepted_industry_pairs
+    module = reconciliation_module
+    codes, *arguments = industry_provenance_inputs(module, fixture, result)
+    for year, kind, sheet, pair, _, numbers in [*industry_pair_cases(),
+                                                *canonical_industry_pair_cases()]:
+        columns = 'D:E' if kind.startswith('census_') else 'C:E'
+        chosen = codes.filter(pl.col('native_vintage').eq(year)
+                              .and_(pl.col('paired_census_code').eq(pair)))
+        row = chosen.row(0, named=True)
+        for number in numbers:
+            target = f'{kind}:{sheet}!{columns}:row:{number}'
+            changed = [v for v in row['reference_locators'] if module.locator_target(v) != target]
+            assert len(changed) == len(row['reference_locators']) - 1
+            damaged = chosen.with_columns(pl.lit(changed).alias('reference_locators'))
+            with pytest.raises(ValueError, match='reference locator targets'):
+                module.code_provenance(damaged, *arguments)
+        other_number = 12 if kind.startswith('census_') else 25
+        original = module.workbook(arguments[0][kind], sheet)
+        assert original[other_number - 1][3 if kind.startswith('census_') else 2] == '0170'
+        for extra in (f'{kind}:{sheet}!{columns}:row:999999',
+                      f'{kind}:{sheet}!{columns}:row:{other_number}',
+                      f'{kind}:{sheet}!A:E:row:{numbers[0]}',
+                      f'{kind}:unrelated!{columns}:row:{numbers[0]}'):
+            changed = sorted([*row['reference_locators'], extra])
+            damaged = chosen.with_columns(pl.lit(changed).alias('reference_locators'))
+            with pytest.raises(ValueError, match='reference locator targets'):
+                module.code_provenance(damaged, *arguments)
+
+
+def test_industry_duplicate_provenance_rejects_absent_or_conflicting_source_assertions(
+        reconciliation_module, accepted_industry_pairs, tmp_path):
+    from acs_mapping_fixtures import write_public_layout
+
+    fixture, _, result = accepted_industry_pairs
+    module = reconciliation_module
+    codes, files, *arguments = industry_provenance_inputs(module, fixture, result)
+    for year, kind, sheet, pair, _, numbers in industry_pair_cases():
+        chosen = codes.filter(pl.col('native_vintage').eq(year)
+                              .and_(pl.col('paired_census_code').eq(pair)))
+        original = module.workbook(files[kind], sheet)
+        for damage in ('absent', 'token', 'expression', 'additional_assertion'):
+            rows = {str(n): list(r) for n, r in enumerate(original, 1)}
+            if damage == 'absent':
+                for n in numbers:
+                    rows[str(n)][2] = None
+            elif damage == 'additional_assertion':
+                rows['25'][2:5] = [pair, '111', '111']
+            else:
+                rows[str(numbers[1])][4 if damage == 'token' else 3] = '111'
+            changed = tmp_path / f'{kind}-{pair}-{damage}.xlsx'
+            write_public_layout(changed, {'sheets': {sheet: {'width': 5, 'rows': rows}}})
+            with pytest.raises(ValueError, match='industry|D10'):
+                module.code_provenance(chosen, {**files, kind: changed}, *arguments)
+
+
+def test_canonical_census_industry_rejects_absent_or_conflicting_assertions(
+        reconciliation_module, accepted_industry_pairs, tmp_path):
+    from copy import deepcopy
+
+    from acs_mapping_fixtures import write_public_layout
+
+    fixture, _, result = accepted_industry_pairs
+    module = reconciliation_module
+    codes, files, inputs, selected, data_dir, code_directory = industry_provenance_inputs(
+        module, fixture, result)
+    for year, kind, sheet, pair, _, numbers in canonical_industry_pair_cases():
+        chosen = codes.filter(pl.col('native_vintage').eq(year)
+                              .and_(pl.col('paired_census_code').eq(pair)))
+        citation = selected['ipums']['references']['receipt']['originals'][kind]['citation']
+        original = module.workbook(data_dir / 'raw' / citation['path'], sheet)
+        for damage in ('absent', 'expression', 'additional_assertion'):
+            rows = {str(n): list(r) for n, r in enumerate(original, 1)}
+            if damage == 'absent':
+                for n in numbers:
+                    rows[str(n)][3] = None
+            elif damage == 'expression':
+                rows[str(numbers[1])][4] = '111'
+            else:
+                rows['12'][3:5] = [pair, '111']
+            changed = data_dir / 'raw' / f'{kind}-{pair}-{damage}.xlsx'
+            write_public_layout(changed, {'sheets': {sheet: {'width': len(original[0]),
+                                                            'rows': rows}}})
+            # Re-pin test bytes to reach the independent semantic check.
+            mutated = deepcopy(selected)
+            mutated['ipums']['references']['receipt']['originals'][kind]['citation'] = {
+                **citation, 'path': changed.relative_to(data_dir / 'raw').as_posix(),
+                **module.record(changed)}
+            with pytest.raises(ValueError, match='Census|D10'):
+                module.code_provenance(chosen, files, inputs, mutated, data_dir, code_directory)
+
+
+def test_d10_independent_rejection_diagnostics_cannot_be_rehashed(
+        reconciliation_module, accepted_industry_pairs):
+    from copy import deepcopy
+
+    fixture, controls, result = accepted_industry_pairs
+    directory = Path(result['directory'])
+    file = directory / 'report.json'
+    original = json.loads(file.read_text())
+    for damage in ('omit_all', 'null_container', 'omit_container', 'omit', 'cause', 'expression',
+                   'members', 'hash', 'locator', 'support',
+                   'vintage', 'tuple', 'token', 'omit_rejected', 'omit_support',
+                   'invent_rejected', 'positive_member', 'positive_hash', 'column', 'sheet',
+                   'positive_row', 'rejected_row'):
+        report = deepcopy(original)
+        rows = report['classifications']['reference_diagnostics'][
+            'rejected_industry_membership_assertions']
+        if damage == 'omit_all':
+            report['classifications']['reference_diagnostics'].pop(
+                'rejected_industry_membership_assertions')
+        elif damage == 'null_container':
+            report['classifications']['reference_diagnostics'] = None
+        elif damage == 'omit_container':
+            report.pop('classifications')
+        elif damage == 'omit':
+            rows.pop()
+        elif damage == 'cause':
+            rows[0]['cause'] = 'confidentiality'
+        elif damage in {'vintage', 'tuple', 'token'}:
+            field, value = {'vintage': ('native_vintage', 2022),
+                            'tuple': ('paired_census_code', '2980'),
+                            'token': ('source_token', '332MZ')}[damage]
+            rows[0][field] = value
+        elif damage == 'omit_rejected':
+            rows[0].pop('rejected_assertion')
+        elif damage == 'omit_support':
+            rows[0]['supporting_assertions'].pop()
+        elif damage == 'invent_rejected':
+            rows.append(deepcopy(rows[0]))
+        else:
+            positive = damage in {'support', 'positive_member', 'positive_hash', 'column',
+                                   'sheet', 'positive_row'}
+            assertion = rows[0]['supporting_assertions'][1] if positive else rows[0][
+                'rejected_assertion']
+            field, value = {
+                'expression': ('expression', '332996'),
+                'members': ('native_finest_candidates', ['332996']),
+                'hash': ('original_sha256', '0' * 64),
+                'locator': ('reference_locator', 'census_industry_2017:wrong!D:E:row=83'),
+                'support': ('reference_locator',
+                            'census_industry_2017:2017 Census Industry Code List!D:E:row=83'),
+                'positive_member': ('native_finest_candidates', ['332992']),
+                'positive_hash': ('original_sha256', '0' * 64),
+                'column': ('reference_locator',
+                           'census_industry_2017:2007 - 2017 Industry Crosswalk!H:J:row=79'),
+                'sheet': ('reference_locator', 'census_industry_2017:wrong!I:K:row=79'),
+                'positive_row': ('reference_locator',
+                                 'census_industry_2017:2007 - 2017 Industry Crosswalk!I:K:row=80'),
+                'rejected_row': ('reference_locator',
+                                 'census_industry_2017:2017 Census Industry Code List!D:E:row=84'),
+            }[damage]
+            assertion[field] = value
+        file.write_text(json.dumps(report))
+        with pytest.raises(ValueError, match='D10 industry rejection diagnostics'):
+            reconciliation_module.reconcile(fixture.data_dir, 'industry_pairs', repin(directory),
+                                            controls)
+
+
+def test_d10_independent_pair_candidate_and_positive_support_bounds(
+        reconciliation_module, accepted_industry_pairs):
+    fixture, _, result = accepted_industry_pairs
+    module = reconciliation_module
+    codes, *arguments = industry_provenance_inputs(module, fixture, result)
+    chosen = codes.filter(pl.col('native_vintage').eq(2017)
+                          .and_(pl.col('paired_census_code').eq('2970')))
+    mutations = {
+        'source_token': '332MZ', 'paired_census_code': '2980', 'native_vintage': 2022,
+        'native_finest_candidates': ['332992'],
+        'reference_locators': ['census_industry_2017:2017 Census Industry Code List!D:E:row=83']}
+    for field, value in mutations.items():
+        damaged = chosen.with_columns(pl.lit(value, dtype=chosen.schema[field]).alias(field))
+        with pytest.raises(ValueError):
+            module.candidate_memberships(damaged, arguments[0], arguments[-1])
+            module.code_provenance(damaged, *arguments)
+
+    for pair in ('2970', '2980'):
+        chosen = codes.filter(pl.col('native_vintage').eq(2017)
+                              .and_(pl.col('paired_census_code').eq(pair)))
+        original = chosen['reference_locators'][0].to_list()
+        for kind in ('pums_industry_2017', 'census_industry_2017'):
+            removed = [v for v in original if v.startswith(kind + ':')]
+            assert len(removed) == 1
+            changed = [v for v in original if v not in removed]
+            damaged = chosen.with_columns(pl.lit(changed).alias('reference_locators'))
+            with pytest.raises(ValueError, match='reference locator targets'):
+                module.code_provenance(damaged, *arguments)
+
+
+def test_d10_independent_source_and_unrelated_membership_mutations(
+        reconciliation_module, accepted_industry_pairs, tmp_path):
+    from copy import deepcopy
+
+    from test_acs_code_references import rewrite_public_cell
+
+    fixture, _, result = accepted_industry_pairs
+    module = reconciliation_module
+    _, files, _, selected, data_dir, code_directory = industry_provenance_inputs(
+        module, fixture, result)
+    module.industry_membership_authorities(files, selected, data_dir, code_directory)
+    mutations = [
+        ('pums_industry_2017', 'ACS', (95, 3), '332992'),
+        ('pums_industry_2017', 'ACS', (96, 4), '33299M'),
+        ('census_industry_2017', '2017 Census Industry Code List', (83, 4), '332996'),
+        ('census_industry_2017', '2017 Census Industry Code List', (84, 3), '2981'),
+        ('census_industry_2017', '2007 - 2017 Industry Crosswalk', (79, 8), '2971'),
+        ('census_industry_2017', '2007 - 2017 Industry Crosswalk', (79, 8), ''),
+        ('census_industry_2017', '2007 - 2017 Industry Crosswalk', (80, 9), '3325'),
+        ('census_industry_2017', '2007 - 2017 Industry Crosswalk', (9, 8), '2022 Census Code'),
+        ('census_industry_2022', '2022 Census Ind Code List ', (12, 4), '112'),
+        ('census_industry_2022', '2022 Census Ind Code List ', (4, 3), '2017 Census Code')]
+    for index, (kind, sheet, address, value) in enumerate(mutations):
+        changed = data_dir / 'raw' / f'd10-variant-{index}.xlsx'
+        rewrite_public_cell(files[kind], changed, sheet, address, value)
+        altered = deepcopy(selected)
+        if kind.startswith('census_'):
+            citation = altered['ipums']['references']['receipt']['originals'][kind]['citation']
+            citation.update(path=changed.relative_to(data_dir / 'raw').as_posix(),
+                            **module.record(changed))
+        with pytest.raises(ValueError, match='D10|industry|Census'):
+            module.industry_membership_authorities({**files, kind: changed}, altered,
+                                                   data_dir, code_directory)
+
+    for kind in ('pums_industry_2017', 'census_industry_2017'):
+        changed = data_dir / 'raw' / f'{kind}-repackaged.xlsx'
+        changed.write_bytes(files[kind].read_bytes() + b' ')
+        altered = deepcopy(selected)
+        if kind.startswith('census_'):
+            altered['ipums']['references']['receipt']['originals'][kind]['citation'].update(
+                path=changed.relative_to(data_dir / 'raw').as_posix(), **module.record(changed))
+        with pytest.raises(ValueError, match='D10 industry original pin'):
+            module.industry_membership_authorities({**files, kind: changed}, altered,
+                                                   data_dir, code_directory)
+
+
+def test_all_admitted_public_classification_keys_have_independent_support(
+        reconciliation_module, accepted_industry_pairs, tmp_path, monkeypatch):
+    '''Synthetic reference-only keys cover every admitted category and full D8 originals.'''
+    from acs_mapping_fixtures import seed_mapping_references
+    from test_acs_source_rules import public_files
+
+    from embedding_data.acs_code_mapping import build_code_lookup
+    from embedding_data.acs_code_references import read_code_evidence
+    from embedding_data.acs_mapping_inputs import select_inputs
+    from embedding_data.acs_mapping_references import check_cached_snapshot
+
+    fixture, _, result = accepted_industry_pairs
+    module = reconciliation_module
+    _, files, inputs, selected, data_dir, code_directory = industry_provenance_inputs(
+        module, fixture, result)
+    originals = tmp_path / 'all-public-originals'
+    originals.mkdir()
+    overrides = {**files, **public_files.__wrapped__(originals)}
+    snapshot_dir = tmp_path / 'all-public-snapshot'
+    snapshot_dir.mkdir()
+    seeded = seed_mapping_references(snapshot_dir, monkeypatch, original_overrides=overrides,
+                                     data_dir=data_dir, reference_id='all_public_support')
+    snapshot = check_cached_snapshot(data_dir, seeded.reference_id)
+    forbid_external_access(monkeypatch)
+    authenticated = select_inputs(data_dir, fixture.request)
+    evidence = read_code_evidence(snapshot, authenticated)
+    keys = evidence.metadata.select(
+        'system', 'source_scheme', 'paired_census_code', 'source_token')
+    codes = build_code_lookup(keys, evidence, authenticated)
+    counts = codes.group_by('system', 'source_scheme').len().sort('system', 'source_scheme')
+    print(json.dumps({'public_reference_key_scope': counts.to_dicts(), 'total_keys': codes.height},
+                     sort_keys=True))
+    assert codes.height == keys.height
+    assert set(codes['source_scheme']) == {'naics2017', 'naics2022', 'soc2018'}
+    module.independent_lookup(codes, snapshot.files)
+    candidates = module.candidate_memberships(codes, snapshot.files, code_directory)
+    rejected = module.code_provenance(codes, dict(snapshot.files), inputs, selected,
+                                      data_dir, code_directory)
+    assert rejected == evidence.diagnostics['rejected_industry_membership_assertions']
+    assert candidates['D8_rejected_occupation_html_assertions'] == evidence.diagnostics[
+        'rejected_occupation_html_assertions']
+    assert len(rejected) == 2
+    assert len(candidates['D8_rejected_occupation_html_assertions']) == 3

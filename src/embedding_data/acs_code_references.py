@@ -629,7 +629,11 @@ def _selected_full_industry(selected):
                 continue
             if not expression or (code in current and current[code][0] != expression.strip()):
                 raise ValueError('contradictory full Census industry category')
-            current[code] = (expression.strip(), _locator(kind, sheet, number, 'D:E'))
+            locator = _locator(kind, sheet, number, 'D:E')
+            if code in current:
+                current[code][1].append(locator)
+            else:
+                current[code] = (expression.strip(), [locator])
         by_vintage[vintage], files[vintage] = current, file
     workbook = fastexcel.read_excel(files[2022].read_bytes())
     rows = (
@@ -653,11 +657,114 @@ def _selected_full_industry(selected):
         current_naics_scope='8114',
         reference_locators=[
             _locator('census_industry_2022', '2007 to 2022 Industry Crosswalk', 313, 'A:O'),
-            by_vintage[2017]['8891'][1],
-            by_vintage[2022]['8891'][1],
+            *by_vintage[2017]['8891'][1],
+            *by_vintage[2022]['8891'][1],
         ],
     )
     return by_vintage, legacy, excluded
+
+
+D10_INDUSTRY_PINS = {
+    'pums_industry_2017': '6f569f8bfcd1955db2f75ed4ec31dc836dea7faebf24375567107b725967f4d2',
+    'census_industry_2017': '479161190aedc0a64529f930d34a21f18e1950609332defe4967e4e3f129c816',
+}
+D10_INDUSTRY_ASSERTIONS = (
+    ('2970', '33299M', 95, 83, 79, '332992, 332993, 332994, 332996',
+     '332992, 332993, 332994', ['332992', '332993', '332994', '332996']),
+    ('2980', '332MZ', 96, 84, 80,
+     '3325, 3326, 3329 exc. 332992, 332993, 332994, 332996',
+     '3325, 3326, 3329 exc. 332992, 332993, 332994',
+     ['332510', '332613', '332618', '332911', '332912', '332913', '332919', '332991', '332999']),
+)
+
+
+def _industry_membership_support(snapshot, selected, full_industry, native):
+    '''Compare complete admitted memberships; retain only the exact D10 rejected assertions.'''
+    originals = selected.provenance['ipums']['inputs']['references']['receipt']['originals']
+    full_file = selected.data_dir / 'raw' / originals['census_industry_2017']['citation']['path']
+    for kind, file in [('pums_industry_2017', snapshot.files['pums_industry_2017']),
+                       ('census_industry_2017', full_file)]:
+        if manifest.sha256_file(file) != D10_INDUSTRY_PINS[kind]:
+            raise ValueError(f'D10 industry original pin differs: {kind}')
+    crosswalk_sheet = '2007 - 2017 Industry Crosswalk'
+    crosswalk = fastexcel.read_excel(full_file.read_bytes()).load_sheet(
+        crosswalk_sheet, header_row=None, dtypes='string').to_polars().rows()
+    if crosswalk[8][8:11] != ('2017 Census Code', '2017 NAICS code',
+                             '2017 Census Industry Description'):
+        raise ValueError('D10 explicit 2017 crosswalk header differs')
+    support, rejected = {}, []
+    for vintage in (2017, 2022):
+        nodes = native.filter(pl.col('vintage').eq(vintage))
+        paths = naics_tables(nodes.select('vintage', 'code', 'title'), vintage)[2]
+        full_members = {code: parse_membership_expression(value[0], nodes, paths)
+                        for code, value in full_industry[vintage].items()}
+        editions = [(f'pums_industry_{vintage}', 'ACS')]
+        if vintage == 2022:
+            editions += [('pums_annual_2024', 'Industry'), ('pums_five_year_2024', 'Industry')]
+        admitted = [(code, token, expression) for kind, sheet in editions
+                    for code, token, expression, _ in _industry_rows(
+                        snapshot, kind, sheet, vintage)
+                    if code != '9920']
+        if vintage == 2017:
+            for number, row in enumerate(crosswalk[9:], 10):
+                code, expression = row[8:10]
+                if code is None and expression is None:
+                    continue
+                if code == '9920' and expression is None and number == len(crosswalk):
+                    continue
+                if not code or not re.fullmatch(r'\d{4}', code) or not expression:
+                    raise ValueError('malformed D10 explicit 2017 crosswalk row')
+                parse_membership_expression(expression, nodes, paths)
+            if not {'2970', '2980'}.issubset({code for code, _, _ in admitted}):
+                raise ValueError('D10 admitted industry pair absent')
+        for code, token, expression in admitted:
+            members = parse_membership_expression(expression, nodes, paths)
+            if code not in full_members:
+                raise ValueError('missing full Census industry support')
+            support[vintage, code] = full_industry[vintage][code][1]
+            assertion = next((r for r in D10_INDUSTRY_ASSERTIONS
+                              if vintage == 2017 and r[0] == code), None)
+            if assertion is None:
+                if full_members[code] != members:
+                    raise ValueError(
+                        'unexplained full Census/PUMS industry membership disagreement')
+                continue
+            (_, expected_token, pums_number, detail_number, crosswalk_number, published,
+             rejected_expression, expected) = assertion
+            if (token, expression, members) != (expected_token, published, expected):
+                raise ValueError('D10 PUMS industry assertion differs')
+            if full_industry[2017][code] != (
+                rejected_expression,
+                [_locator('census_industry_2017', '2017 Census Industry Code List',
+                          detail_number, 'D:E')]
+            ):
+                raise ValueError('D10 rejected industry assertion differs')
+            matches = [(n, r) for n, r in enumerate(crosswalk, 1) if r[8] == code]
+            if (len(matches) != 1 or matches[0][0] != crosswalk_number
+                or matches[0][1][8:10] != (code, published)):
+                raise ValueError('D10 supporting crosswalk assertion differs')
+            if parse_membership_expression(matches[0][1][9], nodes, paths) != expected:
+                raise ValueError('D10 supporting crosswalk membership differs')
+            positive = _locator('census_industry_2017', crosswalk_sheet, crosswalk_number, 'I:K')
+            support[vintage, code] = [positive]
+
+            def evidence(kind, locator, literal, candidates):
+                return dict(kind=kind, original_sha256=D10_INDUSTRY_PINS[kind],
+                            reference_locator=locator, expression=literal,
+                            native_finest_candidates=list(candidates))
+
+            rejected.append(dict(
+                native_vintage=2017, paired_census_code=code, source_token=token,
+                cause='unknown', disposition='rejected_membership_assertion',
+                rejected_assertion=evidence('census_industry_2017',
+                                            full_industry[2017][code][1][0],
+                                            rejected_expression, full_members[code]),
+                supporting_assertions=[
+                    evidence('pums_industry_2017',
+                             _locator('pums_industry_2017', 'ACS', pums_number, 'C:E'),
+                             published, members),
+                    evidence('census_industry_2017', positive, published, expected)]))
+    return support, rejected
 
 
 def _industry_diagnostics(snapshot, admitted, legacy, excluded):
@@ -854,6 +961,8 @@ def read_code_evidence(snapshot: refs.ReferenceSnapshot, selected: SelectedInput
     paths = pl.read_parquet(selected.codes['code_paths'])
     metadata, industry, exclusions = [], {}, []
     full_industry, legacy_industry, full_exclusions = _selected_full_industry(selected)
+    industry_support, rejected_memberships = _industry_membership_support(
+        snapshot, selected, full_industry, native)
     exclusions.extend(full_exclusions)
     token_locators = _token_semantics(snapshot)
     for vintage in (2017, 2022):
@@ -903,7 +1012,7 @@ def read_code_evidence(snapshot: refs.ReferenceSnapshot, selected: SelectedInput
             if code not in full_industry[vintage]:
                 raise ValueError('missing full Census industry support')
             row['reference_ids'].append(f'census_industry_{vintage}')
-            row['reference_locators'].append(full_industry[vintage][code][1])
+            row['reference_locators'].extend(industry_support[vintage, code])
         metadata.extend(by_code.values())
     full = _full_occupation(snapshot)
     if '9920' not in full or full['9920'][0] != 'none':
@@ -1057,6 +1166,7 @@ def read_code_evidence(snapshot: refs.ReferenceSnapshot, selected: SelectedInput
             'rejected_industry_assertions': _industry_diagnostics(
                 snapshot, industry, legacy_industry, exclusions
             ),
+            'rejected_industry_membership_assertions': rejected_memberships,
             'excluded_nonworking': exclusions,
             'rejected_occupation_assertions': rejected_occupation,
             'rejected_occupation_html_assertions': rejected_html,
