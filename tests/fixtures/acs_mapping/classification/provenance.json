@@ -1,0 +1,273 @@
+{
+  "description": "Complete public originals and public-only verified Stage4 official graph tables; reader unit fixtures, not selector-accepted bundles.",
+  "stage4_outputs_sha256": "15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a",
+  "stage4_inputs": [
+    {
+      "client": "manual-import",
+      "client_version": "0.1.0",
+      "collection": null,
+      "extract_number": null,
+      "path": "references/filing-rules/2014-21514.htm",
+      "proxies": [
+        "retrieved_at"
+      ],
+      "retrieved_at": "2026-10-13T22:56:35+00:00",
+      "samples": [],
+      "sha256": "3418238856a56bf0da7bac73a1a07535a4f098e3212287a35048602968855a87",
+      "size": 347880,
+      "source_url": "https://www.govinfo.gov/content/pkg/FR-2014-09-18/html/2014-21514.htm",
+      "through_date": null
+    },
+    {
+      "client": "manual-import",
+      "client_version": "0.1.0",
+      "collection": null,
+      "extract_number": null,
+      "path": "references/filing-rules/2016-10443.htm",
+      "proxies": [
+        "retrieved_at"
+      ],
+      "retrieved_at": "2026-10-13T22:56:34+00:00",
+      "samples": [],
+      "sha256": "ed7ea8e8533236ea0fcbafcb703f38007b75e97b472789f9a2ded55eac958866",
+      "size": 524902,
+      "source_url": "https://www.govinfo.gov/content/pkg/FR-2016-05-12/html/2016-10443.htm",
+      "through_date": null
+    },
+    {
+      "client": "manual-import",
+      "client_version": "0.1.0",
+      "collection": null,
+      "extract_number": null,
+      "path": "references/filing-rules/2023-15091.htm",
+      "proxies": [
+        "retrieved_at"
+      ],
+      "retrieved_at": "2026-10-13T22:56:35+00:00",
+      "samples": [],
+      "sha256": "fd0ae1f1c1462adf2863c2107da32e2a4d1d486503433f347237867edd401551",
+      "size": 718918,
+      "source_url": "https://www.govinfo.gov/content/pkg/FR-2023-07-21/html/2023-15091.htm",
+      "through_date": null
+    },
+    {
+      "client": "manual-import",
+      "client_version": "0.1.0",
+      "collection": null,
+      "extract_number": null,
+      "path": "references/naics/2002_to_2007_NAICS.xls",
+      "proxies": [
+        "retrieved_at"
+      ],
+      "retrieved_at": "2026-10-13T22:56:31+00:00",
+      "samples": [],
+      "sha256": "a4b00b2195e318420962ba52b77f3c3122e83d893a9f804e820c151847ec85b1",
+      "size": 161280,
+      "source_url": "https://www.census.gov/naics/concordances/2002_to_2007_NAICS.xls",
+      "through_date": null
+    },
+    {
+      "client": "manual-import",
+      "client_version": "0.1.0",
+      "collection": null,
+      "extract_number": null,
+      "path": "references/naics/2007_to_2012_NAICS.xls",
+      "proxies": [
+        "retrieved_at"
+      ],
+      "retrieved_at": "2026-10-13T22:56:32+00:00",
+      "samples": [],
+      "sha256": "302b8abcd78881f1ea5aa4c6c9104811bf8fa10d57b48d492939de5cacc8cfc5",
+      "size": 171520,
+      "source_url": "https://www.census.gov/naics/concordances/2007_to_2012_NAICS.xls",
+      "through_date": null
+    },
+    {
+      "client": "httpx",
+      "client_version": "0.28.1",
+      "collection": null,
+      "extract_number": null,
+      "path": "references/naics/2012_NAICS_Structure.xls",
+      "proxies": [],
+      "retrieved_at": "2026-10-13T14:19:19+00:00",
+      "samples": [],
+      "sha256": "50eba48db4e11f863e015d4d2bbaaf618565bd94ef9b019fe62b9bbaddbaaafb",
+      "size": 254976,
+      "source_url": "https://www.census.gov/naics/2012NAICS/2012_NAICS_Structure.xls",
+      "through_date": null
+    },
+    {
+      "client": "manual-import",
+      "client_version": "0.1.0",
+      "collection": null,
+      "extract_number": null,
+      "path": "references/naics/2012_to_2017_NAICS.xlsx",
+      "proxies": [
+        "retrieved_at"
+      ],
+      "retrieved_at": "2026-10-13T22:56:32+00:00",
+      "samples": [],
+      "sha256": "17f463f7e8385df1cc762fadf0dd5c25910aa27034ca96275a906608399188f5",
+      "size": 58543,
+      "source_url": "https://www.census.gov/naics/concordances/2012_to_2017_NAICS.xlsx",
+      "through_date": null
+    },
+    {
+      "client": "httpx",
+      "client_version": "0.28.1",
+      "collection": null,
+      "extract_number": null,
+      "path": "references/naics/2017_NAICS_Structure.xlsx",
+      "proxies": [],
+      "retrieved_at": "2026-10-13T14:19:20+00:00",
+      "samples": [],
+      "sha256": "662b5a2bdff10938997acd7f59f84331527d6f06ff24d5533331581a00a94aad",
+      "size": 95610,
+      "source_url": "https://www.census.gov/naics/2017NAICS/2017_NAICS_Structure.xlsx",
+      "through_date": null
+    },
+    {
+      "client": "manual-import",
+      "client_version": "0.1.0",
+      "collection": null,
+      "extract_number": null,
+      "path": "references/naics/2017_to_2022_NAICS.xlsx",
+      "proxies": [
+        "retrieved_at"
+      ],
+      "retrieved_at": "2026-10-13T22:56:33+00:00",
+      "samples": [],
+      "sha256": "4662cc7ed9e7f3fb8a968e9504a7d06e448f5b65a349996a5627439df193eb30",
+      "size": 59656,
+      "source_url": "https://www.census.gov/naics/concordances/2017_to_2022_NAICS.xlsx",
+      "through_date": null
+    },
+    {
+      "client": "httpx",
+      "client_version": "0.28.1",
+      "collection": null,
+      "extract_number": null,
+      "path": "references/naics/2022_NAICS_Structure.xlsx",
+      "proxies": [],
+      "retrieved_at": "2026-10-13T14:19:20+00:00",
+      "samples": [],
+      "sha256": "217c9e0d4d74e7517bc288f5f308b73aa0de5ee787976a6dd222412be28ada22",
+      "size": 88218,
+      "source_url": "https://www.census.gov/naics/2022NAICS/2022_NAICS_Structure.xlsx",
+      "through_date": null
+    },
+    {
+      "client": "manual-import",
+      "client_version": "0.1.0",
+      "collection": null,
+      "extract_number": null,
+      "path": "references/naics/naics07.xls",
+      "proxies": [
+        "retrieved_at"
+      ],
+      "retrieved_at": "2026-10-13T22:56:30+00:00",
+      "samples": [],
+      "sha256": "9eaa1fc4681ad22296b8f09603dc3674605eeb13b0fd631811d51704e1c2f463",
+      "size": 252416,
+      "source_url": "https://www.census.gov/naics/reference_files_tools/2007/naics07.xls",
+      "through_date": null
+    },
+    {
+      "client": "manual-import",
+      "client_version": "0.1.0",
+      "collection": null,
+      "extract_number": null,
+      "path": "references/naics/naics_2_6_02.txt",
+      "proxies": [
+        "retrieved_at"
+      ],
+      "retrieved_at": "2026-10-13T22:56:31+00:00",
+      "samples": [],
+      "sha256": "b05cb32865d9267eaca4c2df45b89605c02320c5d1794b0ba0304e2c1741edaf",
+      "size": 111445,
+      "source_url": "https://www.census.gov/naics/reference_files_tools/2002/naics_2_6_02.txt",
+      "through_date": null
+    },
+    {
+      "client": "manual-import",
+      "client_version": "0.1.0",
+      "collection": null,
+      "extract_number": null,
+      "path": "references/soc/soc_structure_2018.xlsx",
+      "proxies": [
+        "retrieved_at"
+      ],
+      "retrieved_at": "2026-10-13T22:56:34+00:00",
+      "samples": [],
+      "sha256": "ade08af40923266f3a854842e888ca3e93c15b26a147c20a2b12a61f4c4f4077",
+      "size": 51367,
+      "source_url": "https://www.bls.gov/soc/2018/soc_structure_2018.xlsx",
+      "through_date": null
+    }
+  ],
+  "files": {
+    "census_occupation_2018.xlsx": "fca2818d691c32777a4cd733a9ab77c8c5bd47adcacd7ac3aa149bebd45b5f7f",
+    "code_paths.parquet": "c50dad74752c0d13a0f0c551a862ccef84936a24ead0f3b19850640212b90c8c",
+    "ipums_ind_pairs.xlsx": "4d3f571905a9eddd905213878351c284ecf80ee48733e79cb9375181d70679a8",
+    "ipums_occ_pairs.xlsx": "f95672c481af85302bc2f445888e2f5e493afffa6d88a5ca042b66a39cfc34f1",
+    "naics_native_nodes.parquet": "f5e41785f927c1e0037cf6df1779ec5919df5ceb4ab5d5797764cbd485911cb1",
+    "pums_industry_2017.xlsx": "6f569f8bfcd1955db2f75ed4ec31dc836dea7faebf24375567107b725967f4d2",
+    "pums_industry_2022.xlsx": "e6f9ec64ed2519c667a032d9766b460e50cf0ac085b7dd00ae97a98dc588816d",
+    "pums_occupation_2018.xlsx": "20cc7112cf96c7a3648b579cc0b2af239bea1c9094885a0d986959888695fe0a",
+    "soc_nodes.parquet": "7a2259678719b1fc9d5c0cf3809023d6a87bdb4d6aed4b788e2f266e0586d356",
+    "census_industry_2017.xlsx": "479161190aedc0a64529f930d34a21f18e1950609332defe4967e4e3f129c816",
+    "census_industry_2022.xlsx": "c9d2e004b2735c3975f0768e7dac704df6d2e0b36b24d33f5dbc7109cab5628c",
+    "release-layouts.json": "f0457bfeb3927e3264707b326bb253bc74868fa3ff52c5860dd772cb3245ecbf"
+  },
+  "stage7_industry_originals": {
+    "census_industry_2017": {
+      "citation": {
+        "client": "manual-import",
+        "client_version": "0.1.0",
+        "collection": null,
+        "extract_number": null,
+        "path": "references/ipums-verification/stage7_ipums_references_20261015_r2/census_industry_2017.xlsx",
+        "proxies": [
+          "retrieved_at"
+        ],
+        "retrieved_at": "2026-10-15T22:46:22+00:00",
+        "samples": [],
+        "sha256": "479161190aedc0a64529f930d34a21f18e1950609332defe4967e4e3f129c816",
+        "size": 71800,
+        "source_url": "https://www2.census.gov/programs-surveys/demo/guidance/industry-occupation/2017-industry-code-list-with-crosswalk.xlsx",
+        "through_date": null
+      },
+      "method": "GET",
+      "request_body": null,
+      "retrieved_at": "2026-10-15T22:46:22+00:00",
+      "retrieved_at_is_proxy": true,
+      "source_url": "https://www2.census.gov/programs-surveys/demo/guidance/industry-occupation/2017-industry-code-list-with-crosswalk.xlsx"
+    },
+    "census_industry_2022": {
+      "citation": {
+        "client": "manual-import",
+        "client_version": "0.1.0",
+        "collection": null,
+        "extract_number": null,
+        "path": "references/ipums-verification/stage7_ipums_references_20261015_r2/census_industry_2022.xlsx",
+        "proxies": [
+          "retrieved_at"
+        ],
+        "retrieved_at": "2026-10-15T22:46:23+00:00",
+        "samples": [],
+        "sha256": "c9d2e004b2735c3975f0768e7dac704df6d2e0b36b24d33f5dbc7109cab5628c",
+        "size": 102789,
+        "source_url": "https://www2.census.gov/programs-surveys/demo/guidance/industry-occupation/2022-Census-Industry-Code-List-with-Crosswalk.xlsx",
+        "through_date": null
+      },
+      "method": "GET",
+      "request_body": null,
+      "retrieved_at": "2026-10-15T22:46:23+00:00",
+      "retrieved_at_is_proxy": true,
+      "source_url": "https://www2.census.gov/programs-surveys/demo/guidance/industry-occupation/2022-Census-Industry-Code-List-with-Crosswalk.xlsx"
+    }
+  },
+  "transformations": {
+    "code_paths.parquet": "Verified Stage4 code_paths plus 2017 NAICS paths reconstructed by unchanged classification_tables.naics_tables from selected public native nodes."
+  }
+}

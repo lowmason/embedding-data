@@ -1,0 +1,92 @@
+{
+  "occupation_pairs_html": {
+    "archive": "occupation_pairs_html.html.gz",
+    "archive_sha256": "7a30745e60be487cf70964fbad5cdc0cca27668f98898458373def272e6e718c",
+    "original_sha256": "61862b9ac0e7bfc4500cc28c3664c50adfc8dc51517c7d81f0192fa37e73725c",
+    "original_size": 284695,
+    "provenance": {
+      "authority_role": "token_marker_semantics",
+      "authority_url": "https://usa.ipums.org/usa/volii/occtooccsoc18.shtml",
+      "citation": {
+        "client": "httpx",
+        "client_version": "0.28.1",
+        "collection": null,
+        "extract_number": null,
+        "path": "references/acs-mapping/stage8_acs_references_20261017/occupation_pairs_html.html",
+        "proxies": [],
+        "retrieved_at": "2026-10-18T19:45:18+00:00",
+        "samples": [],
+        "sha256": "61862b9ac0e7bfc4500cc28c3664c50adfc8dc51517c7d81f0192fa37e73725c",
+        "size": 284695,
+        "source_url": "https://usa.ipums.org/usa/volii/occtooccsoc18.shtml",
+        "through_date": null
+      },
+      "edition": "public documentation inspected 2026-10-17",
+      "parser_contract": "crosswalk-html-v1",
+      "retrieved_at": "2026-10-18T19:45:18+00:00",
+      "retrieved_at_is_proxy": false,
+      "sha256": "61862b9ac0e7bfc4500cc28c3664c50adfc8dc51517c7d81f0192fa37e73725c",
+      "size": 284695
+    }
+  },
+  "pums_annual_2024": {
+    "archive": "pums_annual_2024.xls.gz",
+    "archive_sha256": "96a9e1ae094c267c008f6c7e4b1f68b8c2c367632ae7dfcc582e7d22e2ad7cfc",
+    "original_sha256": "f8c945c383322f123b5d409fd1cd1352f23ace3c0ffff5de0bc1cf414886d40d",
+    "original_size": 1526784,
+    "provenance": {
+      "authority_role": "delivered_scheme_and_source_recoding",
+      "authority_url": "https://www2.census.gov/programs-surveys/acs/tech_docs/pums/code_lists/ACSPUMS2024CodeLists.xls",
+      "citation": {
+        "client": "httpx",
+        "client_version": "0.28.1",
+        "collection": null,
+        "extract_number": null,
+        "path": "references/acs-mapping/stage8_acs_references_20261017/pums_annual_2024.xls",
+        "proxies": [],
+        "retrieved_at": "2026-10-18T19:45:15+00:00",
+        "samples": [],
+        "sha256": "f8c945c383322f123b5d409fd1cd1352f23ace3c0ffff5de0bc1cf414886d40d",
+        "size": 1526784,
+        "source_url": "https://www2.census.gov/programs-surveys/acs/tech_docs/pums/code_lists/ACSPUMS2024CodeLists.xls",
+        "through_date": null
+      },
+      "edition": "2024 annual product; 2022 industry and 2018 SOC; occupation heading names 2023",
+      "parser_contract": "workbook-v1",
+      "retrieved_at": "2026-10-18T19:45:15+00:00",
+      "retrieved_at_is_proxy": false,
+      "sha256": "f8c945c383322f123b5d409fd1cd1352f23ace3c0ffff5de0bc1cf414886d40d",
+      "size": 1526784
+    }
+  },
+  "pums_five_year_2024": {
+    "archive": "pums_five_year_2024.xlsx.gz",
+    "archive_sha256": "11eb56f6df152a21c8b151e11e174bf0cf6c0466892a43fddbe22ee7ac18277c",
+    "original_sha256": "634fdd565249d72f09a8f75d82fe4193b20a09d898ef64a4b8e8039348d52994",
+    "original_size": 616820,
+    "provenance": {
+      "authority_role": "delivered_scheme_and_source_recoding",
+      "authority_url": "https://www2.census.gov/programs-surveys/acs/tech_docs/pums/code_lists/ACSPUMS2020_2024CodeLists.xlsx",
+      "citation": {
+        "client": "httpx",
+        "client_version": "0.28.1",
+        "collection": null,
+        "extract_number": null,
+        "path": "references/acs-mapping/stage8_acs_references_20261017/pums_five_year_2024.xlsx",
+        "proxies": [],
+        "retrieved_at": "2026-10-18T19:45:15+00:00",
+        "samples": [],
+        "sha256": "634fdd565249d72f09a8f75d82fe4193b20a09d898ef64a4b8e8039348d52994",
+        "size": 616820,
+        "source_url": "https://www2.census.gov/programs-surveys/acs/tech_docs/pums/code_lists/ACSPUMS2020_2024CodeLists.xlsx",
+        "through_date": null
+      },
+      "edition": "2020-2024 five-year product; delivered 2022 industry and 2018 SOC",
+      "parser_contract": "workbook-v1",
+      "retrieved_at": "2026-10-18T19:45:15+00:00",
+      "retrieved_at_is_proxy": false,
+      "sha256": "634fdd565249d72f09a8f75d82fe4193b20a09d898ef64a4b8e8039348d52994",
+      "size": 616820
+    }
+  }
+}

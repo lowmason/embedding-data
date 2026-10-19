@@ -4,7 +4,7 @@
 
 Roadmap: specs/embedding-evaluation-data-spec-roadmap.md, Stage 8 — on plan completion, tick the stage and re-validate later stages against what shipped.
 
-**Status: PLAN FOR REVIEW (2026-10-17)** — implementation has not begun.
+**Status: COMPLETE (2026-10-19)** — executed via subagent-driven-development; nothing deferred
 
 **Goal:** Produce verified, row-preserving ACS classification companions and
 population allocation references for all three selected deliveries, with measured
@@ -23,8 +23,8 @@ html.parser, json, pathlib, dataclasses, ctypes, tempfile, zipfile and
 xml.etree.ElementTree. No dependency,
 project configuration or lock change.
 
-**Spec:** [Approved Stage 8 spec](../acs-codes-area-allocation.md), approved in
-writing by the owner on 2026-10-16; [source requirements](../embedding-evaluation-data-spec.md)
+**Spec:** [Approved Stage 8 spec](../../completed/acs-codes-area-allocation.md), approved in
+writing by the owner on 2026-10-16; [source requirements](../../embedding-evaluation-data-spec.md)
 R3.9, R3.11 crosswalks, R5.1 ACS, R5.3, R5.4 ACS comparator, R6.3, V8 and
 ACS V11. R3.10 supplies role keys. Read both specs and the Stage 4, 5 and 7
 completed plans' Handoff sections before executing.
@@ -91,6 +91,24 @@ Additional binding execution constraints:
 
 ## Decisions
 
+- **D10** (owner, native-2017 industry source review, 2026-10-18): “Approve bounded D10 rule (Recommended).” Approve only proposal SHA-256 `a3faf524bc84f73bd8216395545510f2a3e1865ce92e99876c179891307c1744`: native-2017 pairs `2970` / `33299M` and `2980` / `332MZ` follow the agreeing ACS PUMS2017 original SHA-256 `6f569f8bfcd1955db2f75ed4ec31dc836dea7faebf24375567107b725967f4d2` (ACS rows95/96) and the full Census2017 original SHA-256 `479161190aedc0a64529f930d34a21f18e1950609332defe4967e4e3f129c816` (`2007 - 2017 Industry Crosswalk`, explicit2017 I:K rows79/80). Include `332996` under2970 and exclude it under2980, preserving the exact four/nine candidate sets and source token semantics. Retain the conflicting full-detail D:E rows83/84 as rejected membership assertions with unknown cause, full literal expressions, candidates, hashes and locators; do not cite them as agreeing membership support. Validate complete originals and independently require every other admitted industry category/vintage to agree; malformed, missing, changed or other unexplained contradictory assertions fail. No generic source/date/title precedence, raw/source correction,2017-to2022 substitution, new category/special, schema/status/dependency/upstream change or CPS authority. Reconstruct bounded positive/rejected evidence independently, preserve all originals and exact87citation bytes, reuse existing receipts, and require source RED/GREEN/review/hooks, fresh original-beforestate r6 controls retaining all five sealed generations, and all actual build/verify/replay/reconciliation/preservation/audit gates. The4195 selected category records are not a fine-industry332996 count. Applied in: Task9 industry authority diagnostics, complete supporting provenance and fresh full acceptance.
+
+- **C1** (source-backed implementation clarification, 2026-10-18): The existing `documented_unavailable` contract applies to the selected five-year migration suppression documented by already frozen originals. The 2020–2024 Census PUMS guide SHA-256 `77f9b74efef7cb9d3eb8ffa4dc875df9e15765432d6134ead3691a5fe8b35e1a`, physical/printed page 20, section X.M, explicitly defines MIGPUMA `88888` and MIGSP `888` for selected 2022 records; cached IPUMS MIGPLAC1 SHA-256 `3f8433e2e44807402493690c6f6f50aa8afd3e0ec84338892556baf07d789bab` explicitly defines IPUMS `988` for that suppression. Implement only migration / `acs/five_year` / `us2024c` / release 2024 / component 2022 / literal pair `988` + `88888`, with exact positive DDI suppression label and both authenticated documentary anchors. Preserve raw values; state/factor remain null, no allocation/split/frame-recoding claim, source Q evidence stays independent. This implements the planned unavailable status; no new reference, output status/schema, source conversion or broad sentinel fallback. Other roles, years, samples, pairs and unexplained values still fail. Recognize the exact positive foreign labels `United Kingdom (excluding England: 2005ACS)` and `USSR` through the existing migration `00001` compatibility and delivered DDI/public authority; no modern-country conversion or numeric/fuzzy foreign heuristic. The sealed r4 observation is 17 keys / 4,434 records (1,914 foreign-label cases, 2,520 suppressed cases), not a documentary population claim. R4 remains immutable; require reviewed source fixes and a fresh original-beforestate control continuation retaining the identical original 5,490-file inventory/prefix, all earlier seals and the complete 87-record suffix, while reusing the unchanged v2/46 receipt `052135beb2e77d3cd14b4b800602be9ab36d54aaa43eaf05abffb4d5c14fd2d5`. Applied in: Task 9 source-role correction, independent semantic validation and fresh production gates.
+
+- **D7** (owner, actual-source contradiction review, 2026-10-18): “Approve bounded D7–D9 package.” Under Geocorr original SHA-256 `9d7ef74ba87b2b3bd4b22303c4c0910a4da0bca966721232c0e9b4461737e04d`, retain only the three exact published rounding assertions identified in proposal `76ae8a5a7539a7017e212777a1a7bb90d48047ec035f90f26152ffe0b2447bf9` as rejected assertions with full diagnostics: row 1136 / 16 / 01300 / 16005 / afact `0.669 ` / 87018÷130062; row 2428 / 30 / 00500 / 30013 / afact `0.5432 ` / 84414÷155387; row 2662 / 34 / 01404 / 34013 / afact2 `0.1252` / 108182÷863728. Derive stored factors from strict integer controls; no broader tolerance, renormalization or other exception. Every tuple/pin mutation and other unexplained discrepancy fails. Implement and verify the bounded rule independently in runtime and reconciliation. Applied in: Task 9 source correction, diagnostics and acceptance.
+
+- **D8** (owner, actual-source contradiction review, 2026-10-18): “Approve bounded D7–D9 package.” Reject only the three erroneous current occupation HTML assertions in original SHA-256 `61862b9ac0e7bfc4500cc28c3664c50adfc8dc51517c7d81f0192fa37e73725c`: row 692 literal `790` / `519160` (agreeing Census/PUMS/current XLS pair `7905` / `519160`); row 789 `9051` / `532031` (canonical `9050` / `532031`); row 843 `9820` / `553010` (canonical `9825` / `553010`). Preserve literal values, titles, locators and all supporting/rejected evidence. This does not rewrite microdata or grant general source precedence, conversion, spelling repair or another occupation exception; D4 remains separately bounded. Exact supporting originals/rows are in approved proposal `76ae8a5a7539a7017e212777a1a7bb90d48047ec035f90f26152ffe0b2447bf9`. Applied in: Task 9 classification correction and independent checks.
+
+- **D9** (owner, actual-source contradiction review, 2026-10-18): “Approve bounded D7–D9 package.” Authorize the proposal's narrowly conditional CT-only official Census block-population route. First authenticate/inspect the exact candidate originals and physical archive schemas, confirm POP20 feasibility, and prove coded joins and exact independent PUMA/town/nine-planning-region controls before adoption. Positive-population ambiguous/unmatched membership fails; verified zero-population exclusions remain explicit. No whole-town or area weighting, redistribution, invented residual, wider tolerance or unapproved substitute original. All non-CT evidence/population arithmetic stays unchanged. Keep Geocorr and every earlier original/control immutable, retain rejected CT population assertions and provenance, and use fresh explicitly versioned references with strict historical v1/39 receipt verification, reviewed software and an explicit continuation retaining the identical original 5,490-file inventory and 1,491,443-byte manifest prefix. Preserve all original/r2/r3 seals and full old/new software/control evidence; never take a later baseline absorbing the 40 appends. Remain within the existing stack, with no dependency, upstream-software or output-contract changes. A new positive relation without faithful existing-contract published-field provenance stops for context. All source feasibility, TDD, software review, production build/replay/reconciliation/preservation and final review gates must pass; no Stage 8 acceptance follows from this in-principle decision. Exact route/URLs, scopes, pins, source conflicts and conditions are in approved proposal `76ae8a5a7539a7017e212777a1a7bb90d48047ec035f90f26152ffe0b2447bf9`. Applied in: Task 9 source feasibility/correction and fresh full acceptance.
+
+- **D6** (owner, production acquisition recovery, 2026-10-18): “Approve option 1.” Permit completion only of failed, unfrozen snapshot `stage8_acs_references_20261017`, after rechecking its exact 32-file ledger SHA-256 `2099eb75d9606e0e134f83e35786411f862bfbd17c40ef4171c8e5ed582771e7`. Preserve all existing original bytes and manifest records; add only the seven missing registered Geocorr kinds and publish a genuine receipt only after all 39 kinds validate. This is a bounded exception to the failed-acquisition fresh-ID/nonresume rule, not general resume support. Review and test strict Geocorr UTF-8/CP1252-compatible decoding without transcoding originals or relaxing keys, numeric checks or upstream software. Preserve original controls, including freeze SHA-256 `244fb29ee81acd90b1699473ade567e87112d73f7196168fec58729de2751f32`. A fresh control must retain the identical original 5,490-file inventory and exact original 1,491,443-byte manifest prefix (SHA-256 `86b2ab169a9d248fd9bfd7b69b632b4f3a8b6fcb0214c80e0a07d978d43601c4`), with fresh reviewed reconciler identities and explicit old/new software-transition evidence binding original controls, inventories and commits. Never substitute a later baseline absorbing the 32 appends. Use fresh unoccupied mapping IDs and rerun software review/checks and all production gates. The concrete proposal is SHA-256 `6017ed0991a72da48d0c4fd03765aa162ac87b57a4800c72dd41f8e4c15f3caf`; its exact inventory and failure evidence remain local controls. Applied in: Task 9 encoding correction, bounded snapshot completion, preservation continuation and fresh production acceptance.
+
+- **D5** (owner, execution software-provenance review, 2026-10-18): “Approve this narrow historical CLI rule.” Only selected geography run `stage5_geography_20261014` with detached output pin `5584b122d45a3617e731f7179d53e9625eb67fd15515d0cd7a5dab366132290d` may retain its historical `src/embedding_data/cli.py` creator hash `68778e16b7cc051745c1e34d3dee6a9fc044fd12b1f78103773984503e9f9742` while current CLI is exactly `32a86b3d07bf112fabc1edb01fd10a966e840c185642e55d00f35dfd435220b3`. The current hash must also match the strictly verified selected Stage 7 software and frozen Stage 8 executing inventory. Git Stage 5 blob `2f1ca20` matches the old hash; the complete later CLI delta only imports/registers `targets_cli` (`5d8e055`) and `ipums_cli` (`a1d12e5`). This historical entrypoint is not executed to consume geography tables. Preserve the original Stage 5 inventory and record explicit compatibility diagnostics with old/new hashes and the bounded rule. Every other implementation, dependency, Python/lock, inventory, raw/source and table check remains strict; unknown run/pin/hash combinations fail. No upstream file, artifact, status or measurement is edited, rebuilt or rewritten. Applied in: Task 8 selector compatibility, bundle provenance/verification and Task 9 independent acceptance.
+
+- **D4** (owner, execution source review, 2026-10-18): “Approve this narrow Census correspondence rule.” For PUMS category `7640` / `49-90XX`, resolve its explicitly named Census constituent `7550` through the full Census occupation list to official SOC `49-9095`. Preserve the erroneous published PUMS `40-9095` assertion and every original locator in rejected-reference diagnostics. This bound applies only to that identified constituent assertion in the registered PUMS occupation editions; it changes no raw/reference/source value, creates no new special code and grants no general source-precedence rule. Every other unexplained occupation contradiction still fails. Applied in: Task 3 classification evidence and its downstream mapping diagnostics.
+
+- **D3** (owner, brief, 2026-10-17): “Plan 8 is approved, including the bounded Census PUMS authority. Prepare a fresh-session execution handoff from c632b34 for Stage 8 only. Do not start implementation here.” Applied in: fresh receiving-session execution of Tasks 1–10; the bounded authority and fail-on-new-conflict requirements remain binding. The planning-session stop applies to the sender.
+
 - **D1** (owner, brief, 2026-10-16): The written spec is approved. Plan Stage 8
   only, commit the reviewable plan, and stop before implementation. Applied in:
   Global Constraints and the execution handoff.
@@ -138,7 +156,7 @@ them from filenames or update its five-profile selection.
 Observed metadata confirms YEAR/SAMPLE/IND/OCC and all six geographic source keys
 are Int64. INDNAICS/OCCSOC are String. MULTYEAR is Int64 in five-year and absent
 elsewhere. QMIGRAT1 is String in core, Int64 in five-year, and absent in vintage.
-The [Stage 7 flag evidence](../findings/stage-7-ipums-extract-verification.md#allocation-flags-and-actual-typedomain-traps)
+The [Stage 7 flag evidence](../../findings/stage-7-ipums-extract-verification.md#allocation-flags-and-actual-typedomain-traps)
 governs applicability and the all-null 2023 core partition.
 
 ### Existing interfaces to reuse without editing
@@ -639,7 +657,7 @@ this plan.
   It uses synthetic manifested raw triples and actual fixture Stage 4/5/7 builds,
   never production data, mocked upstream verification or a fixture bypass.
 
-- [ ] **Step 1: Write trust/schema/race regression tests.** Implement the new
+- [x] **Step 1: Write trust/schema/race regression tests.** Implement the new
   fixture using the existing `code_fixtures.seed_code_tree`,
   `geography_fixtures.seed_geography_tree`, `test_ipums_acceptance.delivery` and
   the genuine DDI/definition construction pattern in
@@ -680,7 +698,7 @@ this plan.
   candidate paths are rejected. A legitimate unrelated append to the manifest
   must not invalidate selected raw citations.
 
-- [ ] **Step 2: Run the new focused tests and inspect the red failures.**
+- [x] **Step 2: Run the new focused tests and inspect the red failures.**
 
   ```bash
   UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_acs_mapping_contract.py tests/test_acs_mapping_inputs.py tests/test_acs_mapping_io.py -q
@@ -689,7 +707,7 @@ this plan.
   Expected before implementation: failures naming missing Stage 8 interfaces;
   existing upstream fixture checks pass.
 
-- [ ] **Step 3: Implement exact contracts and input checks, then the exclusive
+- [x] **Step 3: Implement exact contracts and input checks, then the exclusive
   publication primitive.** Materialize the frozen schema section above. Verify
   the Stage 7 detached pin using its public verifier first; copy its verified
   delivery metadata into `SourceInput`, retaining its substantive unresolved
@@ -698,6 +716,8 @@ this plan.
   without invoking that private function or ITA selection. Verify all files in
   each upstream bundle, schemas, report counts, raw citations and source hashes;
   use only the needed tables after the complete inventory passes.
+
+  > Deviation: The provisional executing inventory was completed as the final 54-member freeze in Task 8; no nonexistent-file hash was accepted.
 
   Define frozen types and complete detached-file check as follows:
 
@@ -767,7 +787,7 @@ this plan.
   tracking; recheck parents before calling the primitive. Catch failures at the
   caller and remove only the directory it successfully reserved.
 
-- [ ] **Step 4: Run the focused tests and adjacent trust/parity tests.**
+- [x] **Step 4: Run the focused tests and adjacent trust/parity tests.**
 
   ```bash
   UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_acs_mapping_contract.py tests/test_acs_mapping_inputs.py tests/test_acs_mapping_io.py tests/test_target_inputs.py tests/test_ipums_verification_run.py tests/test_ipums_parity.py -q
@@ -777,7 +797,7 @@ this plan.
   both supported-platform dispatch/error tests. Check only intended new files
   changed and no upstream frozen file changed.
 
-- [ ] **Step 5: Review and commit the deliverable.**
+- [x] **Step 5: Review and commit the deliverable.**
 
   ```bash
   git add src/embedding_data/acs_mapping_contract.py src/embedding_data/acs_mapping_inputs.py src/embedding_data/acs_mapping_io.py tests/acs_mapping_fixtures.py tests/test_acs_mapping_contract.py tests/test_acs_mapping_inputs.py tests/test_acs_mapping_io.py
@@ -807,7 +827,7 @@ this plan.
 - `check_references(data_dir: Path, reference_id: str, *, expected_receipt_sha256: str) -> ReferenceSnapshot`.
   This is offline and requires the external receipt pin.
 
-- [ ] **Step 1: Write acquisition/import and cache failure tests.** Provide
+- [x] **Step 1: Write acquisition/import and cache failure tests.** Provide
   genuine-layout public excerpts with recorded authority, original hash, sheet/
   table locator and excerpt transformation in `reference-layouts.json`. Only
   synthetic microdata may appear in fixtures. Test every selected destination
@@ -834,7 +854,7 @@ this plan.
   Test request-byte preservation, generated link padding, receipt pin tampering
   and manifest delta accounting. Partial snapshots cannot be used by build.
 
-- [ ] **Step 2: Run the focused red tests.**
+- [x] **Step 2: Run the focused red tests.**
 
   ```bash
   UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_acs_mapping_references.py -q
@@ -842,12 +862,14 @@ this plan.
 
   Expected: missing new lifecycle interfaces or explicit cache/integrity failures.
 
-- [ ] **Step 3: Implement the closed registry and transactional boundary.**
+- [x] **Step 3: Implement the closed registry and transactional boundary.**
   Register the exact classification originals/authority roles in the classification
   evidence section, all geographic originals above, geographic role/state pages,
   2024 annual/five-year delivered-scheme documentation, Geocorr help/form and the
   full population queries. Cite verified Stage 4/7 originals in place by manifest
   citation and pinned receipt/bundle, without duplicating their registry.
+
+  > Deviation: The interim reference version was corrected before production; historical v1/39 verification remains strict beside the separately versioned v2/46 CT originals.
 
   A receipt records `reference_id`, `reference_version`, `originals` keyed by
   registered kind (URL, edition, authority role, parser contract, hash, size,
@@ -900,7 +922,7 @@ this plan.
   an application-error response as empty data. If direct public GET is blocked,
   import exact browser bytes with identity/proxy metadata; no credential request.
 
-- [ ] **Step 4: Run lifecycle and existing manifest/audit tests.**
+- [x] **Step 4: Run lifecycle and existing manifest/audit tests.**
 
   ```bash
   UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_acs_mapping_references.py tests/test_manifest.py tests/test_manifest_audit.py -q
@@ -910,7 +932,7 @@ this plan.
   and cached transport count zero. Record the reference kind/file list in the
   test fixture metadata; all runtime inputs live inside the selected data root.
 
-- [ ] **Step 5: Review and commit the deliverable.**
+- [x] **Step 5: Review and commit the deliverable.**
 
   ```bash
   git add src/embedding_data/acs_mapping_references.py tests/test_acs_mapping_references.py tests/acs_mapping_fixtures.py tests/fixtures/acs_mapping
@@ -949,7 +971,7 @@ this plan.
   Every nonmissing observed `(scheme, IND/OCC, token)` must match explicit
   authoritative paired evidence; references alone do not excuse source mismatch.
 
-- [ ] **Step 1: Write genuine-layout membership and contradiction tests.**
+- [x] **Step 1: Write genuine-layout membership and contradiction tests.**
   Extract bounded actual rows and layout from every selected original; preserve
   their table/sheet/header structures and evidence locators. Include numeric
   coarse categories, every M/P/S/Z marker and actual combinations/discriminating
@@ -984,7 +1006,7 @@ this plan.
   above. Keep expected memberships literal; never generate them by calling the
   production parser.
 
-- [ ] **Step 2: Run the reference parser tests red.**
+- [x] **Step 2: Run the reference parser tests red.**
 
   ```bash
   UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_acs_code_references.py -q
@@ -993,7 +1015,7 @@ this plan.
   Expected: new parser/relationship validation fails; the expected memberships
   are fixed from primary sources before implementation.
 
-- [ ] **Step 3: Implement source-specific relations and bounded expression grammar.**
+- [x] **Step 3: Implement source-specific relations and bounded expression grammar.**
   Validate exact sheet/header editions and row keys. Parse the official Census
   NAICS/SOC membership expressions, numeric nodes and source-token correspondences
   separately. Resolve published whole nodes through actual selected descendant
@@ -1001,6 +1023,8 @@ this plan.
   set. A range is a bounded official code interval, not a numeric enumeration of
   nonexistent codes. Carry `part` clauses as partial support and never pretend
   the whole finest category is fully observed. The core set operation is:
+
+  > Deviation: D4 resolves one exact Census constituent assertion; D3/D8/D10 retain bounded rejected contradictions and fail other unexplained conflicts.
 
   ```python
   def resolve_union_and_exclusion(included: list[set[str]],
@@ -1044,7 +1068,7 @@ this plan.
   documented reason branches but must be labelled synthetic evidence; do not
   manufacture a source-backed per-code disclosure reason.
 
-- [ ] **Step 4: Run membership, official-parentage and relation tests.**
+- [x] **Step 4: Run membership, official-parentage and relation tests.**
 
   ```bash
   UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_acs_code_references.py tests/test_classification_tables.py tests/test_naics_relationships.py -q
@@ -1053,7 +1077,7 @@ this plan.
   Expected: genuine-layout memberships exactly match primary evidence; all
   malformed/contradictory/unsupported cases fail. No source value was rewritten.
 
-- [ ] **Step 5: Review and commit the deliverable.**
+- [x] **Step 5: Review and commit the deliverable.**
 
   ```bash
   git add src/embedding_data/acs_code_references.py tests/test_acs_code_references.py tests/acs_mapping_fixtures.py tests/fixtures/acs_mapping/classification
@@ -1082,7 +1106,7 @@ this plan.
 - `build_code_lookup(observed: pl.DataFrame, evidence: CodeEvidence, selected: SelectedInputs) -> pl.DataFrame` returns `CODE_SCHEMA`.
 - `validate_code_lookup(frame: pl.DataFrame, evidence: CodeEvidence, selected: SelectedInputs) -> None` reconstructs asserted candidates/paths/scalars/reasons.
 
-- [ ] **Step 1: Write vintage/scalar/special regression tests.**
+- [x] **Step 1: Write vintage/scalar/special regression tests.**
 
   ```python
   def test_same_code_content_change_traverses_the_full_relation(split_case):
@@ -1118,7 +1142,7 @@ this plan.
   roots with no common ancestor, padded tokens, malformed internal characters,
   preserved suffixes, absent flags and every other purported special failing.
 
-- [ ] **Step 2: Run the lookup tests red.**
+- [x] **Step 2: Run the lookup tests red.**
 
   ```bash
   UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_acs_code_mapping.py -q
@@ -1126,13 +1150,15 @@ this plan.
 
   Expected: missing scheme/lookup behavior, with native membership fixtures valid.
 
-- [ ] **Step 3: Implement deterministic mapping without row-level expansion.**
+- [x] **Step 3: Implement deterministic mapping without row-level expansion.**
   Remove only documented outer ASCII space padding from a separate token;
   `raw` remains the exact original source column. Normalize paired Census codes
   at the documented width into separate strings. Fail over-width, sign, decimal,
   internal whitespace or unsupported characters. Select schemes solely from
   verified sample/product metadata. For every native-2017 finest possibility,
   compute the full canonical union:
+
+  > Deviation: Positive DDI sample identity became a public helper; Task 8 enforces complete observed-key coverage at bundle build.
 
   ```python
   from embedding_data.naics_relationships import candidates
@@ -1174,7 +1200,7 @@ this plan.
   not in the deduplicated code key. Set counts by profile/component so one shared
   lookup cannot erase source-specific provenance.
 
-- [ ] **Step 4: Run reference and mapping tests together.**
+- [x] **Step 4: Run reference and mapping tests together.**
 
   ```bash
   UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_acs_code_references.py tests/test_acs_code_mapping.py tests/test_naics_relationships.py -q
@@ -1183,7 +1209,7 @@ this plan.
   Expected: supported complete candidates, zero guessed scalar assignments,
   explicit special/unknown-reason partitions and all refusals pass.
 
-- [ ] **Step 5: Review and commit the deliverable.**
+- [x] **Step 5: Review and commit the deliverable.**
 
   ```bash
   git add src/embedding_data/acs_code_mapping.py tests/test_acs_code_mapping.py tests/acs_mapping_fixtures.py
@@ -1230,7 +1256,7 @@ this plan.
   Reconstruct numerators/denominators from original reference frames; Float64
   sums alone are insufficient.
 
-- [ ] **Step 1: Write genuine-layout and hand-calculated regression tests.**
+- [x] **Step 1: Write genuine-layout and hand-calculated regression tests.**
   Create fixture `population_case` in `tests/acs_mapping_fixtures.py`, returning
   `.evidence` and `.selected`. It contains this explicit synthetic population
   truth, in the genuine original layouts:
@@ -1284,7 +1310,7 @@ this plan.
   Put one county in two groups, or make a PUMA-derived group disagree with
   county composition: reject union-only derivation and preserve the diagnostic.
 
-- [ ] **Step 2: Run the area reference and factor tests red.**
+- [x] **Step 2: Run the area reference and factor tests red.**
 
   ```bash
   UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_acs_area_references.py tests/test_acs_geography_factors.py -q
@@ -1293,13 +1319,15 @@ this plan.
   Expected: missing new parsers/factor behavior, with fixed literal arithmetic
   expectations. An incorrect 0.30/0.70 mean-of-PUMA-fractions result must fail.
 
-- [ ] **Step 3: Implement strict originals and integer-first factors.**
+- [x] **Step 3: Implement strict originals and integer-first factors.**
   Read each workbook with fastexcel, preserve strings, validate exact registered
   sheet/header identity and unique source/target pairs. Read Geocorr with stdlib
   CSV, validating both names and descriptive-label rows before strict casts.
   Normalize domestic states through documented correspondence, not arbitrary
   last-two-digit truncation. Validate all complete PUMA/county keys and populations
   against controls/compositions before scope filtering.
+
+  > Deviation: D7 retains three exact rejected rounding assertions; D9 supplies only Connecticut factors from official block-population controls.
 
   For residence, require intersection sums by PUMA and county to equal their
   independent control populations exactly. Join those controls, then calculate
@@ -1345,7 +1373,7 @@ this plan.
   must be nonnegative; never rescale. Record metro/micro distinctions and no
   joint-probability or individual-location claim.
 
-- [ ] **Step 4: Run the geographic and selected upstream geography tests.**
+- [x] **Step 4: Run the geographic and selected upstream geography tests.**
 
   ```bash
   UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_acs_area_references.py tests/test_acs_geography_factors.py tests/test_geography_tables.py tests/test_geography_parsers.py -q
@@ -1355,7 +1383,7 @@ this plan.
   explicit MSA residuals, retained zero relationships and split-county refusals.
   Validate every published reference table against its frozen schema and sort key.
 
-- [ ] **Step 5: Review and commit the deliverable.**
+- [x] **Step 5: Review and commit the deliverable.**
 
   ```bash
   git add src/embedding_data/acs_area_references.py src/embedding_data/acs_geography_factors.py tests/test_acs_area_references.py tests/test_acs_geography_factors.py tests/acs_mapping_fixtures.py tests/fixtures/acs_mapping/geography
@@ -1374,17 +1402,24 @@ this plan.
 
 **Interfaces:**
 
-- `read_role_rules(snapshot: ReferenceSnapshot) -> pl.DataFrame` in
+- `read_role_rules(snapshot: ReferenceSnapshot, sources: dict[str, SourceInput]) -> pl.DataFrame` in
   `acs_area_references.py`: one explicit rule per registered role/state/area
   special or domestic state correspondence, with reference IDs/locators and
   applicability/frame conditions. Conflicting rules fail.
+  Execution clarification: the captured public state/place HTML has empty dynamic
+  code tables. Resolve explicit state/place correspondences through each selected
+  source's delivered DDI, including its STATEFIP correspondence and raw citations;
+  public snapshot originals still govern role specials and frame conditions.
+  Missing, ambiguous or unsupported DDI interpretations fail. No unmatched label
+  becomes foreign by default. This adds the selected sources argument without
+  modifying any frozen upstream interface.
 - `observed_area_keys(sources: dict[str, SourceInput]) -> pl.DataFrame` collects
   only distinct profile/sample/release/component/role/raw-state/raw-area keys
   and source counts, using each role's own documented normalization.
 - `build_area_lookup(observed: pl.DataFrame, rules: pl.DataFrame, evidence: AreaEvidence, factors: FactorTables) -> pl.DataFrame` returns `AREA_SCHEMA`.
 - `validate_area_lookup(lookup: pl.DataFrame, observed: pl.DataFrame, factors: FactorTables) -> None` checks one interpretation per key, cited statuses and complete factors for applicable keys.
 
-- [ ] **Step 1: Write role/state/status tests with exact expected outcomes.**
+- [x] **Step 1: Write role/state/status tests with exact expected outcomes.**
 
   ```python
   @pytest.mark.parametrize(('role', 'state', 'area', 'status'), [
@@ -1418,7 +1453,7 @@ this plan.
   special; and five-year components 2020/2021 versus 2022–2024. Two roles sharing
   a factor table must retain distinct lookup IDs, source columns and citations.
 
-- [ ] **Step 2: Run the role lookup tests red.**
+- [x] **Step 2: Run the role lookup tests red.**
 
   ```bash
   UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_acs_area_mapping.py -q
@@ -1426,12 +1461,14 @@ this plan.
 
   Expected: missing role normalization/status/provenance behavior.
 
-- [ ] **Step 3: Implement observed-key interpretation and factor coverage.**
+- [x] **Step 3: Implement observed-key interpretation and factor coverage.**
   Parse only the six role source columns into separate normalized representations;
   retain their original values/types in companions. Documented width validation
   precedes padding. Classify specials through role/state rules, then applicable
   domestic keys through the complete compositions and factor inventory. A missing
   compatible key is a build error, not `documented_unavailable`.
+
+  > Deviation: Role rules consume selected DDI source evidence because cached dynamic HTML lacked codes; C1 is one exact five-year migration unavailable case.
 
   The factor coverage gate is:
 
@@ -1462,7 +1499,7 @@ this plan.
   in reasons; neither becomes no migration or zero flows. Preserve TRANWORK and
   work-from-home records for Stage 9's eligibility decision.
 
-- [ ] **Step 4: Run role/reference/factor tests together.**
+- [x] **Step 4: Run role/reference/factor tests together.**
 
   ```bash
   UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_acs_area_mapping.py tests/test_acs_area_references.py tests/test_acs_geography_factors.py -q
@@ -1472,7 +1509,7 @@ this plan.
   complete factors, source-assigned geography remains flagged and unknown keys
   are rejected. Disjoint role status counts sum to each profile's row total.
 
-- [ ] **Step 5: Review and commit the deliverable.**
+- [x] **Step 5: Review and commit the deliverable.**
 
   ```bash
   git add src/embedding_data/acs_area_mapping.py src/embedding_data/acs_area_references.py tests/test_acs_area_mapping.py tests/acs_mapping_fixtures.py
@@ -1498,7 +1535,7 @@ this plan.
   JSON-safe aggregate counts, disjoint primary-status partitions and independent
   overlapping provenance-flag counts. No person values or IDs enter reports.
 
-- [ ] **Step 1: Write fidelity/flag and join-failure regression tests.**
+- [x] **Step 1: Write fidelity/flag and join-failure regression tests.**
   Fixture `companion_case` contains all three profiles built through the actual
   converter, one exact duplicate source row, padded INDNAICS, a partial singleton,
   an OCCSOC special, five-year MULTYEAR components, unavailable flags and all role
@@ -1534,7 +1571,7 @@ this plan.
   vintage has no newly fabricated QMIGRAT1 column; five-year Int64 flags remain
   Int64. Geography factor one and code singleton do not clear provenance.
 
-- [ ] **Step 2: Run the companion tests red.**
+- [x] **Step 2: Run the companion tests red.**
 
   ```bash
   UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_acs_mapping_companions.py -q
@@ -1542,13 +1579,15 @@ this plan.
 
   Expected: missing annotation/fidelity behavior, not a change to source types.
 
-- [ ] **Step 3: Implement lazy many-to-one annotation and bounded fidelity.**
+- [x] **Step 3: Implement lazy many-to-one annotation and bounded fidelity.**
   Reject collisions with every final suffix and temporary join-key name before
   scanning. Add zero-based ordinal identity before any join. Original columns
   are never cast, trimmed, replaced or renamed. Scheme/paired-code/token keys
   are temporary separate expressions; join only small unique lookups with
   `validate='m:1'`, `maintain_order='left'` and checked null-key semantics.
   Do not explode candidates or join county-factor rows onto person rows.
+
+  > Deviation: After the sealed r6 memory failure, the streaming join validates small right-key uniqueness before the native lazy join without changing null-key semantics.
 
   Use this row identity/prefix-preserving core:
 
@@ -1598,7 +1637,7 @@ this plan.
   aggregate/partial/crosswalk flags that may overlap. Every role's status counts
   and every source/sample/component partition must reconcile to source totals.
 
-- [ ] **Step 4: Run all annotation and upstream parity/conversion tests.**
+- [x] **Step 4: Run all annotation and upstream parity/conversion tests.**
 
   ```bash
   UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_acs_mapping_companions.py tests/test_acs_code_mapping.py tests/test_acs_area_mapping.py tests/test_ipums_parity.py tests/test_ipums_conversion.py -q
@@ -1608,7 +1647,7 @@ this plan.
   and no person-row expansion. Inspect query plans to confirm production person
   tables stay lazy; small public references/lookups may be eager.
 
-- [ ] **Step 5: Review and commit the deliverable.**
+- [x] **Step 5: Review and commit the deliverable.**
 
   ```bash
   git add src/embedding_data/acs_mapping_companions.py tests/test_acs_mapping_companions.py tests/acs_mapping_fixtures.py
@@ -1624,6 +1663,7 @@ this plan.
 - Create: `tests/test_acs_mapping_bundle.py`
 - Create: `tests/test_acs_mapping_cli.py`
 - Create: `tests/test_acs_mapping_v12.py`
+- Create as required for authenticated fixture integration: `tests/fixtures/acs_mapping/upstream/` (public originals or genuine-layout excerpts with exact provenance; no person data).
 - Modify: `src/embedding_data/acs_mapping_inputs.py` (final executing-file inventory)
 - Modify: `tests/acs_mapping_fixtures.py`
 - Modify: `README.md` (new Stage 8 commands and interpretation limits)
@@ -1660,7 +1700,7 @@ The uppercase names in this CLI synopsis are argument names; Task 9 supplies
 fully selected production invocations and obtains new pins from external control
 receipts. No default selection of a latest run is permitted.
 
-- [ ] **Step 1: Write bundle/CLI/V12 red tests and network guards.**
+- [x] **Step 1: Write bundle/CLI/V12 red tests and network guards.**
 
   ```python
   def test_complete_raw_to_mapping_bundle_and_replay(tmp_path, monkeypatch):
@@ -1695,7 +1735,7 @@ receipts. No default selection of a latest run is permitted.
   order and substantive report content. Test CLI exit codes and no traceback
   person values. Repeated cached acquire must have zero HTTP.
 
-- [ ] **Step 2: Run integration tests red.**
+- [x] **Step 2: Run integration tests red.**
 
   ```bash
   UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_acs_mapping_bundle.py tests/test_acs_mapping_cli.py tests/test_acs_mapping_v12.py -q
@@ -1704,12 +1744,14 @@ receipts. No default selection of a latest run is permitted.
   Expected: missing complete Stage 8 orchestration/CLI/replay behavior; no network
   or credential access is tolerated to make fixtures pass.
 
-- [ ] **Step 3: Implement the bundle transaction, independent verifier and CLI.**
+- [x] **Step 3: Implement the bundle transaction, independent verifier and CLI.**
   Validate selections/references and construct all small evidence/lookups/factors
   before writing person outputs. Reserve caller-owned staging, write the five
   reference Parquets sorted by complete natural keys, then the three lazy
   companions with unchanged original prefixes. Reread every output and rerun
   schema/value/mapping/role/factor checks; write finite JSON only.
+
+  > Deviation: The separate Stage 8 module CLI and exact D5 historical creator-hash rule shipped; each physical bundle has eight Parquets and three JSON files.
 
   Required JSON shapes:
 
@@ -1783,7 +1825,7 @@ receipts. No default selection of a latest run is permitted.
   failure exits 2 with safe metadata-only diagnostics. Suppress unsanitized
   parser exception chains/locals. Leave `cli.py` and `__init__.py` untouched.
 
-- [ ] **Step 4: Run Stage 8 integration and existing CLI/V12 readiness tests.**
+- [x] **Step 4: Run Stage 8 integration and existing CLI/V12 readiness tests.**
 
   ```bash
   UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_acs_mapping_bundle.py tests/test_acs_mapping_cli.py tests/test_acs_mapping_v12.py tests/test_cli.py tests/test_ipums_cli.py tests/test_target_contract_v12.py -q
@@ -1796,7 +1838,7 @@ receipts. No default selection of a latest run is permitted.
   interpretation limits. CLAUDE describes software readiness without claiming
   full-data acceptance. Check all upstream frozen software hashes again.
 
-- [ ] **Step 5: Review and commit the deliverable.**
+- [x] **Step 5: Review and commit the deliverable.**
 
   ```bash
   git add src/embedding_data/acs_mapping_bundle.py src/embedding_data/acs_mapping.py src/embedding_data/acs_mapping_inputs.py tests/test_acs_mapping_bundle.py tests/test_acs_mapping_cli.py tests/test_acs_mapping_v12.py tests/acs_mapping_fixtures.py README.md CLAUDE.md
@@ -1850,7 +1892,7 @@ receipts. No default selection of a latest run is permitted.
   and source Parquets. Its own source/test/version hashes belong to the separate
   reconciliation inventory. It is not called to produce the mapping bundle.
 
-- [ ] **Step 1: Write the independent reconciler tests.** Load the script with
+- [x] **Step 1: Write the independent reconciler tests.** Load the script with
   `importlib.util.spec_from_file_location` from the repository's exact script
   path in fixture `reconciliation_module`; expose its three public functions.
   Use the same explicit arithmetic truth as Task 5, then deliberately mutate
@@ -1934,7 +1976,7 @@ receipts. No default selection of a latest run is permitted.
   external pin, truncated manifest, appended unaccounted raw record, omitted
   county intersection and altered special/unknown reason counts.
 
-- [ ] **Step 2: Run reconciler tests red.**
+- [x] **Step 2: Run reconciler tests red.**
 
   ```bash
   UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_stage8_reconciliation.py -q
@@ -1943,7 +1985,7 @@ receipts. No default selection of a latest run is permitted.
   Expected: missing independent calculations; the writer's own verification
   cannot stand in for these tests.
 
-- [ ] **Step 3: Implement independent calculations, then test them green.**
+- [x] **Step 3: Implement independent calculations, then test them green.**
   Freeze controls before any production acquisition. Use streaming SHA-256 and
   keep `raw/manifest.jsonl` out of the immutable whole-file comparisons. Verify
   its saved prefix bytes against their frozen length/hash, require the current
@@ -2003,7 +2045,7 @@ receipts. No default selection of a latest run is permitted.
   git commit -m "test(acs): reconcile mapping populations and statuses independently"
   ```
 
-- [ ] **Step 4: Freeze the actual before-state and verify selected inputs.**
+- [x] **Step 4: Freeze the actual before-state and verify selected inputs.**
   Inspect occupied run/reference/control names; if any exist, preserve them and
   select fresh IDs with a recorded plan deviation. The following are proposed
   first IDs, not permission to overwrite evidence. Run from the implementation
@@ -2023,7 +2065,7 @@ receipts. No default selection of a latest run is permitted.
   by a failure. Run the full repository checks in Task 10 before freezing final
   production software if they have not yet passed at this checkpoint.
 
-- [ ] **Step 5: Acquire/import the complete actual references and prove cache isolation.**
+- [x] **Step 5: Acquire/import the complete actual references and prove cache isolation.**
 
   ```bash
   set -o noclobber
@@ -2050,7 +2092,7 @@ receipts. No default selection of a latest run is permitted.
   an unexpected membership gap, county split, namespace change or application
   error, preserve diagnostics and stop that gate; fixtures cannot substitute.
 
-- [ ] **Step 6: Build the first complete production mapping bundle.** Read the
+- [x] **Step 6: Build the first complete production mapping bundle.** Read the
   reference pin from the **external** acquisition response; capture the builder's
   returned pin in another external control file. Use the same shell for these
   variable definitions and invocations:
@@ -2070,7 +2112,7 @@ receipts. No default selection of a latest run is permitted.
   any full-file gate. Keep public checksums/control responses outside the bundle;
   never replace them with a checksum calculated solely from its current contents.
 
-- [ ] **Step 7: Build and verify a second named offline replay.**
+- [x] **Step 7: Build and verify a second named offline replay.**
 
   ```bash
   UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked python -m embedding_data.acs_mapping build stage8_acs_mapping_20261017_replay "${stage8_build_args[@]}" > "$stage8_control_dir/build-replay.json"
@@ -2084,7 +2126,9 @@ receipts. No default selection of a latest run is permitted.
   differ. An executing code/reference/dependency correction requires fresh
   selected run IDs and fresh full acceptance, leaving earlier runs untouched.
 
-- [ ] **Step 8: Reconcile independently, reverify preservation and audit the whole tree.**
+- [x] **Step 8: Reconcile independently, reverify preservation and audit the whole tree.**
+
+  > Deviation: Only fresh r7 IDs are accepted; older failed controls and the r6 partial remain immutable. The first r7 timing wrapper exited 1 after publication, while direct detached verification, fresh replay, two full reconciliations and the science seal passed.
 
   ```bash
   UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked python scripts/reconcile_stage8.py reconcile --run-id stage8_acs_mapping_20261017 --outputs-sha256 "$stage8_first_pin" --data-dir /Users/lowell/Projects/embedding-data/data --control-dir "$stage8_control_dir" > "$stage8_control_dir/reconciliation.json"
@@ -2098,7 +2142,7 @@ receipts. No default selection of a latest run is permitted.
   with zero discrepancies. Re-run selected upstream public/new-selector integrity
   checks against their original pins after acceptance. Do not call builders.
 
-- [ ] **Step 9: Write and commit the actual measured finding.** The finding must
+- [x] **Step 9: Write and commit the actual measured finding.** The finding must
   contain the exact selected first/replay/reference IDs; detached pins; full raw,
   public-reference, executing-software and ten-file output inventories with
   hashes/sizes; all eight ordered output schemas (including original source
@@ -2139,7 +2183,7 @@ receipts. No default selection of a latest run is permitted.
 - Produces actual Stage 8 completion markup, measured source-spec citations,
   retired plan/spec and a shipped `Handoff to later stages` for Stages 9–13.
 
-- [ ] **Step 1: Run the applicable repository checks and inspect complete output.**
+- [x] **Step 1: Run the applicable repository checks and inspect complete output.**
 
   ```bash
   UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest
@@ -2156,7 +2200,7 @@ receipts. No default selection of a latest run is permitted.
   not merely as a substitute for reviewing results. Existing always-run commit
   coverage checks remain required.
 
-- [ ] **Step 2: Request and resolve final whole-branch review.** Apply
+- [x] **Step 2: Request and resolve final whole-branch review.** Apply
   requesting-code-review, supplying the approved spec, this plan, full diff,
   measured finding and independent acceptance evidence. Per-task review does
   not replace this gate. Apply receiving-code-review critically to feedback.
@@ -2165,7 +2209,7 @@ receipts. No default selection of a latest run is permitted.
   production builds/replay and reconciliations; old runs remain immutable.
   Update the finding with the resolved review and check results.
 
-- [ ] **Step 3: Replace R6.3's open marker only when measured evidence supports it.**
+- [x] **Step 3: Replace R6.3's open marker only when measured evidence supports it.**
   If full-source V8 finds no split counties and reconciles all units, replace
   exactly:
 
@@ -2192,7 +2236,7 @@ receipts. No default selection of a latest run is permitted.
   finding citation to its Verification item, preserving the documented split
   requirement and ACS-only V11 scope; do not close CPS V11 or full V12.
 
-- [ ] **Step 4: Apply the resolve-before-defer completion gate and write actual handoff.**
+- [x] **Step 4: Apply the resolve-before-defer completion gate and write actual handoff.**
   Batch unresolved owner decisions before markup; finish newly unblocked work.
   Then tick completed plan steps once, annotate actual deviations/skips and
   update earlier deferred items this plan implemented. New deferrals require
@@ -2222,7 +2266,7 @@ receipts. No default selection of a latest run is permitted.
   boxes unchanged. The actual handoff, rather than planning defaults, is the
   evidence derive-roadmap uses to amend later entries at the next resume.
 
-- [ ] **Step 5: Triage backlog, retire plan/spec and stop this stage.** Run the
+- [x] **Step 5: Triage backlog, retire plan/spec and stop this stage.** Run the
   writing-plans backlog statistics command and report open count/closure rate/
   aged tail. If its rubric triggers triage, present the read-only proposal; do
   not execute dispositions without owner direction. Commit completion markup
@@ -2233,6 +2277,18 @@ receipts. No default selection of a latest run is permitted.
   worktree cleanup, with no automatic next-stage planning. End with a resume-
   roadmap handoff. This protocol is for **implementation completion**, not for
   the current planning-only commit.
+
+## Handoff to later stages
+
+The [approved Stage 8 spec](../../completed/acs-codes-area-allocation.md) defines the scope; the [measured finding](../../findings/stage-8-acs-codes-area-allocation.md) gives complete ordered schemas, public APIs, selected IDs, detached pins and limitations. Consume explicit selected runs, never a latest alias or mixed-run fallback. The accepted control is `stage8_acceptance_20261018_r7`; the first and replay bundles are `stage8_acs_mapping_20261018_r7` and `stage8_acs_mapping_20261018_r7_replay`, with detached `outputs.json` SHA-256 pins `1ec9701092f576b122b01464cdb6fa3fbee49db030e4ad3df7b64e621b8e75f4` and `a115c5f7e2691ecbffe763bd1b6b9780fb6a71bc512a2691cf4014f9857b3565`. Historical v1/39 and selected v2/46 reference receipts remain distinct. `compare_runs` proves logical equality; detached verification establishes each physical bundle's authority.
+
+- **Stage 9 — ACS targets:** Consume five selected reference tables and three ordered companions through the finding's `SelectionRequest` seven-field upstream selection, `select_inputs(...).verify()`, `verify_bundle(..., expected_outputs_sha256=...)`, and exact schemas. `observed_code_keys`, `build_code_lookup`, `observed_area_keys`, `build_area_lookup`, `build_factor_tables`, `validate_factor_tables`, `annotate_source`, `write_companion` and `validate_companion` are the shipped seams, with signatures in the finding. Code natural key `(system,source_scheme,paired_census_code,source_token)` and area natural key `(profile,sample_id,release_year,component_year,role,source_state_code,source_area_code)` remain distinct. Preserve original row order/duplicates and zero-based `source_row` within a source Parquet, native/canonical candidates and paths, the ACS-only empty-candidate `559830` special, typed null/unknown/documented statuses, and independent source-imputation, recoding, Q/role and geographic-allocation flags. Apply county factors during later estimation, never by expanding the identity-preserving companion. Target universe/eligibility, workplace work-from-home exclusion, estimands, pooling, replicate SEs and family V12 remain Stage 9.
+- **Stage 10 — ITA targets:** The selected Stage 2–6 ITA inputs, `targets-v1` writer/validator, Stage 4 canonical node/path APIs and adopted R2.6/R2.7 linkage rules remain unchanged. D5's exact Stage 5 creator-hash compatibility records history only; it authorizes no upstream rebuild, new ITA eligibility or deduplication. ITA text-code/co-ownership rules and family V12 remain Stage 10.
+- **Stage 11 — CPS flow:** Stage 8's selected parser accepts ACS schemes only. Reuse Stage 4 canonical node/path/relationship APIs, and resolve the open [Stage 7 `9890` authority](../../deferred_items.md#7-ipums-extract-verification--2026-10-15) before assigning a CPS leaf. ACS `559830`, D4/D8/D10 and C1 grant no CPS special or membership shortcut. CPS parsing, linkage/job-change guards, weights, CPS V11 and family V12 remain Stage 11.
+- **Stage 12 — worker profile:** Consume ACS through Stage 9's later helpers and CPS through Stage 11's. Stage 8 supplies no worker-profile estimator, eligibility or metro rule. Preserve source-imputation, recoding, allocation and unavailable states separately. CPS earnings, R4.4 metro eligibility, weights/uncertainty and family V12 remain Stage 12.
+- **Stage 13 — comparator:** Consume the vintage companion's native-2017 to canonical-2022 complete candidate/path/flag provenance, explicit source/target frames, and physical raw/reference/software/output inventories and detached pins separately from logical replay. Stage 9's later estimator/universe/SE helpers remain necessary. V9, comparator targets and citations, and full eight-family V12 remain Stage 13. Mapping is evaluation input, not training or model-selection material.
+
+The interim `acs-mapping-public-references-v1` tag, provisional executing inventory and imagined writer lookup parameter did not ship. Reader-only `SelectedInputs` fixtures were not a substitute for the authenticated raw-to-upstream selector path. The shipped reference editions are v1 and v2, while output format/rule versions remain v1. These corrections and bounded refusals supersede planning defaults without changing later stages' own decisions.
 
 ## Measured acceptance matrix
 
@@ -2264,46 +2320,12 @@ candidate set, zero population or successful exclusion.
 | Independent reconciliation | Independent source code/flag/status frequencies, population controls/group/MSA/residual arithmetic agree; script/evidence identities recorded | 9 |
 | Preservation / repository | Immutable inventory excludes `raw/manifest.jsonl`; every other earlier protected file unchanged; saved manifest bytes remain an exact prefix with every append accounted; legitimate-append and prior-byte-mutation regressions pass; whole-tree audit zero; pytest/Behave/Ruff/lock/hooks/reviews pass | 9–10 |
 
-## Self-review and execution handoff
+## Execution and completion evidence
 
-Before committing this planning artifact, check the approved spec section by
-section against the matrix and task interfaces. Scan for unresolved implementation
-stand-ins, inconsistent type/function names and unnamed fixtures. Verify the
-verbatim roadmap header and all selected pins, validate local Markdown links,
-parse every Python block for syntax, and confirm only the plan changed. The
-planning commit must not create source modules, production references, mapping
-runs, a finding, roadmap completion markup or spec retirement.
+Tasks 1–8 were implemented in dependency order with focused RED/GREEN cycles, normal hooked commits and independent task-scoped reviews. The reviewed source at `1542f8d8f1db2e55f28b9cfec4b1306739589ce8` includes the bounded D4–D10/C1 policies, complete 54-member executing inventory and seven-member independent reconciler inventory. The [measured finding](../../findings/stage-8-acs-codes-area-allocation.md) records Task 9's 12,238,491-row acceptance, two detached output pins, ordered eight-table replay, two complete independent reconciliations, zero-discrepancy audit, original 5,490-file beforestate and exact 87 accounted manifest appends. Its immutable science seal SHA-256 is `b09d1a56308f09d6e99f97070c02ffbbc0523d6c595f7901bb0e01a999bd3ddf`. The first r7 outer timing wrapper failed after publication and did not capture the Python child's wait status or peak RSS; direct detached verification separately passed. These remain limits, not a successful original process-exit claim.
 
-Planning self-review on 2026-10-17 mapped each approved spec section to the task
-and acceptance matrix. All 24 Python blocks parse, all 34 shell blocks pass
-`bash -n`, existing local Markdown links resolve, and the required header occurs
-once verbatim. Executing the schema declarations confirms the five reference
-schemas and 114-field companion suffix; the unequal-population arithmetic
-example produces exactly 0.15/0.85. Source-schema widths, task order, selected
-pins, explicit new-module inventory and reference-role/unknown-reason gates were
-checked for consistency. These are plan checks, not Stage 8 software/data gates.
+Task 10 repository checks after the Task 9 finding/README/CLAUDE.md commit passed: offline pytest **2,107 passed / 1 deselected** in 1106.53 seconds (log SHA-256 `ad0e9fe25dae1f31f343237d283f1ef63586b826e5c53722955807b49dcfc2e6`); Behave **2 scenarios / 10 steps passed** (log SHA `6c5796eeebc5e0a9d03e22b880353cf5911ba745fd5db8d4271271cfa0537ae0`); Ruff and the offline 63-package lock check passed; all ten `pre-commit run --all-files` hooks including Coverage Check passed (log SHA `fb75d4e94294110d6cf5a6ada5d2809a4c84d4a3a0f4f912653cbca85c638bc5`). The full merge-base review `.sdd/8-acs-codes-area-allocation/task-10-whole-branch-review.md` SHA `de2484acc6a0c4310464f96dbbf817b6567a38e7958e2a0d500da88b1f113cb8` approved reviewed implementation and science with no actionable finding; the reviewed diff SHA was `1c1b5c3f144c37a14b86063114d645166125c73e213eb963720f20c5e3c75386` and was confirmed at Task 9 HEAD `551586d88f85a713d56c57af16c7f2e159a80c7d`.
 
-Review defaults proposed by this plan:
+The independent V8 read-only original-backed control found **zero of 3,222 counties** assigned to multiple groups and **zero of 4,689 accepted PUMA–county group mismatches**, with 2,486 PUMAs, 1,027 groups and exact complete/scoped population 334,735,155 / 331,449,281. It supports the measured R6.3 marker for the selected 2020 definitions only. Earlier review issues are fixed and re-reviewed. No planned implementation step was skipped, no required science gate was deferred, and no owner question remains. Deferred backlog at the completion review has 12 open / 4 closed / 25% closure / zero older than 45 days; no earlier item was implemented by this stage, including Stage 7's open 2026 `9890` authority, and no Stage 8 section is appended.
 
-1. Exact typed schemas and deterministic lookup/factor IDs, with source-prefix
-   fidelity and materialized companions rather than person-level cross-products.
-2. The bounded Census PUMS industry pair/membership authority, preserving the
-   contradictory IPUMS pair table as explicit diagnostic evidence. This is
-   supported by the complete observed-pair preflight, not a generic preference.
-3. Three complete Geocorr queries for intersections and independent PUMA/county
-   controls, full 52-state validation then explicit 50-state-plus-DC publication.
-4. Role-specific delivered state code rules, separately from composition encodings;
-   style/legend evidence for documented OCCSOC reasons; unknown where unsupported.
-5. Separate module CLI, unchanged upstream frozen software and native exclusive
-   directory publication with a refusal on unsupported guarantees.
-6. Proposed dated production/reference/control IDs, inspect-before-use and new IDs
-   for occupied paths or substantive corrections; measured gates, not fixtures,
-   authorize completion.
-
-Plan review precedes execution. Recommended after approval: start a **fresh
-session** and execute task-by-task via subagent-driven-development, with focused
-ownership and two-stage review. The reference, classification, geography and
-publication boundaries have distinct failure modes that benefit from separate
-review gates. Inline execution via executing-plans is available if the owner
-chooses it. This planning session commits the plan and stops; it does not choose
-or start implementation, tick Stage 8 or plan Stage 9.
+This plan and its exclusively implemented spec are retired in `specs/plans/completed/` and `specs/completed/`, and the roadmap marks Stage 8 complete. The science seal remains unchanged and continues to record its historical `adoption=false` state; the repository completion is documented here and in the finding.
