@@ -111,6 +111,12 @@ def aggregate_native(rows: FamilyRows) -> AggregateSet:
         _native_groups(rows.members, PAIR_KEYS, rows.product, scale),
         _native_groups(rows.members, DENOMINATOR_KEYS, rows.product, scale),
     ])
+    if rows.product.view == 'canonical':
+        coverage = rows.members.select(
+            *DENOMINATOR_KEYS, '_canonical_native_coverage').unique().explode(
+                '_canonical_native_coverage').unnest('_canonical_native_coverage').collect()
+        denominators = denominators.join(coverage,
+            on=[*DENOMINATOR_KEYS, 'component_year'], how='left', validate='m:1')
     if cells.filter(pl.col('replicate').eq(0)).select(
             pl.col('sum_exact').cast(pl.Decimal(DECIMAL_PRECISION, scale)).lt(0).any()).item():
         raise ValueError('negative full cell mass')

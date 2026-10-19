@@ -266,3 +266,67 @@ def estimation_rows(records, *, years=(2023, 2024), pool_divisor=2):
     schema.update({name: pl.Decimal(38, scale) for name in WEIGHT_NAMES})
     return FamilyRows(pl.DataFrame(values, schema=schema).lazy(),
                       pl.DataFrame(schema=DIAGNOSTIC_SCHEMA).lazy(), product)
+
+
+def projection_case():
+    '''Rational raw native masses with two categories and signed interior replicates.'''
+    from decimal import Decimal
+
+    import polars as pl
+
+    from embedding_data.acs_mapping_contract import COUNTY_FACTOR_SCHEMA, factor_key
+    from embedding_data.acs_target_contract import PRODUCTS
+    from embedding_data.acs_target_estimation import aggregate_native
+    from embedding_data.acs_target_membership import FamilyRows
+    from embedding_data.geography_tables import COUNTY_SCHEMA
+
+    product = next(p for p in PRODUCTS if p.family == 'area_mix' and p.dimension == 'industry'
+                   and p.view == 'observed' and p.evidence_policy == 'strict')
+    records = [dict(year=year, a=work, b=code, **weights(str(mass)))
+               for year in (2023, 2024) for work, mass in [('W1', 100), ('W2', 60)]
+               for code in ('A', 'B')]
+    rows = estimation_rows(records)
+    members = rows.members.with_columns(
+        pl.lit('work_migration_puma').alias('unit_a_type'),
+        pl.col('unit_a').str.replace('feature:acs_industry_category:W1',
+            'geography:2020:work_migration_puma:0100100', literal=True)
+            .str.replace('feature:acs_industry_category:W2',
+            'geography:2020:work_migration_puma:0200200', literal=True).alias('unit_a'),
+        pl.lit('acs_industry_category').alias('unit_b_type'),
+        pl.col('unit_b').str.replace('acs_occupation_category', 'acs_industry_category',
+                                    literal=True),
+        pl.lit(Decimal('-7'), dtype=pl.Decimal(38, 0)).alias('REPWTP37'))
+    rows = FamilyRows(members, rows.diagnostics, product)
+    factors = []
+    for state, area, counties in [('01', '00100', [('00000', 0.), ('01001', .25),
+                                                ('02001', .5), ('01003', .25)]),
+                                   ('02', '00200', [('02003', 1.)])]:
+        for geoid, factor in counties:
+            row = {name: [] if isinstance(dtype, pl.List) else None
+                   for name, dtype in COUNTY_FACTOR_SCHEMA.items()}
+            row.update(factor_key=factor_key('work_migration', state, area),
+                area_type='work_migration', state_fips=state, area_code=area,
+                county_geoid=geoid, county_node_id='geography:2025:county:' + geoid,
+                factor=factor, population_year=2020, puma_vintage=2020,
+                county_composition_year=2022, county_inventory_vintage=2025,
+                flag_geographic_allocation=True, flag_fractional_split=factor < 1)
+            factors.append(row)
+    counties = []
+    for geoid, cbsa, kind in [('00000', None, None), ('01001', '10000', 'metropolitan'),
+                              ('02001', '10000', 'metropolitan'),
+                              ('01003', '20000', 'micropolitan'), ('02003', None, None)]:
+        row = dict.fromkeys(COUNTY_SCHEMA)
+        row.update(county_id='geography:2025:county:' + geoid, county_geoid=geoid,
+                   county_vintage=2025, cbsa_id='geography:2023:cbsa:' + cbsa if cbsa else None,
+                   cbsa_code=cbsa, cbsa_type=kind, cbsa_vintage=2023 if cbsa else None)
+        counties.append(row)
+    return {'rows': rows, 'native': aggregate_native(rows),
+            'factors': pl.DataFrame(factors, schema=COUNTY_FACTOR_SCHEMA),
+            'counties': pl.DataFrame(counties, schema=COUNTY_SCHEMA),
+            'msa_product': next(p for p in PRODUCTS if p.view == 'allocated_msa'
+                and p.dimension == product.dimension and p.base_universe == product.base_universe
+                and p.evidence_policy == product.evidence_policy),
+            'county_product': next(p for p in PRODUCTS if p.view == 'allocated_county'
+                and p.dimension == product.dimension and p.base_universe == product.base_universe
+                and p.evidence_policy == product.evidence_policy),
+            'code_a': 'feature:acs_industry_category:A', 'w1_input_count': 2}

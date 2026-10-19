@@ -191,3 +191,16 @@ def test_substantive_applicability_is_separate_from_universe(field, flag, value,
     evidence = rows.diagnostics.filter(pl.col('partition_kind').eq('evidence').and_(
         pl.col('variable').eq(flag))).collect()
     assert evidence['evidence_status'].to_list() == [status]
+
+
+def test_observed_diagnostic_exact_mass_uses_canonical_decimal_strings():
+    from embedding_data.acs_target_contract import validate_auxiliary
+
+    rows = family_rows(membership_frame([{'source_row': i} for i in range(8)]),
+                       product(), membership_rules(), membership_units())
+    diagnostic = rows.diagnostics.collect()
+    validate_auxiliary('eligibility_diagnostics', diagnostic)
+    full = diagnostic.filter((pl.col('partition_kind') == 'first_exclusion')
+                              & (pl.col('reason') == 'eligible'))
+    assert full['weight_sum_exact'].item() == '802'
+    assert full['weighted_mass'].item() == 401.

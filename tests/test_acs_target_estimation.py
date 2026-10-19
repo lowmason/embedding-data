@@ -295,3 +295,34 @@ def test_every_output_defers_aggregate_evaluation_and_se_vectors_are_bounded(mon
         assert not result[name].collect().is_empty()
         assert len(reads) > previous_reads, f'{name} lost its deferred aggregate dependency'
     assert vector_lengths and set(vector_lengths) == {80}
+
+
+def test_canonical_internal_baseline_is_consumed_before_source_lifetime_ends(tmp_path):
+
+    from embedding_data.acs_target_contract import PRODUCTS
+    from embedding_data.acs_target_membership import FamilyRows
+
+    rows = estimation_rows([record('10', year=2023)])
+    product = next(p for p in PRODUCTS if p.view == 'canonical'
+                   and p.family == rows.product.family
+                   and p.base_universe == rows.product.base_universe
+                   and p.evidence_policy == rows.product.evidence_policy)
+    coverage_type = pl.List(pl.Struct({'component_year': pl.Int64,
+        'native_coverage_n': pl.UInt64, 'native_coverage_mass': pl.Float64}))
+    metadata = [{'component_year': 0, 'native_coverage_n': 3, 'native_coverage_mass': 90.},
+                {'component_year': 2023, 'native_coverage_n': 1, 'native_coverage_mass': 10.},
+                {'component_year': 2024, 'native_coverage_n': 2, 'native_coverage_mass': 80.}]
+    source = tmp_path / 'source.parquet'
+    rows.members.with_columns(pl.lit(metadata, dtype=coverage_type)
+        .alias('_canonical_native_coverage')).collect().write_parquet(source)
+    canonical = FamilyRows(pl.scan_parquet(source), rows.diagnostics, product)
+    aggregates = aggregate_native(canonical)
+    source.unlink()
+    baseline = aggregates.denominators.filter(pl.col('replicate') == 0).collect()
+    assert dict(baseline.select('component_year', 'native_coverage_n').rows()) == {
+        0: 3, 2023: 1, 2024: 2}
+    support = estimate(aggregates)['support'].filter(pl.col('measure') == 'forward_share')\
+        .collect()
+    assert dict(support.select('component_year', 'native_coverage_mass').rows()) == {
+        0: 45., 2023: 5., 2024: 40.}
+    assert support.filter(pl.col('component_year') == 2024)['n_unweighted'].item() == 0

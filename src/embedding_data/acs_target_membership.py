@@ -118,7 +118,8 @@ def _diagnostic(frame, product, *, partition, reason, variable=None, rules=None)
     return frame.group_by(keys).agg(
         pl.len().cast(pl.UInt64).alias('n_unweighted'),
         pl.col('PERWT').sum().alias('_weight')).with_columns(
-            pl.col('_weight').cast(pl.String).alias('weight_sum_exact'),
+            pl.col('_weight').cast(pl.String).str.replace(r'(\.\d*?)0+$', '${1}')
+                .str.replace(r'\.$', '').replace('-0', '0').alias('weight_sum_exact'),
             pl.col('_weight').cast(pl.Float64).truediv(product.pool_divisor).alias('weighted_mass'),
             pl.lit([citation['path']] if citation else [], dtype=pl.List(pl.String))
             .alias('reference_ids'),
