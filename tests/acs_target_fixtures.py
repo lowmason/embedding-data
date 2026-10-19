@@ -121,3 +121,109 @@ def selected_target_fixture(tmp_path, monkeypatch):
     return select_targets(fixture['data_dir'], 'mapping',
                           expected_mapping_outputs_sha256=fixture['mapping_outputs_sha256'],
                           request=fixture['request'])
+
+
+def prepare_target_delivery(profile: str, ddi: dict, frame):
+    '''Supply usable synthetic targets in raw originals before conversion.'''
+    import polars as pl
+
+    ddi, frame = target_delivery(profile, ddi, frame)
+    frame = frame.with_columns(
+        pl.lit(10).alias('EMPSTATD'), pl.lit('113M').alias('INDNAICS'),
+        pl.lit(190).alias('IND'), pl.lit('111021').alias('OCCSOC'),
+        pl.lit(20).alias('OCC'), pl.lit(1).alias('PWSTATE2'),
+        pl.lit(100).alias('PWPUMA00'), pl.lit(1).alias('MIGPLAC1'),
+        pl.lit(100).alias('MIGPUMA1'),
+        pl.when(pl.col('YEAR').eq(2023)).then(None).otherwise(0)
+        .cast(pl.Int64).alias('QMIGRAT1'),
+        pl.lit('-2.5').alias('REPWTP37'))
+    if profile == 'core':
+        allocated = frame.filter(pl.col('YEAR').eq(2024)).head(1).with_columns(
+            pl.lit(4, dtype=pl.Int64).alias('QMIGRAT1'))
+        frame = pl.concat([frame, allocated])
+    return ddi, frame
+
+
+def membership_rules():
+    '''Handwritten synthetic meanings, independently labeled for membership tests.'''
+    from embedding_data.acs_target_rules import FlagRules
+
+    statuses = {'0': 'nonallocation', '1': 'edited_failed_edit', '4': 'allocated'}
+    domains = {name: {'dtype': 'String', 'values': {
+        code: {'status': ('edited_failed_edit' if name == 'QMIGPLC1' and code == '4'
+                          else status)} for code, status in statuses.items()}}
+        for name in FLAG_LABELS}
+    return FlagRules('acs-target-rules-v1', domains, {}, {
+        'EMPSTATD': {'values': {'00': 'N/A', '10': 'At work',
+            '12': 'Has job, not working', '14': 'Armed forces, at work',
+            '15': 'Armed forces, has job, not working', '20': 'Unemployed',
+            '30': 'Not in labor force', '99': 'Unknown/Illegible'}},
+        'CLASSWKRD': {'values': {'00': 'N/A', '13': 'Self-employed, not incorporated',
+            '14': 'Self-employed, incorporated', '22': 'Wage/salary, private',
+            '23': 'Wage/salary at non-profit', '98': 'Illegible', '99': 'Unknown'}},
+        'TRANWORK': {'eligible': ['10', '20', '31', '60'], 'home': ['80'],
+                     'not_applicable': ['00']}})
+
+
+def membership_frame(records: list[dict]):
+    '''Explicit synthetic mathematical rows, never selected-input replacements.'''
+    from decimal import Decimal
+
+    import polars as pl
+
+    from embedding_data.acs_mapping_contract import ANNOTATION_SCHEMA
+
+    defaults = {name: ([] if isinstance(dtype, pl.List) else
+                       False if dtype == pl.Boolean else None)
+                for name, dtype in ANNOTATION_SCHEMA.items()}
+    defaults.update(source_delivery_id='synthetic', source_parquet_sha256='a' * 64, source_row=0,
+                    acs_profile='acs/core', acs_sample_id='us2024a',
+                    acs_release_year=2024, acs_component_year=2024,
+                    EMPSTATD=10, CLASSWKRD=22, TRANWORK=10, MIGRATE1=2,
+                    INDNAICS='111110', OCCSOC='111021', PWSTATE2=1, MIGPLAC1=1)
+    defaults.update({name: '0' for name in FLAG_LABELS})
+    for prefix, key in [('industry', 'industry-a'), ('occupation', 'occupation-a')]:
+        defaults.update({prefix + '_code_lookup_id': key,
+                         prefix + '_source_token': defaults[
+                             'INDNAICS' if prefix == 'industry' else 'OCCSOC'],
+                         prefix + '_mapping_status': 'mapped',
+                         prefix + '_canonical_scalar_node_id': 'node:' + key})
+    for role in ('residence', 'workplace', 'migration'):
+        defaults.update({role + '_area_status': 'applicable',
+                         role + '_factor_key': ('residence' if role == 'residence'
+                                                else 'work_migration') + ':01100',
+                         role + '_state_fips': '01', role + '_area_code': '00100',
+                         role + '_area_type': ('residence' if role == 'residence'
+                                               else 'work_migration')})
+    defaults.update({k: Decimal(v) for k, v in weights('100.25').items()})
+    rows = [defaults | record for record in records]
+    schema = {**ANNOTATION_SCHEMA, 'source_delivery_id': pl.String,
+              **{name: pl.String for name in FLAG_LABELS},
+              **{name: pl.Int64 for name in ('EMPSTATD', 'CLASSWKRD', 'TRANWORK',
+                                             'MIGRATE1', 'PWSTATE2', 'MIGPLAC1')},
+              'INDNAICS': pl.String, 'OCCSOC': pl.String,
+              **{name: pl.Decimal(38, 2) for name in weights('1')}}
+    return pl.DataFrame(rows, schema=schema).lazy()
+
+
+def membership_units():
+    import polars as pl
+
+    from embedding_data.acs_target_contract import UNIT_SCHEMA
+
+    rows = []
+    for kind, key in [('acs_industry_category', 'industry-a'),
+                      ('acs_occupation_category', 'occupation-a')]:
+        row = {name: [] if isinstance(dtype, pl.List) else None
+               for name, dtype in UNIT_SCHEMA.items()}
+        row.update(unit_type=kind, unit=f'feature:{kind}:{key}', kind='observed_code',
+                   code_code_lookup_id=key, code_mapping_status='mapped')
+        rows.append(row)
+    for kind in ('residence_puma', 'work_migration_puma'):
+        row = {name: [] if isinstance(dtype, pl.List) else None
+               for name, dtype in UNIT_SCHEMA.items()}
+        row.update(unit_type=kind, unit=f'geography:2020:{kind}:0100100', kind='native_area',
+                   factor_keys=[('residence' if kind == 'residence_puma'
+                                 else 'work_migration') + ':01100'])
+        rows.append(row)
+    return pl.DataFrame(rows, schema=UNIT_SCHEMA)
