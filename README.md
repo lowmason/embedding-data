@@ -23,11 +23,14 @@ separate immutable ITA bundle. The [measured V11 finding](specs/findings/v11-ita
 records the full-data run and its unresolved source codes. Geography references and
 the shared target writer are implemented. The [measured Stage 6 finding](specs/findings/stage-6-ita-area-mix-build.md)
 records full-data ITA assignment, the 2023 area-mix target and exact cached replay.
-Stage 8 ACS code parsing and PUMA allocation are now measured and science-sealed;
+Stage 8 ACS code parsing and PUMA allocation are measured and science-sealed;
 the [Stage 8 finding](specs/findings/stage-8-acs-codes-area-allocation.md) records
 the three profile companions in each of two full-data bundles, replay and independent
-reconciliation. Repository adoption, CPS code parsing, person-month linkage and other
-target families remain planned. Raw downloads are recorded in `data/raw/manifest.jsonl`.
+reconciliation. Repository completion is recorded in that finding, the
+[retired plan](specs/plans/completed/8-acs-codes-area-allocation.md) and the
+[roadmap](specs/embedding-evaluation-data-spec-roadmap.md). CPS code parsing,
+person-month linkage and other target families remain planned. Raw downloads are
+recorded in `data/raw/manifest.jsonl`.
 The OSHA case-detail files are acquired but feed no target; the specification's
 establishment data are the Form 300A summaries.
 
@@ -770,8 +773,9 @@ for 12,238,491 source rows. The immutable external science seal is
 its 880-file control inventory has SHA-256
 `7af71e3b57c6c07867224259f49563c20e0cd3b75e1d99f54b4cea4f92cc221a`.
 The [measured Stage 8 finding](specs/findings/stage-8-acs-codes-area-allocation.md)
-keeps the first-build timing-wrapper limit and the pending repository adoption
-explicit. Mapping outputs are evaluation inputs, never embedder training or
-model-selection data. ACS universes, headline inclusion, target families,
+keeps the first-build timing-wrapper limit and distinguishes the immutable
+seal's historical `adoption=false` from completed repository adoption. Mapping
+outputs are evaluation inputs, never embedder training or model-selection data.
+ACS universes, headline inclusion, target families,
 employment-weighted code allocation, pooling and replicate standard errors remain
 later-stage work.

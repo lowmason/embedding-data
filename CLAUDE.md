@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-Builds aggregate evaluation targets for industry (NAICS), occupation (SOC), and geography embeddings from three sources: OSHA ITA Form 300A summaries, ACS via IPUMS USA, and CPS via IPUMS CPS. `specs/embedding-evaluation-data-spec.md` is the source of truth. So far the IPUMS extract scripts (define → submit → download → CSV-to-Parquet), the OSHA Form 300A summary acquisition with its stacked establishment-year table, and an OSHA case-detail download (download → CSV-to-Parquet) exist; every raw file is recorded in an append-only manifest (`data/raw/manifest.jsonl`); canonical NAICS/SOC graphs, NAICS concordances, ITA candidate mapping and filing-universe diagnostics are built. Geography reference bundles now supply the complete 2025 county inventory, July 2023 metropolitan/micropolitan membership and 2025Q4 HUD eligibility; the Stage 6 commands have measured full-data ITA assignment, a 2023 ITA area-mix target and exact cached replay through the shared target writer; the selected data acceptance is recorded in `specs/findings/stage-6-ita-area-mix-build.md`. Stage 7 now measures the five delivered IPUMS extracts with full-file parity, exact aggregate replay and frozen public references; its source-backed decisions and limits are in `specs/findings/stage-7-ipums-extract-verification.md`. Stage 8 ACS code parsing, population allocation, companion replay and full independent reconciliation are science-sealed in `specs/findings/stage-8-acs-codes-area-allocation.md`; repository adoption, CPS mapping and other target families remain planned.
+Builds aggregate evaluation targets for industry (NAICS), occupation (SOC), and geography embeddings from three sources: OSHA ITA Form 300A summaries, ACS via IPUMS USA, and CPS via IPUMS CPS. `specs/embedding-evaluation-data-spec.md` is the source of truth. So far the IPUMS extract scripts (define → submit → download → CSV-to-Parquet), the OSHA Form 300A summary acquisition with its stacked establishment-year table, and an OSHA case-detail download (download → CSV-to-Parquet) exist; every raw file is recorded in an append-only manifest (`data/raw/manifest.jsonl`); canonical NAICS/SOC graphs, NAICS concordances, ITA candidate mapping and filing-universe diagnostics are built. Geography reference bundles now supply the complete 2025 county inventory, July 2023 metropolitan/micropolitan membership and 2025Q4 HUD eligibility; the Stage 6 commands have measured full-data ITA assignment, a 2023 ITA area-mix target and exact cached replay through the shared target writer; the selected data acceptance is recorded in `specs/findings/stage-6-ita-area-mix-build.md`. Stage 7 now measures the five delivered IPUMS extracts with full-file parity, exact aggregate replay and frozen public references; its source-backed decisions and limits are in `specs/findings/stage-7-ipums-extract-verification.md`. Stage 8 ACS code parsing, population allocation, companion replay and full independent reconciliation are science-sealed in `specs/findings/stage-8-acs-codes-area-allocation.md`; repository completion is recorded in the [retired plan](specs/plans/completed/8-acs-codes-area-allocation.md) and [roadmap](specs/embedding-evaluation-data-spec-roadmap.md). CPS mapping and other target families remain planned.
 
 ## Commands
 
@@ -271,9 +271,9 @@ immutable science seal is
 the 880-file control inventory pin is
 `7af71e3b57c6c07867224259f49563c20e0cd3b75e1d99f54b4cea4f92cc221a`.
 The [Stage 8 finding](specs/findings/stage-8-acs-codes-area-allocation.md)
-separates measured science from pending repository adoption; Stage 8 remains
-unticked pending Task 10 completion and review. No ACS universe, headline inclusion,
-Stage 9–13, V9 or full eight-family V12 acceptance follows from it.
+separates measured science and the immutable seal's historical `adoption=false`
+from completed repository adoption; the roadmap now ticks Stage 8. No ACS universe,
+headline inclusion, Stage 9–13, V9 or full eight-family V12 acceptance follows.
 
 
 Owner decision D5 permits only the exact selected historical Stage 5 run/output pin

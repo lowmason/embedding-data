@@ -1,10 +1,12 @@
 # ACS codes and area allocation
 
+**Status: COMPLETE (2026-10-19)** — implemented by [plan 8](../plans/completed/8-acs-codes-area-allocation.md); see the [measured finding](../findings/stage-8-acs-codes-area-allocation.md).
+
 ## Scope and approved decisions
 
-Stage 8 of [the roadmap](embedding-evaluation-data-spec-roadmap.md) implements
+Stage 8 of [the roadmap](../embedding-evaluation-data-spec-roadmap.md) implements
 R3.9, R3.11's crosswalks, R5.1 (ACS), R5.3, R5.4 (ACS comparator), R6.3, V8 and
-V11 (ACS) in [the source spec](embedding-evaluation-data-spec.md). R3.10 supplies
+V11 (ACS) in [the source spec](../embedding-evaluation-data-spec.md). R3.10 supplies
 the geographic-role keys. This is one mapping and reference-allocation cycle;
 Stage 9 owns ACS target universes, pooling, estimation, replicate standard
 errors and headline/sensitivity variants. Stage 13 owns comparator targets,
@@ -30,9 +32,10 @@ The owner approved the architecture on 2026-10-16:
   codes and unparseable codes. This is the owner's narrow V11 clarification;
   it admits no other unknown or unsupported classification value.
 
-Owner review of the written spec precedes writing-plans. No Stage 8 software,
-production reference snapshot, canonical microdata bundle or V8/V11 completion
-is claimed by this design.
+The written design was owner-approved before implementation. Its production
+reference snapshots, canonical companions, V8 and ACS V11 conclusions are now
+measured in the finding linked above; this specification retains the original
+architecture and its limits.
 
 ## Binding boundaries and selected inputs
 
@@ -50,9 +53,9 @@ these selected inputs without rebuilding or editing them:
 
 | Input | Selected identity and authority |
 | --- | --- |
-| Stage 4 classification bundle | `derived/codes/stage4_v11_20261013_r2/`; detached `outputs.json` SHA-256 `15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a`; [plan 4 Handoff](plans/completed/4-code-tables-ita-naics-mapping.md#handoff-to-later-stages) |
-| Stage 5 geography bundle | `derived/geography/stage5_geography_20261014/`; detached `outputs.json` SHA-256 `5584b122d45a3617e731f7179d53e9625eb67fd15515d0cd7a5dab366132290d`; [plan 5 Handoff](plans/completed/5-geography-hierarchy-county-reference.md#handoff-to-later-stages) |
-| Stage 7 verification | `derived/ipums/verification/stage7_ipums_verification_20261015_r2/`; detached `outputs.json` SHA-256 `db129a788daa312408f793df1b94fa3f211190a5541fc17ae87b96e84df913dc`; [measured finding](findings/stage-7-ipums-extract-verification.md) |
+| Stage 4 classification bundle | `derived/codes/stage4_v11_20261013_r2/`; detached `outputs.json` SHA-256 `15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a`; [plan 4 Handoff](../plans/completed/4-code-tables-ita-naics-mapping.md#handoff-to-later-stages) |
+| Stage 5 geography bundle | `derived/geography/stage5_geography_20261014/`; detached `outputs.json` SHA-256 `5584b122d45a3617e731f7179d53e9625eb67fd15515d0cd7a5dab366132290d`; [plan 5 Handoff](../plans/completed/5-geography-hierarchy-county-reference.md#handoff-to-later-stages) |
+| Stage 7 verification | `derived/ipums/verification/stage7_ipums_verification_20261015_r2/`; detached `outputs.json` SHA-256 `db129a788daa312408f793df1b94fa3f211190a5541fc17ae87b96e84df913dc`; [measured finding](../findings/stage-7-ipums-extract-verification.md) |
 | Stage 7 public references | `stage7_ipums_references_20261015_r2`, `ipums-public-references-v3`; receipt SHA-256 `3163968dde603ba53f807976dd09b9e40d73235a98c6f36e4e02c67ec4239c9c` |
 
 The three ACS Parquets and their manifested raw CSV/DDI/definition triples are
@@ -474,15 +477,11 @@ target representativeness.
 
 ## Rollout and later-stage handoff
 
-Next skill: writing-plans in a fresh session, scoped to this Stage 8 spec after
-the owner reviews the written document. The plan header must carry this verbatim:
+The implementation is complete under the retired plan linked above. Its
+`Handoff to later stages` records the shipped APIs, selected pins and refusals;
+the roadmap now marks Stage 8 complete. The source spec and roadmap remain live.
 
-> Roadmap: specs/embedding-evaluation-data-spec-roadmap.md, Stage 8 — on plan completion, tick the stage and re-validate later stages against what shipped.
-
-Stage 8 stays unticked until the implementation, full-data finding, independent
-replay, relevant checks and reviews pass. At plan completion, stamp its actual
-implementing plan, record the shipped `Handoff to later stages`, and follow the
-plan/spec retirement protocol. The Handoff must revalidate every Stage 9–13:
+The completed Handoff revalidates every Stage 9–13:
 
 - Stage 9 consumes the selected companions, exact mapping/role/factor APIs and
   independent ambiguity, special, source-imputation and allocation provenance;
@@ -497,7 +496,7 @@ plan/spec retirement protocol. The Handoff must revalidate every Stage 9–13:
   selected inventories while retaining comparator-target, citation, size-gate
   and complete V12 responsibilities.
 
-Tick Stage 8 only on completion. Reconcile later roadmap entries against that
-actual Handoff through derive-roadmap; no later stage is implemented or marked
-complete by this design. Any add/split/drop/reorder remains an owner decision.
-The source spec and roadmap remain live.
+The roadmap marks only Stage 8 complete. Reconcile later entries against the
+actual Handoff through derive-roadmap at resume; no later stage is implemented
+or marked complete by this stage. Any add/split/drop/reorder remains an owner
+decision. The source spec and roadmap remain live.

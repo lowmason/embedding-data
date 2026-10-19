@@ -4,7 +4,7 @@
 
 Roadmap: specs/embedding-evaluation-data-spec-roadmap.md, Stage 8 — on plan completion, tick the stage and re-validate later stages against what shipped.
 
-**Status: COMPLETION DOCUMENTATION (2026-10-19)** — Tasks 1–9 and Task 10 review/check gates complete; retirement pending.
+**Status: COMPLETE (2026-10-19)** — executed via subagent-driven-development; nothing deferred
 
 **Goal:** Produce verified, row-preserving ACS classification companions and
 population allocation references for all three selected deliveries, with measured
@@ -23,8 +23,8 @@ html.parser, json, pathlib, dataclasses, ctypes, tempfile, zipfile and
 xml.etree.ElementTree. No dependency,
 project configuration or lock change.
 
-**Spec:** [Approved Stage 8 spec](../acs-codes-area-allocation.md), approved in
-writing by the owner on 2026-10-16; [source requirements](../embedding-evaluation-data-spec.md)
+**Spec:** [Approved Stage 8 spec](../../completed/acs-codes-area-allocation.md), approved in
+writing by the owner on 2026-10-16; [source requirements](../../embedding-evaluation-data-spec.md)
 R3.9, R3.11 crosswalks, R5.1 ACS, R5.3, R5.4 ACS comparator, R6.3, V8 and
 ACS V11. R3.10 supplies role keys. Read both specs and the Stage 4, 5 and 7
 completed plans' Handoff sections before executing.
@@ -156,7 +156,7 @@ them from filenames or update its five-profile selection.
 Observed metadata confirms YEAR/SAMPLE/IND/OCC and all six geographic source keys
 are Int64. INDNAICS/OCCSOC are String. MULTYEAR is Int64 in five-year and absent
 elsewhere. QMIGRAT1 is String in core, Int64 in five-year, and absent in vintage.
-The [Stage 7 flag evidence](../findings/stage-7-ipums-extract-verification.md#allocation-flags-and-actual-typedomain-traps)
+The [Stage 7 flag evidence](../../findings/stage-7-ipums-extract-verification.md#allocation-flags-and-actual-typedomain-traps)
 governs applicability and the all-null 2023 core partition.
 
 ### Existing interfaces to reuse without editing
@@ -2266,7 +2266,7 @@ receipts. No default selection of a latest run is permitted.
   boxes unchanged. The actual handoff, rather than planning defaults, is the
   evidence derive-roadmap uses to amend later entries at the next resume.
 
-- [ ] **Step 5: Triage backlog, retire plan/spec and stop this stage.** Run the
+- [x] **Step 5: Triage backlog, retire plan/spec and stop this stage.** Run the
   writing-plans backlog statistics command and report open count/closure rate/
   aged tail. If its rubric triggers triage, present the read-only proposal; do
   not execute dispositions without owner direction. Commit completion markup
@@ -2280,11 +2280,11 @@ receipts. No default selection of a latest run is permitted.
 
 ## Handoff to later stages
 
-The [approved Stage 8 spec](../acs-codes-area-allocation.md) defines the scope; the [measured finding](../findings/stage-8-acs-codes-area-allocation.md) gives complete ordered schemas, public APIs, selected IDs, detached pins and limitations. Consume explicit selected runs, never a latest alias or mixed-run fallback. The accepted control is `stage8_acceptance_20261018_r7`; the first and replay bundles are `stage8_acs_mapping_20261018_r7` and `stage8_acs_mapping_20261018_r7_replay`, with detached `outputs.json` SHA-256 pins `1ec9701092f576b122b01464cdb6fa3fbee49db030e4ad3df7b64e621b8e75f4` and `a115c5f7e2691ecbffe763bd1b6b9780fb6a71bc512a2691cf4014f9857b3565`. Historical v1/39 and selected v2/46 reference receipts remain distinct. `compare_runs` proves logical equality; detached verification establishes each physical bundle's authority.
+The [approved Stage 8 spec](../../completed/acs-codes-area-allocation.md) defines the scope; the [measured finding](../../findings/stage-8-acs-codes-area-allocation.md) gives complete ordered schemas, public APIs, selected IDs, detached pins and limitations. Consume explicit selected runs, never a latest alias or mixed-run fallback. The accepted control is `stage8_acceptance_20261018_r7`; the first and replay bundles are `stage8_acs_mapping_20261018_r7` and `stage8_acs_mapping_20261018_r7_replay`, with detached `outputs.json` SHA-256 pins `1ec9701092f576b122b01464cdb6fa3fbee49db030e4ad3df7b64e621b8e75f4` and `a115c5f7e2691ecbffe763bd1b6b9780fb6a71bc512a2691cf4014f9857b3565`. Historical v1/39 and selected v2/46 reference receipts remain distinct. `compare_runs` proves logical equality; detached verification establishes each physical bundle's authority.
 
 - **Stage 9 — ACS targets:** Consume five selected reference tables and three ordered companions through the finding's `SelectionRequest` seven-field upstream selection, `select_inputs(...).verify()`, `verify_bundle(..., expected_outputs_sha256=...)`, and exact schemas. `observed_code_keys`, `build_code_lookup`, `observed_area_keys`, `build_area_lookup`, `build_factor_tables`, `validate_factor_tables`, `annotate_source`, `write_companion` and `validate_companion` are the shipped seams, with signatures in the finding. Code natural key `(system,source_scheme,paired_census_code,source_token)` and area natural key `(profile,sample_id,release_year,component_year,role,source_state_code,source_area_code)` remain distinct. Preserve original row order/duplicates and zero-based `source_row` within a source Parquet, native/canonical candidates and paths, the ACS-only empty-candidate `559830` special, typed null/unknown/documented statuses, and independent source-imputation, recoding, Q/role and geographic-allocation flags. Apply county factors during later estimation, never by expanding the identity-preserving companion. Target universe/eligibility, workplace work-from-home exclusion, estimands, pooling, replicate SEs and family V12 remain Stage 9.
 - **Stage 10 — ITA targets:** The selected Stage 2–6 ITA inputs, `targets-v1` writer/validator, Stage 4 canonical node/path APIs and adopted R2.6/R2.7 linkage rules remain unchanged. D5's exact Stage 5 creator-hash compatibility records history only; it authorizes no upstream rebuild, new ITA eligibility or deduplication. ITA text-code/co-ownership rules and family V12 remain Stage 10.
-- **Stage 11 — CPS flow:** Stage 8's selected parser accepts ACS schemes only. Reuse Stage 4 canonical node/path/relationship APIs, and resolve the open [Stage 7 `9890` authority](../deferred_items.md#7-ipums-extract-verification--2026-10-15) before assigning a CPS leaf. ACS `559830`, D4/D8/D10 and C1 grant no CPS special or membership shortcut. CPS parsing, linkage/job-change guards, weights, CPS V11 and family V12 remain Stage 11.
+- **Stage 11 — CPS flow:** Stage 8's selected parser accepts ACS schemes only. Reuse Stage 4 canonical node/path/relationship APIs, and resolve the open [Stage 7 `9890` authority](../../deferred_items.md#7-ipums-extract-verification--2026-10-15) before assigning a CPS leaf. ACS `559830`, D4/D8/D10 and C1 grant no CPS special or membership shortcut. CPS parsing, linkage/job-change guards, weights, CPS V11 and family V12 remain Stage 11.
 - **Stage 12 — worker profile:** Consume ACS through Stage 9's later helpers and CPS through Stage 11's. Stage 8 supplies no worker-profile estimator, eligibility or metro rule. Preserve source-imputation, recoding, allocation and unavailable states separately. CPS earnings, R4.4 metro eligibility, weights/uncertainty and family V12 remain Stage 12.
 - **Stage 13 — comparator:** Consume the vintage companion's native-2017 to canonical-2022 complete candidate/path/flag provenance, explicit source/target frames, and physical raw/reference/software/output inventories and detached pins separately from logical replay. Stage 9's later estimator/universe/SE helpers remain necessary. V9, comparator targets and citations, and full eight-family V12 remain Stage 13. Mapping is evaluation input, not training or model-selection material.
 
@@ -2322,10 +2322,10 @@ candidate set, zero population or successful exclusion.
 
 ## Execution and completion evidence
 
-Tasks 1–8 were implemented in dependency order with focused RED/GREEN cycles, normal hooked commits and independent task-scoped reviews. The reviewed source at `1542f8d8f1db2e55f28b9cfec4b1306739589ce8` includes the bounded D4–D10/C1 policies, complete 54-member executing inventory and seven-member independent reconciler inventory. The [measured finding](../findings/stage-8-acs-codes-area-allocation.md) records Task 9's 12,238,491-row acceptance, two detached output pins, ordered eight-table replay, two complete independent reconciliations, zero-discrepancy audit, original 5,490-file beforestate and exact 87 accounted manifest appends. Its immutable science seal SHA-256 is `b09d1a56308f09d6e99f97070c02ffbbc0523d6c595f7901bb0e01a999bd3ddf`. The first r7 outer timing wrapper failed after publication and did not capture the Python child's wait status or peak RSS; direct detached verification separately passed. These remain limits, not a successful original process-exit claim.
+Tasks 1–8 were implemented in dependency order with focused RED/GREEN cycles, normal hooked commits and independent task-scoped reviews. The reviewed source at `1542f8d8f1db2e55f28b9cfec4b1306739589ce8` includes the bounded D4–D10/C1 policies, complete 54-member executing inventory and seven-member independent reconciler inventory. The [measured finding](../../findings/stage-8-acs-codes-area-allocation.md) records Task 9's 12,238,491-row acceptance, two detached output pins, ordered eight-table replay, two complete independent reconciliations, zero-discrepancy audit, original 5,490-file beforestate and exact 87 accounted manifest appends. Its immutable science seal SHA-256 is `b09d1a56308f09d6e99f97070c02ffbbc0523d6c595f7901bb0e01a999bd3ddf`. The first r7 outer timing wrapper failed after publication and did not capture the Python child's wait status or peak RSS; direct detached verification separately passed. These remain limits, not a successful original process-exit claim.
 
 Task 10 repository checks after the Task 9 finding/README/CLAUDE.md commit passed: offline pytest **2,107 passed / 1 deselected** in 1106.53 seconds (log SHA-256 `ad0e9fe25dae1f31f343237d283f1ef63586b826e5c53722955807b49dcfc2e6`); Behave **2 scenarios / 10 steps passed** (log SHA `6c5796eeebc5e0a9d03e22b880353cf5911ba745fd5db8d4271271cfa0537ae0`); Ruff and the offline 63-package lock check passed; all ten `pre-commit run --all-files` hooks including Coverage Check passed (log SHA `fb75d4e94294110d6cf5a6ada5d2809a4c84d4a3a0f4f912653cbca85c638bc5`). The full merge-base review `.sdd/8-acs-codes-area-allocation/task-10-whole-branch-review.md` SHA `de2484acc6a0c4310464f96dbbf817b6567a38e7958e2a0d500da88b1f113cb8` approved reviewed implementation and science with no actionable finding; the reviewed diff SHA was `1c1b5c3f144c37a14b86063114d645166125c73e213eb963720f20c5e3c75386` and was confirmed at Task 9 HEAD `551586d88f85a713d56c57af16c7f2e159a80c7d`.
 
 The independent V8 read-only original-backed control found **zero of 3,222 counties** assigned to multiple groups and **zero of 4,689 accepted PUMA–county group mismatches**, with 2,486 PUMAs, 1,027 groups and exact complete/scoped population 334,735,155 / 331,449,281. It supports the measured R6.3 marker for the selected 2020 definitions only. Earlier review issues are fixed and re-reviewed. No planned implementation step was skipped, no required science gate was deferred, and no owner question remains. Deferred backlog at the completion review has 12 open / 4 closed / 25% closure / zero older than 45 days; no earlier item was implemented by this stage, including Stage 7's open 2026 `9890` authority, and no Stage 8 section is appended.
 
-Retirement remains the final Task 10 Step 5 transaction. The roadmap tick, final plan/spec status and repository adoption statement are committed with the retired paths, after which this section describes the completed branch. The science seal remains unchanged and continues to record its historical `adoption=false` state.
+This plan and its exclusively implemented spec are retired in `specs/plans/completed/` and `specs/completed/`, and the roadmap marks Stage 8 complete. The science seal remains unchanged and continues to record its historical `adoption=false` state; the repository completion is documented here and in the finding.

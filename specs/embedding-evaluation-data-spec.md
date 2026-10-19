@@ -467,7 +467,7 @@ code fails the build. *(verified; USA)*
 When the official references do not identify a particular aggregated OCCSOC code's
 reason, retain an explicit unknown reason with provenance rather than inferring
 one; supported candidate membership is still required. *(owner, Stage 8 design,
-2026-10-16; [stage spec](acs-codes-area-allocation.md))*
+2026-10-16; [stage spec](completed/acs-codes-area-allocation.md))*
 
 **R5.4** Vintage concordances — ITA's 2012 and 2017 codes, and the 2022 ACS
 comparator's 2017-based codes — carry one-to-many and many-to-many relationships
@@ -619,7 +619,7 @@ bullet here.
   original value and every row, leave canonical candidates empty and nodes null,
   and report it separately from both mapped and unparseable codes. It asserts
   no canonical occupation and admits no other unsupported value. *(owner,
-  Stage 8 design, 2026-10-16; [stage spec](acs-codes-area-allocation.md))*
+  Stage 8 design, 2026-10-16; [stage spec](completed/acs-codes-area-allocation.md))*
 - **V12 — offline contract test**. From fixture raw files through Parquet
   conversion, code parsing, geography allocation, one target per family, and the
   manifest, with no network and no credentials.
