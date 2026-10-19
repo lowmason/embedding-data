@@ -128,7 +128,9 @@ def test_stage9_freeze_has_literal_complete_checkpoint_inventory():
     assert snapshot['python_full'] == sys.version
     assert set(snapshot['files']) == set(acs_mapping_inputs.SOFTWARE_FILES) | {
         'src/embedding_data/target_contract.py', 'src/embedding_data/acs_target_contract.py',
-        'src/embedding_data/acs_target_inputs.py', 'pyproject.toml', 'uv.lock'}
+        'src/embedding_data/acs_target_inputs.py',
+        'src/embedding_data/acs_target_rules.py',
+        'src/embedding_data/acs_target_units.py', 'pyproject.toml', 'uv.lock'}
     assert snapshot['dependencies']['polars']
 
 
