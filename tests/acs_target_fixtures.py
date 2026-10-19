@@ -227,3 +227,42 @@ def membership_units():
                                  else 'work_migration') + ':01100'])
         rows.append(row)
     return pl.DataFrame(rows, schema=UNIT_SCHEMA)
+
+
+def estimate_case(records: list[dict], *, years: tuple[int, ...] = (2023, 2024),
+                  pool_divisor: int = 2) -> dict:
+    from embedding_data.acs_target_estimation import aggregate_native, estimate
+
+    rows = estimation_rows(records, years=years, pool_divisor=pool_divisor)
+    return {name: lf.collect() for name, lf in estimate(aggregate_native(rows)).items()}
+
+
+def estimation_rows(records, *, years=(2023, 2024), pool_divisor=2):
+    from dataclasses import replace
+    from decimal import Decimal
+
+    import polars as pl
+
+    from embedding_data.acs_target_contract import DIAGNOSTIC_SCHEMA, PRODUCTS
+    from embedding_data.acs_target_membership import FamilyRows
+    from embedding_data.acs_target_weights import WEIGHT_NAMES
+
+    product = replace(next(p for p in PRODUCTS if p.family == 'staffing_pattern'
+                           and p.view == 'observed'), years=years, pool_divisor=pool_divisor)
+    values = []
+    for i, record in enumerate(records):
+        values.append({'source_parquet_sha256': 'synthetic', 'source_row': i,
+                       'YEAR': record['year'], 'unit_a_type': 'acs_industry_category',
+                       'unit_a': 'feature:acs_industry_category:' + record['a'],
+                       'unit_b_type': 'acs_occupation_category',
+                       'unit_b': 'feature:acs_occupation_category:' + record['b'],
+                       'flags': record.get('flags', ['size_gate_pending']),
+                       **{name: Decimal(record[name]) for name in WEIGHT_NAMES}})
+    schema = {'source_parquet_sha256': pl.String, 'source_row': pl.UInt64,
+              'YEAR': pl.Int64, 'unit_a_type': pl.String, 'unit_a': pl.String,
+              'unit_b_type': pl.String, 'unit_b': pl.String, 'flags': pl.List(pl.String)}
+    scale = max((max(0, -v[name].as_tuple().exponent)
+                 for v in values for name in WEIGHT_NAMES if v[name].is_finite()), default=0)
+    schema.update({name: pl.Decimal(38, scale) for name in WEIGHT_NAMES})
+    return FamilyRows(pl.DataFrame(values, schema=schema).lazy(),
+                      pl.DataFrame(schema=DIAGNOSTIC_SCHEMA).lazy(), product)
