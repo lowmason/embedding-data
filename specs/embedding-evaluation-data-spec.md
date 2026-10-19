@@ -493,9 +493,10 @@ factors, never through majority assignment alone. Residence PUMAs split large
 counties and pool small ones. Place-of-work PUMAs follow county lines under the
 standards introduced with the 2010 vintage, and 2020 place-of-work PUMAs are
 identical to 2020 migration PUMAs, so commuting and migration flows share one
-set of county-based units. *(verified; USA)* Whether the 2020 vintage kept the
-county-line rule is *(open — resolved by verification, not argument, discharged
-by V8)*.
+set of county-based units. *(verified; USA)* The selected 2020 definitions
+satisfy the whole-county rule under the full-source county-to-group and
+population reconciliation checks. *(verified; V8; [measured Stage 8
+finding](findings/stage-8-acs-codes-area-allocation.md))*.
 
 **R6.4** Exclude Puerto Rico and the island areas from the hierarchy. *(chosen;
 D)*
@@ -598,7 +599,10 @@ bullet here.
   totals land near published levels before any target uses it.
 - **V8 — 2020 place-of-work PUMA boundaries** *(discharges R6.3)*. Check the
   2020 place-of-work PUMA definitions against county boundaries. Any split
-  county gets allocation factors, as residence PUMAs do.
+  county gets allocation factors, as residence PUMAs do. The selected full-source
+  check found zero of 3,222 counties assigned to multiple composition groups
+  and zero of 4,689 accepted PUMA–county group mismatches; see the
+  [measured Stage 8 finding](findings/stage-8-acs-codes-area-allocation.md).
 - **V9 — minimum cell counts** *(discharges R7.3)*. After the first full build,
   report unweighted-count distributions for every family and set the headline
   minimum in a recorded decision. Until then, no target is described as passing
