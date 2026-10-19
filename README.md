@@ -25,10 +25,9 @@ the shared target writer are implemented. The [measured Stage 6 finding](specs/f
 records full-data ITA assignment, the 2023 area-mix target and exact cached replay.
 Stage 8 ACS code parsing and PUMA allocation are now measured and science-sealed;
 the [Stage 8 finding](specs/findings/stage-8-acs-codes-area-allocation.md) records
-both full-data companions, replay and independent reconciliation. Repository
-adoption, CPS code parsing, person-month linkage and other target families remain
-planned. Raw downloads are recorded in
-`data/raw/manifest.jsonl`.
+the three profile companions in each of two full-data bundles, replay and independent
+reconciliation. Repository adoption, CPS code parsing, person-month linkage and other
+target families remain planned. Raw downloads are recorded in `data/raw/manifest.jsonl`.
 The OSHA case-detail files are acquired but feed no target; the specification's
 establishment data are the Form 300A summaries.
 

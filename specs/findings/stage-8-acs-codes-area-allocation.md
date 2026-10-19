@@ -143,11 +143,11 @@ The independent science audit (`.sdd/8-acs-codes-area-allocation/task-9-r7-scien
 | Classification | Complete originals; admitted relation endpoints/membership; exact D4/D8/D10 positive/rejected evidence | PASS — 1,062 lookup/4,197 membership/6,349 observed keys; C1 candidate memberships equal |
 | ACS V11 | All 12,238,491 rows; zero unparseable; mapped/missing/special partitions | PASS — 12,238,491 rows, zero industry/occupation unparseable in all profiles; 559830 special retained |
 | Special cross-check | Remeasure 559830 core 5,204 / five-year 14,799 / vintage 3,405; investigate disagreement | PASS — exact 5,204 / 14,799 / 3,405 match Phase A, C1 and selected Stage 7 |
-| Aggregation reasons | Documented category_design/disclosure plus unknown counts/locators; candidate lengths | PASS — C1 complete reason/status/length partitions; unknown remains unknown, original locators retained |
+| Aggregation reasons | Documented category_design/disclosure plus unknown counts/locators; candidate lengths | PASS — among 1,062 lookup keys, 30 `category_design`, 32 `disclosure`, 607 unknown and 393 not applicable; exact source-row status/length partitions and original locators below |
 | Vintage/provenance | Delivered versus interview scheme, source recoding, SOC2018, retained singleton flags | PASS — annual 2022 native2017; delivered 2023–24/five-year native2022; component recoding and flags checked |
 | Original fidelity | Three complete ordered prefix schemas/values/order/multiplicity; source SHA and UInt64 ordinal | PASS — BOTH C1 original-prefix/annotation checks for 3,206,859 / 7,456,212 / 1,575,420 rows |
 | Q/source evidence | Every Q type/value, core String/all-null 2023 QMIGRAT1, five-year Int64, vintage absence; null/unavailable retained | PASS — C1 original Q dtype/value frequencies and annotation statuses equal |
-| Roles | Disjoint statuses per profile/sample/release/component/role; complete keys; bounded C1; zero unknowns | PASS — 36,229 Phase A keys; C1 role partitions/allocation flags equal |
+| Roles | Disjoint statuses per profile/sample/release/component/role; complete keys; bounded C1; zero unknowns | PASS — all 73 component-level status rows and 36,229 Phase A keys; C1 role partitions/allocation flags equal |
 | Residence factors | Exact integer intersections and independent PUMA/county controls, all applicable keys, closure<=1e-12 | PASS — 7,754 role-expanded county factor rows; complete/scoped population 334,735,155 / 331,449,281; max closure 3.33e-16 |
 | V8 | Full PUMA→group AND county→group checks; counts/splits/membership/populations; no fabricated weights | PASS — 0/3,222 multi-group counties and 0/4,689 accepted relation/group mismatches; 2,486 PUMAs, 1,027 groups, population 334,735,155 complete / 331,449,281 scoped; selected 2020 definitions only |
 | Frame compatibility | Nine CT regions, no relabel, county/CBSA type/nonmembership retained; distinct frame years | PASS — CT 49,926 blocks / 3,605,944 population; nine explicit zero exclusions; distinct frames retained |
@@ -433,6 +433,19 @@ The C1 first/replay aggregate JSON is byte-identical (794,347 bytes; SHA-256 `7a
 | `acs/vintage` | industry | mapped:1,575,420 | not_applicable:32,709, unknown:1,542,711 | 1:334,473, 2:243,106, 3:96,969, 4:229,872, 5:100,607, 6:98,780, 7:132,759, 8:68,105, 9:47,051, 10:16,557, 11:13,998, 12:4,301, 13:22,039, 14:17,305, 19:6,228, 30:12,875, 31:101,322, 35:8,509, 39:932, 42:8,826, 43:390, 54:117, 57:4,653, 69:996, 346:4,650 |
 | `acs/vintage` | occupation | documented_special:3,405, mapped:1,572,015 | documented:223,314, not_applicable:1,028,509, unknown:323,597 | 0:3,405, 1:1,025,104, 2:226,830, 3:105,357, 4:119,897, 5:33,020, 6:26,169, 7:1,064, 8:8,550, 13:10,280, 37:15,744 |
 
+The documented-reason cut has **lookup-key grain**, distinct from the source-row status counts above. The first bundle's sealed `acs_code_lookup.parquet` is **1,062 rows / 116,423 bytes**, SHA-256 `4b09b6963c3a2d9cc4c062fc62860bb6be0468f510ef2d3b7fccf445d53e397d`, under external `outputs.json` pin `1ec9701092f576b122b01464cdb6fa3fbee49db030e4ad3df7b64e621b8e75f4`. Its `aggregation_reasons` list and `aggregation_reason_status` yield this complete partition; `unknown` lists remain empty and are **not** assigned a motive.
+
+| System | Reason status | Documented reason | Lookup keys |
+| --- | --- | --- | ---: |
+| NAICS | `not_applicable` | none | 15 |
+| NAICS | `unknown` | unknown | 518 |
+| SOC | `documented` | `category_design` | 30 |
+| SOC | `documented` | `disclosure` | 32 |
+| SOC | `not_applicable` | none | 378 |
+| SOC | `unknown` | unknown | 89 |
+
+Every lookup key carries exact `reference_locators` in that sealed table. For the documented SOC rows, the original `soc_tokens_html` aggregate-code explanation is SHA-256 `9e6411ca71a2800d3506ad44ab310ac3fd9d481551bd8077d7a6f74a4350ab5b`; the original `pums_occupation_2018` workbook is SHA-256 `20cc7112cf96c7a3648b579cc0b2af239bea1c9094885a0d986959888695fe0a`. A `category_design` row cites `soc_tokens_html:aggregate-code-explanation` and a precise workbook row such as `pums_occupation_2018:ACS!A:C:row=85:source_token_raw='13-20XX'`; a `disclosure` row cites `pums_occupation_2018:ACS!A884:highlighting-confidentiality` and its precise source-token row. The complete locators, not these examples alone, are retained per key in the pinned lookup. The source-row status counts above remain a separate measurement and do not imply that all documented rows share one reason.
+
 Source Q evidence and allocation statuses, preserving literal null and unavailable cases:
 
 | Profile | Q field | Source dtype | Source value: count | Annotation status: count |
@@ -460,6 +473,84 @@ Disjoint geographic role statuses:
 | `acs/vintage` | migration | applicable:190,129, foreign:7,738, niu_or_unidentifiable:1,377,386, territory:167 |
 | `acs/vintage` | residence | applicable:1,575,420 |
 | `acs/vintage` | workplace | applicable:1,542,648, foreign:702, niu_or_unidentifiable:32,060, territory:10 |
+
+The full component-level role/status partition comes from the sealed external control `/Users/lowell/Projects/embedding-data/data/derived/acs/mapping-controls/stage8_acceptance_20261018_r7/r7-prebuild-role-status-rows.json` (14,535 bytes, SHA-256 `c1beea2b56650b3734d7b2abd98f069e3c5970d8e3eaf5ec0ca47ad96101407d`). Its **73 unique aggregate rows** cover every profile/sample/release/component/role/status combination. For each of the eight profile/sample/component sets, each role's disjoint status rows sum to that component's source-row count; across three roles the table sums to **36,715,473** role observations, three times the **12,238,491** selected source rows. The nine profile/role totals above are summaries of this complete partition. These are aggregate counts, not person rows or identifiers.
+
+| Profile | Sample | Release year | Component year | Role | Area status | Rows |
+| --- | --- | ---: | ---: | --- | --- | ---: |
+| `acs/core` | `us2023a` | 2023 | 2023 | `migration` | `applicable` | 178,595 |
+| `acs/core` | `us2023a` | 2023 | 2023 | `migration` | `foreign` | 8,599 |
+| `acs/core` | `us2023a` | 2023 | 2023 | `migration` | `niu_or_unidentifiable` | 1,411,487 |
+| `acs/core` | `us2023a` | 2023 | 2023 | `migration` | `territory` | 157 |
+| `acs/core` | `us2023a` | 2023 | 2023 | `residence` | `applicable` | 1,598,838 |
+| `acs/core` | `us2023a` | 2023 | 2023 | `workplace` | `applicable` | 1,567,307 |
+| `acs/core` | `us2023a` | 2023 | 2023 | `workplace` | `foreign` | 725 |
+| `acs/core` | `us2023a` | 2023 | 2023 | `workplace` | `niu_or_unidentifiable` | 30,777 |
+| `acs/core` | `us2023a` | 2023 | 2023 | `workplace` | `territory` | 29 |
+| `acs/core` | `us2024a` | 2024 | 2024 | `migration` | `applicable` | 172,637 |
+| `acs/core` | `us2024a` | 2024 | 2024 | `migration` | `foreign` | 8,249 |
+| `acs/core` | `us2024a` | 2024 | 2024 | `migration` | `niu_or_unidentifiable` | 1,427,002 |
+| `acs/core` | `us2024a` | 2024 | 2024 | `migration` | `territory` | 133 |
+| `acs/core` | `us2024a` | 2024 | 2024 | `residence` | `applicable` | 1,608,021 |
+| `acs/core` | `us2024a` | 2024 | 2024 | `workplace` | `applicable` | 1,577,086 |
+| `acs/core` | `us2024a` | 2024 | 2024 | `workplace` | `foreign` | 670 |
+| `acs/core` | `us2024a` | 2024 | 2024 | `workplace` | `niu_or_unidentifiable` | 30,254 |
+| `acs/core` | `us2024a` | 2024 | 2024 | `workplace` | `territory` | 11 |
+| `acs/five_year` | `us2024c` | 2024 | 2020 | `migration` | `applicable` | 145,217 |
+| `acs/five_year` | `us2024c` | 2024 | 2020 | `migration` | `foreign` | 4,169 |
+| `acs/five_year` | `us2024c` | 2024 | 2020 | `migration` | `niu_or_unidentifiable` | 1,044,520 |
+| `acs/five_year` | `us2024c` | 2024 | 2020 | `migration` | `territory` | 133 |
+| `acs/five_year` | `us2024c` | 2024 | 2020 | `residence` | `applicable` | 1,194,039 |
+| `acs/five_year` | `us2024c` | 2024 | 2020 | `workplace` | `applicable` | 1,164,838 |
+| `acs/five_year` | `us2024c` | 2024 | 2020 | `workplace` | `foreign` | 411 |
+| `acs/five_year` | `us2024c` | 2024 | 2020 | `workplace` | `niu_or_unidentifiable` | 28,787 |
+| `acs/five_year` | `us2024c` | 2024 | 2020 | `workplace` | `territory` | 3 |
+| `acs/five_year` | `us2024c` | 2024 | 2021 | `migration` | `applicable` | 182,871 |
+| `acs/five_year` | `us2024c` | 2024 | 2021 | `migration` | `foreign` | 5,328 |
+| `acs/five_year` | `us2024c` | 2024 | 2021 | `migration` | `niu_or_unidentifiable` | 1,291,518 |
+| `acs/five_year` | `us2024c` | 2024 | 2021 | `migration` | `territory` | 177 |
+| `acs/five_year` | `us2024c` | 2024 | 2021 | `residence` | `applicable` | 1,479,894 |
+| `acs/five_year` | `us2024c` | 2024 | 2021 | `workplace` | `applicable` | 1,448,268 |
+| `acs/five_year` | `us2024c` | 2024 | 2021 | `workplace` | `foreign` | 544 |
+| `acs/five_year` | `us2024c` | 2024 | 2021 | `workplace` | `niu_or_unidentifiable` | 31,073 |
+| `acs/five_year` | `us2024c` | 2024 | 2021 | `workplace` | `territory` | 9 |
+| `acs/five_year` | `us2024c` | 2024 | 2022 | `migration` | `applicable` | 187,615 |
+| `acs/five_year` | `us2024c` | 2024 | 2022 | `migration` | `documented_unavailable` | 2,520 |
+| `acs/five_year` | `us2024c` | 2024 | 2022 | `migration` | `foreign` | 7,738 |
+| `acs/five_year` | `us2024c` | 2024 | 2022 | `migration` | `niu_or_unidentifiable` | 1,377,386 |
+| `acs/five_year` | `us2024c` | 2024 | 2022 | `migration` | `territory` | 161 |
+| `acs/five_year` | `us2024c` | 2024 | 2022 | `residence` | `applicable` | 1,575,420 |
+| `acs/five_year` | `us2024c` | 2024 | 2022 | `workplace` | `applicable` | 1,542,648 |
+| `acs/five_year` | `us2024c` | 2024 | 2022 | `workplace` | `foreign` | 702 |
+| `acs/five_year` | `us2024c` | 2024 | 2022 | `workplace` | `niu_or_unidentifiable` | 32,060 |
+| `acs/five_year` | `us2024c` | 2024 | 2022 | `workplace` | `territory` | 10 |
+| `acs/five_year` | `us2024c` | 2024 | 2023 | `migration` | `applicable` | 178,595 |
+| `acs/five_year` | `us2024c` | 2024 | 2023 | `migration` | `foreign` | 8,599 |
+| `acs/five_year` | `us2024c` | 2024 | 2023 | `migration` | `niu_or_unidentifiable` | 1,411,487 |
+| `acs/five_year` | `us2024c` | 2024 | 2023 | `migration` | `territory` | 157 |
+| `acs/five_year` | `us2024c` | 2024 | 2023 | `residence` | `applicable` | 1,598,838 |
+| `acs/five_year` | `us2024c` | 2024 | 2023 | `workplace` | `applicable` | 1,567,307 |
+| `acs/five_year` | `us2024c` | 2024 | 2023 | `workplace` | `foreign` | 725 |
+| `acs/five_year` | `us2024c` | 2024 | 2023 | `workplace` | `niu_or_unidentifiable` | 30,777 |
+| `acs/five_year` | `us2024c` | 2024 | 2023 | `workplace` | `territory` | 29 |
+| `acs/five_year` | `us2024c` | 2024 | 2024 | `migration` | `applicable` | 172,637 |
+| `acs/five_year` | `us2024c` | 2024 | 2024 | `migration` | `foreign` | 8,249 |
+| `acs/five_year` | `us2024c` | 2024 | 2024 | `migration` | `niu_or_unidentifiable` | 1,427,002 |
+| `acs/five_year` | `us2024c` | 2024 | 2024 | `migration` | `territory` | 133 |
+| `acs/five_year` | `us2024c` | 2024 | 2024 | `residence` | `applicable` | 1,608,021 |
+| `acs/five_year` | `us2024c` | 2024 | 2024 | `workplace` | `applicable` | 1,577,086 |
+| `acs/five_year` | `us2024c` | 2024 | 2024 | `workplace` | `foreign` | 670 |
+| `acs/five_year` | `us2024c` | 2024 | 2024 | `workplace` | `niu_or_unidentifiable` | 30,254 |
+| `acs/five_year` | `us2024c` | 2024 | 2024 | `workplace` | `territory` | 11 |
+| `acs/vintage` | `us2022a` | 2022 | 2022 | `migration` | `applicable` | 190,129 |
+| `acs/vintage` | `us2022a` | 2022 | 2022 | `migration` | `foreign` | 7,738 |
+| `acs/vintage` | `us2022a` | 2022 | 2022 | `migration` | `niu_or_unidentifiable` | 1,377,386 |
+| `acs/vintage` | `us2022a` | 2022 | 2022 | `migration` | `territory` | 167 |
+| `acs/vintage` | `us2022a` | 2022 | 2022 | `residence` | `applicable` | 1,575,420 |
+| `acs/vintage` | `us2022a` | 2022 | 2022 | `workplace` | `applicable` | 1,542,648 |
+| `acs/vintage` | `us2022a` | 2022 | 2022 | `workplace` | `foreign` | 702 |
+| `acs/vintage` | `us2022a` | 2022 | 2022 | `workplace` | `niu_or_unidentifiable` | 32,060 |
+| `acs/vintage` | `us2022a` | 2022 | 2022 | `workplace` | `territory` | 10 |
 
 Role allocation and split flag partitions (each line is one measured combination; `null` remains distinct from false):
 
