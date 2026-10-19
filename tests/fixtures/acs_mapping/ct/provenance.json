@@ -1,0 +1,91 @@
+{
+  "ct_tabblock2020": {
+    "filename": "tl_2020_09_tabblock20.zip",
+    "original_sha256": "a935a5a85717389ded782debd15d7019705d7fc0777548d22cc09552208ac6b1",
+    "fixture_sha256": "d2844d68c013dccc91f6d741e8d740b0f6920d854805e682bf6c6bfb055cbb12",
+    "archive_sha256": "8b8ffb9f15e3bee82e551ef82c56bd4b22267411f0a21cf7ce2b4134213a0bbb",
+    "fixture_size": 6912090,
+    "transformation": "All seven original members retained; unused SHP/SHX geometry payloads truncated to their first 100 original bytes. Complete original DBF/CPG/PRJ/XML bytes preserved. ZIP metadata regenerated; fixture never claims the production archive hash.",
+    "source_url": "https://www2.census.gov/geo/tiger/TIGER2020/TABBLOCK20/tl_2020_09_tabblock20.zip",
+    "retrieved_at": "2026-10-18T21:08:26.397580+00:00",
+    "original_size": 61439410,
+    "archive_parts": [
+      {
+        "filename": "tl_2020_09_tabblock20.zip.gz.1",
+        "sha256": "5ab1a1c2a37f5489d8a37523b321361ff5eddf5b1181f69528bd1dfe7fc2cf3f",
+        "size": 750000
+      },
+      {
+        "filename": "tl_2020_09_tabblock20.zip.gz.2",
+        "sha256": "32e8d86266e050afde9321b4ea66a173a77042609afd3b966c8eb500f2902491",
+        "size": 721750
+      }
+    ]
+  },
+  "ct_block_assignment2020": {
+    "filename": "BlockAssign_ST09_CT.zip",
+    "original_sha256": "1125c49564224cced90844ab2345df9a2c191a0084c5029ff53ddc9c320c54ba",
+    "fixture_sha256": "1125c49564224cced90844ab2345df9a2c191a0084c5029ff53ddc9c320c54ba",
+    "archive_sha256": "6dc0dd5de9edfee2023fc7feac965797e141b2092d0900338684ca5571831423",
+    "fixture_size": 1205420,
+    "transformation": "Lossless complete original.",
+    "source_url": "https://www2.census.gov/geo/docs/maps-data/data/baf2020/BlockAssign_ST09_CT.zip",
+    "retrieved_at": "2026-10-18T21:08:58.778689+00:00",
+    "original_size": 1205420
+  },
+  "ct_county_crosswalk": {
+    "filename": "ct_cou_to_cousub_crosswalk.txt",
+    "original_sha256": "13ad002564e30e6dcd1df112fdaa985f2cd0cdb908f7f3017cd2723db294cff8",
+    "fixture_sha256": "13ad002564e30e6dcd1df112fdaa985f2cd0cdb908f7f3017cd2723db294cff8",
+    "archive_sha256": "7584cede93b2552c131749bfa78445c96446307da150cc96431a44ce6069ca78",
+    "fixture_size": 22091,
+    "transformation": "Lossless complete original.",
+    "source_url": "https://www2.census.gov/geo/docs/reference/ct_change/ct_cou_to_cousub_crosswalk.txt",
+    "retrieved_at": "2026-10-18T21:08:58.883343+00:00",
+    "original_size": 22091
+  },
+  "tract_puma2020": {
+    "filename": "2020_Census_Tract_to_2020_PUMA.txt",
+    "original_sha256": "5262f460b2c8dbe86b00549e916317b1791fdc595c9af72ab18f6f6a67040531",
+    "fixture_sha256": "5262f460b2c8dbe86b00549e916317b1791fdc595c9af72ab18f6f6a67040531",
+    "archive_sha256": "09458416f8f23f7feaf671c39f685614da07790cad6b6bfb7e49c21b35078126",
+    "fixture_size": 1709076,
+    "transformation": "Lossless complete original.",
+    "source_url": "https://www2.census.gov/geo/docs/maps-data/data/rel2020/2020_Census_Tract_to_2020_PUMA.txt",
+    "retrieved_at": "2026-10-18T21:08:59.337877+00:00",
+    "original_size": 1709076
+  },
+  "census_puma_population2020": {
+    "filename": "census-puma2020-pop100.html",
+    "original_sha256": "70993afd338e51246142432723306fec63b927df15e0537cb388741d1e9d8894",
+    "fixture_sha256": "70993afd338e51246142432723306fec63b927df15e0537cb388741d1e9d8894",
+    "archive_sha256": "d39686fa880eb61727c7329470259d76733722ba6da9e3523cec355c984b05a5",
+    "fixture_size": 1949300,
+    "transformation": "Lossless complete original.",
+    "source_url": "https://tigerweb.geo.census.gov/tigerwebmain/Files/acs26/tigerweb_acs26_puma_2020_tab20_us.html",
+    "retrieved_at": "2026-10-18T20:51:09.124953+00:00",
+    "original_size": 1949300
+  },
+  "census_ct_mcd_population2020": {
+    "filename": "census-ct-cousub2020-pop100.html",
+    "original_sha256": "475f9509cedaf42fef2d7e2bc59891f732e3233b2158c6b22e71e9dacf865a3f",
+    "fixture_sha256": "475f9509cedaf42fef2d7e2bc59891f732e3233b2158c6b22e71e9dacf865a3f",
+    "archive_sha256": "7000d5b132487826336f5b71c95a2768803b6f31dd12f3e7d5f5898cea7fb423",
+    "fixture_size": 167188,
+    "transformation": "Lossless complete original.",
+    "source_url": "https://tigerweb.geo.census.gov/tigerwebmain/Files/acs26/tigerweb_acs26_cousub_2020_tab20_ct.html",
+    "retrieved_at": "2026-10-18T20:51:08.558287+00:00",
+    "original_size": 167188
+  },
+  "ct_opm_population2020": {
+    "filename": "ct-opm-2020-planning-pop.xlsx",
+    "original_sha256": "1a3ba5ff53aa5bb4b3ec68178cfa24a0ba5d1294c15ce4bb03b5e86ee660c391",
+    "fixture_sha256": "1a3ba5ff53aa5bb4b3ec68178cfa24a0ba5d1294c15ce4bb03b5e86ee660c391",
+    "archive_sha256": "608039a76921f58b9023047e8bb4ee9cd1eee2cd83f70cfea1da2939e5b85162",
+    "fixture_size": 21088,
+    "transformation": "Lossless complete original.",
+    "source_url": "https://portal.ct.gov/opm/-/media/opm/igpp/org/cogs/2020-census-population-by-planning-region.xlsx?hash=CC2974EA5238511D82466EA6757581F8&rev=ac73c0fee0b7449fbc055f0fdde8af17",
+    "retrieved_at": "2026-10-18T20:51:08.899945+00:00",
+    "original_size": 21088
+  }
+}

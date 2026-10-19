@@ -23,9 +23,14 @@ separate immutable ITA bundle. The [measured V11 finding](specs/findings/v11-ita
 records the full-data run and its unresolved source codes. Geography references and
 the shared target writer are implemented. The [measured Stage 6 finding](specs/findings/stage-6-ita-area-mix-build.md)
 records full-data ITA assignment, the 2023 area-mix target and exact cached replay.
-PUMA allocation, ACS/CPS code parsers, person-month linkage and other target
-families remain planned. Raw downloads are recorded in
-`data/raw/manifest.jsonl`.
+Stage 8 ACS code parsing and PUMA allocation are measured and science-sealed;
+the [Stage 8 finding](specs/findings/stage-8-acs-codes-area-allocation.md) records
+the three profile companions in each of two full-data bundles, replay and independent
+reconciliation. Repository completion is recorded in that finding, the
+[retired plan](specs/plans/completed/8-acs-codes-area-allocation.md) and the
+[roadmap](specs/embedding-evaluation-data-spec-roadmap.md). CPS code parsing,
+person-month linkage and other target families remain planned. Raw downloads are
+recorded in `data/raw/manifest.jsonl`.
 The OSHA case-detail files are acquired but feed no target; the specification's
 establishment data are the Form 300A summaries.
 
@@ -701,3 +706,76 @@ data/preview/                                Dry-run extract definitions
 pyproject.toml                               Project dependencies and Python requirement
 uv.lock                                      Project dependency lockfile
 ```
+
+
+### ACS classification and population allocation (Stage 8 software)
+
+The separate module commands use explicit run IDs, an explicit local data root and
+external control pins. They consume selected Stage 4, 5 and 7 bundles in place.
+Only `acquire-references` retrieves public originals; `import-reference` registers
+local public original bytes. A complete cached reference snapshot is checked without
+constructing an HTTP client. Build, verification and comparison are offline; none
+loads `.env`, requests credentials or constructs an IPUMS API client.
+
+```bash
+uv run --offline --locked python -m embedding_data.acs_mapping acquire-references REFERENCE_ID --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked python -m embedding_data.acs_mapping import-reference REFERENCE_ID KIND ORIGINAL --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked python -m embedding_data.acs_mapping build RUN_ID --references REFERENCE_ID --references-sha256 RECEIPT_PIN --codes-run CODES_ID --codes-outputs-sha256 CODES_PIN --geography-run GEOGRAPHY_ID --geography-outputs-sha256 GEOGRAPHY_PIN --ipums-run IPUMS_ID --ipums-outputs-sha256 IPUMS_PIN --ipums-references-sha256 IPUMS_RECEIPT_PIN --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked python -m embedding_data.acs_mapping verify RUN_ID --outputs-sha256 EXTERNAL_PIN --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked python -m embedding_data.acs_mapping compare-runs FIRST_ID SECOND_ID --data-dir /Users/lowell/Projects/embedding-data/data
+```
+
+Uppercase tokens are required explicit selections for a new run. `uv --offline`
+restricts package fetching; the acquisition command itself can
+retrieve public references. Reference receipts and upstream `outputs.json` files need
+independently captured pins. Build emits JSON with `run_id`, `directory` and
+`outputs_sha256`; save this response outside the bundle in a gitignored control
+receipt. Verification requires that external output pin before trusting local records.
+Owner decision D5 preserves the selected historical Stage 5 creator CLI record only
+for `stage5_geography_20261014` and its exact approved detached output pin. The
+current CLI hash must also agree with strictly verified Stage 7 and frozen
+Stage 8 executing software. The original upstream inventory
+is retained with explicit compatibility diagnostics; every other software,
+dependency, Python/lock, source/reference and table check stays strict.
+Comparison checks ordered logical contents of all eight tables and substantive report
+content; it does not establish trust. Verify both runs separately before adopting a
+replay. Exit codes are 0 for success, 1 for logical mismatch and 2 for validation or
+acquisition failure, with metadata-only error output.
+
+Each run under `data/derived/acs/mapping/RUN_ID/` has eight Parquets plus
+`inputs.json`, `report.json` and `outputs.json`. The inventory covers the other ten
+files. The three companions preserve original columns, strings, delivery-specific
+Q flags, types, duplicate multiplicity and person row order, followed by a typed
+annotation suffix. Reference tables retain sorted distinct unweighted classification
+possibilities, root-to-leaf candidate paths and cited geography statuses. Factors use
+2020 population and PUMA definitions, 2022 county composition, the 2025 county inventory
+and July 2023 MSA delineations as separate frames. Geographic allocation and fractional
+splits remain explicit; allocation does not infer an individual's county or MSA.
+
+Existing final or `.part` names are refused. Inspect caller-owned interrupted paths
+and choose a fresh explicit run ID; do not overwrite an earlier bundle or repair it
+in place. Failed builds clean only their owned staging. The public verifier reconstructs
+mappings, factors and all companion annotations from pinned originals and selected
+sources, and checks current executing software and dependencies.
+
+Fixture software readiness is separate from Stage 8 full-data science. The
+raw-to-converter-to-authenticated-upstreams fixture exercises replay, preservation and
+integrity gates; it does not establish V9 or complete eight-family V12 acceptance.
+The selected full-data runs are `stage8_acs_mapping_20261018_r7` and
+`stage8_acs_mapping_20261018_r7_replay`, under control
+`stage8_acceptance_20261018_r7`. Their external `outputs.json` pins are
+`1ec9701092f576b122b01464cdb6fa3fbee49db030e4ad3df7b64e621b8e75f4`
+and `a115c5f7e2691ecbffe763bd1b6b9780fb6a71bc512a2691cf4014f9857b3565`.
+At executing source `1542f8d8f1db2e55f28b9cfec4b1306739589ce8`, both detached
+verifiers, eight-table/report replay and both full independent reconciliations passed
+for 12,238,491 source rows. The immutable external science seal is
+`b09d1a56308f09d6e99f97070c02ffbbc0523d6c595f7901bb0e01a999bd3ddf`;
+its 880-file control inventory has SHA-256
+`7af71e3b57c6c07867224259f49563c20e0cd3b75e1d99f54b4cea4f92cc221a`.
+The [measured Stage 8 finding](specs/findings/stage-8-acs-codes-area-allocation.md)
+keeps the first-build timing-wrapper limit and distinguishes the immutable
+seal's historical `adoption=false` from completed repository adoption. Mapping
+outputs are evaluation inputs, never embedder training or model-selection data.
+ACS universes, headline inclusion, target families,
+employment-weighted code allocation, pooling and replicate standard errors remain
+later-stage work.

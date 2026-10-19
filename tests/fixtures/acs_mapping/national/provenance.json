@@ -1,0 +1,1202 @@
+{
+  "intake": [
+    {
+      "name": "2025_Gaz_counties_national.zip",
+      "original_sha256": "4c90d0f805779923b5958ab13d0c1e9b99fe4932b786bfcf75dd739bb2dcb4ea",
+      "original_bytes": 138993,
+      "citation": {
+        "path": "references/geography/2025/2025_Gaz_counties_national.zip",
+        "sha256": "4c90d0f805779923b5958ab13d0c1e9b99fe4932b786bfcf75dd739bb2dcb4ea",
+        "size": 138993,
+        "retrieved_at": "2026-10-14T13:58:30+00:00",
+        "client": "manual-import",
+        "client_version": "0.1.0",
+        "source_url": "https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2025_Gazetteer/2025_Gaz_counties_national.zip",
+        "collection": null,
+        "extract_number": null,
+        "samples": [],
+        "proxies": [
+          "retrieved_at"
+        ],
+        "through_date": null
+      },
+      "gzip_bytes": 139049,
+      "gzip_sha256": "684f8b477df789829722f28dfc05193a863e62363f8ce63e9e09730078e20e78",
+      "gzip_transform": "stdlib gzip level9 mtime0; decompresses byte-for-byte to original",
+      "zip_members": [
+        {
+          "name": "2025_Gaz_counties_national.txt",
+          "bytes": 332830,
+          "compressed_bytes": 138783,
+          "compression": 8
+        }
+      ],
+      "profile": {
+        "encoding": "utf-8-sig",
+        "delimiter": "pipe",
+        "rows_without_header": 3222,
+        "header": [
+          "USPS",
+          "GEOID",
+          "GEOIDFQ",
+          "ANSICODE",
+          "NAME",
+          "ALAND",
+          "AWATER",
+          "ALAND_SQMI",
+          "AWATER_SQMI",
+          "INTPTLAT",
+          "INTPTLONG"
+        ],
+        "first_data": [
+          "AL",
+          "01001",
+          "0500000US01001",
+          "00161526",
+          "Autauga County",
+          "1539631460",
+          "25677536",
+          "594.455",
+          "9.914",
+          "32.532237",
+          "-86.64644"
+        ],
+        "unique_GEOID": 3222
+      }
+    },
+    {
+      "name": "list1_2023.xlsx",
+      "original_sha256": "952c4b1e78acbb54e6ec9412434b7602fedacbf021736351a63c181bdb753629",
+      "original_bytes": 143798,
+      "citation": {
+        "path": "references/geography/2023/list1_2023.xlsx",
+        "sha256": "952c4b1e78acbb54e6ec9412434b7602fedacbf021736351a63c181bdb753629",
+        "size": 143798,
+        "retrieved_at": "2026-10-14T13:58:31+00:00",
+        "client": "manual-import",
+        "client_version": "0.1.0",
+        "source_url": "https://www2.census.gov/programs-surveys/metro-micro/geographies/reference-files/2023/delineation-files/list1_2023.xlsx",
+        "collection": null,
+        "extract_number": null,
+        "samples": [],
+        "proxies": [
+          "retrieved_at"
+        ],
+        "through_date": null
+      },
+      "gzip_bytes": 139915,
+      "gzip_sha256": "501acc98c6ee3e20a62bc50f5ceb60fca825cc47ebcdeb0f77fa54d2bbfb0500",
+      "gzip_transform": "stdlib gzip level9 mtime0; decompresses byte-for-byte to original",
+      "zip_members": [
+        {
+          "name": "[Content_Types].xml",
+          "bytes": 1284,
+          "compressed_bytes": 366,
+          "compression": 8
+        },
+        {
+          "name": "_rels/.rels",
+          "bytes": 588,
+          "compressed_bytes": 244,
+          "compression": 8
+        },
+        {
+          "name": "xl/workbook.xml",
+          "bytes": 2014,
+          "compressed_bytes": 842,
+          "compression": 8
+        },
+        {
+          "name": "xl/_rels/workbook.xml.rels",
+          "bytes": 698,
+          "compressed_bytes": 243,
+          "compression": 8
+        },
+        {
+          "name": "xl/worksheets/sheet1.xml",
+          "bytes": 905590,
+          "compressed_bytes": 108984,
+          "compression": 8
+        },
+        {
+          "name": "xl/theme/theme1.xml",
+          "bytes": 6796,
+          "compressed_bytes": 1683,
+          "compression": 8
+        },
+        {
+          "name": "xl/styles.xml",
+          "bytes": 5400,
+          "compressed_bytes": 1108,
+          "compression": 8
+        },
+        {
+          "name": "xl/sharedStrings.xml",
+          "bytes": 111021,
+          "compressed_bytes": 26080,
+          "compression": 8
+        },
+        {
+          "name": "xl/worksheets/_rels/sheet1.xml.rels",
+          "bytes": 322,
+          "compressed_bytes": 193,
+          "compression": 8
+        },
+        {
+          "name": "xl/printerSettings/printerSettings1.bin",
+          "bytes": 220,
+          "compressed_bytes": 68,
+          "compression": 8
+        },
+        {
+          "name": "docProps/core.xml",
+          "bytes": 593,
+          "compressed_bytes": 319,
+          "compression": 8
+        },
+        {
+          "name": "docProps/app.xml",
+          "bytes": 785,
+          "compressed_bytes": 394,
+          "compression": 8
+        }
+      ],
+      "workbook_sheets": [
+        {
+          "name": "List 1",
+          "rows_including_headers": 1921,
+          "columns": 12,
+          "first_12_rows": [
+            [
+              "Table with row headers in column A and column headers in row 3",
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              "List 1. CORE BASED STATISTICAL AREAS (CBSAs), METROPOLITAN DIVISIONS, AND COMBINED STATISTICAL AREAS (CSAs), JULY 2023",
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              "CBSA Code",
+              "Metropolitan Division Code",
+              "CSA Code",
+              "CBSA Title",
+              "Metropolitan/Micropolitan Statistical Area",
+              "Metropolitan Division Title",
+              "CSA Title",
+              "County/County Equivalent",
+              "State Name",
+              "FIPS State Code",
+              "FIPS County Code",
+              "Central/Outlying County"
+            ],
+            [
+              "10100",
+              null,
+              null,
+              "Aberdeen, SD",
+              "Micropolitan Statistical Area",
+              null,
+              null,
+              "Brown County",
+              "South Dakota",
+              "46",
+              "013",
+              "Central"
+            ],
+            [
+              "10100",
+              null,
+              null,
+              "Aberdeen, SD",
+              "Micropolitan Statistical Area",
+              null,
+              null,
+              "Edmunds County",
+              "South Dakota",
+              "46",
+              "045",
+              "Outlying"
+            ],
+            [
+              "10140",
+              null,
+              null,
+              "Aberdeen, WA",
+              "Micropolitan Statistical Area",
+              null,
+              null,
+              "Grays Harbor County",
+              "Washington",
+              "53",
+              "027",
+              "Central"
+            ],
+            [
+              "10180",
+              null,
+              "101",
+              "Abilene, TX",
+              "Metropolitan Statistical Area",
+              null,
+              "Abilene-Sweetwater, TX",
+              "Callahan County",
+              "Texas",
+              "48",
+              "059",
+              "Outlying"
+            ],
+            [
+              "10180",
+              null,
+              "101",
+              "Abilene, TX",
+              "Metropolitan Statistical Area",
+              null,
+              "Abilene-Sweetwater, TX",
+              "Jones County",
+              "Texas",
+              "48",
+              "253",
+              "Outlying"
+            ],
+            [
+              "10180",
+              null,
+              "101",
+              "Abilene, TX",
+              "Metropolitan Statistical Area",
+              null,
+              "Abilene-Sweetwater, TX",
+              "Taylor County",
+              "Texas",
+              "48",
+              "441",
+              "Central"
+            ],
+            [
+              "10220",
+              null,
+              null,
+              "Ada, OK",
+              "Micropolitan Statistical Area",
+              null,
+              null,
+              "Pontotoc County",
+              "Oklahoma",
+              "40",
+              "123",
+              "Central"
+            ],
+            [
+              "10300",
+              null,
+              "220",
+              "Adrian, MI",
+              "Micropolitan Statistical Area",
+              null,
+              "Detroit-Warren-Ann Arbor, MI",
+              "Lenawee County",
+              "Michigan",
+              "26",
+              "091",
+              "Central"
+            ],
+            [
+              "10380",
+              null,
+              "364",
+              "Aguadilla, PR",
+              "Metropolitan Statistical Area",
+              null,
+              "Mayag\u00fcez-Aguadilla, PR",
+              "Aguada Municipio",
+              "Puerto Rico",
+              "72",
+              "003",
+              "Central"
+            ]
+          ],
+          "dtypes": [
+            "String",
+            "String",
+            "String",
+            "String",
+            "String",
+            "String",
+            "String",
+            "String",
+            "String",
+            "String",
+            "String",
+            "String"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "state-geocodes-v2025.xlsx",
+      "original_sha256": "327c7fa3dfeb6526b20cd3d1cef7f471ec08316e92b183f12c5b168bfed7da84",
+      "original_bytes": 14700,
+      "citation": {
+        "path": "references/geography/2025/state-geocodes-v2025.xlsx",
+        "sha256": "327c7fa3dfeb6526b20cd3d1cef7f471ec08316e92b183f12c5b168bfed7da84",
+        "size": 14700,
+        "retrieved_at": "2026-10-14T13:58:31+00:00",
+        "client": "httpx",
+        "client_version": "0.28.1",
+        "source_url": "https://www2.census.gov/programs-surveys/popest/geographies/2025/state-geocodes-v2025.xlsx",
+        "collection": null,
+        "extract_number": null,
+        "samples": [],
+        "proxies": [],
+        "through_date": null
+      },
+      "gzip_bytes": 11673,
+      "gzip_sha256": "881533b650da3ff2212d9f9a74c1dbfdcd4f9aa086260f08ac72d96dc8336a8b",
+      "gzip_transform": "stdlib gzip level9 mtime0; decompresses byte-for-byte to original",
+      "zip_members": [
+        {
+          "name": "[Content_Types].xml",
+          "bytes": 1409,
+          "compressed_bytes": 378,
+          "compression": 8
+        },
+        {
+          "name": "_rels/.rels",
+          "bytes": 735,
+          "compressed_bytes": 258,
+          "compression": 8
+        },
+        {
+          "name": "xl/workbook.xml",
+          "bytes": 1855,
+          "compressed_bytes": 828,
+          "compression": 8
+        },
+        {
+          "name": "xl/_rels/workbook.xml.rels",
+          "bytes": 698,
+          "compressed_bytes": 243,
+          "compression": 8
+        },
+        {
+          "name": "xl/worksheets/sheet1.xml",
+          "bytes": 14754,
+          "compressed_bytes": 2484,
+          "compression": 8
+        },
+        {
+          "name": "xl/theme/theme1.xml",
+          "bytes": 7127,
+          "compressed_bytes": 1661,
+          "compression": 8
+        },
+        {
+          "name": "xl/styles.xml",
+          "bytes": 4095,
+          "compressed_bytes": 931,
+          "compression": 8
+        },
+        {
+          "name": "xl/sharedStrings.xml",
+          "bytes": 3322,
+          "compressed_bytes": 912,
+          "compression": 8
+        },
+        {
+          "name": "xl/worksheets/_rels/sheet1.xml.rels",
+          "bytes": 322,
+          "compressed_bytes": 193,
+          "compression": 8
+        },
+        {
+          "name": "xl/printerSettings/printerSettings1.bin",
+          "bytes": 7944,
+          "compressed_bytes": 1918,
+          "compression": 8
+        },
+        {
+          "name": "docProps/core.xml",
+          "bytes": 854,
+          "compressed_bytes": 475,
+          "compression": 8
+        },
+        {
+          "name": "docProps/app.xml",
+          "bytes": 983,
+          "compressed_bytes": 461,
+          "compression": 8
+        },
+        {
+          "name": "docProps/custom.xml",
+          "bytes": 441,
+          "compressed_bytes": 306,
+          "compression": 8
+        }
+      ],
+      "workbook_sheets": [
+        {
+          "name": "CODES25",
+          "rows_including_headers": 69,
+          "columns": 4,
+          "first_12_rows": [
+            [
+              "Census Bureau Region and Division Codes and Federal Information Processing System (FIPS) Codes for States",
+              null,
+              null,
+              null
+            ],
+            [
+              "Source: U.S. Census Bureau, Population Division",
+              null,
+              null,
+              null
+            ],
+            [
+              "Internet Release Date: May 2026",
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              "Region",
+              "Division",
+              "State (FIPS)",
+              "Name"
+            ],
+            [
+              "1",
+              "0",
+              "00",
+              "Northeast Region"
+            ],
+            [
+              "1",
+              "1",
+              "00",
+              "New England Division"
+            ],
+            [
+              "1",
+              "1",
+              "09",
+              "Connecticut"
+            ],
+            [
+              "1",
+              "1",
+              "23",
+              "Maine"
+            ],
+            [
+              "1",
+              "1",
+              "25",
+              "Massachusetts"
+            ],
+            [
+              "1",
+              "1",
+              "33",
+              "New Hampshire"
+            ],
+            [
+              "1",
+              "1",
+              "44",
+              "Rhode Island"
+            ]
+          ],
+          "dtypes": [
+            "String",
+            "String",
+            "String",
+            "String"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "geocorr_puma_totals.csv",
+      "original_sha256": "b29e5804353c71070346d80b50f208a9d417e4d6841866a5f5d1d8b6a8182fa2",
+      "original_bytes": 215815,
+      "citation": {
+        "authority_role": "2020_population_relation",
+        "authority_url": "https://mcdc.missouri.edu/cgi-bin/broker?state=Al01&state=Ak02&state=Az04&state=Ar05&state=Ca06&state=Co08&state=Ct09&state=De10&state=Dc11&state=Fl12&state=Ga13&state=Hi15&state=Id16&state=Il17&state=In18&state=Ia19&state=Ks20&state=Ky21&state=La22&state=Me23&state=Md24&state=Ma25&state=Mi26&state=Mn27&state=Ms28&state=Mo29&state=Mt30&state=Ne31&state=Nv32&state=Nh33&state=Nj34&state=Nm35&state=Ny36&state=Nc37&state=Nd38&state=Oh39&state=Ok40&state=Or41&state=Pa42&state=Ri44&state=Sc45&state=Sd46&state=Tn47&state=Tx48&state=Ut49&state=Vt50&state=Va51&state=Wa53&state=Wv54&state=Wi55&state=Wy56&state=Pr72&_PROGRAM=apps.geocorr2022.sas&_SERVICE=MCDC_long&_debug=0&g1_=puma22&g2_=state&wtvar=pop20&nozerob=1&fileout=1&filefmt=csv&lstfmt=html&title=&afacts2=on&counties=&metros=&places=&oropt=&latitude=&longitude=&distance=&kiloms=0&locname=",
+        "citation": {
+          "client": "manual-import",
+          "client_version": "0.1.0",
+          "collection": null,
+          "extract_number": null,
+          "path": "references/acs-mapping/stage8_acs_references_20261017/geocorr_puma_totals.csv",
+          "proxies": [
+            "retrieved_at"
+          ],
+          "retrieved_at": "2026-10-18T20:40:02+00:00",
+          "samples": [],
+          "sha256": "b29e5804353c71070346d80b50f208a9d417e4d6841866a5f5d1d8b6a8182fa2",
+          "size": 215815,
+          "source_url": "https://mcdc.missouri.edu/cgi-bin/broker?state=Al01&state=Ak02&state=Az04&state=Ar05&state=Ca06&state=Co08&state=Ct09&state=De10&state=Dc11&state=Fl12&state=Ga13&state=Hi15&state=Id16&state=Il17&state=In18&state=Ia19&state=Ks20&state=Ky21&state=La22&state=Me23&state=Md24&state=Ma25&state=Mi26&state=Mn27&state=Ms28&state=Mo29&state=Mt30&state=Ne31&state=Nv32&state=Nh33&state=Nj34&state=Nm35&state=Ny36&state=Nc37&state=Nd38&state=Oh39&state=Ok40&state=Or41&state=Pa42&state=Ri44&state=Sc45&state=Sd46&state=Tn47&state=Tx48&state=Ut49&state=Vt50&state=Va51&state=Wa53&state=Wv54&state=Wi55&state=Wy56&state=Pr72&_PROGRAM=apps.geocorr2022.sas&_SERVICE=MCDC_long&_debug=0&g1_=puma22&g2_=state&wtvar=pop20&nozerob=1&fileout=1&filefmt=csv&lstfmt=html&title=&afacts2=on&counties=&metros=&places=&oropt=&latitude=&longitude=&distance=&kiloms=0&locname=",
+          "through_date": null
+        },
+        "edition": "2020 Census population; 2020 PUMAs; current CT planning regions",
+        "parser_contract": "geocorr-csv-v1",
+        "retrieval_url": "https://mcdc.missouri.edu/temp/geocorr2022_2629109689.csv",
+        "retrieved_at": "2026-10-18T20:40:02+00:00",
+        "retrieved_at_is_proxy": true,
+        "sha256": "b29e5804353c71070346d80b50f208a9d417e4d6841866a5f5d1d8b6a8182fa2",
+        "size": 215815
+      },
+      "gzip_bytes": 60492,
+      "gzip_sha256": "2fdbd8c6373d96aa1e723337e094af90aca9b560224f875322f3e695b8b3333a",
+      "gzip_transform": "stdlib gzip level9 mtime0; decompresses byte-for-byte to original",
+      "profile": {
+        "encoding": "utf-8",
+        "records_including_header_and_description": 2488,
+        "rows_without_header_description": 2486,
+        "header": [
+          "state",
+          "puma22",
+          "stab",
+          "PUMA22name",
+          "pop20",
+          "afact2",
+          "afact"
+        ],
+        "description": [
+          "State code",
+          "PUMA (2022)",
+          "State abbr.",
+          "PUMA22 name",
+          "Total population (2020 Census)",
+          "state-to-puma22 allocation factor",
+          "puma22-to-state allocation factor"
+        ],
+        "first_data": [
+          "01",
+          "00100",
+          "AL",
+          "Lauderdale, Colbert & Franklin Counties",
+          "182904",
+          "0.0364",
+          "1 "
+        ]
+      }
+    },
+    {
+      "name": "geocorr_county_totals.csv",
+      "original_sha256": "ad91effe25b29321a54469aa310eae470688165c85ff0b606de2018eea579e26",
+      "original_bytes": 153234,
+      "citation": {
+        "authority_role": "2020_population_relation",
+        "authority_url": "https://mcdc.missouri.edu/cgi-bin/broker?state=Al01&state=Ak02&state=Az04&state=Ar05&state=Ca06&state=Co08&state=Ct09&state=De10&state=Dc11&state=Fl12&state=Ga13&state=Hi15&state=Id16&state=Il17&state=In18&state=Ia19&state=Ks20&state=Ky21&state=La22&state=Me23&state=Md24&state=Ma25&state=Mi26&state=Mn27&state=Ms28&state=Mo29&state=Mt30&state=Ne31&state=Nv32&state=Nh33&state=Nj34&state=Nm35&state=Ny36&state=Nc37&state=Nd38&state=Oh39&state=Ok40&state=Or41&state=Pa42&state=Ri44&state=Sc45&state=Sd46&state=Tn47&state=Tx48&state=Ut49&state=Vt50&state=Va51&state=Wa53&state=Wv54&state=Wi55&state=Wy56&state=Pr72&_PROGRAM=apps.geocorr2022.sas&_SERVICE=MCDC_long&_debug=0&g1_=county&g2_=state&wtvar=pop20&nozerob=1&fileout=1&filefmt=csv&lstfmt=html&title=&afacts2=on&counties=&metros=&places=&oropt=&latitude=&longitude=&distance=&kiloms=0&locname=",
+        "citation": {
+          "client": "manual-import",
+          "client_version": "0.1.0",
+          "collection": null,
+          "extract_number": null,
+          "path": "references/acs-mapping/stage8_acs_references_20261017/geocorr_county_totals.csv",
+          "proxies": [
+            "retrieved_at"
+          ],
+          "retrieved_at": "2026-10-18T20:40:02+00:00",
+          "samples": [],
+          "sha256": "ad91effe25b29321a54469aa310eae470688165c85ff0b606de2018eea579e26",
+          "size": 153234,
+          "source_url": "https://mcdc.missouri.edu/cgi-bin/broker?state=Al01&state=Ak02&state=Az04&state=Ar05&state=Ca06&state=Co08&state=Ct09&state=De10&state=Dc11&state=Fl12&state=Ga13&state=Hi15&state=Id16&state=Il17&state=In18&state=Ia19&state=Ks20&state=Ky21&state=La22&state=Me23&state=Md24&state=Ma25&state=Mi26&state=Mn27&state=Ms28&state=Mo29&state=Mt30&state=Ne31&state=Nv32&state=Nh33&state=Nj34&state=Nm35&state=Ny36&state=Nc37&state=Nd38&state=Oh39&state=Ok40&state=Or41&state=Pa42&state=Ri44&state=Sc45&state=Sd46&state=Tn47&state=Tx48&state=Ut49&state=Vt50&state=Va51&state=Wa53&state=Wv54&state=Wi55&state=Wy56&state=Pr72&_PROGRAM=apps.geocorr2022.sas&_SERVICE=MCDC_long&_debug=0&g1_=county&g2_=state&wtvar=pop20&nozerob=1&fileout=1&filefmt=csv&lstfmt=html&title=&afacts2=on&counties=&metros=&places=&oropt=&latitude=&longitude=&distance=&kiloms=0&locname=",
+          "through_date": null
+        },
+        "edition": "2020 Census population; 2020 PUMAs; current CT planning regions",
+        "parser_contract": "geocorr-csv-v1",
+        "retrieval_url": "https://mcdc.missouri.edu/temp/geocorr2022_2629100663.csv",
+        "retrieved_at": "2026-10-18T20:40:02+00:00",
+        "retrieved_at_is_proxy": true,
+        "sha256": "ad91effe25b29321a54469aa310eae470688165c85ff0b606de2018eea579e26",
+        "size": 153234
+      },
+      "gzip_bytes": 46942,
+      "gzip_sha256": "6290b9d098eb0656553da9aa8903d820aae6bca0f93f833d37f963c0fc18655b",
+      "gzip_transform": "stdlib gzip level9 mtime0; decompresses byte-for-byte to original",
+      "profile": {
+        "encoding": "cp1252",
+        "records_including_header_and_description": 3224,
+        "rows_without_header_description": 3222,
+        "header": [
+          "county",
+          "state",
+          "stab",
+          "CountyName",
+          "pop20",
+          "afact2",
+          "afact"
+        ],
+        "description": [
+          "County code",
+          "State code",
+          "State abbr.",
+          "County name",
+          "Total population (2020 Census)",
+          "state-to-county allocation factor",
+          "county-to-state allocation factor"
+        ],
+        "first_data": [
+          "01001",
+          "01",
+          "AL",
+          "Autauga AL",
+          "58805",
+          "0.0117",
+          "1 "
+        ]
+      }
+    },
+    {
+      "name": "puma_composition_2020.xls",
+      "original_sha256": "022e4784cb08dcf01acfa4f680564cd26ba79e867f6643ee683577fde0b37a5d",
+      "original_bytes": 237568,
+      "citation": {
+        "authority_role": "geographic_composition",
+        "authority_url": "https://usa.ipums.org/usa/resources/volii/puma_migpuma1_pwpuma00_2020.xls",
+        "citation": {
+          "client": "httpx",
+          "client_version": "0.28.1",
+          "collection": null,
+          "extract_number": null,
+          "path": "references/acs-mapping/stage8_acs_references_20261017/puma_composition_2020.xls",
+          "proxies": [],
+          "retrieved_at": "2026-10-18T19:45:14+00:00",
+          "samples": [],
+          "sha256": "022e4784cb08dcf01acfa4f680564cd26ba79e867f6643ee683577fde0b37a5d",
+          "size": 237568,
+          "source_url": "https://usa.ipums.org/usa/resources/volii/puma_migpuma1_pwpuma00_2020.xls",
+          "through_date": null
+        },
+        "edition": "2020 PUMA definitions",
+        "parser_contract": "workbook-v1",
+        "retrieved_at": "2026-10-18T19:45:14+00:00",
+        "retrieved_at_is_proxy": false,
+        "sha256": "022e4784cb08dcf01acfa4f680564cd26ba79e867f6643ee683577fde0b37a5d",
+        "size": 237568
+      },
+      "gzip_bytes": 44120,
+      "gzip_sha256": "2cfef87b1fdf56457ef820714a4abb178bf3f9ecc783a8028a687fffd77546f8",
+      "gzip_transform": "stdlib gzip level9 mtime0; decompresses byte-for-byte to original",
+      "workbook_sheets": [
+        {
+          "name": "PUMA_POWPUMA_MIGPUMA",
+          "rows_including_headers": 2487,
+          "columns": 4,
+          "first_12_rows": [
+            [
+              "State of Residence (ST)",
+              "PUMA",
+              "Place of Work State (PWSTATE2) or Migration State (MIGPLAC1)",
+              "PWPUMA00 or MIGPUMA1"
+            ],
+            [
+              "01",
+              "00100",
+              "001",
+              "00100"
+            ],
+            [
+              "01",
+              "00200",
+              "001",
+              "00200"
+            ],
+            [
+              "01",
+              "00300",
+              "001",
+              "00300"
+            ],
+            [
+              "01",
+              "00401",
+              "001",
+              "00490"
+            ],
+            [
+              "01",
+              "00402",
+              "001",
+              "00490"
+            ],
+            [
+              "01",
+              "00403",
+              "001",
+              "00490"
+            ],
+            [
+              "01",
+              "00501",
+              "001",
+              "00490"
+            ],
+            [
+              "01",
+              "00600",
+              "001",
+              "00600"
+            ],
+            [
+              "01",
+              "00700",
+              "001",
+              "00700"
+            ],
+            [
+              "01",
+              "00800",
+              "001",
+              "00800"
+            ],
+            [
+              "01",
+              "00900",
+              "001",
+              "00900"
+            ]
+          ],
+          "dtypes": [
+            "String",
+            "String",
+            "String",
+            "String"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "county_composition_2022.xls",
+      "original_sha256": "bd42f18ee36a10d91404be78106e60c613b6ec8ce53e9bc5860753af497ffadf",
+      "original_bytes": 294912,
+      "citation": {
+        "authority_role": "geographic_composition",
+        "authority_url": "https://usa.ipums.org/usa/resources/volii/county_migpuma_pwpuma_2022.xls",
+        "citation": {
+          "client": "httpx",
+          "client_version": "0.28.1",
+          "collection": null,
+          "extract_number": null,
+          "path": "references/acs-mapping/stage8_acs_references_20261017/county_composition_2022.xls",
+          "proxies": [],
+          "retrieved_at": "2026-10-18T19:45:14+00:00",
+          "samples": [],
+          "sha256": "bd42f18ee36a10d91404be78106e60c613b6ec8ce53e9bc5860753af497ffadf",
+          "size": 294912,
+          "source_url": "https://usa.ipums.org/usa/resources/volii/county_migpuma_pwpuma_2022.xls",
+          "through_date": null
+        },
+        "edition": "2022 county composition",
+        "parser_contract": "workbook-v1",
+        "retrieved_at": "2026-10-18T19:45:14+00:00",
+        "retrieved_at_is_proxy": false,
+        "sha256": "bd42f18ee36a10d91404be78106e60c613b6ec8ce53e9bc5860753af497ffadf",
+        "size": 294912
+      },
+      "gzip_bytes": 61837,
+      "gzip_sha256": "c6e976378b42abc37e95c0c720795483fa150ebd0eb8682c89e86683915a895f",
+      "gzip_transform": "stdlib gzip level9 mtime0; decompresses byte-for-byte to original",
+      "workbook_sheets": [
+        {
+          "name": "MIGPUMA-POWPUMA 2022 Lookup",
+          "rows_including_headers": 3223,
+          "columns": 4,
+          "first_12_rows": [
+            [
+              "State of Residence (ST)",
+              "County of Residence",
+              "Place of Work State (PWSTATE2) or Migration State (MIGPLAC1)",
+              "PWPUMA00 or MIGPUMA1"
+            ],
+            [
+              "01",
+              "001",
+              "001",
+              "01700"
+            ],
+            [
+              "01",
+              "003",
+              "001",
+              "02700"
+            ],
+            [
+              "01",
+              "005",
+              "001",
+              "02500"
+            ],
+            [
+              "01",
+              "007",
+              "001",
+              "01100"
+            ],
+            [
+              "01",
+              "009",
+              "001",
+              "00900"
+            ],
+            [
+              "01",
+              "011",
+              "001",
+              "02000"
+            ],
+            [
+              "01",
+              "013",
+              "001",
+              "02500"
+            ],
+            [
+              "01",
+              "015",
+              "001",
+              "00800"
+            ],
+            [
+              "01",
+              "017",
+              "001",
+              "02000"
+            ],
+            [
+              "01",
+              "019",
+              "001",
+              "00700"
+            ],
+            [
+              "01",
+              "021",
+              "001",
+              "01503"
+            ]
+          ],
+          "dtypes": [
+            "String",
+            "String",
+            "String",
+            "String"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "msa_puma_2023_2020.xlsx",
+      "original_sha256": "80763eaf73cbda1b59818bdbf7650058eebbe18fa8a697599e645b3df235258f",
+      "original_bytes": 226680,
+      "citation": {
+        "authority_role": "geographic_composition",
+        "authority_url": "https://usa.ipums.org/usa/resources/volii/MSA2023_PUMA2020_crosswalk.xlsx",
+        "citation": {
+          "client": "httpx",
+          "client_version": "0.28.1",
+          "collection": null,
+          "extract_number": null,
+          "path": "references/acs-mapping/stage8_acs_references_20261017/msa_puma_2023_2020.xlsx",
+          "proxies": [],
+          "retrieved_at": "2026-10-18T19:45:14+00:00",
+          "samples": [],
+          "sha256": "80763eaf73cbda1b59818bdbf7650058eebbe18fa8a697599e645b3df235258f",
+          "size": 226680,
+          "source_url": "https://usa.ipums.org/usa/resources/volii/MSA2023_PUMA2020_crosswalk.xlsx",
+          "through_date": null
+        },
+        "edition": "July 2023 MSA; 2020 population",
+        "parser_contract": "workbook-v1",
+        "retrieved_at": "2026-10-18T19:45:14+00:00",
+        "retrieved_at_is_proxy": false,
+        "sha256": "80763eaf73cbda1b59818bdbf7650058eebbe18fa8a697599e645b3df235258f",
+        "size": 226680
+      },
+      "gzip_bytes": 221194,
+      "gzip_sha256": "c3ba5160f4c57e29008ab57663d41cf324ef35a096e935a60d0b69c03e57ec54",
+      "gzip_transform": "stdlib gzip level9 mtime0; decompresses byte-for-byte to original",
+      "zip_members": [
+        {
+          "name": "[Content_Types].xml",
+          "bytes": 1284,
+          "compressed_bytes": 366,
+          "compression": 8
+        },
+        {
+          "name": "_rels/.rels",
+          "bytes": 588,
+          "compressed_bytes": 244,
+          "compression": 8
+        },
+        {
+          "name": "xl/workbook.xml",
+          "bytes": 2282,
+          "compressed_bytes": 927,
+          "compression": 8
+        },
+        {
+          "name": "xl/_rels/workbook.xml.rels",
+          "bytes": 698,
+          "compressed_bytes": 243,
+          "compression": 8
+        },
+        {
+          "name": "xl/worksheets/sheet1.xml",
+          "bytes": 1187335,
+          "compressed_bytes": 164490,
+          "compression": 8
+        },
+        {
+          "name": "xl/theme/theme1.xml",
+          "bytes": 8450,
+          "compressed_bytes": 1884,
+          "compression": 8
+        },
+        {
+          "name": "xl/styles.xml",
+          "bytes": 17861,
+          "compressed_bytes": 2269,
+          "compression": 8
+        },
+        {
+          "name": "xl/sharedStrings.xml",
+          "bytes": 203211,
+          "compressed_bytes": 49556,
+          "compression": 8
+        },
+        {
+          "name": "xl/worksheets/_rels/sheet1.xml.rels",
+          "bytes": 322,
+          "compressed_bytes": 193,
+          "compression": 8
+        },
+        {
+          "name": "xl/printerSettings/printerSettings1.bin",
+          "bytes": 15788,
+          "compressed_bytes": 2509,
+          "compression": 8
+        },
+        {
+          "name": "docProps/core.xml",
+          "bytes": 588,
+          "compressed_bytes": 326,
+          "compression": 8
+        },
+        {
+          "name": "docProps/app.xml",
+          "bytes": 786,
+          "compressed_bytes": 399,
+          "compression": 8
+        }
+      ],
+      "workbook_sheets": [
+        {
+          "name": "MSA2023_PUMA2020_crosswalk",
+          "rows_including_headers": 2359,
+          "columns": 11,
+          "first_12_rows": [
+            [
+              "MSA Code",
+              "MSA Title",
+              "State FIPS Code",
+              "State Name",
+              "PUMA Code",
+              "PUMA Name",
+              "MSA 2020 Population ",
+              "PUMA 2020 Population ",
+              " Intersection 2020 Population ",
+              "Percent MSA Population",
+              "Percent PUMA Population"
+            ],
+            [
+              "10180",
+              "Abilene, TX",
+              "48",
+              "Texas",
+              "02600",
+              "West Central Texas COG (Outside Taylor County)",
+              "176579",
+              "189114",
+              "33371",
+              "18.8986",
+              "17.646"
+            ],
+            [
+              "10180",
+              "Abilene, TX",
+              "48",
+              "Texas",
+              "02700",
+              "West Central Texas COG--Taylor County, Abilene City",
+              "176579",
+              "143208",
+              "143208",
+              "81.1014",
+              "100"
+            ],
+            [
+              "10380",
+              "Aguadilla, PR",
+              "72",
+              "Puerto Rico",
+              "00100",
+              "Aguadilla, Aguada & Moca",
+              "253768",
+              "145884",
+              "145884",
+              "57.4872",
+              "100"
+            ],
+            [
+              "10380",
+              "Aguadilla, PR",
+              "72",
+              "Puerto Rico",
+              "00200",
+              "Mayag\u00fcez, A\u00f1asco & Hormigueros",
+              "253768",
+              "114327",
+              "25596",
+              "10.0864",
+              "22.3884"
+            ],
+            [
+              "10380",
+              "Aguadilla, PR",
+              "72",
+              "Puerto Rico",
+              "01800",
+              "Isabela, Hatillo & Camuy",
+              "253768",
+              "137894",
+              "42943",
+              "16.9221",
+              "31.142"
+            ],
+            [
+              "10380",
+              "Aguadilla, PR",
+              "72",
+              "Puerto Rico",
+              "01900",
+              "San Sebasti\u00e1n, Utuado & Lares",
+              "253768",
+              "180583",
+              "39345",
+              "15.5043",
+              "21.7878"
+            ],
+            [
+              "10420",
+              "Akron, OH",
+              "39",
+              "Ohio",
+              "01100",
+              "Portage County",
+              "702219",
+              "161791",
+              "161791",
+              "23.04",
+              "100"
+            ],
+            [
+              "10420",
+              "Akron, OH",
+              "39",
+              "Ohio",
+              "01201",
+              "Summit County (North & Northwest)--Hudson, Twinsburg & Macedonia Cities",
+              "702219",
+              "120557",
+              "120557",
+              "17.168",
+              "100"
+            ],
+            [
+              "10420",
+              "Akron, OH",
+              "39",
+              "Ohio",
+              "01202",
+              "Summit County (East Central)--Cuyahoga Falls, Stow & Tallmadge Cities",
+              "702219",
+              "111908",
+              "111908",
+              "15.9363",
+              "100"
+            ],
+            [
+              "10420",
+              "Akron, OH",
+              "39",
+              "Ohio",
+              "01203",
+              "Summit County (Central)--Akron City",
+              "702219",
+              "192570",
+              "192570",
+              "27.4231",
+              "100"
+            ],
+            [
+              "10420",
+              "Akron, OH",
+              "39",
+              "Ohio",
+              "01204",
+              "Summit County (South)--Green, Barberton & New Franklin Cities",
+              "702219",
+              "115393",
+              "115393",
+              "16.4326",
+              "100"
+            ]
+          ],
+          "dtypes": [
+            "String",
+            "String",
+            "String",
+            "String",
+            "String",
+            "String",
+            "String",
+            "String",
+            "String",
+            "String",
+            "String"
+          ]
+        }
+      ]
+    }
+  ]
+}
