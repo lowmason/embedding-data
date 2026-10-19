@@ -18,6 +18,85 @@ from test_acs_code_references import (  # noqa: F401
 from embedding_data.acs_mapping_contract import ANNOTATION_SCHEMA
 from embedding_data.ipums_parity import compare_ordered
 
+def test_join_streams_and_preserves_ordered_nested_payloads():
+    from embedding_data.acs_mapping_companions import _join
+
+    left = pl.DataFrame({'key': ['B', 'A', 'A', None, 'missing'],
+                         'ordinal': [0, 1, 2, 3, 4]},
+                        schema={'key': pl.String, 'ordinal': pl.Int64}).lazy()
+    right = pl.DataFrame(
+        {'key': ['A', 'B'], 'candidates': [['a', 'b'], []],
+         'paths': [[['root', 'a'], ['root', 'b']], []]},
+        schema={'key': pl.String, 'candidates': pl.List(pl.String),
+                'paths': pl.List(pl.List(pl.String))},
+    )
+    joined = _join(left, right, ['key'])
+    expected = left.join(right.lazy(), on=['key'], how='left', validate='m:1',
+                         maintain_order='left', nulls_equal=False, coalesce=True).collect()
+    actual = joined.collect(engine='streaming')
+    assert actual.equals(expected)
+    assert actual['ordinal'].to_list() == [0, 1, 2, 3, 4]
+    assert actual['candidates'].to_list() == [[], ['a', 'b'], ['a', 'b'], None, None]
+    assert actual['paths'].to_list() == [[], [['root', 'a'], ['root', 'b']],
+                                        [['root', 'a'], ['root', 'b']], None, None]
+    physical = joined.show_graph(plan_stage='physical', engine='streaming',
+                                 raw_output=True, show=False)
+    assert 'in-memory-join' not in physical
+    assert 'equi-join' in physical
+
+
+@pytest.mark.parametrize('keys', [['key'], ['key', 'vintage']])
+def test_join_rejects_duplicate_complete_lookup_keys_before_execution(keys):
+    from embedding_data.acs_mapping_companions import _join
+
+    right = pl.DataFrame({'key': [None, None, 'A', 'A'], 'vintage': [2022] * 4,
+                          'payload': ['null-one', 'null-two', 'first', 'second']})
+    left = pl.DataFrame({'key': ['unmatched'], 'vintage': [2022]}).lazy()
+    with pytest.raises(pl.exceptions.ComputeError, match='m:1'):
+        left.join(right.lazy(), on=keys, how='left', validate='m:1',
+                  nulls_equal=False).collect()
+    with pytest.raises(ValueError, match='duplicate.*lookup.*key') as error:
+        _join(left, right, keys)
+    assert all(key in str(error.value) for key in keys)
+
+
+@pytest.mark.parametrize('keys', [['key'], ['key', 'vintage']])
+@pytest.mark.parametrize('empty_lookup', [False, True])
+def test_join_preserves_nonmatching_null_keys_and_empty_lookup(keys, empty_lookup):
+    from embedding_data.acs_mapping_companions import _join
+
+    right = pl.DataFrame(
+        {'key': [None, None, 'A'], 'vintage': [2022, 2022, 2022],
+         'payload': ['null-one', 'null-two', 'matched']},
+        schema={'key': pl.String, 'vintage': pl.Int64, 'payload': pl.String},
+    )
+    if len(keys) == 2:
+        right = pl.concat([right, pl.DataFrame(
+            {'key': ['A', 'A', None, None], 'vintage': [None] * 4,
+             'payload': ['partial-one', 'partial-two', 'null-three', 'null-four']},
+            schema=right.schema)])
+    if empty_lookup:
+        right = right.head(0)
+    left = pl.DataFrame({'key': [None, 'A', 'A', None],
+                         'vintage': [2022, None, 2022, None]},
+                        schema={'key': pl.String, 'vintage': pl.Int64}).lazy()
+    expected = left.join(right.lazy(), on=keys, how='left', validate='m:1',
+                         maintain_order='left', nulls_equal=False, coalesce=True).collect()
+    actual = _join(left, right, keys).collect(engine='streaming')
+    assert actual.equals(expected)
+    assert actual['payload'].to_list() == (
+        [None] * 4 if empty_lookup else
+        [None, 'matched' if len(keys) == 1 else None, 'matched', None])
+
+
+def test_join_requires_materialized_small_lookup():
+    from embedding_data.acs_mapping_companions import _join
+
+    left = pl.DataFrame({'key': ['A']}).lazy()
+    with pytest.raises(TypeError, match='materialized.*DataFrame'):
+        _join(left, left, ['key'])
+
+
 def write_case(case, output):
     from embedding_data.acs_mapping_companions import annotate_source, write_companion
 

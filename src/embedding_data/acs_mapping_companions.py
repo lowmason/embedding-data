@@ -42,7 +42,13 @@ def indexed_source(source: SourceInput) -> pl.LazyFrame:
 
 
 def _join(frame, lookup, keys):
-    return frame.join(lookup.lazy(), on=keys, how='left', validate='m:1',
+    if not isinstance(lookup, pl.DataFrame):
+        raise TypeError('ACS lookup must be a materialized polars DataFrame')
+    # Validate the small lookup eagerly: m:1 forces an in-memory person join.
+    # Null-containing keys cannot match with nulls_equal=False.
+    if lookup.select(keys).drop_nulls().is_duplicated().any():
+        raise ValueError(f'duplicate ACS lookup keys violate m:1 cardinality: {keys}')
+    return frame.join(lookup.lazy(), on=keys, how='left', validate='m:m',
                       maintain_order='left', nulls_equal=False, coalesce=True)
 
 
