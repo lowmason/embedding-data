@@ -629,6 +629,7 @@ def _validate_diagnostics(lf: pl.LazyFrame) -> None:
             'invalid exact diagnostic mass': _decimal_invalid('weight_sum_exact'),
             'negative diagnostic mass': pl.col('weighted_mass').lt(0),
             'unsupported diagnostic source': pl.col('source').ne('acs'),
+            'invalid diagnostic source year': pl.col('component_year').is_in([2023, 2024]).not_(),
         },
     )
 
@@ -739,7 +740,7 @@ def validate_cross_tables(
     ]
     for name, lf in [('support', support), ('replicate', replicates)]:
         _anti_join(lf, registry, product_keys, name + ' has unknown product metadata')
-    for name, lf in [('support', support), ('diagnostic', diagnostics), ('residual', residuals)]:
+    for name, lf in [('support', support), ('residual', residuals)]:
         selected = lf.join(registry.select('product_id', 'years'), on='product_id', how='left')
         _reject(
             selected,
@@ -956,3 +957,71 @@ def validate_cross_tables(
             .not_(),
         },
     )
+
+    _validate_numeric_relationships(tables, targets, pooled, replicates)
+
+
+def _validate_numeric_relationships(tables, targets, pooled, replicates):
+    '''Reconcile each point, paired variance vector and exact native support decomposition.'''
+    from embedding_data.acs_target_estimation import replicate_se
+
+    total = pl.col('measure').eq('annual_average_total')
+    joined = targets.join(pooled, on=STAT_KEY_COLUMNS, how='left', nulls_equal=True,
+                          suffix='_support')
+    expected_value = pl.when(total).then(pl.col('cell_mass')).otherwise(
+        pl.col('cell_mass') / pl.col('denominator_mass'))
+    _reject(joined, {
+        'target point differs from support': pl.col('value').ne(expected_value),
+        'target weighted support differs': pl.col('n_weighted').ne(pl.col('cell_mass')),
+        'target count differs from support': pl.col('n_unweighted').ne(
+            pl.col('n_unweighted_support')),
+        'target flags differ from support': pl.col('flags').ne(pl.col('flags_support')),
+    })
+    rep = replicates.join(pooled.select(*STAT_KEY_COLUMNS, 'cell_mass', 'denominator_mass'),
+                          on=STAT_KEY_COLUMNS, how='left', nulls_equal=True)
+    expected_rep = pl.when(total).then(pl.col('numerator')).otherwise(
+        pl.col('numerator') / pl.col('denominator'))
+    _reject(rep, {'replicate estimate differs from sums': pl.col('status').eq('defined').and_(
+        pl.col('estimate').ne(expected_rep))})
+    vectors = replicates.group_by(STAT_KEY_COLUMNS).agg(
+        pl.col('estimate').sort_by('replicate').alias('_values'))
+    se = joined.join(vectors, on=STAT_KEY_COLUMNS, how='left', nulls_equal=True).with_columns(
+        pl.struct('value', '_values').map_elements(
+            lambda row: replicate_se(row['value'], tuple(row['_values'])),
+            return_dtype=F, skip_nulls=False).alias('_expected_se'))
+    _reject(se, {'target SE differs from paired replicates':
+                pl.col('se').eq_missing(pl.col('_expected_se')).not_()})
+    support = _lazy(tables['target_support']).filter(pl.col('record_kind').eq('cell'))
+    native = support.filter(pl.col('view').is_in(['observed', 'canonical']))
+    for lf, exact, mass in [(native, 'cell_weight_sum_exact', 'cell_mass'),
+                            (native, 'denominator_weight_sum_exact', 'denominator_mass'),
+                            (replicates.filter(pl.col('view').is_in(['observed', 'canonical'])),
+                             'numerator_sum_exact', 'numerator'),
+                            (replicates.filter(pl.col('view').is_in(['observed', 'canonical'])),
+                             'denominator_sum_exact', 'denominator')]:
+        _reject(lf, {mass + ': exact native sum differs': pl.col(mass).ne(
+            pl.col(exact).cast(F) / pl.col('pool_divisor'))})
+    # Decimal aggregation occurs before Float64, matching the native estimator contract.
+    for column in ('cell_weight_sum_exact', 'denominator_weight_sum_exact'):
+        scale = native.select(pl.col(column).str.split('.').list.get(1, null_on_oob=True)
+                              .str.len_chars().max()).collect().item() or 0
+        annual = native.filter(pl.col('component_year').ne(0)).group_by(STAT_KEY_COLUMNS).agg(
+            pl.col(column).cast(pl.Decimal(38, scale)).sum().alias('_annual_sum'),
+            pl.len().alias('_annual_count'))
+        checked = native.filter(pl.col('component_year').eq(0)).join(
+            annual, on=STAT_KEY_COLUMNS, how='left', nulls_equal=True)
+        _reject(checked, {'native annual support does not close to pooled':
+            pl.col(column).cast(pl.Decimal(38, scale)).ne(pl.col('_annual_sum'))
+            .or_(pl.col('_annual_count').ne(pl.col('pool_divisor')))})
+    annual_n = support.filter(pl.col('component_year').ne(0)).group_by(STAT_KEY_COLUMNS).agg(
+        pl.col('n_unweighted').sum().alias('_annual_n'),
+        pl.col('denominator_n_unweighted').sum().alias('_annual_denominator_n'))
+    _reject(pooled.join(annual_n, on=STAT_KEY_COLUMNS, how='left', nulls_equal=True), {
+        'annual counts differ from pooled support': pl.col('n_unweighted').ne(pl.col('_annual_n'))
+            .or_(pl.col('denominator_n_unweighted').ne(pl.col('_annual_denominator_n')))})
+    denominator_keys = [name for name in STAT_KEY_COLUMNS if name not in {'unit_b', 'unit_b_type'}]
+    groups = support.group_by(*denominator_keys, 'component_year').agg(
+        pl.col('denominator_mass').n_unique().alias('_mass_versions'),
+        pl.col('denominator_n_unweighted').n_unique().alias('_count_versions'))
+    _reject(groups, {'denominator group differs across cells': pl.col('_mass_versions').ne(1)
+                    .or_(pl.col('_count_versions').ne(1))})

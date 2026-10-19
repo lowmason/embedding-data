@@ -1,5 +1,7 @@
 '''Small synthetic primitives shared by ACS target tests.'''
 
+import pytest
+
 from embedding_data.target_contract import TARGET_SCHEMA
 
 def minimal_target(**changes) -> dict:
@@ -330,3 +332,25 @@ def projection_case():
                 and p.dimension == product.dimension and p.base_universe == product.base_universe
                 and p.evidence_policy == product.evidence_policy),
             'code_a': 'feature:acs_industry_category:A', 'w1_input_count': 2}
+
+
+@pytest.fixture(name='target_runs')
+def target_runs(tmp_path, monkeypatch):
+    '''Real authenticated raw fixture and two independently pinned Stage9 builds.'''
+    import hashlib
+    from pathlib import Path
+
+    from embedding_data import acs_target_bundle
+
+    with pytest.MonkeyPatch.context() as patch:
+        fixture = authenticated_mapping(tmp_path, patch,
+                                        prepare_acs=prepare_target_delivery)
+        results = [acs_target_bundle.build(fixture['data_dir'], run, 'mapping',
+            expected_mapping_outputs_sha256=fixture['mapping_outputs_sha256'],
+            request=fixture['request']) for run in ('first', 'replay')]
+        yield {'data_dir': fixture['data_dir'], 'request': fixture['request'],
+               'mapping_run': 'mapping',
+               'mapping_pin': hashlib.sha256(
+                   (fixture['mapping'] / 'outputs.json').read_bytes()).hexdigest(),
+               **{key: Path(result['directory']) for key, result in
+                  zip(('first', 'replay'), results, strict=True)}}
