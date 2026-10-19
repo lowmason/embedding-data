@@ -378,3 +378,53 @@ def test_projection_outputs_match_unchanged_target_and_auxiliary_contracts():
         validate_auxiliary('replicate_estimates', result['replicates'])
         validate_auxiliary('eligibility_diagnostics', aggregates.diagnostics)
     validate_auxiliary('allocation_residuals', residuals)
+
+
+@pytest.mark.parametrize('view', ['allocated_county', 'allocated_msa'])
+def test_allocated_sensitivity_retains_evidence_identity_and_limitations(view):
+    from embedding_data.acs_target_contract import observed_counterpart
+
+    case = projection_case()
+    observed = next(p for p in PRODUCTS if p.view == 'observed'
+        and p.family == case['native'].product.family
+        and p.dimension == case['native'].product.dimension
+        and p.base_universe == case['native'].product.base_universe
+        and p.evidence_policy == 'sensitivity'
+        and p.years == case['native'].product.years)
+    product = next(p for p in PRODUCTS if p.view == view
+                   and observed_counterpart(p) == observed)
+    evidence_flags = ['source_evidence_QIND_allocated', 'industry_flag_vintage_crosswalk']
+    incoming_flags = pl.concat_list('flags', pl.lit(evidence_flags)).list.unique().list.sort()
+    native = replace(case['native'], product=observed,
+        cells=case['native'].cells.with_columns(incoming_flags.alias('flags')),
+        denominators=case['native'].denominators.with_columns(incoming_flags.alias('flags')))
+    allocated, residuals = allocate_area_mix(native, case['factors'], case['counties'], product)
+    assert allocated.product == product
+    output = estimate(allocated)
+    targets, support, residuals = pl.collect_all([
+        output['targets'], output['support'], residuals])
+    assert targets.height > 0
+    assert support.height > 0
+    expected_flags = {
+        *evidence_flags, 'size_gate_pending', 'flag_geographic_allocation',
+        'allocation_conditional_sampling_se', 'allocation_error_unquantified',
+        'mapping_uncertainty_unquantified', 'population2020', 'puma2020',
+        'county_composition2022', 'county_inventory2025', 'msa_delineation_July_2023',
+    }
+    expected_metadata = {
+        'source': 'acs', 'family': 'area_mix', 'sample_set': observed.sample_set,
+        'vintage': product.vintage, 'universe': observed.base_universe + ':sensitivity',
+    }
+    for frame in [targets, support]:
+        assert frame.select(*expected_metadata).unique().to_dicts() == [expected_metadata]
+        assert all(expected_flags.issubset(flags) for flags in frame['flags'])
+    assert support.select('view', 'product_id').unique().rows() == [(view, product.product_id)]
+    assert support['pool_divisor'].unique().to_list() == [product.pool_divisor]
+    if view == 'allocated_msa':
+        assert residuals['residual_type'].unique().sort().to_list() == ['micropolitan', 'no_cbsa']
+        metadata = expected_metadata | {'product_id': product.product_id,
+                                        'pool_divisor': product.pool_divisor}
+        assert residuals.select(*metadata).unique().to_dicts() == [metadata]
+        assert all(expected_flags.issubset(flags) for flags in residuals['flags'])
+    else:
+        assert residuals.is_empty()
