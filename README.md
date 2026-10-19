@@ -23,8 +23,11 @@ separate immutable ITA bundle. The [measured V11 finding](specs/findings/v11-ita
 records the full-data run and its unresolved source codes. Geography references and
 the shared target writer are implemented. The [measured Stage 6 finding](specs/findings/stage-6-ita-area-mix-build.md)
 records full-data ITA assignment, the 2023 area-mix target and exact cached replay.
-PUMA allocation, ACS/CPS code parsers, person-month linkage and other target
-families remain planned. Raw downloads are recorded in
+Stage 8 ACS code parsing and PUMA allocation are now measured and science-sealed;
+the [Stage 8 finding](specs/findings/stage-8-acs-codes-area-allocation.md) records
+both full-data companions, replay and independent reconciliation. Repository
+adoption, CPS code parsing, person-month linkage and other target families remain
+planned. Raw downloads are recorded in
 `data/raw/manifest.jsonl`.
 The OSHA case-detail files are acquired but feed no target; the specification's
 establishment data are the Form 300A summaries.
@@ -720,8 +723,8 @@ uv run --offline --locked python -m embedding_data.acs_mapping verify RUN_ID --o
 uv run --offline --locked python -m embedding_data.acs_mapping compare-runs FIRST_ID SECOND_ID --data-dir /Users/lowell/Projects/embedding-data/data
 ```
 
-Uppercase tokens are required selections, supplied by the later production execution
-step. `uv --offline` restricts package fetching; the acquisition command itself can
+Uppercase tokens are required explicit selections for a new run. `uv --offline`
+restricts package fetching; the acquisition command itself can
 retrieve public references. Reference receipts and upstream `outputs.json` files need
 independently captured pins. Build emits JSON with `run_id`, `directory` and
 `outputs_sha256`; save this response outside the bundle in a gitignored control
@@ -753,11 +756,23 @@ in place. Failed builds clean only their owned staging. The public verifier reco
 mappings, factors and all companion annotations from pinned originals and selected
 sources, and checks current executing software and dependencies.
 
-Fixture software readiness is separate from Stage 8 full-data acceptance. The
+Fixture software readiness is separate from Stage 8 full-data science. The
 raw-to-converter-to-authenticated-upstreams fixture exercises replay, preservation and
 integrity gates; it does not establish V9 or complete eight-family V12 acceptance.
-Mapping outputs are evaluation inputs, never embedder training or model-selection
-data. ACS universes, headline inclusion, target families, employment-weighted code
-allocation, pooling and replicate standard errors remain later-stage work. Full-data
-measurements, independent reconciliation and review are still required before retiring
-Stage 8.
+The selected full-data runs are `stage8_acs_mapping_20261018_r7` and
+`stage8_acs_mapping_20261018_r7_replay`, under control
+`stage8_acceptance_20261018_r7`. Their external `outputs.json` pins are
+`1ec9701092f576b122b01464cdb6fa3fbee49db030e4ad3df7b64e621b8e75f4`
+and `a115c5f7e2691ecbffe763bd1b6b9780fb6a71bc512a2691cf4014f9857b3565`.
+At executing source `1542f8d8f1db2e55f28b9cfec4b1306739589ce8`, both detached
+verifiers, eight-table/report replay and both full independent reconciliations passed
+for 12,238,491 source rows. The immutable external science seal is
+`b09d1a56308f09d6e99f97070c02ffbbc0523d6c595f7901bb0e01a999bd3ddf`;
+its 880-file control inventory has SHA-256
+`7af71e3b57c6c07867224259f49563c20e0cd3b75e1d99f54b4cea4f92cc221a`.
+The [measured Stage 8 finding](specs/findings/stage-8-acs-codes-area-allocation.md)
+keeps the first-build timing-wrapper limit and the pending repository adoption
+explicit. Mapping outputs are evaluation inputs, never embedder training or
+model-selection data. ACS universes, headline inclusion, target families,
+employment-weighted code allocation, pooling and replicate standard errors remain
+later-stage work.
