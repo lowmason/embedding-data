@@ -265,3 +265,33 @@ def test_canonical_baseline_counts_and_unpooled_mass_are_preserved():
     assert support['native_coverage_n'].to_list() == [5] * 6
     assert support['native_coverage_mass'].to_list() == [20.] * 6
     validate_auxiliary('target_support', support)
+
+
+def test_every_output_defers_aggregate_evaluation_and_se_vectors_are_bounded(monkeypatch):
+    from dataclasses import replace
+
+    import embedding_data.acs_target_estimation as module
+
+    aggregates = aggregate_native(estimation_rows([record('10'), record('30', b='B')]))
+    reads = []
+    vector_lengths = []
+    original_se = module.replicate_se
+
+    def observe_aggregate(frame):
+        reads.append(frame.height)
+        return frame
+
+    def observe_se(full, replicates):
+        vector_lengths.append(len(replicates))
+        return original_se(full, replicates)
+
+    monkeypatch.setattr(module, 'replicate_se', observe_se)
+    aggregates = replace(aggregates, cells=aggregates.cells.map_batches(
+        observe_aggregate, streamable=True))
+    result = estimate(aggregates)
+    assert not vector_lengths, 'SE finalization must wait for output collection'
+    for name in ('targets', 'support', 'replicates'):
+        previous_reads = len(reads)
+        assert not result[name].collect().is_empty()
+        assert len(reads) > previous_reads, f'{name} lost its deferred aggregate dependency'
+    assert vector_lengths and set(vector_lengths) == {80}
