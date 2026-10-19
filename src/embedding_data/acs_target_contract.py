@@ -19,6 +19,13 @@ SCHEMA_VERSION = 'acs-targets-v1'
 RULE_VERSION = 'acs-target-rules-v1'
 REPLICATES = tuple(range(1, 81))
 MEASURES = ('annual_average_total', 'forward_share')
+SELECTED_NODE_FRAMES = {
+    'naics_national_industry': ('naics', 2022, 'national_industry'),
+    'soc_detailed': ('soc', 2018, 'detailed'),
+    'county': ('geography', 2025, 'county'),
+    'cbsa': ('geography', 2023, 'cbsa'),
+}
+MSA_DELINEATION = 'July 2023'
 S, I, U, F = pl.String, pl.Int64, pl.UInt64, pl.Float64  # noqa: E741
 LS, LU8 = pl.List(S), pl.List(pl.UInt8)
 TARGET_STAT_KEY_COLUMNS = [name for name in TARGET_KEY_COLUMNS if name != 'se_method']
@@ -459,6 +466,8 @@ def _validate_units(lf: pl.LazyFrame) -> None:
                 not in {'naics_national_industry', 'soc_detailed', 'county', 'cbsa'}
             ):
                 raise ValueError('selected node fields contradict typed unit')
+            if (system, int(vintage), level) != SELECTED_NODE_FRAMES[row['unit_type']]:
+                raise ValueError('selected node contradicts frozen system/vintage/level frame')
             if any(row[name] is not None for name in area_fields[:3]):
                 raise ValueError('selected node has unrelated native area fields')
             if row['unit_type'] in {'county', 'cbsa'}:
@@ -466,8 +475,8 @@ def _validate_units(lf: pl.LazyFrame) -> None:
                           'county_composition_year': 2022, 'county_inventory_vintage': 2025}
                 if any(row[name] != value for name, value in frames.items()):
                     raise ValueError('allocated unit registry has incomplete distinct frames')
-                if row['unit_type'] == 'cbsa' and row['msa_delineation'] is None:
-                    raise ValueError('allocated MSA has no delineation frame')
+                if row['unit_type'] == 'cbsa' and row['msa_delineation'] != MSA_DELINEATION:
+                    raise ValueError('allocated MSA contradicts frozen delineation frame')
             elif any(row[name] is not None for name in frame_fields + ['puma_vintage']):
                 raise ValueError('classification node has unrelated geographic frames')
             if row['unit_type'] == 'cbsa' and row['cbsa_type'] not in {
@@ -809,6 +818,22 @@ def validate_cross_tables(
         _anti_join(
             endpoints, units, ['unit_type', 'unit'], 'residual endpoint missing from unit registry'
         )
+    checked_residuals = residuals.join(
+        typed_products.select('product_id', 'expected_b'), on='product_id', how='left'
+    ).join(
+        units.select(pl.col('unit_type').alias('workplace_unit_type'),
+                     pl.col('unit').alias('workplace_unit'),
+                     pl.col('kind').alias('workplace_kind'),
+                     pl.col('roles').alias('workplace_roles')),
+        on=['workplace_unit_type', 'workplace_unit'], how='left',
+    )
+    _reject(checked_residuals, {
+        'residual endpoints contradict product dimension or native workplace provenance':
+            pl.col('workplace_unit_type').ne('work_migration_puma')
+            .or_(pl.col('code_unit_type').ne(pl.col('expected_b')))
+            .or_(pl.col('workplace_kind').ne('native_area').fill_null(True))
+            .or_(pl.col('workplace_roles').list.contains('workplace').not_().fill_null(True))
+    })
     msa_support = support.filter(pl.col('view').eq('allocated_msa')).join(
         units.select(
             pl.col('unit_type').alias('unit_a_type'), pl.col('unit').alias('unit_a'), 'cbsa_type'

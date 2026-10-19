@@ -606,17 +606,18 @@ def node_unit(kind, code='01001', cbsa_type=None):
             puma_vintage=2020,
         )
     if kind == 'cbsa':
-        row['msa_delineation'] = '2023-07'
+        row['msa_delineation'] = 'July 2023'
     return row
 
 
-def allocated_tables(view='allocated_county', cbsa_type='metropolitan'):
+def allocated_tables(view='allocated_county', cbsa_type='metropolitan',
+                     dimension='industry'):
     tables = empty_tables()
     product = next(
         p
         for p in c.PRODUCTS
         if p.view == view
-        and p.dimension == 'industry'
+        and p.dimension == dimension
         and p.base_universe == 'civilian_employed'
         and p.evidence_policy == 'strict'
     )
@@ -625,7 +626,7 @@ def allocated_tables(view='allocated_county', cbsa_type='metropolitan'):
         if view == 'allocated_county'
         else node_unit('cbsa', '12345', cbsa_type)
     )
-    code = observed_unit('naics')
+    code = observed_unit('naics' if dimension == 'industry' else 'soc')
     target = minimal_target(
         family='area_mix',
         unit_a_type=area['unit_type'],
@@ -868,3 +869,80 @@ def test_share_replicate_status_respects_zero_denominator_while_totals_remain_de
     c.validate_auxiliary('replicate_estimates', frame('replicate_estimates', [row | dict(
         measure='annual_average_total', denominator=0.0,
         denominator_sum_exact='0', estimate=25.0)]))
+
+
+def native_area_unit(role='workplace'):
+    area_type = 'residence' if role == 'residence' else 'work_migration'
+    unit_type = 'residence_puma' if role == 'residence' else 'work_migration_puma'
+    row = {name: ([] if isinstance(dtype, pl.List) else None)
+           for name, dtype in c.UNIT_SCHEMA.items()}
+    row.update(unit_type=unit_type, unit=f'geography:2020:{unit_type}:0100001',
+        kind='native_area', area_type=area_type, state_fips='01', area_code='00001',
+        puma_vintage=2020, roles=[role],
+        area_lookup_ids=[lookup_id(['acs/core', 'us2023a', 2023, 2023, role, '01', '00001'])],
+        factor_keys=[lookup_id([area_type, '01', '00001', 2020])])
+    return row
+
+
+def valid_residual_tables(dimension='industry', role='workplace'):
+    tables = allocated_tables('allocated_msa', dimension=dimension)
+    workplace = native_area_unit(role)
+    support = tables['target_support'].row(0, named=True)
+    row = residual_row() | {name: support[name] for name in
+        ['source', 'family', 'sample_set', 'vintage', 'universe', 'product_id', 'pool_divisor']}
+    row.update(workplace_unit_type=workplace['unit_type'], workplace_unit=workplace['unit'],
+               code_unit_type=support['unit_b_type'], code_unit=support['unit_b'])
+    tables['target_units'] = frame('target_units',
+        tables['target_units'].to_dicts() + [workplace])
+    tables['allocation_residuals'] = frame('allocation_residuals', [row])
+    return tables
+
+
+@pytest.mark.parametrize('dimension', ['industry', 'occupation'])
+def test_allocated_residuals_retain_native_workplace_and_dimension_provenance(dimension):
+    c.validate_cross_tables(valid_residual_tables(dimension), c.PRODUCTS)
+
+
+@pytest.mark.parametrize('dimension', ['industry', 'occupation'])
+@pytest.mark.parametrize('defect', ['swapped', 'wrong_dimension', 'residence', 'migration_only'])
+def test_residual_endpoints_must_match_workplace_role_and_product_dimension(dimension, defect):
+    tables = valid_residual_tables(dimension,
+        role={'residence': 'residence', 'migration_only': 'migration'}.get(defect, 'workplace'))
+    row = tables['allocation_residuals'].row(0, named=True)
+    if defect == 'swapped':
+        support = tables['target_support'].row(0, named=True)
+        row.update(workplace_unit_type=support['unit_b_type'], workplace_unit=support['unit_b'],
+                   code_unit_type=support['unit_a_type'], code_unit=support['unit_a'])
+    if defect == 'wrong_dimension':
+        code = observed_unit('soc' if dimension == 'industry' else 'naics')
+        tables['target_units'] = frame('target_units',
+            tables['target_units'].to_dicts() + [code])
+        row.update(code_unit_type=code['unit_type'], code_unit=code['unit'])
+    tables['allocation_residuals'] = frame('allocation_residuals', [row])
+    with pytest.raises(ValueError, match='residual endpoint'):
+        c.validate_cross_tables(tables, c.PRODUCTS)
+
+
+@pytest.mark.parametrize('kind,code,wrong_vintage', [
+    ('naics_national_industry', '111111', 2017), ('soc_detailed', '111011', 2010),
+    ('county', '01001', 2020), ('cbsa', '12345', 2025)])
+def test_selected_node_structural_frames_reject_self_consistent_wrong_vintages(
+        kind, code, wrong_vintage):
+    row = node_unit(kind, code, 'metropolitan' if kind == 'cbsa' else None)
+    c.validate_auxiliary('target_units', frame('target_units', [row]))
+    system, _, level, _ = row['unit'].split(':', 3)
+    wrong_unit = f'{system}:{wrong_vintage}:{level}:{code}'
+    row.update(unit=wrong_unit, node_id=wrong_unit, node_vintage=wrong_vintage)
+    with pytest.raises(ValueError, match='selected node.*frame'):
+        c.validate_auxiliary('target_units', frame('target_units', [row]))
+
+
+@pytest.mark.parametrize('column,value', [
+    ('population_year', 2021), ('puma_vintage', 2010), ('county_composition_year', 2025),
+    ('county_inventory_vintage', 2022), ('msa_delineation', '2023-07'),
+    ('msa_delineation', '2099-01'), ('msa_delineation', 'July 2025')])
+def test_allocated_unit_distinct_frames_reject_incorrect_nonnull_values(column, value):
+    row = node_unit('cbsa', '12345', 'metropolitan')
+    assert row['msa_delineation'] == 'July 2023'
+    with pytest.raises(ValueError, match='frame'):
+        c.validate_auxiliary('target_units', frame('target_units', [row | {column: value}]))
