@@ -42,12 +42,63 @@ Roadmap: specs/embedding-evaluation-data-spec-roadmap.md, Stage 9 — on plan co
 - “Output evidence is aggregate.” No person/household identifiers, source positions or microdata audit rows in published bundles or git. Complete aggregate category/area registries are permitted. Never use evaluation inputs for embedder training, mining or model selection.
 - Build/verify/compare run offline, with explicit `--data-dir`, no environment-file access or live clients, acquisition, conversion recovery, upstream rebuild or automatic refresh. The module CLI has exactly `build`, `verify`, `compare-runs`; do not register it in the frozen top-level CLI.
 - Hermetic tests join normal pytest, with temporary roots and guarded external access. “No new dependency or test-configuration edit is needed for this design.” No new marker/default exclusion; the existing network canary stays deselected.
+- Owner D2 governs all verification and commit steps: run focused tests during development and one complete coverage-enabled suite for each final tested source state. Reuse its recorded passing evidence for identical source/tests/fixtures/configuration/dependencies/runtime/test selection; only then may subsequent all-files or commit invocations set `SKIP=coverage-check`, with every other hook active. Any relevant change invalidates reuse. Documentation-only changes use applicable document/diff checks unless tests consume the changed document. No marker, default exclusion, coverage threshold, hook configuration or scientific gate changes. See Verification execution policy below.
 - Full-data independent comparisons: exact schemas/identities/keys/counts and native Decimal sums; shares absolute tolerance `1e-12`; allocated masses and SEs `abs(actual - expected) <= 1e-8 + 1e-12 * abs(expected)`. Never widen these after measuring. Logical replay remains exact across all eight ordered tables and substantive reports, excluding only top-level run ID/creation time.
 - Stage 9 stays unticked throughout planning and software-only readiness. Completion requires full-data first/replay, detached verification, independent reconciliation, preservation, repository checks, recorded review and the completion protocol. Later-stage Consumes reconciliation belongs to the subsequent roadmap resume.
 
 ## Decisions
 
 - **D1** (owner, plan review, 2026-10-19): “Approved. Review specs/plans/9-acs-targets.md against the approved spec and shipped upstream contracts. Fix any gaps in the same replacement worktree, keeping this session planning-only.” Approval authorizes this plan review and technical corrections; it does not authorize implementation or production-data operations in this session. Applied in: Global Constraints and Planning self-review and execution handoff. The written Stage 9 spec remains binding; the review corrections below introduce no spec amendment.
+
+- **D2** (owner, 2026-10-19, this execution chat): after the controller recommended one complete coverage run per unchanged source state, focused checks during development, independent review and separate integration-test profiling, the owner replied “Yes.” This amends execution procedure only. It supersedes redundant full-suite invocations and the prior blanket prohibition on skipping the coverage hook, solely under the evidence-reuse conditions below. All scientific requirements, tests, full default-suite membership, external guards, detached verification, full-data acceptance and independent reviews remain binding. No test/hook/dependency configuration change is authorized or needed.
+
+## Verification execution policy — owner D2
+
+1. During implementation and each review fix, run the covering focused tests. Finish source changes and self-review before starting long gates. Do not repeat a completed focused run merely because it also appears in a later task's checklist.
+2. At a software-readiness, pre-production or final integration checkpoint, require one complete coverage-enabled default suite for the final tested source state. The normal commit coverage hook can supply this gate; alternatively run the explicit coverage command below to retain visible test counts, durations and warnings. Do not run plain full pytest, all-files coverage and commit coverage on identical tested bytes.
+3. Record the tested commit/tree plus any worktree differences, command, exit status/log, Python/dependency/lock identity, test selection and COVERAGE_THRESHOLD. Compare current bytes before reuse: include production code, scripts, tests/helpers/fixture originals, Behave features/steps, configuration, dependencies and any additional files those checks consume. A commit SHA alone or an unchanged production module alone is insufficient. Source/test/fixture/config/dependency/runtime/selection changes invalidate the receipt. Failed, incomplete, truncated or unidentifiable evidence cannot be reused. A failed gate must be resolved and its amended code checked.
+4. If that exact tested state already has passing complete coverage evidence, subsequent all-files and commit invocations may set `SKIP=coverage-check`; all other hooks remain active. Log this explicit owner-authorized reuse, the receipt and the actual Skipped status. Do not claim the skipped hook ran. Never use this exception to skip a missing full gate, a focused regression, independent review or any scientific acceptance check. No global SKIP setting or hook/config edit.
+5. Documentation-only changes require document/link/diff checks. Reuse the prior software receipt only after confirming no tested input changed; run a relevant focused check if tests consume the document. If another hook changes executable/tested files, the receipt is invalid and the changed state needs appropriate focused tests and a new complete coverage gate before production/integration.
+6. Tasks8/10/11 may cite the same valid receipt across checkpoints. Task8's historical three broad passes remain recorded honestly; they are not rerun or erased. Task9 implementation will change tested files and therefore requires a fresh receipt. Pure finding, plan, retirement or Handoff edits do not by themselves require another hour-long suite. Relevant changes to frozen executing science software still require fresh science IDs and all existing acceptance gates.
+
+One explicit full gate, when no valid receipt exists (record the current threshold; do not lower it):
+
+```bash
+UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache UV_OFFLINE=1 uv run --offline --locked pytest --cov=embedding_data --cov-report=term-missing --cov-fail-under="${COVERAGE_THRESHOLD:-0}" --durations=20
+```
+
+After confirming a valid matching receipt, run mechanical all-files checks and the normal commit with only the redundant coverage invocation omitted:
+
+```bash
+UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache UV_OFFLINE=1 SKIP=coverage-check uv run --offline --locked pre-commit run --all-files
+UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache UV_OFFLINE=1 SKIP=coverage-check git commit -m 'TASK-SPECIFIC MESSAGE'
+```
+
+A normal commit without SKIP remains the default if it is supplying the one required coverage gate. Behave, Ruff and lock checks remain required, with reuse of identical-state results recorded. Reviewers use the implementer's retained test evidence rather than rerunning it without a concrete unresolved doubt.
+
+Separate performance work preserves the current tests and trust semantics. Measure one representative guarded synthetic case with cProfile/durations and source-backed call counts before changing implementation. No production data, broad-suite profiling, new exclusion/marker, cloned-upstream replacement or authentication memoization is part of D2. Record measured attribution separately from optimization hypotheses; any later implementation follows a scoped approved design and preserves all invariants.
+
+
+### D2 runtime investigation — measured synthetic case
+
+At unchanged software commit `ab87d45ad308115a0d13fa8a2cc79e5b82d967c6`, one fresh guarded `test_raw_to_all_four_acs_families_is_offline_and_replayable` completed under cProfile: **1 passed in 996.38 seconds**, call-phase duration996.22s; profile-accounted time992.565s. This is a diagnostic run with instrumentation overhead, not a new full-suite or production acceptance gate. Existing uninstrumented Task8 V12-containing focused runs are recorded separately. Raw profile/logs remain local: `/private/tmp/stage9-runtime-v12.prof`, `/private/tmp/stage9-runtime-v12.log`; aggregate function summary is copied to the ignored SDD workspace.
+
+| Profiled boundary | Calls | Cumulative seconds |
+| --- | ---: | ---: |
+| Stage9 `select_targets` | 32 | 842.145 |
+| Stage8 `verify_bundle` | 66 | 605.027 |
+| Stage9 `derive_tables` | 4 | 427.621 |
+| Counted file guard `check` | 3,536,169 | 385.983 |
+
+These timings overlap and must not be added. In particular, target derivation includes authenticated weight-source preparation;427.621s is not an exclusive estimator time. cProfile measured200estimator calls (50products ×4derivations), and the complete profile recorded3,875,785,210calls including library/guard overhead. These tiny-fixture measurements do not establish production scalability.
+
+The exact nested-verification count is source-backed and measured: each successful Stage9 build/verify has initial selection1 + input-evidence weighted-source selection3 + derivation weighted-source selection3 + closing recheck1 =8selectors. Two builds and two verifiers therefore invoke32selectors; each takes2mapping snapshots, giving64Stage8verifications. Explicit upstream verification and target comparison add2, for66verifications/67Stage8derivations including the initial mapping build. Relevant boundaries: `acs_target_weights.py:74,90,94`, `acs_target_inputs.py:52,76,113–114`, `acs_target_bundle.py:102,273,297,364,421`, `acs_target_tables.py:44`. The initial read-only audit's18count omitted the weighted-source checks and is superseded; its lifecycle55count was similarly incomplete and is not retained as evidence.
+
+The guard was installed4times. Each installation captures already-patched open functions (`tests/acs_target_fixtures.py:459–484`), so safe fixture file reads pass through nested wrappers. The measured `check` executed3,536,169times; `guarded_open` has451,076primitive calls and3,536,169total recursive calls, with396.776cumulative seconds. This identifies a test-only optimization candidate: make guard reinstallation replace its own wrappers while retaining original-then-counted installation semantics, all protected paths/bound client/transport seams, counter-before-denial behavior and monkeypatch restoration. A subsequent implementation should first test repeated installation and exact counted refusals; it must retain the real raw chain and zero-access assertions. No such implementation is included in D2.
+
+After that isolated fixture change, reprofile the same case before choosing production optimizations. Reducing repeated full upstream reconstruction requires a separate design that preserves detached authority and fresh drift checks at every existing boundary; do not memoize away those guarantees. Likewise, moving schema/serialization or mathematical cases to cheap layers must preserve their assertions and at least one real authenticated end-to-end chain. No tests, markers, default selections, frozen upstream files or production estimators changed during this investigation.
+
+An initial attempt to profile retained temporary inputs stopped at the existing Stage7 reference-vintage check because the original fixture's scoped synthetic-reference registrations were no longer active. No validator was weakened; the successful measurement used the complete original fresh guarded fixture instead.
 
 ---
 
@@ -914,7 +965,7 @@ Use Annotated[Path,typer.Option('--data-dir')] with no default and pass every ar
 
 README documents fixture software readiness, exact selected upstream pins, explicit data root, standalone commands, publication refusals and the distinction between native/strict, canonical and population-allocated products. CLAUDE.md gains only Stage9 software behavior now, leaving measured full-data status pending. Include factor1/pooling/sampling-SE limits, identified-flow denominator interpretation, 2024 strict migration/matched sensitivity and size_gate_pending. Do not publish microdata or describe fixtures as scientific acceptance.
 
-- [ ] **Step 4: Run software-readiness checks green.** `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_acs_target_cli.py tests/test_acs_target_v12.py tests/test_target_contract_v12.py tests/test_acs_mapping_v12.py -q`; expect genuine raw-chain replay and zero external attempts. Run the complete five repository commands in Task11 before the production checkpoint; all must pass. No new marker, dependency, lock or frozen top-level CLI change is allowed.
+- [ ] **Step 4: Run software-readiness checks green.** `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest tests/test_acs_target_cli.py tests/test_acs_target_v12.py tests/test_target_contract_v12.py tests/test_acs_mapping_v12.py -q`; expect genuine raw-chain replay and zero external attempts. Satisfy Task11 repository checks before the production checkpoint under D2; reuse identical-state evidence instead of repeating the broad suite. No new marker, dependency, lock or frozen top-level CLI change is allowed.
 
 - [ ] **Step 5: Commit the software-ready interface.** `git add src/embedding_data/acs_targets.py src/embedding_data/acs_target_inputs.py tests/acs_target_fixtures.py tests/test_acs_target_cli.py tests/test_acs_target_v12.py README.md CLAUDE.md`; `git commit -m 'feat: expose offline ACS targets and authenticated family V12'`. Record software readiness only; Stage9 science acceptance and roadmap completion remain open.
 
@@ -998,7 +1049,7 @@ Freeze inventories all existing raw/derived upstream bytes, including selected S
 
 **Interfaces:** Consumes frozen reviewed software, selected Stage8 first/replay pins and every public/independent API from Tasks7–9. Produces authenticated first/replay target bundles, detached pins, exact ordered eight-table replay, full independent gate matrices, preservation controls and a committed aggregate finding. These are future execution actions; this planning session stops before them.
 
-- [ ] **Step 1: Verify execution identity, readiness and unoccupied prospective paths.** In the implementation worktree run branch/HEAD/status, all five repository checks from Task11 and the independent acceptance tests. Record the executing commit and complete transformation/acceptance software, lock, Python and dependencies. Confirm frozen upstream files match the approved spec commit's blobs and selected Stage7/8 inventories; verify exact D5. Confirm neither prospective run nor partial/control path exists. Inspect any occupied path and choose fresh IDs; never remove/overwrite. Run both selected Stage8 public verifiers before selection, using their exact detached pins; do not build or repair upstreams.
+- [ ] **Step 1: Verify execution identity, readiness and unoccupied prospective paths.** In the implementation worktree run branch/HEAD/status and satisfy Task11 repository checks plus the independent acceptance tests under D2; reuse valid identical-state results rather than rerunning them. Record the executing commit and complete transformation/acceptance software, lock, Python and dependencies. Confirm frozen upstream files match the approved spec commit's blobs and selected Stage7/8 inventories; verify exact D5. Confirm neither prospective run nor partial/control path exists. Inspect any occupied path and choose fresh IDs; never remove/overwrite. Run both selected Stage8 public verifiers before selection, using their exact detached pins; do not build or repair upstreams.
 
 - [ ] **Step 2: Freeze preservation controls and build first/replay with explicit inputs.** The following is a concrete prospective command sequence for execution; use it only after Tasks1–9 and reviews. Each uv command supplies the implementation working directory explicitly as well as the actual data root. The shell itself must also have the implementation worktree as its tool working directory. `set -C` refuses overwriting redirected controls. If IDs are occupied, change all three selections consistently to fresh reviewed IDs and record that selection in the finding.
 
@@ -1087,17 +1138,18 @@ Only record actual outcomes, including command failures/legitimate limitations. 
 
 **Interfaces:** Consumes completed software/science/review gates. Produces recorded complete checks, resolved/deferred partition, exact shipped Handoff, completion stamp and retired plan/spec according to writing-plans. Subsequent roadmap entry reconciliation is a separate fresh-session derive-roadmap resume.
 
-- [ ] **Step 1: Run the complete offline repository checks and read every result.** Tool working directory must be `/Users/lowell/.codex/worktrees/acs-targets-design/embedding-data` for every command:
+- [ ] **Step 1: Satisfy the complete offline repository checks under D2 and read every result.** Reuse valid identical-state receipts; otherwise obtain one full coverage pass and the remaining checks. Tool working directory must be `/Users/lowell/.codex/worktrees/acs-targets-design/embedding-data` for every command:
 
 ```bash
-UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked pytest
+# Obtain or cite the valid full coverage receipt defined in D2 first.
 UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked behave
 UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv run --offline --locked ruff check .
 UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache uv lock --offline --check
-UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache UV_OFFLINE=1 uv run --offline --locked pre-commit run --all-files
+# Only with that matching passing receipt:
+UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache UV_OFFLINE=1 SKIP=coverage-check uv run --offline --locked pre-commit run --all-files
 ```
 
-Expected: pytest all default-selected tests pass (only the existing network canary deselected); every Behave scenario passes; ruff, lock check and all hooks pass. Record real counts and any warnings/failures, not guessed baseline numbers. No skipping hooks or adding marker/dependency/config changes. If pre-commit fixes tracked code, re-review relevant changes and redo invalidated science with fresh IDs; a formatting fix to a frozen executing file is still an identity change.
+Expected: pytest all default-selected tests pass (only the existing network canary deselected); every Behave scenario passes; ruff, lock check and every required hook pass (redundant coverage reuse is explicitly recorded as Skipped under D2). Record real counts and any warnings/failures, not guessed baseline numbers. Only the explicitly authorized redundant coverage-hook reuse in D2 is permitted; no marker/dependency/config changes or other hook omissions. If pre-commit fixes tracked code, re-review relevant changes and redo invalidated science with fresh IDs; a formatting fix to a frozen executing file is still an identity change.
 
 - [ ] **Step 2: Resolve final whole-branch and measured-science review.** Follow requesting-code-review and receiving-code-review. Review against the approved spec plus this plan, especially required evidence, paired denominator membership, exact weights/80 replicates, source preservation, frozen interfaces and aggregate disclosure. Record actual reviewer identity/commit scope, findings and dispositions in the measured finding. Apply relevant repository model-routing guidance where the runtime supports the requested reviewer models; do not claim a model/review that did not run. Recheck full gates after code changes; purely documentary review edits require documentation/diff checks. Read verification-before-completion before reporting success.
 
