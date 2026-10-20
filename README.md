@@ -776,8 +776,9 @@ The [measured Stage 8 finding](specs/findings/stage-8-acs-codes-area-allocation.
 keeps the first-build timing-wrapper limit and distinguishes the immutable
 seal's historical `adoption=false` from completed repository adoption. Mapping
 outputs are evaluation inputs, never embedder training or model-selection data.
-Stage 9 now provides the offline target software described below; its full-data
-measurement and scientific acceptance remain later-stage work.
+Stage 9 provides the offline target software described below. Its first full-data
+attempt failed before publication; scientific acceptance remains incomplete, as
+recorded in the [Stage 9 finding](specs/findings/stage-9-acs-targets.md).
 
 ### ACS target families (Stage 9 software)
 
@@ -787,9 +788,16 @@ consume authenticated Stage 8 mapping and Stage 4/5/7 selections in place. They 
 not acquire data, load environment files, rebuild upstreams or refresh selections.
 Stage 9 software readiness uses a tiny synthetic manifested raw CSV/DDI chain,
 unchanged conversion and real builders/selectors through four ACS families plus
-independent detached verification and exact replay. Full-data measurement, independent
-reconciliation, science acceptance and roadmap completion remain pending. Fixtures
-are software checks, never scientific acceptance or microdata publications.
+independent detached verification and exact replay. The first full-data build,
+`stage9_acs_targets_20261019_r1`, returned exit 137 after 5,084.62 seconds on
+2026-10-20, with no final bundle; replay and target acceptance gates were not run.
+A PID-matched macOS kernel record confirms a memory-pressure kill; the responsible
+source operator remains under diagnosis. Both selected Stage 8 public verifiers passed and all 8,020 pre-existing protected
+files/raw-manifest bytes remained unchanged, but full preservation failed because
+owned CSV scratch and an empty first `.part` remain. The [measured attempt](specs/findings/stage-9-acs-targets.md)
+records exact pins and open gates. Task 10 diagnosis/resolution and science acceptance
+remain in progress. Fixtures are software checks, never scientific acceptance or
+microdata publications.
 
 The explicit selected upstream identities are:
 
@@ -801,8 +809,9 @@ The explicit selected upstream identities are:
 | IPUMS verification | `stage7_ipums_verification_20261015_r2` | `db129a788daa312408f793df1b94fa3f211190a5541fc17ae87b96e84df913dc` |
 | IPUMS reference receipt | `stage7_ipums_references_20261015_r2` | `3163968dde603ba53f807976dd09b9e40d73235a98c6f36e4e02c67ec4239c9c` |
 
-These commands describe the software interface; production execution belongs to the
-later full-data checkpoint. Substitute the recorded identities above for uppercase
+These commands describe the software interface. Preserve the failed attempt paths
+and use fresh IDs/controls for subsequent reviewed execution. Substitute the recorded
+identities above for uppercase
 upstream tokens, fresh explicit target IDs, and independently saved target pins:
 
 ```bash

@@ -304,7 +304,19 @@ three target tables use unchanged targets-v1. The actual raw→converter→Stage
 regions/PR controls and tests detached verification/replay. Its tiny numeric/null CSV
 naturally converts QMIGRAT1 to Int64; direct small-frame tests cover production String
 storage separately. Fixture software readiness does not establish full-data feasibility,
-science acceptance or roadmap completion. Those measurements remain pending.
+science acceptance or roadmap completion. The first full-data attempt
+`stage9_acs_targets_20261019_r1` failed with direct uv-child exit 137 after
+5,084.62 seconds on 2026-10-20 and published no final. Replay, target verification
+and independent target reconciliation were not run. A matching kernel event confirms
+a memory-pressure kill; the source operator causing the footprint remains unproven.
+Both selected Stage 8 public verifiers passed. All 8,020 protected old files and exact
+raw-manifest bytes were unchanged, and raw audit found zero discrepancies. Full
+preservation failed on remaining owned CSV scratch and the empty first `.part`.
+Preserve failed paths and controls; do not reuse or overwrite them. The
+[Stage 9 attempt finding](specs/findings/stage-9-acs-targets.md) records selected
+identities, detached freeze pin, actual outcomes and unmeasured gates. Task 10 remains
+in progress pending diagnosed memory-feasibility resolution; no scientific acceptance,
+Task 11 completion or roadmap completion is claimed.
 
 Only core produces targets. Native strict/sensitivity products retain explicit family
 Q-evidence; canonical products require supported scalar six-digit NAICS/detailed SOC
