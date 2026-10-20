@@ -503,7 +503,9 @@ def install_counted_guards(monkeypatch, counts):
     return probes
 
 
-def run_acs_target_v12(data_dir: Path, monkeypatch) -> dict[str, Path | str | dict]:
+def run_acs_target_v12(
+    data_dir: Path, monkeypatch, *, before_targets=None
+) -> dict[str, Path | str | dict]:
     '''Genuine Stage4/5/7/8→Stage9 first/replay plus detached verification controls.'''
     import json
     from pathlib import Path
@@ -532,6 +534,8 @@ def run_acs_target_v12(data_dir: Path, monkeypatch) -> dict[str, Path | str | di
     result = {'data_dir': data_dir, 'mapping_run': 'mapping',
               'mapping_pin': mapping['outputs_sha256'], 'request': fixture.request,
               'external_access_counts': counts}
+    if before_targets is not None:
+        before_targets(result)
     controls = data_dir.parent / 'target-controls'
     controls.mkdir()
     for name in ('first', 'replay'):
