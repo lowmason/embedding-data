@@ -136,7 +136,8 @@ def test_stage9_freeze_has_literal_complete_checkpoint_inventory():
         'src/embedding_data/acs_target_estimation.py',
         'src/embedding_data/acs_target_projection.py',
         'src/embedding_data/acs_target_tables.py',
-        'src/embedding_data/acs_target_bundle.py', 'pyproject.toml', 'uv.lock'}
+        'src/embedding_data/acs_target_bundle.py',
+        'src/embedding_data/acs_targets.py', 'pyproject.toml', 'uv.lock'}
     assert snapshot['dependencies']['polars']
 
 

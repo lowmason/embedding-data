@@ -284,3 +284,39 @@ entrypoint provenance, with no general stale-software exception. All other files
 dependencies, Python/lock identities, inventories, citations and tables stay strict.
 The approved run/pins/hashes and registration-only source commits are recorded in
 the Stage 8 plan's D5 decision and selector constants.
+
+**ACS target software (Stage 9).** `python -m embedding_data.acs_targets` exposes
+exactly `build`, `verify` and `compare-runs`, separate from the frozen top-level CLI.
+Always pass explicit `--data-dir`, mapping run and detached mapping pin; build also
+requires the unchanged seven-field Stage4/5/7 request and verify requires the detached
+target pin before any bundle content is trusted. README records the exact selected
+upstream identities and full invocation contract. Commands run offline with no env-file
+access, live clients, acquisition, upstream rebuild or automatic refresh. Existing
+final/partial paths, symlinks, unsafe IDs, changed inputs/software and mixed selections
+are refused. Build owns exclusive staging; failure cleans only its temporary paths.
+Success emits aggregate JSON; validation errors use a fixed safe diagnostic (exit2),
+while unequal comparisons exit1. Compare establishes exact logical replay, not trust;
+verify both bundles independently with external target pins.
+
+Stage9 bundles contain eight aggregate Parquets and inputs/report/outputs JSON; only
+three target tables use unchanged targets-v1. The actual raw→converter→Stage4/5/7→Stage8
+→four-family Stage9 fixture measures external-access attempts, preserves all nine CT
+regions/PR controls and tests detached verification/replay. Its tiny numeric/null CSV
+naturally converts QMIGRAT1 to Int64; direct small-frame tests cover production String
+storage separately. Fixture software readiness does not establish full-data feasibility,
+science acceptance or roadmap completion. Those measurements remain pending.
+
+Only core produces targets. Native strict/sensitivity products retain explicit family
+Q-evidence; canonical products require supported scalar six-digit NAICS/detailed SOC
+leaves with supported-subset denominators. Population allocation applies only to
+observed workplace mixes, with typed county→CBSA membership, separate micro/noCBSA
+residuals and no renormalization or allocated flows. Preserve every mapping/evidence
+flag and separate population2020/PUMA2020/composition2022/inventory2025/July2023 frames.
+PERWT and exactly REPWTP1–80 use literal factor1, Decimal native sums, signed replicates
+and one division by k. Strict migration and matched sensitivity use2024/k1; pooled
+migration sensitivity and other products use2023–2024/k2. Shares condition on identified
+eligible pairs with identical numerator/denominator restrictions. Sampling SEs are
+conditional on allocation and exclude allocation/mapping uncertainty. Keep
+size_gate_pending without a minimum count. Publish aggregate evidence only; never use
+evaluation inputs for embedder training, mining or model selection. Migration is
+domestic geographic movement, not a prior-job/job-related claim.

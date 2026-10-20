@@ -776,6 +776,86 @@ The [measured Stage 8 finding](specs/findings/stage-8-acs-codes-area-allocation.
 keeps the first-build timing-wrapper limit and distinguishes the immutable
 seal's historical `adoption=false` from completed repository adoption. Mapping
 outputs are evaluation inputs, never embedder training or model-selection data.
-ACS universes, headline inclusion, target families,
-employment-weighted code allocation, pooling and replicate standard errors remain
-later-stage work.
+Stage 9 now provides the offline target software described below; its full-data
+measurement and scientific acceptance remain later-stage work.
+
+### ACS target families (Stage 9 software)
+
+The standalone `python -m embedding_data.acs_targets` module has exactly `build`,
+`verify` and `compare-runs`. All run offline against an explicit `--data-dir`; they
+consume authenticated Stage 8 mapping and Stage 4/5/7 selections in place. They do
+not acquire data, load environment files, rebuild upstreams or refresh selections.
+Stage 9 software readiness uses a tiny synthetic manifested raw CSV/DDI chain,
+unchanged conversion and real builders/selectors through four ACS families plus
+independent detached verification and exact replay. Full-data measurement, independent
+reconciliation, science acceptance and roadmap completion remain pending. Fixtures
+are software checks, never scientific acceptance or microdata publications.
+
+The explicit selected upstream identities are:
+
+| Selection | Run | External SHA-256 |
+| --- | --- | --- |
+| Mapping | `stage8_acs_mapping_20261018_r7` | `1ec9701092f576b122b01464cdb6fa3fbee49db030e4ad3df7b64e621b8e75f4` |
+| Codes | `stage4_v11_20261013_r2` | `15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a` |
+| Geography | `stage5_geography_20261014` | `5584b122d45a3617e731f7179d53e9625eb67fd15515d0cd7a5dab366132290d` |
+| IPUMS verification | `stage7_ipums_verification_20261015_r2` | `db129a788daa312408f793df1b94fa3f211190a5541fc17ae87b96e84df913dc` |
+| IPUMS reference receipt | `stage7_ipums_references_20261015_r2` | `3163968dde603ba53f807976dd09b9e40d73235a98c6f36e4e02c67ec4239c9c` |
+
+These commands describe the software interface; production execution belongs to the
+later full-data checkpoint. Substitute the recorded identities above for uppercase
+upstream tokens, fresh explicit target IDs, and independently saved target pins:
+
+```bash
+uv run --offline --locked python -m embedding_data.acs_targets build RUN_ID --data-dir /Users/lowell/Projects/embedding-data/data --mapping-run MAPPING_ID --mapping-outputs-sha256 MAPPING_PIN --codes-run CODES_ID --codes-outputs-sha256 CODES_PIN --geography-run GEOGRAPHY_ID --geography-outputs-sha256 GEOGRAPHY_PIN --ipums-run IPUMS_ID --ipums-outputs-sha256 IPUMS_PIN --ipums-references-sha256 IPUMS_RECEIPT_PIN
+uv run --offline --locked python -m embedding_data.acs_targets verify RUN_ID --data-dir /Users/lowell/Projects/embedding-data/data --mapping-run MAPPING_ID --mapping-outputs-sha256 MAPPING_PIN --outputs-sha256 TARGET_EXTERNAL_PIN
+uv run --offline --locked python -m embedding_data.acs_targets compare-runs FIRST_ID SECOND_ID --data-dir /Users/lowell/Projects/embedding-data/data --mapping-run MAPPING_ID --mapping-outputs-sha256 MAPPING_PIN
+```
+
+Build emits aggregate success JSON with the detached `outputs_sha256`; save it outside
+the bundle. Verify authenticates that external target inventory pin before trusting
+bundle content and rederives all eight ordered tables. Compare checks exact ordered
+logical tables and substantive reports, excluding only top-level run ID/time; it does
+not establish trust. Verify both runs with their own detached pins first. Success
+exits 0, unequal comparison exits 1 and validation failure exits 2 with the fixed
+`ACS target validation failed.` diagnostic. No exception row values are printed.
+
+Each fresh `data/derived/acs/targets/RUN_ID/` contains eight Parquets:
+`targets_observed`, `targets_canonical`, `targets_allocated_area_mix`, `target_units`,
+`target_support`, `replicate_estimates`, `eligibility_diagnostics` and
+`allocation_residuals`, plus `inputs.json`, `report.json` and `outputs.json`. Only the
+first three use the unchanged ordered `targets-v1` contract. Evidence is aggregate;
+person/household identifiers and source-position audit rows are never published.
+Occupied final/partial names, symlinks, unsafe IDs, mixed selections, stale executing
+software, unpinned inputs and changed sources are refused. Failed builds publish no
+new final and clean only their exclusively owned temporary paths.
+
+Native observed products retain delivered categories. Strict evidence requires each
+family's documented nonallocation/applicability; sensitivity retains applicable
+allocated, edited or unavailable evidence with flags. Civilian employment is exactly
+EMPSTATD10/12; private wage/salary additionally requires CLASSWKRD22/23. Staffing
+retains temporarily absent workers. Workplace mixes and commuting require at-work,
+applicable domestic endpoints and applicable non-home transport (NIU is excluded).
+Migration requires domestic movers MIGRATE1 2/3, from prior work/migration PUMA to
+current residence PUMA; this is geographic movement, not prior-job or job-related
+movement. Strict migration and matched sensitivity use annual 2024 (k=1); pooled
+migration sensitivity uses 2023–2024 (k=2). Other products use 2023–2024 (k=2).
+
+Canonical staffing and workplace mixes require frozen supported NAICS six-digit/SOC
+detailed scalar leaves and recompute supported-subset denominators. Prefixes,
+candidates and common ancestors cannot supply leaves; crosswalk/imputation provenance
+cannot enter strict canonical products. County/MSA products allocate only observed
+workplace mixes using work/migration population factors followed by typed county/CBSA
+membership. They provide no allocated flows or canonical allocated products. Keep
+2020 population/PUMAs, 2022 county composition, the 2025 county inventory (including
+all nine Connecticut planning regions) and July 2023 delineations distinct.
+Micropolitan and no-CBSA residual mass remain separate; MSA mass is not renormalized.
+
+PERWT supplies point estimates; exactly REPWTP1–80 supply sampling variance at literal
+CSV factor 1. Native weighted masses aggregate in Decimal before Float64 publication;
+annual-average totals divide by k once. Signed replicate weights and ratios are
+retained. Only `annual_average_total` and `forward_share` are published, for positive
+full-weight cells. Shares condition on identified eligible pairs and denominators
+use each numerator's exact restrictions. Allocation-conditional sampling SEs quantify
+neither allocation error nor mapping uncertainty. All targets retain
+`size_gate_pending`; no minimum count is chosen. Evaluation inputs must never be used
+for embedder training, mining or model selection.

@@ -27,7 +27,8 @@ SOFTWARE_FILES = tuple(dict.fromkeys((*acs_mapping_inputs.SOFTWARE_FILES,
         'src/embedding_data/acs_target_estimation.py',
         'src/embedding_data/acs_target_projection.py',
         'src/embedding_data/acs_target_tables.py',
-        'src/embedding_data/acs_target_bundle.py', 'pyproject.toml', 'uv.lock')))
+        'src/embedding_data/acs_target_bundle.py',
+        'src/embedding_data/acs_targets.py', 'pyproject.toml', 'uv.lock')))
 MAPPING_TABLES = (
     'acs_code_lookup', 'acs_area_lookup', 'puma_county_factors', 'puma_msa_factors',
     'puma_msa_coverage', 'acs_core_canonical', 'acs_five_year_canonical',

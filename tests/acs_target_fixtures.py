@@ -1,5 +1,7 @@
 '''Small synthetic primitives shared by ACS target tests.'''
 
+from pathlib import Path
+
 import pytest
 
 from embedding_data.target_contract import TARGET_SCHEMA
@@ -354,3 +356,181 @@ def target_runs(tmp_path, monkeypatch):
                    (fixture['mapping'] / 'outputs.json').read_bytes()).hexdigest(),
                **{key: Path(result['directory']) for key, result in
                   zip(('first', 'replay'), results, strict=True)}}
+
+
+# Literal public locators, independent of the production mapper's result.
+SUPPORTED_PAIR = {
+    'industry': {'IND': 8780, 'INDNAICS': '811192',
+        'node': 'naics:2022:national_industry:811192', 'title': 'Car washes',
+        'locators': ['census_industry_2022.xlsx:2022 Census Ind Code List :317:D/E',
+                     'ipums_ind_pairs.xlsx:Sheet1:419']},
+    'occupation': {'OCC': 20, 'OCCSOC': '111021',
+        'node': 'soc:2018:detailed:11-1021',
+        'locators': ['census_occupation_2018.xlsx:Sheet2:16:C/D',
+                     'ipums_occ_pairs.xlsx:Sheet1:7']},
+}
+
+
+def prepare_v12_delivery(profile, ddi, frame):
+    '''Explicit tiny population, modified only before manifested CSV conversion.'''
+    import polars as pl
+
+    ddi, frame = prepare_target_delivery(profile, ddi, frame)
+    frame = frame.with_columns(
+        pl.lit(SUPPORTED_PAIR['industry']['IND']).alias('IND'),
+        pl.lit(SUPPORTED_PAIR['industry']['INDNAICS']).alias('INDNAICS'))
+    # OCC20 is the numeric interpretation of the public zero-padded Census code0020.
+    if profile != 'core':
+        return ddi, frame
+    extra_categories = {
+        'EMPSTATD': {'14': 'Armed forces, at work', '15': 'Armed forces, has job, not working'},
+        'CLASSWKRD': {'13': 'Self-employed, not incorporated',
+                      '14': 'Self-employed, incorporated'},
+    }
+    for variable in ddi['variables']:
+        variable['categories'].extend({'value': code, 'label': label}
+            for code, label in extra_categories.get(variable['name'], {}).items())
+    seed = frame.filter(pl.col('YEAR').eq(2024)).head(1)
+    controls = [
+        {'EMPSTATD': 12}, {'EMPSTATD': 14}, {'EMPSTATD': 15},
+        {'CLASSWKRD': 23}, {'CLASSWKRD': 13}, {'CLASSWKRD': 14},
+        {'MIGRATE1': 1}, {'MIGRATE1': 4, 'MIGPLAC1': 150, 'MIGPUMA1': 1},
+        {'MIGRATE1': 3, 'MIGPLAC1': 110},
+        {'TRANWORK': 80}, {'TRANWORK': 0}, {'PWSTATE2': 80, 'PWPUMA00': 1}, {'PWSTATE2': 72},
+        *[{name: value} for name in FLAG_LABELS
+          for value in (0, 4) if name != 'QMIGRAT1'],
+        {'QEMPSTAT': 1}, {'QIND': None}, {'QMIGPLC1': 4},
+    ]
+    schema = frame.collect_schema()
+    additions = [seed.with_columns(pl.lit(value, dtype=schema[name]).alias(name)
+                                  for name, value in changes.items()) for changes in controls]
+    return ddi, pl.concat([frame, *additions])
+
+
+def install_counted_guards(monkeypatch, counts):
+    '''Count before denial at actual transports, bound clients and protected file paths.'''
+    import builtins
+    import io
+    import os
+    import socket
+    from functools import partial
+    from pathlib import Path
+
+    import dotenv
+    import httpx
+    import ipumspy
+
+    from embedding_data import (
+        acs_benchmark_extract,
+        acs_mapping_references,
+        cps_benchmark_extract,
+        geography_references,
+        ipums_census_access,
+        ipums_references,
+        ita_assignment_acquire,
+        ita_verification_run,
+        paths,
+    )
+
+    probes = []
+
+    def deny(category, *args, **kwargs):
+        counts[category] += 1
+        raise AssertionError('offline ACS targets attempted protected access')
+
+    seams = [
+        ('network', socket, ('create_connection',)),
+        ('network', socket.socket, ('connect', 'connect_ex')),
+        ('network', httpx, ('get', 'post', 'request', 'stream', 'Client', 'AsyncClient')),
+        ('environment_file', dotenv, ('load_dotenv', 'dotenv_values')),
+        ('environment_file', ipums_census_access, ('dotenv_values', 'read_credential')),
+        ('live_client', ipumspy, ('IpumsApiClient',)),
+    ]
+    for module in (acs_benchmark_extract, cps_benchmark_extract):
+        seams.extend([('environment_file', module, ('load_dotenv',)),
+                      ('live_client', module, ('IpumsApiClient',))])
+    for module in (ipums_census_access, ipums_references, acs_mapping_references,
+                   geography_references, ita_assignment_acquire, ita_verification_run):
+        seams.append(('live_client', module, ('make_client',)))
+    for category, owner, names in seams:
+        for name in names:
+            monkeypatch.setattr(owner, name, partial(deny, category))
+            probes.append((category, partial(getattr(owner, name), 'guard-probe')))
+
+    production = Path('/Users/lowell/Projects/embedding-data')
+    environment_files = {production / '.env', paths.PROJECT_ROOT / '.env'}
+    data_roots = (production / 'data', paths.DATA_DIR)
+    original_open, original_io_open = builtins.open, io.open
+    original_path_open = Path.open
+
+    def check(file):
+        if isinstance(file, (str, bytes, os.PathLike)):
+            path = Path(os.fsdecode(file)).absolute()
+            if path in environment_files:
+                deny('environment_file')
+            if any(path == root or root in path.parents for root in data_roots):
+                deny('live_client')
+
+    def guarded_open(original, file, *args, **kwargs):
+        check(file)
+        return original(file, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, 'open', partial(guarded_open, original_open))
+    monkeypatch.setattr(io, 'open', partial(guarded_open, original_io_open))
+
+    def path_open(file, *args, **kwargs):
+        return guarded_open(original_path_open, file, *args, **kwargs)
+
+    monkeypatch.setattr(Path, 'open', path_open)
+    probes.extend([
+        ('environment_file', lambda: builtins.open(production / '.env')),
+        ('environment_file', lambda: io.open(paths.PROJECT_ROOT / '.env')),
+        ('environment_file', lambda: path_open(production / '.env')),
+        ('live_client', lambda: (production / 'data/raw/manifest.jsonl').open()),
+    ])
+    return probes
+
+
+def run_acs_target_v12(data_dir: Path, monkeypatch) -> dict[str, Path | str | dict]:
+    '''Genuine Stage4/5/7/8→Stage9 first/replay plus detached verification controls.'''
+    import json
+    from pathlib import Path
+
+    import acs_mapping_fixtures as mapping_fixtures
+
+    from embedding_data import acs_mapping_bundle, acs_target_bundle, manifest
+
+    counts = {'network': 0, 'environment_file': 0, 'live_client': 0}
+    original_guard = mapping_fixtures.forbid_external_access
+
+    def counted_guard(patch):
+        original_guard(patch)
+        install_counted_guards(patch, counts)
+
+    # The old seed/build helpers reinstall their guards; always layer counters afterward.
+    monkeypatch.setattr(mapping_fixtures, 'forbid_external_access', counted_guard)
+    counted_guard(monkeypatch)
+    fixture = mapping_fixtures.seed_reconciliation_inputs(
+        data_dir.parent, monkeypatch, prepare_acs=prepare_v12_delivery)
+    assert fixture.data_dir == data_dir
+    mapping = mapping_fixtures.build_fixture_mapping(fixture, 'mapping', monkeypatch)
+    mapping_directory = Path(mapping['directory'])
+    acs_mapping_bundle.verify_bundle(mapping_directory, data_dir,
+                                     expected_outputs_sha256=mapping['outputs_sha256'])
+    result = {'data_dir': data_dir, 'mapping_run': 'mapping',
+              'mapping_pin': mapping['outputs_sha256'], 'request': fixture.request,
+              'external_access_counts': counts}
+    controls = data_dir.parent / 'target-controls'
+    controls.mkdir()
+    for name in ('first', 'replay'):
+        response = acs_target_bundle.build(data_dir, name, 'mapping',
+            expected_mapping_outputs_sha256=mapping['outputs_sha256'], request=fixture.request)
+        result[name] = Path(response['directory'])
+        control = controls / (name + '.json')
+        control.write_text(json.dumps(response, sort_keys=True) + '\n')
+        result[name + '_control'] = control
+        assert manifest.sha256_file(result[name] / 'outputs.json') == response['outputs_sha256']
+        result[name + '_verification'] = acs_target_bundle.verify_bundle(
+            result[name], data_dir, expected_outputs_sha256=response['outputs_sha256'],
+            mapping_run='mapping', expected_mapping_outputs_sha256=mapping['outputs_sha256'])
+    return result
