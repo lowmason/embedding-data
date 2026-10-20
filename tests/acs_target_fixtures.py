@@ -460,8 +460,17 @@ def install_counted_guards(monkeypatch, counts):
     production = Path('/Users/lowell/Projects/embedding-data')
     environment_files = {production / '.env', paths.PROJECT_ROOT / '.env'}
     data_roots = (production / 'data', paths.DATA_DIR)
-    original_open, original_io_open = builtins.open, io.open
-    original_path_open = Path.open
+
+    def without_owned_guard(opener):
+        owned = getattr(opener, '_acs_target_guard', None)
+        # Identity prevents functools.wraps metadata copied by foreign guards from matching.
+        if owned is not None and owned[0] is opener:
+            return owned[1]
+        return opener
+
+    original_open = without_owned_guard(builtins.open)
+    original_io_open = without_owned_guard(io.open)
+    original_path_open = without_owned_guard(Path.open)
 
     def check(file):
         if isinstance(file, (str, bytes, os.PathLike)):
@@ -475,12 +484,15 @@ def install_counted_guards(monkeypatch, counts):
         check(file)
         return original(file, *args, **kwargs)
 
-    monkeypatch.setattr(builtins, 'open', partial(guarded_open, original_open))
-    monkeypatch.setattr(io, 'open', partial(guarded_open, original_io_open))
+    for owner, original in ((builtins, original_open), (io, original_io_open)):
+        wrapper = partial(guarded_open, original)
+        wrapper._acs_target_guard = (wrapper, original)
+        monkeypatch.setattr(owner, 'open', wrapper)
 
     def path_open(file, *args, **kwargs):
         return guarded_open(original_path_open, file, *args, **kwargs)
 
+    path_open._acs_target_guard = (path_open, original_path_open)
     monkeypatch.setattr(Path, 'open', path_open)
     probes.extend([
         ('environment_file', lambda: builtins.open(production / '.env')),
