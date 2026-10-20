@@ -52,6 +52,8 @@ Roadmap: specs/embedding-evaluation-data-spec-roadmap.md, Stage 9 — on plan co
 
 - **D2** (owner, 2026-10-19, this execution chat): after the controller recommended one complete coverage run per unchanged source state, focused checks during development, independent review and separate integration-test profiling, the owner replied “Yes.” This amends execution procedure only. It supersedes redundant full-suite invocations and the prior blanket prohibition on skipping the coverage hook, solely under the evidence-reuse conditions below. All scientific requirements, tests, full default-suite membership, external guards, detached verification, full-data acceptance and independent reviews remain binding. No test/hook/dependency configuration change is authorized or needed.
 
+- **D3** (owner, 2026-10-19, execution chat): owner replied “Approved” to the proposed test-only guard-reinstallation fix after D2 profiling. Implement bounded/idempotent reinstallation in `tests/acs_target_fixtures.py` with regression coverage in `tests/test_acs_target_v12.py`; preserve every protected path, transport/bound-client seam, counter-before-denial behavior, inherited original-then-counted installation order, monkeypatch restoration and real authenticated raw chain. Reprofile the same representative synthetic case, run one fresh complete coverage gate under D2, and independently review before marking this follow-up complete. Production authentication/estimators, frozen upstream files, fixture scope/raw setup, test exclusions/configuration/dependencies and completed Tasks1–8 remain unchanged. Task9 remains next after this approved follow-up.
+
 ## Verification execution policy — owner D2
 
 1. During implementation and each review fix, run the covering focused tests. Finish source changes and self-review before starting long gates. Do not repeat a completed focused run merely because it also appears in a later task's checklist.
@@ -99,6 +101,28 @@ The guard was installed4times. Each installation captures already-patched open f
 After that isolated fixture change, reprofile the same case before choosing production optimizations. Reducing repeated full upstream reconstruction requires a separate design that preserves detached authority and fresh drift checks at every existing boundary; do not memoize away those guarantees. Likewise, moving schema/serialization or mathematical cases to cheap layers must preserve their assertions and at least one real authenticated end-to-end chain. No tests, markers, default selections, frozen upstream files or production estimators changed during this investigation.
 
 An initial attempt to profile retained temporary inputs stopped at the existing Stage7 reference-vintage check because the original fixture's scoped synthetic-reference registrations were no longer active. No validator was weakened; the successful measurement used the complete original fresh guarded fixture instead.
+
+
+### D3 guard-reinstallation follow-up — completed 2026-10-20
+
+Code commit `7021b95dd1ecdab4fedb9f7ff96c4dab7863e1a4` changes only `tests/acs_target_fixtures.py` and `tests/test_acs_target_v12.py`. Reinstallation replaces directly owned wrappers using callable self-identity; foreign wrappers remain opaque even if `functools.wraps` copies helper metadata. Protected paths, counter-before-denial behavior, transport and bound-client probes, inherited guard composition, and nested MonkeyPatch restoration are preserved. Production code, authentication, estimators, test configuration, and the real raw chain are unchanged.
+
+Deterministic TDD reproduced growing work before the fix: four installations gave 1/2/3/4 checks through builtins/io and 2/4/6/8 through Path.open. Final work stays 1/1/1/1 and 2/2/2/2 respectively. The final focused check passed 20 tests, with two targeted deselections, in 0.82s. Full-suite selection retains every default test.
+
+| Same-case instrumented comparison | Before | After |
+| --- | ---: | ---: |
+| Test elapsed seconds | 996.38 | 709.43 |
+| Guard `check` calls | 3,536,169 | 892,618 |
+| Guard `check` cumulative seconds | 385.983 | 101.535 |
+| Actual `_io.open` calls | 451,406 | 451,406 |
+| Stage 8 verify / derive calls | 66 / 67 | 66 / 67 |
+| Target derivations | 4 | 4 |
+
+The single-case instrumented elapsed reduction is about 28.8%; this is not a universal speedup or production-scaling claim. Cumulative boundaries overlap. The successful raw-chain test retains all four families, both detached target verifiers, exact replay, and measured zero network, environment-file, and live-client attempts. The baseline profile is preserved; after artifacts are `/private/tmp/stage9-guard-after.prof` and `.log`, with an aggregate summary retained in the ignored SDD workspace.
+
+Exactly one fresh complete coverage gate ran on the final tested state: **2,484 passed, one existing network canary deselected, 94% coverage in 3,551.69s (59m11s), exit 0**. No warning or failure summary appeared. Behave passed one feature, two scenarios, and ten steps; Ruff and lock checks passed. The matching 222-file/Python/dependency/platform/threshold/selection fingerprint has digest `fa265292f1411249454bc703003968793f9be331c4d03a441542d536eca3d95b`. Receipts matched after coverage, hooks, and commit; the controller and independent reviewer checked them. All-files and commit hooks explicitly recorded redundant Coverage Check as Skipped under D2; all other applicable hooks passed. The commit's routine unstaged-plan warning was accounted for by successful stash/restore. No second broad gate ran.
+
+Fresh read-only `guard_reinstallation_review` (inherited runtime; no Claude-model claim) reviewed `f9b4766..7021b95`: spec compliant, quality Approved, no Critical/Important/Minor findings. The complete report, tested/current receipts, and profile summaries are in `.sdd/9-acs-targets/`. The controller rehashed all 57 recorded local Stage 8 executing/independent members: no mismatch. Tasks 1–8 remain complete, Task 9 remains next, Stage 9 remains unticked, and production science acceptance remains pending. No additional optimization or production-data operation occurred.
 
 ---
 
