@@ -177,6 +177,7 @@ def compare_rows(gates, group, name, actual, expected, keys, *, exact=False):
                 elif (
                     field == 'se'
                     or e.get('view', '').startswith('allocated')
+                    or name == 'targets_allocated_area_mix'
                     or name.startswith('allocation_')
                 ):
                     equal = calc.close_allocated_or_se(actual_value, expected_value)

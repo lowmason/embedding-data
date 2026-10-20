@@ -696,3 +696,87 @@ def test_mapping_provenance_retains_complete_authenticated_parquet_records(tmp_p
     (tmp_path / 'outputs.json').write_text(json.dumps(inventory))
     expected = {name: dict(record) for name in acceptance.io.stage8.TABLES}
     assert acceptance.mapping_table_inventory(tmp_path) == expected
+
+
+@pytest.mark.parametrize('field', ['value', 'n_weighted'])
+@pytest.mark.parametrize(
+    'expected,delta,accepted',
+    [
+        (0.0, 5e-9, True),
+        (0.0, 2e-8, False),
+        (1e8, 0.00009, True),
+        (1e8, 0.001, False),
+    ],
+)
+def test_allocated_target_masses_use_frozen_absolute_and_relative_bound(
+    field, expected, delta, accepted
+):
+    acceptance = load_script('reconcile_stage9')
+    gates = {n: {'failures': []} for n in acceptance.GROUPS}
+    row = {'key': 'cell', 'measure': 'annual_average_total', field: expected}
+    actual = dict(row, **{field: expected + delta})
+    acceptance.compare_rows(gates, 5, 'targets_allocated_area_mix', [actual], [row], ['key'])
+    assert (gates[5]['failures'] == []) is accepted
+
+
+@pytest.mark.parametrize(
+    'share_delta,mass_delta,failed_fields',
+    [
+        (5e-13, 0.00009, set()),
+        (1e-10, 0.00009, {'value'}),
+        (5e-13, 0.001, {'n_weighted'}),
+    ],
+)
+def test_allocated_share_value_and_weighted_mass_use_distinct_predicates(
+    share_delta, mass_delta, failed_fields
+):
+    acceptance = load_script('reconcile_stage9')
+    gates = {n: {'failures': []} for n in acceptance.GROUPS}
+    row = {'key': 'cell', 'measure': 'forward_share', 'value': 0.5, 'n_weighted': 1e8, 'se': 1e8}
+    actual = dict(row, value=0.5 + share_delta, n_weighted=1e8 + mass_delta, se=1e8 + 0.00009)
+    acceptance.compare_rows(gates, 5, 'targets_allocated_area_mix', [actual], [row], ['key'])
+    assert {f['field'] for f in gates[5]['failures']} == failed_fields
+
+
+def test_allocated_target_replay_remains_exact_inside_mass_and_se_tolerances():
+    acceptance = load_script('reconcile_stage9')
+    gates = {n: {'failures': []} for n in acceptance.GROUPS}
+    row = {
+        'key': 'cell',
+        'measure': 'annual_average_total',
+        'value': 1.0,
+        'n_weighted': 1e8,
+        'se': 1.0,
+    }
+    actual = dict(row, value=1.0 + 5e-9, n_weighted=1e8 + 0.00009, se=1.0 + 5e-9)
+    acceptance.compare_rows(
+        gates, 6, 'targets_allocated_area_mix', [actual], [row], ['key'], exact=True
+    )
+    assert {f['field'] for f in gates[6]['failures']} == {'value', 'n_weighted', 'se'}
+
+
+def test_native_mass_counts_and_decimal_sums_remain_exact():
+    acceptance = load_script('reconcile_stage9')
+    gates = {n: {'failures': []} for n in acceptance.GROUPS}
+    row = {
+        'key': 'cell',
+        'measure': 'annual_average_total',
+        'value': 1e8,
+        'n_weighted': 1e8,
+        'n_unweighted': 1,
+        'cell_weight_sum_exact': '1.00000000000000000001',
+    }
+    actual = dict(
+        row,
+        value=1e8 + 0.00009,
+        n_weighted=1e8 + 0.00009,
+        n_unweighted=2,
+        cell_weight_sum_exact='1.00000000000000000002',
+    )
+    acceptance.compare_rows(gates, 3, 'targets_observed', [actual], [row], ['key'])
+    assert {f['field'] for f in gates[3]['failures']} == {
+        'value',
+        'n_weighted',
+        'n_unweighted',
+        'cell_weight_sum_exact',
+    }
