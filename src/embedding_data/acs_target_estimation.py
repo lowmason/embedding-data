@@ -1,11 +1,15 @@
 '''Exact native pooling and paired replicate uncertainty at aggregate cell grain.'''
 
 import math
+import re
+import shutil
 from dataclasses import dataclass
 from decimal import Decimal, localcontext
+from pathlib import Path
 
 import polars as pl
 
+from embedding_data.acs_mapping_io import safe_path
 from embedding_data.acs_target_contract import (
     REPLICATE_SCHEMA,
     STAT_KEY_COLUMNS,
@@ -71,7 +75,7 @@ def _weight_scale(rows):
     return scale
 
 
-def _native_groups(members, keys, product, scale):
+def _native_wide_groups(members, keys, scale):
     values = [pl.col(name).cast(pl.Decimal(DECIMAL_PRECISION, scale)).sum().alias(name)
               for name in WEIGHT_NAMES]
     values.extend([pl.len().cast(pl.UInt64).alias('n_unweighted'),
@@ -80,7 +84,10 @@ def _native_groups(members, keys, product, scale):
     annual = members.group_by(*keys, 'YEAR').agg(values).rename({'YEAR': 'component_year'})
     pooled = members.group_by(keys).agg(values).with_columns(
         pl.lit(0, dtype=pl.Int64).alias('component_year'))
-    wide = pl.concat([annual, pooled], how='diagonal')
+    return annual, pooled
+
+
+def _native_long_groups(wide, keys, product):
     components = pl.LazyFrame({'component_year': [0, *product.years]},
                              schema={'component_year': pl.Int64})
     grid = wide.select(keys).unique().join(components, how='cross')
@@ -100,6 +107,104 @@ def _native_groups(members, keys, product, scale):
         exact.alias('sum_exact'),
         pl.col('n_unweighted').cast(pl.Float64).alias('fractional_support_mass'),
     ).drop('_weight', '_sum').sort([*keys, 'component_year', 'replicate'])
+
+
+def _native_groups(members, keys, product, scale):
+    annual, pooled = _native_wide_groups(members, keys, scale)
+    return _native_long_groups(pl.concat([annual, pooled], how='diagonal'), keys, product)
+
+
+def _sink_native_aggregate(frame, destination):
+    safe_path(destination)
+    with destination.open('xb') as stream:
+        frame.sink_parquet(stream)
+
+
+def _native_wide_schema(keys, scale):
+    return {**{key: pl.String for key in keys}, 'component_year': pl.Int64,
+            **{name: pl.Decimal(DECIMAL_PRECISION, scale) for name in WEIGHT_NAMES},
+            'n_unweighted': pl.UInt64, 'flags': pl.List(pl.String)}
+
+
+def _spill_native_long(wide, keys, product, directory, label, batch_size, scale,
+                       coverage=None):
+    registry_path = directory / f'{label}-keys.parquet'
+    _sink_native_aggregate(wide.select(keys).unique().sort(keys), registry_path)
+    registry = pl.scan_parquet(registry_path)
+    _reject_any(registry, pl.any_horizontal(pl.col(key).is_null() for key in keys),
+                'null aggregate join key')
+    paths = []
+    offset = 0
+    while True:
+        batch = registry.slice(offset, batch_size).collect()
+        if batch.is_empty() and paths:
+            break
+        selected = wide.join(batch.lazy(), on=keys, how='semi')
+        long = _native_long_groups(selected, keys, product)
+        if coverage is not None:
+            long = long.join(coverage, on=[*keys, 'component_year'], how='left',
+                             validate='m:1', maintain_order='left')
+        path = directory / f'{label}-long-{len(paths):08d}.parquet'
+        _sink_native_aggregate(long, path)
+        if label == 'cells':
+            _reject_any(pl.scan_parquet(path).filter(pl.col('replicate').eq(0)),
+                        pl.col('sum_exact').cast(pl.Decimal(DECIMAL_PRECISION, scale)).lt(0),
+                        'negative full cell mass')
+        paths.append(path)
+        if batch.height < batch_size:
+            break
+        offset += batch_size
+    return pl.concat([pl.scan_parquet(path) for path in paths])
+
+
+def _aggregate_native_spilled(rows: FamilyRows, scratch: Path, *,
+                              batch_size: int = 128) -> AggregateSet:
+    '''Persist aggregate-only shards; returned scans live until caller removes scratch.'''
+    if rows.product.pool_divisor not in (1, 2) or not rows.product.years:
+        raise ValueError('unsupported declared pooling period')
+    if isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size <= 0:
+        raise ValueError('batch_size must be a positive integer')
+    if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]*', rows.product.product_id):
+        raise ValueError('unsafe native aggregate product ID')
+    scratch = Path(scratch)
+    safe_path(scratch)
+    if not scratch.is_dir():
+        raise ValueError('native aggregate scratch must be an existing directory')
+    directory = scratch / ('native-' + rows.product.product_id)
+    safe_path(directory)
+    directory.mkdir()
+    try:
+        scale = _weight_scale(rows)
+        wide_frames = {}
+        for label, keys in [('cells', PAIR_KEYS), ('denominators', DENOMINATOR_KEYS)]:
+            paths = []
+            schema = _native_wide_schema(keys, scale)
+            for component, frame in zip(('annual', 'pooled'),
+                    _native_wide_groups(rows.members, keys, scale), strict=True):
+                path = directory / f'{label}-{component}.parquet'
+                _sink_native_aggregate(_typed_projection(frame, schema), path)
+                if list(pl.scan_parquet(path).collect_schema().items()) != list(schema.items()):
+                    raise ValueError('native wide aggregate schema mismatch')
+                paths.append(path)
+            wide_frames[label] = pl.concat([pl.scan_parquet(path) for path in paths])
+        coverage = None
+        if rows.product.view == 'canonical':
+            coverage_path = directory / 'coverage.parquet'
+            _sink_native_aggregate(rows.members.select(
+                *DENOMINATOR_KEYS, '_canonical_native_coverage').unique().explode(
+                    '_canonical_native_coverage').unnest('_canonical_native_coverage'),
+                coverage_path)
+            coverage = pl.scan_parquet(coverage_path)
+        diagnostics_path = directory / 'diagnostics.parquet'
+        _sink_native_aggregate(rows.diagnostics, diagnostics_path)
+        cells = _spill_native_long(wide_frames['cells'], PAIR_KEYS, rows.product, directory,
+                                   'cells', batch_size, scale)
+        denominators = _spill_native_long(wide_frames['denominators'], DENOMINATOR_KEYS,
+            rows.product, directory, 'denominators', batch_size, scale, coverage)
+        return AggregateSet(cells, denominators, pl.scan_parquet(diagnostics_path), rows.product)
+    except BaseException:
+        shutil.rmtree(directory)
+        raise
 
 
 def aggregate_native(rows: FamilyRows) -> AggregateSet:
@@ -328,3 +433,186 @@ def estimate(aggregates: AggregateSet) -> dict[str, pl.LazyFrame]:
         'replicates': _typed_projection(replicates, REPLICATE_SCHEMA).sort(
             [*STAT_KEY_COLUMNS, 'replicate'], nulls_last=False),
     }
+
+
+ESTIMATE_INPUT_CHUNK_ROWS = 4096
+
+
+def _aggregate_batches(frame):
+    return frame.collect_batches(chunk_size=ESTIMATE_INPUT_CHUNK_ROWS,
+                                 engine='streaming', maintain_order=True, lazy=True)
+
+
+class _OrderedAggregateReader:
+    '''Read and validate one complete fact key with a bounded unfinished carry.'''
+
+    def __init__(self, frame, keys, product):
+        self.schema = frame.collect_schema()
+        expected = {**{key: pl.String for key in keys},
+                    'component_year': pl.Int64, 'replicate': pl.UInt8}
+        if any(self.schema.get(key) != dtype for key, dtype in expected.items()):
+            raise ValueError('aggregate join key types must match ordered aggregate schema')
+        self._keys = [self.schema.names().index(key) for key in keys]
+        self._grain = [*self._keys, self.schema.names().index('component_year'),
+                       self.schema.names().index('replicate')]
+        self._components = sorted([0, *product.years])
+        self._group_rows = len(self._components) * (REPLICATE_COUNT + 1)
+        self._batches = _aggregate_batches(frame)
+        self._batch = None
+        self._offset = 0
+        self._previous = None
+        self._rows = []
+
+    def release(self):
+        # The pinned Polars batch iterator has no public cancellation method.
+        self._batches = None
+        self._batch = None
+        self._rows = []
+
+    def _take_row(self):
+        while self._batch is None or self._offset == self._batch.height:
+            self._batch = next(self._batches, None)
+            self._offset = 0
+            if self._batch is None:
+                return None
+        row = self._batch.row(self._offset)
+        self._offset += 1
+        return row
+
+    def next_group(self):
+        key = None
+        while len(self._rows) < self._group_rows:
+            row = self._take_row()
+            if row is None:
+                if self._rows:
+                    raise ValueError('incomplete aggregate component/replicate membership')
+                return None
+            grain = tuple(row[index] for index in self._grain)
+            if any(value is None for value in grain):
+                raise ValueError('null aggregate join key')
+            if self._previous is not None:
+                if grain == self._previous:
+                    raise ValueError('duplicate aggregate join keys')
+                if grain < self._previous:
+                    raise ValueError('aggregate input must be globally ordered by full grain')
+            self._previous = grain
+            row_key = grain[:-2]
+            if key is None:
+                key = row_key
+            if (row_key != key or grain[-2] not in self._components
+                    or not 0 <= grain[-1] <= REPLICATE_COUNT):
+                raise ValueError('incomplete aggregate component/replicate membership')
+            self._rows.append(row)
+        # C strictly increasing grains from C allowed members fill the complete grid.
+        frame = pl.DataFrame(self._rows, schema=self.schema, orient='row')
+        self._rows = []
+        return key, frame
+
+
+@dataclass(frozen=True)
+class _EstimateFragment:
+    path: Path
+    first_key: tuple | None
+    last_key: tuple | None
+    row_count: int
+    schema: tuple
+
+
+def _sink_estimate_fragment(frame, directory, label, index, keys):
+    schema = tuple(frame.collect_schema().items())
+    summary = frame.select(pl.len().alias('n'),
+        pl.struct(keys).first().alias('first'), pl.struct(keys).last().alias('last')).collect()
+    count, first, last = summary.row(0)
+    if not count:
+        return
+    path = directory / f'{label}-{index:08d}.parquet'
+    _sink_native_aggregate(frame, path)
+    return _EstimateFragment(path, tuple(first.values()), tuple(last.values()), count, schema)
+
+
+def _spill_estimates(aggregates: AggregateSet, workspace: Path, *,
+                     batch_size: int = 128) -> dict[str, pl.LazyFrame]:
+    '''Merge ordered aggregate scans; result scans live until caller removes workspace.'''
+    product = aggregates.product
+    if product.pool_divisor not in (1, 2) or not product.years:
+        raise ValueError('unsupported declared pooling period')
+    if isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size <= 0:
+        raise ValueError('batch_size must be a positive integer')
+    if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]*', product.product_id):
+        raise ValueError('unsafe estimator aggregate product ID')
+    workspace = Path(workspace)
+    safe_path(workspace)
+    if not workspace.is_dir():
+        raise ValueError('estimator workspace must be an existing directory')
+    directory = workspace / ('estimates-' + product.product_id)
+    safe_path(directory)
+    directory.mkdir()
+    cells = denominators = None
+    try:
+        cells = _OrderedAggregateReader(aggregates.cells, PAIR_KEYS, product)
+        denominators = _OrderedAggregateReader(aggregates.denominators, DENOMINATOR_KEYS, product)
+        empty_cells = pl.DataFrame(schema=cells.schema).lazy()
+        fragments = {name: [] for name in ('targets', 'support', 'replicates')}
+        schemas = {'targets': TARGET_SCHEMA, 'support': SUPPORT_SCHEMA,
+                   'replicates': REPLICATE_SCHEMA}
+        keys = {'targets': TARGET_KEY_COLUMNS,
+                'support': [*STAT_KEY_COLUMNS, 'record_kind', 'component_year'],
+                'replicates': [*STAT_KEY_COLUMNS, 'replicate']}
+
+        def sink(label, frame):
+            fragment = _sink_estimate_fragment(frame, directory, label,
+                                               len(fragments[label]), keys[label])
+            if fragment is not None:
+                fragments[label].append(fragment)
+
+        def sink_cells(batch, denominator):
+            bounded = AggregateSet(pl.concat(batch).lazy(), denominator.lazy(),
+                                   aggregates.diagnostics, product)
+            outputs = estimate(bounded)
+            sink('targets', outputs['targets'])
+            sink('support', outputs['support'].filter(pl.col('record_kind').eq('cell')))
+            sink('replicates', outputs['replicates'])
+
+        cell = cells.next_group()
+        denominator = denominators.next_group()
+        while denominator is not None:
+            a, facts = denominator
+            if cell is not None and cell[0][:len(DENOMINATOR_KEYS)] < a:
+                raise ValueError('cell missing denominator aggregate')
+            statuses = estimate(AggregateSet(empty_cells, facts.lazy(),
+                                            aggregates.diagnostics, product))['support']
+            sink('support', statuses.filter(pl.col('record_kind').eq('denominator_status')))
+            del statuses
+            batch = []
+            while cell is not None and cell[0][:len(DENOMINATOR_KEYS)] == a:
+                batch.append(cell[1])
+                cell = None
+                if len(batch) == batch_size:
+                    sink_cells(batch, facts)
+                    batch.clear()
+                cell = cells.next_group()
+            if batch:
+                sink_cells(batch, facts)
+                batch.clear()
+            denominator = None
+            del facts
+            denominator = denominators.next_group()
+        if cell is not None:
+            raise ValueError('cell missing denominator aggregate')
+        outputs = {}
+        for label, records in fragments.items():
+            paths = [fragment.path for fragment in records]
+            if not paths:
+                path = directory / f'{label}-empty.parquet'
+                _sink_native_aggregate(pl.LazyFrame(schema=schemas[label]), path)
+                paths.append(path)
+            outputs[label] = pl.concat([pl.scan_parquet(path) for path in paths])
+        return outputs
+    except BaseException:
+        shutil.rmtree(directory)
+        raise
+    finally:
+        if cells is not None:
+            cells.release()
+        if denominators is not None:
+            denominators.release()

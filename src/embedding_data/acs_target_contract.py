@@ -156,6 +156,8 @@ AUXILIARY_KEYS = {
     'allocation_residuals': list(RESIDUAL_SCHEMA)[:13],
 }
 TARGET_TABLES = ('targets_observed', 'targets_canonical', 'targets_allocated_area_mix')
+_VALIDATION_PREFIX = ['source', 'family', 'unit_a_type', 'unit_a']
+_VALIDATION_CHUNK_ROWS = 4096
 
 
 @dataclass(frozen=True)
@@ -265,9 +267,58 @@ def _reject(lf: pl.LazyFrame, checks: dict[str, pl.Expr]) -> None:
             raise ValueError(name)
 
 
+def _validation_partitions(frames, prefix=None):
+    '''Yield complete actual prefixes from every side, retaining all original rows.'''
+    prefix = _VALIDATION_PREFIX if prefix is None else prefix
+    frames = [_lazy(frame) for frame in frames]
+    registry = pl.concat([lf.select(prefix) for lf in frames]).unique().sort(
+        prefix, nulls_last=False)
+    batches = registry.collect_batches(chunk_size=_VALIDATION_CHUNK_ROWS, maintain_order=True,
+                                       engine='streaming', lazy=True)
+    try:
+        for batch in batches:
+            for values in batch.iter_rows():
+                predicate = pl.all_horizontal([
+                    pl.col(name).eq_missing(value) for name, value in zip(prefix, values,
+                                                                         strict=True)])
+                yield tuple(lf.filter(predicate) for lf in frames)
+    finally:
+        del batches
+
+
+def _validate_key_order(lf, keys, message):
+    '''Check original serialized key order across batches without sorting away corruption.'''
+    batches = _lazy(lf).select(keys).collect_batches(
+        chunk_size=_VALIDATION_CHUNK_ROWS, maintain_order=True, engine='streaming', lazy=True)
+    previous = None
+    try:
+        for batch in batches:
+            for values in batch.iter_rows():
+                # Optional keys use the existing nulls-first lexicographic order.
+                current = tuple((value is not None, value) for value in values)
+                if previous is not None and current < previous:
+                    raise ValueError(message)
+                previous = current
+    finally:
+        del batches
+
+
 def _unique(lf: pl.LazyFrame, keys: list[str], description: str) -> None:
-    if lf.group_by(keys).len().filter(pl.col('len').gt(1)).select(pl.len()).collect().item():
-        raise ValueError('duplicate ' + description)
+    if 'workplace_unit' in keys:
+        prefix = ['source', 'family', 'workplace_unit_type', 'workplace_unit',
+                  'code_unit_type', 'code_unit']
+    elif 'source_parquet_sha256' in keys:
+        prefix = ['source', 'profile', 'delivery_id', 'source_parquet_sha256',
+                  'sample_id', 'component_year']
+    else:
+        prefix = [name for name in _VALIDATION_PREFIX if name in keys]
+    if not prefix:
+        partitions = [(lf,)]
+    else:
+        partitions = _validation_partitions([lf], prefix)
+    for (part,) in partitions:
+        if part.group_by(keys).len().filter(pl.col('len').gt(1)).select(pl.len()).collect().item():
+            raise ValueError('duplicate ' + description)
 
 
 def validate_statistic_keys(frame: pl.DataFrame | pl.LazyFrame) -> None:
@@ -308,12 +359,18 @@ def _decimal_invalid(column: str) -> pl.Expr:
 
 def validate_auxiliary(name: str, frame: pl.DataFrame | pl.LazyFrame) -> None:
     '''Check exact ordered types, null-safe grains and explicit per-table value domains.'''
+    _validate_auxiliary_rows(name, frame)
+    lf = _lazy(frame)
+    _unique(lf, AUXILIARY_KEYS[name], name + ' key')
+    _validate_key_order(lf, AUXILIARY_KEYS[name], name + ': key sort differs')
+
+
+def _validate_auxiliary_rows(name, frame):
     if name not in AUXILIARY_SCHEMAS:
         raise ValueError('unknown auxiliary table: ' + name)
     schema, lf = AUXILIARY_SCHEMAS[name], _lazy(frame)
     if list(lf.collect_schema().items()) != list(schema.items()):
         raise ValueError(name + ': ordered schema differs')
-    _unique(lf, AUXILIARY_KEYS[name], name + ' key')
     nullable = {
         'target_units': set(UNIT_SCHEMA) - {'unit_type', 'unit', 'kind'},
         'target_support': {
@@ -356,13 +413,6 @@ def validate_auxiliary(name: str, frame: pl.DataFrame | pl.LazyFrame) -> None:
         'allocation_residuals': _validate_residuals,
     }
     validators[name](lf)
-    keys = pl.struct(AUXILIARY_KEYS[name])
-    if (
-        lf.select(keys.ne(keys.sort_by(AUXILIARY_KEYS[name], nulls_last=False)).any())
-        .collect()
-        .item()
-    ):
-        raise ValueError(name + ': key sort differs')
 
 
 def _validate_units(lf: pl.LazyFrame) -> None:
@@ -721,7 +771,7 @@ def validate_cross_tables(
     if set(tables) != set(AUXILIARY_SCHEMAS) | set(TARGET_TABLES):
         raise ValueError('bundle table names differ')
     for name in AUXILIARY_SCHEMAS:
-        validate_auxiliary(name, tables[name])
+        _validate_auxiliary_rows(name, tables[name])
     registry = _product_registry(products).lazy()
     units = _lazy(tables['target_units'])
     support = _lazy(tables['target_support'])
@@ -854,8 +904,8 @@ def validate_cross_tables(
     target_frames = []
     for name in TARGET_TABLES:
         lf = _lazy(tables[name])
-        validate_targets(lf)
-        validate_statistic_keys(lf)
+        if list(lf.collect_schema().items()) != list(TARGET_SCHEMA.items()):
+            raise ValueError('targets schema must match exact ordered targets-v1 types')
         if name == 'targets_allocated_area_mix':
             lf = lf.join(
                 units.select(
@@ -890,6 +940,34 @@ def validate_cross_tables(
             )
         target_frames.append(lf.select('view', *TARGET_SCHEMA))
     targets = pl.concat(target_frames)
+    # This is implied by target-to-pooled membership, but reject it before filtering.
+    _anti_join(targets, registry,
+               ['source', 'family', 'view', 'sample_set', 'vintage', 'universe'],
+               'target has unknown product metadata')
+    for name, lf in [('target', targets), ('replicate', replicates)]:
+        for side in ('a', 'b'):
+            endpoints = lf.select(
+                pl.col('unit_' + side + '_type').alias('unit_type'),
+                pl.col('unit_' + side).alias('unit'),
+            )
+            _anti_join(endpoints, units, ['unit_type', 'unit'],
+                       name + ' endpoint missing from unit registry')
+    for name in AUXILIARY_SCHEMAS:
+        _unique(_lazy(tables[name]), AUXILIARY_KEYS[name], name + ' key')
+        _validate_key_order(tables[name], AUXILIARY_KEYS[name], name + ': key sort differs')
+    for name in TARGET_TABLES:
+        lf = _lazy(tables[name])
+        for (part,) in _validation_partitions([lf]):
+            validate_targets(part)
+        validate_statistic_keys(lf)
+    native_scales = _native_numeric_scales(support)
+    for support_part, replicate_part, target_part in _validation_partitions(
+            [support, replicates, targets]):
+        _validate_statistic_relationships(support_part, replicate_part, target_part, native_scales)
+
+
+def _validate_statistic_relationships(support, replicates, targets, native_scales):
+    '''Keep every view, component and b code for a denominator together.'''
     pooled = support.filter(pl.col('component_year').eq(0).and_(pl.col('record_kind').eq('cell')))
     _anti_join(targets, pooled, STAT_KEY_COLUMNS, 'target missing pooled cell support')
     _anti_join(replicates, pooled, STAT_KEY_COLUMNS, 'orphan replicate statistic')
@@ -958,10 +1036,20 @@ def validate_cross_tables(
         },
     )
 
-    _validate_numeric_relationships(tables, targets, pooled, replicates)
+    _validate_numeric_relationships({'target_support': support}, targets, pooled, replicates,
+                                    native_scales=native_scales)
 
 
-def _validate_numeric_relationships(tables, targets, pooled, replicates):
+def _native_numeric_scales(support):
+    native = support.filter(pl.col('record_kind').eq('cell') &
+                            pl.col('view').is_in(['observed', 'canonical']))
+    return {column: native.select(
+        pl.col(column).str.split('.').list.get(1, null_on_oob=True).str.len_chars().max()
+    ).collect().item() or 0
+        for column in ('cell_weight_sum_exact', 'denominator_weight_sum_exact')}
+
+
+def _validate_numeric_relationships(tables, targets, pooled, replicates, *, native_scales=None):
     '''Reconcile each point, paired variance vector and exact native support decomposition.'''
     from embedding_data.acs_target_estimation import replicate_se
 
@@ -1003,8 +1091,8 @@ def _validate_numeric_relationships(tables, targets, pooled, replicates):
             pl.col(exact).cast(F) / pl.col('pool_divisor'))})
     # Decimal aggregation occurs before Float64, matching the native estimator contract.
     for column in ('cell_weight_sum_exact', 'denominator_weight_sum_exact'):
-        scale = native.select(pl.col(column).str.split('.').list.get(1, null_on_oob=True)
-                              .str.len_chars().max()).collect().item() or 0
+        scale = (_native_numeric_scales(support) if native_scales is None
+                 else native_scales)[column]
         annual = native.filter(pl.col('component_year').ne(0)).group_by(STAT_KEY_COLUMNS).agg(
             pl.col(column).cast(pl.Decimal(38, scale)).sum().alias('_annual_sum'),
             pl.len().alias('_annual_count'))

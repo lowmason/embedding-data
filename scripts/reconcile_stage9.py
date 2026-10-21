@@ -3,10 +3,13 @@
 import importlib.util
 import json
 import math
+import shutil
 from collections import defaultdict
 from decimal import Decimal, localcontext
+from itertools import groupby
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import NamedTuple
 
 import polars as pl
 import typer
@@ -193,6 +196,166 @@ def compare_rows(gates, group, name, actual, expected, keys, *, exact=False):
                     actual=actual_value,
                     expected=expected_value,
                 )
+
+
+def _normalized_sort(frame, keys):
+    '''Keep original typed keys and input ordinal through lexical null-first sorting.'''
+    for key in keys:
+        if key not in frame.collect_schema():
+            raise KeyError(key)
+    ordinal = '__independent_ordinal'
+    io.require(ordinal not in frame.collect_schema(), 'reserved comparison column')
+    ordered = frame.with_columns(pl.int_range(0, pl.len(), dtype=pl.UInt64).alias(ordinal))
+    expressions = []
+    for key in keys:
+        expressions.extend((pl.col(key).is_not_null(), pl.col(key).cast(pl.String).fill_null('')))
+    return ordered.sort([*expressions, pl.col(ordinal)], maintain_order=True), ordinal
+
+
+def _field_equal(name, field, actual_value, expected_value, expected, exact):
+    equal = actual_value == expected_value
+    if isinstance(expected_value, float) and actual_value is not None and not exact:
+        if field in ('value', 'estimate') and expected.get('measure') == 'forward_share':
+            return calc.close_share(actual_value, expected_value)
+        if (
+            field == 'se'
+            or expected.get('view', '').startswith('allocated')
+            or name == 'targets_allocated_area_mix'
+            or name.startswith('allocation_')
+        ):
+            return calc.close_allocated_or_se(actual_value, expected_value)
+        return math.isfinite(actual_value) and actual_value == expected_value
+    return equal
+
+
+def _compare_fact_rows(
+    gates, group, name, actual, expected, keys, workspace, *, exact=False, batch_rows=4096
+):
+    '''Merge complete key groups; ledger duplicates in original side/encounter order.'''
+    io.require(type(batch_rows) is int and batch_rows > 0, 'invalid batch_rows')
+    with TemporaryDirectory(prefix='comparison-', dir=workspace) as temporary:
+        owner = Path(temporary)
+        duplicate_tables = []
+
+        def grouped(frame, label):
+            ordered, ordinal = _normalized_sort(frame, keys)
+            path = owner / (label + '-ordered.parquet')
+            calc._sink(ordered, path)
+            writer = calc._FactWriter(
+                owner,
+                label + '-duplicates',
+                {'ordinal': pl.UInt64, 'key': pl.String},
+                ['ordinal'],
+                '',
+                None,
+                batch_rows,
+            )
+            last_key, last = None, None
+            for row in calc._rows(pl.scan_parquet(path), batch_rows):
+                position = row.pop(ordinal)
+                key = tuple(row[k] for k in keys)
+                if last is not None and key == last_key:
+                    writer.append({'ordinal': position, 'key': json.dumps(list(key))})
+                elif last is not None:
+                    yield last_key, last
+                last_key, last = key, row
+            if last is not None:
+                yield last_key, last
+            duplicate_tables.append((label, writer.finish(sort=True)))
+
+        field_ledger = owner / 'fields.jsonl'
+        with field_ledger.open('x') as output:
+
+            def record(check, **details):
+                single = {group: {'failures': []}}
+                fail(single, group, check, **details)
+                output.write(json.dumps(single[group]['failures'][0], allow_nan=False) + '\n')
+
+            a_rows, e_rows = iter(grouped(actual, 'actual')), iter(grouped(expected, 'expected'))
+            a, e = next(a_rows, None), next(e_rows, None)
+            while a is not None or e is not None:
+                if e is None or (a is not None and sort_key(a[0]) < sort_key(e[0])):
+                    record(
+                        name + ': key set differs',
+                        key=list(a[0]),
+                        actual_present=True,
+                        expected_present=False,
+                    )
+                    a = next(a_rows, None)
+                elif a is None or sort_key(e[0]) < sort_key(a[0]) or a[0] != e[0]:
+                    record(
+                        name + ': key set differs',
+                        key=list(e[0]),
+                        actual_present=False,
+                        expected_present=True,
+                    )
+                    e = next(e_rows, None)
+                else:
+                    for field in set(a[1]) | set(e[1]):
+                        av, ev = a[1].get(field), e[1].get(field)
+                        if not _field_equal(name, field, av, ev, e[1], exact):
+                            record(
+                                name + ': field differs',
+                                key=list(a[0]),
+                                field=field,
+                                actual=av,
+                                expected=ev,
+                            )
+                    a, e = next(a_rows, None), next(e_rows, None)
+        for label, table in sorted(duplicate_tables, key=lambda item: item[0]):
+            for row in calc._rows(_scan(table), batch_rows):
+                fail(
+                    gates,
+                    group,
+                    name + ': duplicate ' + label + ' key',
+                    key=json.loads(row['key']),
+                )
+        with field_ledger.open() as source:
+            for line in source:
+                gates[group]['failures'].append(json.loads(line))
+
+
+def _compare_original_order(first, second, *, batch_rows=4096):
+    '''Drain independently sized batches while comparing aligned original serialized slices.'''
+    io.require(type(batch_rows) is int and batch_rows > 0, 'invalid batch_rows')
+    schema_equal = list(first.collect_schema().items()) == list(second.collect_schema().items())
+    streams = [
+        iter(
+            frame.collect_batches(
+                chunk_size=batch_rows, engine='streaming', maintain_order=True, lazy=True
+            )
+        )
+        for frame in (first, second)
+    ]
+    counts = [0, 0]
+
+    def advance(side):
+        batch = next(streams[side], None)
+        if batch is not None:
+            counts[side] += batch.height
+        return batch
+
+    a, b = advance(0), advance(1)
+    values_equal = schema_equal
+    while a is not None or b is not None:
+        if a is None:
+            values_equal = False
+            b = advance(1)
+        elif b is None:
+            values_equal = False
+            a = advance(0)
+        else:
+            length = min(a.height, b.height)
+            if schema_equal and not a.head(length).equals(b.head(length)):
+                values_equal = False
+            a = a.slice(length) if a.height > length else advance(0)
+            b = b.slice(length) if b.height > length else advance(1)
+    return {
+        'schema_equal': schema_equal,
+        'values_equal': values_equal,
+        'first_rows': counts[0],
+        'second_rows': counts[1],
+    }
 
 
 def schemas(code_schema):
@@ -411,6 +574,177 @@ def calculate(data_dir, mapping, mapping_inputs, frozen, scratch):
         mapping, code_dir, geo_dir, expected_schemas['target_units']
     )
     return expected, expected_schemas, sources, registry, allocation_measurements
+
+
+class _DiskCalculation(NamedTuple):
+    owner: Path
+    tables: dict[str, calc._FactTable]
+    schemas: dict
+    sources: dict
+    registry: tuple[dict, ...]
+    allocation_measurements: tuple[calc._FactTable, ...]
+
+
+def _typed_schema(schema):
+    def dtype(text):
+        if text.startswith('List('):
+            return pl.List(dtype(text[5:-1]))
+        return getattr(pl, text)
+
+    return pl.Schema({name: dtype(text) for name, text in schema.items()})
+
+
+def _scan(table):
+    return pl.scan_parquet(table.paths, glob=False)
+
+
+def _table_keys(name):
+    return tuple(KEYS.get(name, TARGET_KEYS))
+
+
+
+def _assemble_ranges(frame, name, owner, schema, keys, batch_rows):
+    '''Persist leading-prefix ranges in one ordered pass without deduplication.'''
+    ordered = owner / (name + '-ordered.parquet')
+    calc._sink(frame.sort(keys, nulls_last=False, maintain_order=True), ordered)
+    writer = calc._FactWriter(owner, name + '-range', schema, keys, '', None, batch_rows)
+    prefix_keys = keys[:4]
+    previous = None
+    for row in calc._rows(pl.scan_parquet(ordered), batch_rows):
+        prefix = tuple(row[k] for k in prefix_keys)
+        if previous is not None and prefix != previous and writer.rows:
+            writer.flush()
+        writer.append(row)
+        previous = prefix
+    result = writer.finish()
+    ordered.unlink()
+    return result
+
+
+def _calculate_disk(data_dir, mapping, mapping_inputs, frozen, scratch, *, batch_rows=4096):
+    '''Complete source-dependent work before publishing calculation-owned aggregate files.'''
+    io.require(type(batch_rows) is int and batch_rows > 0, 'invalid batch_rows')
+    declared = schemas(pl.read_parquet_schema(mapping / 'acs_code_lookup.parquet'))
+    typed = {name: _typed_schema(schema) for name, schema in declared.items()}
+    with calc._owned(scratch, 'independent-calculation') as owner:
+        work, outputs = owner / 'work', owner / 'outputs'
+        work.mkdir()
+        outputs.mkdir()
+        core, sources = calc.prepare_sources(data_dir, mapping, mapping_inputs, owner)
+        base, codes, usable = calc.semantic_frame(core)
+        nodes, counties, factors, code_dir, geo_dir = reference_facts(data_dir, frozen, mapping)
+        registry = tuple(calc.products())
+        paths = {name: [] for name in io.TABLES}
+        measurements = {}
+        final_schemas = {
+            name: typed[name] for name in ('target_support', 'replicate_estimates')
+        } | {'targets': typed['targets_observed']}
+
+        def retain(name, table):
+            path = outputs / f'{name}-{len(paths[name]):04d}.parquet'
+            calc._sink(_scan(table).select(typed[name].names()), path)
+            paths[name].append(path)
+
+        def finalize(facts, product):
+            completed = calc._finalize_disk(
+                facts.cells,
+                facts.denominators,
+                facts.coverage if isinstance(facts, calc._NativeFacts) else None,
+                product,
+                work,
+                schemas=final_schemas,
+                batch_rows=batch_rows,
+            )
+            for name in ('target_support', 'replicate_estimates'):
+                retain(name, completed[name])
+            target = (
+                'targets_allocated_area_mix'
+                if product['view'].startswith('allocated')
+                else ('targets_' + product['view'])
+            )
+            retain(target, completed['targets'])
+            retain('eligibility_diagnostics', facts.diagnostics)
+            shutil.rmtree(completed['targets'].owner)
+
+        comparison_fields = (
+            'family',
+            'dimension',
+            'base_universe',
+            'evidence_policy',
+            'years',
+            'sample_set',
+            'pool_divisor',
+        )
+        for product in registry:
+            if product['view'].startswith('allocated'):
+                continue
+            native = calc._expected_native_disk(
+                base,
+                core,
+                product,
+                nodes,
+                codes,
+                usable,
+                work,
+                diagnostic_schema=typed['eligibility_diagnostics'],
+                batch_rows=batch_rows,
+            )
+            finalize(native, product)
+            if product['view'] == 'observed':
+                for allocated in registry:
+                    if not allocated['view'].startswith('allocated') or not all(
+                        product[n] == allocated[n] for n in comparison_fields
+                    ):
+                        continue
+                    facts = calc._allocation_disk(
+                        native,
+                        allocated,
+                        factors,
+                        counties,
+                        work,
+                        residual_schema=typed['allocation_residuals'],
+                        diagnostic_schema=typed['eligibility_diagnostics'],
+                        batch_rows=batch_rows,
+                    )
+                    finalize(facts, allocated)
+                    retain('allocation_residuals', facts.residuals)
+                    path = outputs / ('measurements-' + allocated['product_id'] + '.parquet')
+                    calc._sink(_scan(facts.measurements), path)
+                    measurements[allocated['product_id']] = facts.measurements._replace(
+                        owner=owner, paths=(path,)
+                    )
+                    shutil.rmtree(facts.owner)
+            shutil.rmtree(native.owner)
+        units = pl.DataFrame(
+            expected_units(mapping, code_dir, geo_dir, declared['target_units']),
+            schema=typed['target_units'],
+        ).lazy()
+        unit_path = outputs / 'units.parquet'
+        calc._sink(units, unit_path)
+        paths['target_units'].append(unit_path)
+        tables = {}
+        for name in io.TABLES:
+            keys = _table_keys(name)
+            frame = (
+                pl.scan_parquet(paths[name], glob=False)
+                if paths[name]
+                else (pl.DataFrame(schema=typed[name]).lazy())
+            )
+            tables[name] = _assemble_ranges(frame, name, outputs, typed[name], keys, batch_rows)
+            for fragment in paths[name]:
+                fragment.unlink()
+        return _DiskCalculation(
+            owner,
+            tables,
+            declared,
+            sources,
+            registry,
+            tuple(
+                measurements[p['product_id']]
+                for p in registry
+                if p['view'].startswith('allocated')
+            ),
+        )
 
 
 def mapping_table_inventory(mapping):
@@ -825,6 +1159,407 @@ def report_checks(gates, report, expected, actual, registry, sources):
         fail(gates, 1, 'independent disjoint funnel closure failed')
 
 
+def _row_count(frame):
+    return frame.select(pl.len()).collect(engine='streaming').item()
+
+
+def _check_table_domain_counts(gates, name, actual, expected, keys, *, batch_rows=4096):
+    if name in ('target_support', 'replicate_estimates') and 'view' in actual.collect_schema():
+        invalid = actual.filter(
+            pl.col('view').is_null()
+            | ~pl.col('view').is_in(['observed', 'canonical', 'allocated_county', 'allocated_msa'])
+        )
+        for row in calc._rows(invalid, batch_rows):
+            fail(
+                gates,
+                2,
+                'unsupported support/replicate view',
+                table=name,
+                key=[row[k] for k in keys],
+                view=row['view'],
+            )
+    actual_count, expected_count = _row_count(actual), _row_count(expected)
+    if actual_count != expected_count:
+        fail(
+            gates,
+            2,
+            'independent table row count differs',
+            table=name,
+            actual=actual_count,
+            expected=expected_count,
+        )
+
+
+def _partition_disk(frame, keys, reducers, owner, label, batch_rows):
+    '''One sorted aggregate file, independent complete-group passes for each reduction.'''
+    path = owner / (label + '-groups.parquet')
+    calc._sink(frame.sort(keys, nulls_last=False, maintain_order=True), path)
+    schema = frame.collect_schema()
+    output_schema = {k: schema[k] for k in keys} | {n: dtype for n, dtype, _, _ in reducers}
+    writer = calc._FactWriter(owner, label, output_schema, keys, '', None, batch_rows)
+
+    def reduced(operation, column):
+        for key, values in groupby(
+            calc._rows(pl.scan_parquet(path), batch_rows),
+            key=lambda row: tuple(row[k] for k in keys),
+        ):
+            yield key, operation(row[column] if column else 1 for row in values)
+
+    streams = [reduced(operation, column) for _, _, operation, column in reducers]
+    for groups in zip(*streams, strict=True):
+        key = groups[0][0]
+        io.require(all(g[0] == key for g in groups), 'summary group alignment differs')
+        writer.append(
+            dict(zip(keys, key, strict=True))
+            | {spec[0]: group[1] for spec, group in zip(reducers, groups, strict=True)}
+        )
+    return writer.finish()
+
+
+def _report_conservation_disk(calculation, owner, batch_rows):
+    '''Keep only required product/year/r mass summaries, never cell or replicate indexes.'''
+    masses, residual_masses = {}, {}
+    registry = calculation.registry
+    products_by_id = {p['product_id']: p for p in registry}
+    for name, group_keys, value_column, text_column in [
+        ('target_support', ['product_id', 'component_year'], 'cell_mass', 'cell_weight_sum_exact'),
+        ('replicate_estimates', ['product_id', 'replicate'], 'numerator', 'numerator_sum_exact'),
+    ]:
+        frame = _scan(calculation.tables[name]).filter(
+            pl.col('family').eq('area_mix') & pl.col('measure').eq('annual_average_total')
+        )
+        if name == 'target_support':
+            frame = frame.filter(pl.col('record_kind').eq('cell'))
+        path = owner / (name + '-report-mass.parquet')
+        calc._sink(frame.sort([*group_keys, *calc.PAIR], maintain_order=True), path)
+        for key, values in groupby(
+            calc._rows(pl.scan_parquet(path), batch_rows),
+            key=lambda r: tuple(r[k] for k in group_keys),
+        ):
+            product = products_by_id[key[0]]
+            exact = None
+            if product['view'] == 'observed':
+                with localcontext() as context:
+                    context.prec = 80
+                    raw = sum((Decimal(r[text_column]) for r in values), Decimal(0))
+                exact = calc.decimal_text(raw)
+                mass = float(raw) / product['pool_divisor']
+            else:
+                mass = 0.0
+                for row in values:
+                    mass += row[value_column]
+            year, rep = (key[1], 0) if name == 'target_support' else (0, key[1])
+            masses[key[0], year, rep] = mass, exact
+    keys = ['product_id', 'component_year', 'replicate', 'residual_type']
+    path = owner / 'report-residual-masses.parquet'
+    calc._sink(
+        _scan(calculation.tables['allocation_residuals'])
+        .filter(pl.col('component_year').eq(0) | pl.col('replicate').eq(0))
+        .sort(
+            [*keys, 'workplace_unit_type', 'workplace_unit', 'code_unit_type', 'code_unit'],
+            maintain_order=True,
+        ),
+        path,
+    )
+    for key, values in groupby(
+        calc._rows(pl.scan_parquet(path), batch_rows), key=lambda r: tuple(r[k] for k in keys)
+    ):
+        mass = 0.0
+        for row in values:
+            mass += row['weighted_mass']
+        residual_masses[key] = mass
+
+    measurements, counts = [], []
+    match = ('dimension', 'base_universe', 'evidence_policy', 'years')
+    for observed in registry:
+        if observed['view'] != 'observed' or observed['family'] != 'area_mix':
+            continue
+        county = next(
+            p
+            for p in registry
+            if p['view'] == 'allocated_county' and all(p[n] == observed[n] for n in match)
+        )
+        metro = next(
+            p
+            for p in registry
+            if p['view'] == 'allocated_msa' and all(p[n] == observed[n] for n in match)
+        )
+        keys = {
+            (year, rep)
+            for pid, year, rep in masses
+            if pid in (observed['product_id'], county['product_id'], metro['product_id'])
+        }
+        keys |= {
+            (year, rep) for pid, year, rep, _ in residual_masses if pid == metro['product_id']
+        }
+        before = len(measurements)
+        for year, rep in sorted(keys):
+            native, exact = masses.get((observed['product_id'], year, rep), (0.0, None))
+            allocated = masses.get((county['product_id'], year, rep), (0.0, None))[0]
+            msa = masses.get((metro['product_id'], year, rep), (0.0, None))[0]
+            micro = residual_masses.get((metro['product_id'], year, rep, 'micropolitan'), 0.0)
+            no_cbsa = residual_masses.get((metro['product_id'], year, rep, 'no_cbsa'), 0.0)
+            for label, expected_mass, actual_mass in [
+                ('native_to_county', native, allocated),
+                ('county_to_msa_and_residuals', allocated, math.fsum((msa, micro, no_cbsa))),
+            ]:
+                difference = actual_mass - expected_mass
+                measurements.append(
+                    {
+                        'observed_product_id': observed['product_id'],
+                        'county_product_id': county['product_id'],
+                        'msa_product_id': metro['product_id'],
+                        'component_year': year,
+                        'replicate': rep,
+                        'check': label,
+                        'expected_mass': expected_mass,
+                        'actual_mass': actual_mass,
+                        'difference': difference,
+                        'absolute_error': abs(difference),
+                        'tolerance': 1e-8 + 1e-12 * abs(expected_mass),
+                        'status': 'pass'
+                        if calc.close_allocated_or_se(actual_mass, expected_mass)
+                        else 'fail',
+                        'native_weight_sum_exact': exact if label == 'native_to_county' else None,
+                        'metropolitan_mass': msa if label != 'native_to_county' else None,
+                        'micropolitan_mass': micro if label != 'native_to_county' else None,
+                        'no_cbsa_mass': no_cbsa if label != 'native_to_county' else None,
+                    }
+                )
+        counts.append(
+            {
+                'observed_product_id': observed['product_id'],
+                'serialized_check_count': len(measurements) - before,
+            }
+        )
+    return measurements, counts
+
+
+def _report_checks_disk(gates, report, calculation, actual, workspace, *, batch_rows=4096):
+    registry, sources = calculation.registry, calculation.sources
+    expected = {n: _scan(t) for n, t in calculation.tables.items()}
+    support_counts = {
+        r['product_id']: r
+        for r in expected['target_support']
+        .filter(pl.col('component_year').eq(0) & pl.col('record_kind').eq('cell'))
+        .group_by('product_id')
+        .agg(
+            pl.len().alias('supported_statistics'),
+            pl.col('point_status').eq('defined').sum().alias('target_rows'),
+        )
+        .collect(engine='streaming')
+        .iter_rows(named=True)
+    }
+    funnels = defaultdict(list)
+    for r in (
+        expected['eligibility_diagnostics']
+        .filter(pl.col('partition_kind').eq('first_exclusion'))
+        .group_by('product_id', 'component_year')
+        .agg(pl.col('n_unweighted').sum().alias('count'))
+        .sort('component_year')
+        .collect(engine='streaming')
+        .iter_rows(named=True)
+    ):
+        funnels[r['product_id']].append(
+            {'year': r['component_year'], 'input_rows': r['count'], 'partition_rows': r['count']}
+        )
+    expected_products = {}
+    for product in registry:
+        pid = product['product_id']
+        counts = support_counts.get(pid, {'target_rows': 0, 'supported_statistics': 0})
+        expected_products[pid] = {
+            'product': product,
+            'target_rows': counts['target_rows'],
+            'supported_statistics': counts['supported_statistics'],
+            'empty_reason': None
+            if counts['target_rows']
+            else 'no_positive_eligible_supported_cells',
+            'funnel_closure': funnels[pid],
+        }
+    actual_products = {r['product']['product_id']: r for r in report.get('products', [])}
+    if len(report.get('products', [])) != 50:
+        fail(gates, 6, 'report product count is not exactly50')
+    for pid in sorted(set(actual_products) | set(expected_products)):
+        if actual_products.get(pid) != expected_products.get(pid):
+            fail(
+                gates,
+                6,
+                'product counts/empty reasons/funnel closure differ',
+                product_id=pid,
+                actual=actual_products.get(pid),
+                expected=expected_products.get(pid),
+            )
+    for name, frame in actual.items():
+        schema = frame.collect_schema()
+        expected_table = {
+            'rows': _row_count(frame),
+            'columns': schema.names(),
+            'schema': {n: str(t) for n, t in schema.items()},
+        }
+        if report.get('tables', {}).get(name) != expected_table:
+            fail(gates, 2, 'report table schema/count differs', table=name)
+        keys = KEYS.get(name, [n for n in TARGET_KEYS if n != 'se_method'])
+        if set(keys) <= set(schema):
+            _check_table_domain_counts(
+                gates, name, frame, expected[name], keys, batch_rows=batch_rows
+            )
+        elif _row_count(frame) != _row_count(expected[name]):
+            fail(
+                gates,
+                2,
+                'independent table row count differs',
+                table=name,
+                actual=_row_count(frame),
+                expected=_row_count(expected[name]),
+            )
+    with TemporaryDirectory(prefix='report-', dir=workspace) as temporary:
+        owner = Path(temporary)
+        partitions = [
+            (
+                'diagnostic_partitions',
+                1,
+                'eligibility_diagnostics',
+                [
+                    'product_id',
+                    'component_year',
+                    'partition_kind',
+                    'variable',
+                    'evidence_status',
+                    'reason',
+                ],
+                [
+                    ('n_unweighted', pl.UInt64, sum, 'n_unweighted'),
+                    ('weighted_mass', pl.Float64, math.fsum, 'weighted_mass'),
+                ],
+            ),
+            (
+                'support_distributions',
+                6,
+                'target_support',
+                [
+                    'product_id',
+                    'component_year',
+                    'measure',
+                    'record_kind',
+                    'point_status',
+                    'se_status',
+                    'se_reason',
+                ],
+                [
+                    ('rows', pl.UInt64, sum, None),
+                    ('n_min', pl.UInt64, min, 'n_unweighted'),
+                    ('n_max', pl.UInt64, max, 'n_unweighted'),
+                ],
+            ),
+            (
+                'allocation_residuals',
+                5,
+                'allocation_residuals',
+                ['product_id', 'component_year', 'replicate', 'residual_type'],
+                [
+                    ('weighted_mass', pl.Float64, math.fsum, 'weighted_mass'),
+                    ('fractional_support_mass', pl.Float64, math.fsum, 'fractional_support_mass'),
+                ],
+            ),
+        ]
+        for name, group, table, keys, reducers in partitions:
+            summary = _partition_disk(expected[table], keys, reducers, owner, name, batch_rows)
+            values = report.get(name, [])
+            reported = (
+                pl.DataFrame(values, infer_schema_length=None)
+                if values
+                else pl.DataFrame(schema=summary.schema)
+            ).lazy()
+            _compare_fact_rows(
+                gates, group, name, reported, _scan(summary), keys, owner, batch_rows=batch_rows
+            )
+        measurements, counts = _report_conservation_disk(calculation, owner, batch_rows)
+        conservation = report.get('allocation_conservation', {})
+        compare_rows(
+            gates,
+            5,
+            'allocation_conservation',
+            conservation.get('measurements', []),
+            measurements,
+            ['observed_product_id', 'component_year', 'replicate', 'check'],
+        )
+        compare_rows(
+            gates,
+            5,
+            'allocation_product_counts',
+            conservation.get('products', []),
+            counts,
+            ['observed_product_id'],
+            exact=True,
+        )
+        if (
+            conservation.get('serialized_check_count') != len(measurements)
+            or conservation.get('serialized_failure_count') != 0
+        ):
+            fail(gates, 5, 'allocation conservation check/failure counts differ')
+        if (
+            conservation.get('absolute_tolerance') != 1e-8
+            or conservation.get('relative_tolerance') != 1e-12
+        ):
+            fail(gates, 6, 'reported numerical tolerances differ')
+    if (
+        sum(r['input_rows'] for values in funnels.values() for r in values)
+        != sources['acs/core']['rows'] * 50
+    ):
+        fail(gates, 1, 'independent disjoint funnel closure failed')
+
+
+
+def _allocation_evidence_disk(gates, tables, *, batch_rows=4096):
+    '''Retain every measurement and nest failed records without reserved-key collisions.'''
+    io.require(type(batch_rows) is int and batch_rows > 0, 'invalid batch_rows')
+    measurements = []
+    for table in tables:
+        for row in calc._rows(_scan(table), batch_rows):
+            measurement = {k: v for k, v in row.items() if k != '_check_order'}
+            measurements.append(measurement)
+            if measurement['status'] != 'pass':
+                fail(
+                    gates,
+                    5,
+                    'independent annual/pooled full/all80 conservation failed',
+                    measurement=measurement,
+                )
+    return measurements
+
+
+def _substantive_report(value):
+    return {k: v for k, v in value.items() if k not in ('run_id', 'created_at')}
+
+
+def _replay_checks_disk(gates, actual, replay, workspace, *, batch_rows=4096):
+    for name, frame in actual.items():
+        second = replay[name]
+        comparison = _compare_original_order(frame, second, batch_rows=batch_rows)
+        if not comparison['schema_equal']:
+            fail(gates, 6, 'exact replay schema differs', table=name)
+        elif not comparison['values_equal']:
+            keys = KEYS.get(name, [n for n in TARGET_KEYS if n != 'se_method'])
+            _compare_fact_rows(
+                gates,
+                6,
+                name + ': exact replay',
+                frame,
+                second,
+                keys,
+                workspace,
+                exact=True,
+                batch_rows=batch_rows,
+            )
+            ordered = _compare_original_order(
+                frame.sort(keys, nulls_last=False, maintain_order=True),
+                second.sort(keys, nulls_last=False, maintain_order=True),
+                batch_rows=batch_rows,
+            )
+            if ordered['values_equal']:
+                fail(gates, 6, 'exact replay row order differs', table=name)
+
+
 def reconcile(
     data_dir: Path,
     run_id: str,
@@ -858,92 +1593,72 @@ def reconcile(
         fail(gates, 2, 'target explicit upstream request differs')
     if inputs.get('sources') != mapping_inputs['sources']:
         fail(gates, 1, 'target source metadata differs')
-    actual = {name: pl.read_parquet(directory / (name + '.parquet')) for name in io.TABLES}
+    actual = {name: pl.scan_parquet(directory / (name + '.parquet')) for name in io.TABLES}
     with TemporaryDirectory(
         prefix='stage9-independent-', dir=Path(control_dir).parent
     ) as temporary:
-        expected, expected_schemas, sources, registry, allocation_measurements = calculate(
-            Path(data_dir), mapping, mapping_inputs, frozen, Path(temporary)
+        workspace = Path(temporary)
+        calculation = _calculate_disk(Path(data_dir), mapping, mapping_inputs, frozen, workspace)
+        sources, registry = calculation.sources, calculation.registry
+        gates[5]['independent_conservation'] = _allocation_evidence_disk(
+            gates, calculation.allocation_measurements
         )
-    for measurement in allocation_measurements:
-        if measurement['status'] != 'pass':
-            fail(
-                gates, 5, 'independent annual/pooled full/all80 conservation failed', **measurement
-            )
-    gates[5]['independent_conservation'] = allocation_measurements
-    input_checks(gates, inputs, mapping_inputs, frozen, Path(data_dir), mapping, registry)
-    if len(inputs.get('products', [])) != 50 or {
-        p['product_id']: p for p in inputs.get('products', [])
-    } != {p['product_id']: p for p in registry}:
-        fail(gates, 2, '50-product spec registry differs')
-    for name, frame in actual.items():
-        schema = {n: str(t) for n, t in frame.schema.items()}
-        if list(schema.items()) != list(expected_schemas[name].items()):
-            fail(
-                gates,
-                2,
-                'exact ordered schema differs',
-                table=name,
-                actual=schema,
-                expected=expected_schemas[name],
-            )
-        keys = KEYS.get(name, [n for n in TARGET_KEYS if n != 'se_method'])
-        if not set(keys) <= set(frame.columns):
-            continue
-        if name in ('target_support', 'replicate_estimates'):
-            for views, group in [
-                (['observed'], 3),
-                (['canonical'], 4),
-                (['allocated_county', 'allocated_msa'], 5),
-            ]:
-                compare_rows(
-                    gates,
-                    group,
-                    name,
-                    frame.filter(pl.col('view').is_in(views)).to_dicts(),
-                    [row for row in expected[name] if row['view'] in views],
-                    keys,
-                )
-        else:
-            group = {
-                'target_units': 4,
-                'eligibility_diagnostics': 1,
-                'allocation_residuals': 5,
-                'targets_canonical': 4,
-                'targets_allocated_area_mix': 5,
-            }.get(name, 3)
-            compare_rows(gates, group, name, frame.to_dicts(), expected[name], keys)
-    report = io.read(directory / 'report.json')
-    if report.get('run_id') != run_id or report.get('schema_version') != 'acs-targets-v1':
-        fail(gates, 2, 'report run/schema identity differs')
-    report_checks(gates, report, expected, actual, registry, sources)
-    other_id = frozen['replay_run'] if run_id == frozen['first_run'] else frozen['first_run']
-    other = io.target_directory(data_dir, other_id)
-    if other.exists():
+        input_checks(gates, inputs, mapping_inputs, frozen, Path(data_dir), mapping, registry)
+        if len(inputs.get('products', [])) != 50 or {
+            p['product_id']: p for p in inputs.get('products', [])
+        } != {p['product_id']: p for p in registry}:
+            fail(gates, 2, '50-product spec registry differs')
         for name, frame in actual.items():
-            replay = pl.read_parquet(other / (name + '.parquet'))
-            if list(frame.schema.items()) != list(replay.schema.items()):
-                fail(gates, 6, 'exact replay schema differs', table=name)
-            elif not frame.equals(replay):
-                keys = KEYS.get(name, [n for n in TARGET_KEYS if n != 'se_method'])
-                compare_rows(
+            schema = {n: str(t) for n, t in frame.collect_schema().items()}
+            if list(schema.items()) != list(calculation.schemas[name].items()):
+                fail(
                     gates,
-                    6,
-                    name + ': exact replay',
-                    frame.to_dicts(),
-                    replay.to_dicts(),
-                    keys,
-                    exact=True,
+                    2,
+                    'exact ordered schema differs',
+                    table=name,
+                    actual=schema,
+                    expected=calculation.schemas[name],
                 )
-                if frame.sort(keys, nulls_last=False).equals(replay.sort(keys, nulls_last=False)):
-                    fail(gates, 6, 'exact replay row order differs', table=name)
-        other_report = io.read(other / 'report.json')
-
-        def substantive(value):
-            return {k: v for k, v in value.items() if k not in ('run_id', 'created_at')}
-
-        if substantive(report) != substantive(other_report):
-            fail(gates, 6, 'exact substantive report replay differs')
+            keys = KEYS.get(name, [n for n in TARGET_KEYS if n != 'se_method'])
+            if not set(keys) <= set(schema):
+                continue
+            expected = _scan(calculation.tables[name])
+            if name in ('target_support', 'replicate_estimates'):
+                for views, group in [
+                    (['observed'], 3),
+                    (['canonical'], 4),
+                    (['allocated_county', 'allocated_msa'], 5),
+                ]:
+                    _compare_fact_rows(
+                        gates,
+                        group,
+                        name,
+                        frame.filter(pl.col('view').is_in(views)),
+                        expected.filter(pl.col('view').is_in(views)),
+                        keys,
+                        workspace,
+                    )
+            else:
+                group = {
+                    'target_units': 4,
+                    'eligibility_diagnostics': 1,
+                    'allocation_residuals': 5,
+                    'targets_canonical': 4,
+                    'targets_allocated_area_mix': 5,
+                }.get(name, 3)
+                _compare_fact_rows(gates, group, name, frame, expected, keys, workspace)
+        report = io.read(directory / 'report.json')
+        if report.get('run_id') != run_id or report.get('schema_version') != 'acs-targets-v1':
+            fail(gates, 2, 'report run/schema identity differs')
+        _report_checks_disk(gates, report, calculation, actual, workspace)
+        other_id = frozen['replay_run'] if run_id == frozen['first_run'] else frozen['first_run']
+        other = io.target_directory(data_dir, other_id)
+        if other.exists():
+            replay = {name: pl.scan_parquet(other / (name + '.parquet')) for name in io.TABLES}
+            _replay_checks_disk(gates, actual, replay, workspace)
+            other_report = io.read(other / 'report.json')
+            if _substantive_report(report) != _substantive_report(other_report):
+                fail(gates, 6, 'exact substantive report replay differs')
     for group in gates.values():
         group['failure_count'] = len(group['failures'])
         group['status'] = 'fail' if group['failure_count'] else 'pass'

@@ -150,13 +150,13 @@ def _inputs(selected, run_id, created_at, evidence):
 
 
 def _read_tables(directory):
-    return {name: pl.read_parquet(directory / (name + '.parquet')) for name in TABLES}
+    return {name: pl.scan_parquet(directory / (name + '.parquet')) for name in TABLES}
 
 
 def _report(tables, selected, run_id, created_at):
-    support = tables['target_support']
-    diagnostics = tables['eligibility_diagnostics']
-    residuals = tables['allocation_residuals']
+    support = tables['target_support'].lazy()
+    diagnostics = tables['eligibility_diagnostics'].lazy()
+    residuals = tables['allocation_residuals'].lazy()
     source = selected.upstream.sources['acs/core']
     year_counts = dict(
         pl.scan_parquet(source.parquet).group_by('YEAR').len().collect().iter_rows()
@@ -171,23 +171,29 @@ def _report(tables, selected, run_id, created_at):
             pl.concat_str(pl.lit('us'), pl.col('component_year').cast(pl.String), pl.lit('a'))
         )
     )
-    if invalid.height:
+    if invalid.select(pl.len()).collect().item():
         raise ValueError('diagnostic source sample/year identity differs')
+    cell_counts = {
+        row['product_id']: row for row in support.filter(
+            pl.col('component_year').eq(0) & pl.col('record_kind').eq('cell')
+        ).group_by('product_id').agg(
+            pl.len().alias('supported_statistics'),
+            pl.col('point_status').eq('defined').sum().alias('target_rows'),
+        ).collect().iter_rows(named=True)
+    }
+    funnel_counts = {
+        (row['product_id'], row['component_year']): row['n_unweighted']
+        for row in diagnostics.filter(pl.col('partition_kind').eq('first_exclusion'))
+        .group_by('product_id', 'component_year').agg(pl.col('n_unweighted').sum())
+        .collect().iter_rows(named=True)
+    }
     products = []
     for product in PRODUCTS:
-        cells = support.filter(
-            pl.col('product_id').eq(product.product_id)
-            & pl.col('component_year').eq(0)
-            & pl.col('record_kind').eq('cell')
-        )
-        defined = cells.filter(pl.col('point_status').eq('defined'))
-        funnel = diagnostics.filter(
-            pl.col('product_id').eq(product.product_id)
-            & pl.col('partition_kind').eq('first_exclusion')
-        )
+        counts = cell_counts.get(product.product_id, {})
+        defined = counts.get('target_rows', 0)
         closure = []
         for year in sorted(year_counts):
-            actual = funnel.filter(pl.col('component_year').eq(year))['n_unweighted'].sum()
+            actual = funnel_counts.get((product.product_id, year), 0)
             expected = year_counts.get(year, 0)
             if actual != expected:
                 raise ValueError('disjoint eligibility funnel does not close')
@@ -195,9 +201,9 @@ def _report(tables, selected, run_id, created_at):
         products.append(
             {
                 'product': asdict(product),
-                'target_rows': defined.height,
-                'supported_statistics': cells.height,
-                'empty_reason': None if defined.height else 'no_positive_eligible_supported_cells',
+                'target_rows': defined,
+                'supported_statistics': counts.get('supported_statistics', 0),
+                'empty_reason': None if defined else 'no_positive_eligible_supported_cells',
                 'funnel_closure': closure,
             }
         )
@@ -218,9 +224,9 @@ def _report(tables, selected, run_id, created_at):
         'created_at': created_at,
         'tables': {
             name: {
-                'rows': frame.height,
-                'columns': frame.columns,
-                'schema': {key: str(dtype) for key, dtype in frame.schema.items()},
+                'rows': frame.lazy().select(pl.len()).collect().item(),
+                'columns': frame.collect_schema().names(),
+                'schema': {key: str(dtype) for key, dtype in frame.collect_schema().items()},
             }
             for name, frame in tables.items()
         },
@@ -381,12 +387,11 @@ def verify_bundle(
             raise ValueError('substantive report differs from reconstruction')
         reconstructed = derive_tables(selected, scratch)
         for name in TABLES:
-            expected = reconstructed[name]
-            if isinstance(expected, pl.LazyFrame):
-                expected = expected.collect()
-            if list(actual[name].schema.items()) != list(expected.schema.items()) or not actual[
-                name
-            ].equals(expected):
+            comparison = ipums_parity.compare_ordered(
+                reconstructed[name].lazy(), actual[name],
+            )
+            if (not comparison['schema_equal'] or not comparison['values_equal']
+                    or comparison['expected_rows'] != comparison['actual_rows']):
                 raise ValueError(name + ': ordered table differs from reconstruction')
         if report != _json_normalized(
             _report(actual, selected, directory.name, report['created_at'])

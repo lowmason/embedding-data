@@ -9,8 +9,10 @@ import re
 import shutil
 import xml.etree.ElementTree as ET
 from collections import defaultdict
-from decimal import Decimal, localcontext
+from contextlib import contextmanager
+from decimal import Decimal, InvalidOperation, localcontext
 from pathlib import Path
+from typing import NamedTuple
 
 import polars as pl
 
@@ -225,7 +227,7 @@ def delivered_categories(file):
                 }
                 key = fields.get('catValu')
                 io.require(key is not None and key not in values, 'invalid delivered DDI domain')
-                values[key] = fields.get('labl', '')
+                values[key] = fields.get('labl') or None
         variables[name] = values
     return variables
 
@@ -606,8 +608,20 @@ def diagnostic_rows(
     evidence=None,
     raw=None,
 ):
+    grouped = _diagnostic_plan(
+        frame, variable=variable, evidence=evidence, raw=raw, reason=reason, schema=schema
+    ).collect()
+    return [
+        _diagnostic_record(
+            value, product, source, ddi_citation, schema, partition=partition, variable=variable
+        )
+        for value in grouped.iter_rows(named=True)
+    ]
+
+
+def _diagnostic_plan(frame, *, variable, evidence, raw, reason, schema):
     keys = ['YEAR', '_raw', '_evidence', '_diagnostic_reason']
-    grouped = (
+    return (
         frame.with_columns(
             (
                 raw
@@ -621,56 +635,70 @@ def diagnostic_rows(
         )
         .group_by(keys)
         .agg(pl.len().alias('_n'), pl.col('PERWT').sum().alias('_sum'))
-        .collect()
     )
-    rows = []
-    for value in grouped.iter_rows(named=True):
-        row = dict(
-            source='acs',
-            profile='acs/core',
-            delivery_id=source['delivery_id'],
-            source_parquet_sha256=source['parquet_record']['sha256'],
-            sample_id='us' + str(value['YEAR']) + 'a',
-            component_year=value['YEAR'],
-            **{
-                n: product[n]
-                for n in (
-                    'family',
-                    'dimension',
-                    'base_universe',
-                    'evidence_policy',
-                    'view',
-                    'product_id',
-                )
-            },
-            partition_kind=partition,
-            variable=variable,
-            raw_dtype=(
-                'String'
-                if variable == '_canonical_denominator'
-                else str(schema[variable])
-                if variable in schema
-                else None
-            ),
-            raw_value=value['_raw'],
-            evidence_status=value['_evidence'],
-            reason=value['_diagnostic_reason'],
-            n_unweighted=value['_n'],
-            weight_sum_exact=decimal_text(value['_sum']),
-            weighted_mass=float(value['_sum']) / product['pool_divisor'],
-            reference_ids=[ddi_citation['path']] if partition == 'evidence' else [],
-            reference_locators=[f'dataDscr/var[@name="{variable}"]']
-            if partition == 'evidence'
-            else [],
-        )
-        rows.append(row)
-    return rows
+
+
+def _diagnostic_record(value, product, source, ddi_citation, schema, *, partition, variable):
+    row = dict(
+        source='acs',
+        profile='acs/core',
+        delivery_id=source['delivery_id'],
+        source_parquet_sha256=source['parquet_record']['sha256'],
+        sample_id='us' + str(value['YEAR']) + 'a',
+        component_year=value['YEAR'],
+        **{
+            n: product[n]
+            for n in (
+                'family',
+                'dimension',
+                'base_universe',
+                'evidence_policy',
+                'view',
+                'product_id',
+            )
+        },
+        partition_kind=partition,
+        variable=variable,
+        raw_dtype=(
+            'String'
+            if variable == '_canonical_denominator'
+            else str(schema[variable])
+            if variable in schema
+            else None
+        ),
+        raw_value=value['_raw'],
+        evidence_status=value['_evidence'],
+        reason=value['_diagnostic_reason'],
+        n_unweighted=value['_n'],
+        weight_sum_exact=decimal_text(value['_sum']),
+        weighted_mass=float(value['_sum']) / product['pool_divisor'],
+        reference_ids=[ddi_citation['path']] if partition == 'evidence' else [],
+        reference_locators=[f'dataDscr/var[@name="{variable}"]']
+        if partition == 'evidence'
+        else [],
+    )
+    return row
 
 
 def expected_native(base, core, product, nodes, codes, usable):
+    eligible, baseline, plans = _native_plans(base, core, product, nodes, codes, usable)
+    coverage = (
+        denominator_groups(complete_components(aggregate(baseline), product))
+        if baseline is not None
+        else {}
+    )
+    diagnostics = [row for args, kwargs in plans for row in diagnostic_rows(*args, **kwargs)]
+    return complete_components(aggregate(eligible), product), coverage, diagnostics
+
+
+def _diagnostic_request(*args, **kwargs):
+    return [(args, kwargs)]
+
+
+def _native_plans(base, core, product, nodes, codes, usable):
     frame, dimensions, roles, booleans = classify_product(base, product, codes, usable)
     _, schema, _, source, citation = core
-    diagnostics = diagnostic_rows(
+    diagnostics = _diagnostic_request(
         frame,
         product,
         source,
@@ -680,7 +708,7 @@ def expected_native(base, core, product, nodes, codes, usable):
         reason=pl.col('_reason'),
     )
     for q in QFIELDS:
-        diagnostics += diagnostic_rows(
+        diagnostics += _diagnostic_request(
             frame,
             product,
             source,
@@ -692,7 +720,7 @@ def expected_native(base, core, product, nodes, codes, usable):
             evidence=pl.col('_q_' + q),
         )
     for name in booleans:
-        diagnostics += diagnostic_rows(
+        diagnostics += _diagnostic_request(
             frame.filter(pl.col(name).fill_null(False)),
             product,
             source,
@@ -702,7 +730,7 @@ def expected_native(base, core, product, nodes, codes, usable):
             reason=pl.lit(name),
         )
     for role in roles:
-        diagnostics += diagnostic_rows(
+        diagnostics += _diagnostic_request(
             frame,
             product,
             source,
@@ -711,7 +739,7 @@ def expected_native(base, core, product, nodes, codes, usable):
             partition='limitation',
             reason=pl.lit(role + '_puma_specific_evidence_unavailable'),
         )
-    diagnostics += diagnostic_rows(
+    diagnostics += _diagnostic_request(
         frame.filter(pl.col('OCCSOC').eq('559830')),
         product,
         source,
@@ -723,7 +751,7 @@ def expected_native(base, core, product, nodes, codes, usable):
         .otherwise(pl.lit('559830_outside_civilian')),
     )
     eligible = frame.filter(pl.col('_reason').eq('eligible'))
-    coverage = {}
+    baseline = None
     if product['view'] == 'canonical':
         baseline = eligible
         if product['family'] == 'staffing_pattern':
@@ -734,9 +762,8 @@ def expected_native(base, core, product, nodes, codes, usable):
                 pl.col('industry_canonical_scalar_node_id').alias('unit_a'),
                 pl.lit('naics_national_industry').alias('unit_a_type'),
             )
-        coverage = denominator_groups(complete_components(aggregate(baseline), product))
         accepted = canonical_filter(eligible, dimensions, product, nodes)
-        diagnostics += diagnostic_rows(
+        diagnostics += _diagnostic_request(
             eligible.filter(~accepted),
             product,
             source,
@@ -746,7 +773,7 @@ def expected_native(base, core, product, nodes, codes, usable):
             reason=pl.lit('canonical_unsupported_or_policy_excluded'),
         )
         baseline_accepted = canonical_filter(baseline, dimensions, product, nodes)
-        diagnostics += diagnostic_rows(
+        diagnostics += _diagnostic_request(
             baseline.filter(~baseline_accepted),
             product,
             source,
@@ -768,7 +795,7 @@ def expected_native(base, core, product, nodes, codes, usable):
                 ).alias('unit_' + side + '_type'),
                 pl.col(dimension + '_canonical_scalar_node_id').alias('unit_' + side),
             )
-    return complete_components(aggregate(eligible), product), coverage, diagnostics
+    return eligible, baseline, diagnostics
 
 
 def allocation(native, product, factors, counties, *, measurements=None):
@@ -945,9 +972,13 @@ def statistic_metadata(product, pair, measure):
 
 
 def finalize(cells, coverage, product):
+    denominator = denominator_groups(cells, product['view'].startswith('allocated'))
+    return _finalize_values(cells, coverage, product, denominator)
+
+
+def _finalize_values(cells, coverage, product, denominator, *, include_status=True):
     '''All 80 ratios and SDR errors are recomputed from independently grouped native sums.'''
     allocated = product['view'].startswith('allocated')
-    denominator = denominator_groups(cells, allocated)
     support, replicates, targets = [], [], []
     k = product['pool_divisor']
     for pair in sorted({key[:4] for key in cells}):
@@ -1070,7 +1101,7 @@ def finalize(cells, coverage, product):
     bad_pooled = {
         key[:2]
         for key, value in denominator.items()
-        if key[2] == 0 and float(value['weights'][0]) <= 0 and value['n'] > 0
+        if include_status and key[2] == 0 and float(value['weights'][0]) <= 0 and value['n'] > 0
     }
     for (kind, unit, year), den in sorted(denominator.items()):
         if (kind, unit) in bad_pooled and den['n'] > 0:
@@ -1104,3 +1135,883 @@ def finalize(cells, coverage, product):
                 )
             )
     return support, replicates, targets
+
+
+class _FactTable(NamedTuple):
+    owner: Path
+    paths: tuple[Path, ...]
+    schema: pl.Schema
+    keys: tuple[str, ...]
+    product_id: str
+    weight_kind: str | None
+
+
+class _NativeFacts(NamedTuple):
+    owner: Path
+    cells: _FactTable
+    denominators: _FactTable
+    coverage: _FactTable | None
+    diagnostics: _FactTable
+
+
+def _fact_schema(keys, weight_kind):
+    return pl.Schema(
+        {
+            **dict.fromkeys(keys, pl.String),
+            'component_year': pl.Int64,
+            'weights': pl.List(pl.String if weight_kind == 'decimal_text' else pl.Float64),
+            'n': pl.UInt64,
+            'fraction': pl.Float64,
+            'flags': pl.List(pl.String),
+        }
+    )
+
+
+def _check_product(product, batch_rows):
+    io.require(type(batch_rows) is int and batch_rows > 0, 'invalid batch_rows')
+    io.require(
+        isinstance(product, dict) and type(product.get('pool_divisor')) is int
+        and type(product.get('years')) is list
+        and all(type(year) is int for year in product['years'])
+        and product in products(),
+        'product identity/years/divisor differs',
+    )
+    return 'float64' if product['view'].startswith('allocated') else 'decimal_text'
+
+
+@contextmanager
+def _owned(workspace, label):
+    workspace = io.safe(Path(workspace))
+    io.require(workspace.is_dir(), 'workspace must be an existing directory')
+    io.identifier(label)
+    owner = io.safe(workspace / label)
+    owner.mkdir()
+    try:
+        yield owner
+    except BaseException:
+        shutil.rmtree(owner)
+        raise
+
+
+def _sink(frame, path):
+    io.safe(path)
+    with path.open('xb') as output:
+        frame.sink_parquet(output, engine='streaming', maintain_order=True)
+
+
+class _FactWriter:
+    '''Bounded aggregate rows; paths alone survive between flushed fragments.'''
+
+    def __init__(self, owner, label, schema, keys, product_id, kind, batch_rows):
+        self.owner, self.label, self.schema = owner, label, pl.Schema(schema)
+        self.keys, self.product_id, self.kind = tuple(keys), product_id, kind
+        self.batch_rows, self.rows, self.paths = batch_rows, [], []
+
+    def append(self, row):
+        io.require(set(row) == set(self.schema), 'output row/schema columns differ')
+        self.rows.append(row)
+        if len(self.rows) == self.batch_rows:
+            self.flush()
+
+    def flush(self):
+        path = self.owner / f'{self.label}-{len(self.paths):08d}.parquet'
+        _sink(pl.DataFrame(self.rows, schema=self.schema).lazy(), path)
+        self.paths.append(path)
+        self.rows.clear()
+
+    def finish(self, *, sort=False):
+        if self.rows or not self.paths:
+            self.flush()
+        if sort:
+            path = self.owner / (self.label + '-ordered.parquet')
+            _sink(pl.scan_parquet(self.paths, glob=False).sort(self.keys, nulls_last=False), path)
+            for old in self.paths:
+                old.unlink()
+            self.paths = [path]
+        return _FactTable(
+            self.owner, tuple(self.paths), self.schema, self.keys, self.product_id, self.kind
+        )
+
+
+def _rows(frame, batch_rows):
+    for batch in frame.collect_batches(
+        chunk_size=batch_rows, engine='streaming', maintain_order=True, lazy=True
+    ):
+        yield from batch.iter_rows(named=True)
+
+
+def _fact_rows(table, product, batch_rows, *, pair):
+    kind = _check_product(product, batch_rows)
+    keys = tuple([*(PAIR if pair else PAIR[:2]), 'component_year'])
+    io.require(
+        table.product_id == product['product_id'] and table.weight_kind == kind,
+        'fact product/weight kind differs',
+    )
+    schema = _fact_schema(PAIR if pair else PAIR[:2], kind)
+    io.require(table.schema == schema and table.keys == keys, 'fact schema/grain differs')
+    owner = io.safe(table.owner)
+    io.require(owner.is_dir() and bool(table.paths), 'missing fact owner/paths')
+    for path in table.paths:
+        path = io.safe(Path(path))
+        io.require(path.is_relative_to(owner) and path.is_file(), 'unsafe fact path')
+        io.require(pl.read_parquet_schema(path) == schema, 'physical fact schema differs')
+    previous, current, components = None, None, []
+    expected = sorted([0, *product['years']])
+    for row in _rows(pl.scan_parquet(table.paths, glob=False), batch_rows):
+        key = tuple(row[n] for n in keys)
+        io.require(all(v is not None for v in key), 'null fact key')
+        io.require(previous is None or key > previous, 'duplicate/out-of-order fact key')
+        group = key[:-1]
+        if group != current:
+            if current is not None:
+                io.require(components == expected, 'missing final component')
+            current, components = group, []
+        components.append(key[-1])
+        io.require(components == expected[: len(components)], 'invalid component order/year')
+        weights = row['weights']
+        io.require(
+            weights is not None
+            and len(weights) == len(WEIGHTS)
+            and all(v is not None for v in weights),
+            'invalid weight vector length/null',
+        )
+        if kind == 'decimal_text':
+            io.require(all(re.fullmatch(r'-?[0-9]+(?:\.[0-9]+)?', text) for text in weights),
+                       'noncanonical decimal vector')
+            try:
+                values = [Decimal(v) for v in weights]
+            except InvalidOperation as exc:
+                raise ValueError('invalid decimal vector') from exc
+            io.require(
+                all(
+                    v.is_finite() and decimal_text(v) == text
+                    for v, text in zip(values, weights, strict=True)
+                ),
+                'noncanonical/nonfinite decimal vector',
+            )
+        else:
+            values = weights
+            io.require(all(math.isfinite(v) for v in values), 'nonfinite float vector')
+        io.require(
+            row['n'] is not None
+            and row['fraction'] is not None
+            and math.isfinite(row['fraction']),
+            'invalid support value',
+        )
+        flags = row['flags']
+        io.require(
+            flags is not None
+            and all(isinstance(v, str) for v in flags)
+            and flags == sorted(set(flags)),
+            'invalid flags',
+        )
+        previous = key
+        yield (
+            key,
+            {'weights': values, 'n': row['n'], 'fraction': row['fraction'], 'flags': set(flags)},
+        )
+    if current is not None:
+        io.require(components == expected, 'missing final component')
+
+
+def _fact_row(keys, key, value, kind):
+    return dict(zip(keys, key, strict=True)) | {
+        'weights': [decimal_text(v) for v in value['weights']]
+        if kind == 'decimal_text'
+        else value['weights'],
+        'n': value['n'],
+        'fraction': value['fraction'],
+        'flags': sorted(value['flags']),
+    }
+
+
+def _complete_annual_rows(rows, product):
+    '''One actual pair carry; undeclared, repeated and disordered tails fail immediately.'''
+    pair, annual, previous = None, {}, None
+    for row in rows:
+        key = tuple(row[n] for n in [*PAIR, 'YEAR'])
+        io.require(all(v is not None for v in key), 'null annual key')
+        io.require(previous is None or key > previous, 'duplicate/out-of-order annual key')
+        io.require(key[-1] in product['years'], 'undeclared annual year')
+        if pair is not None and key[:4] != pair:
+            yield pair, complete_components(annual, product)
+            annual = {}
+        pair, previous = key[:4], key
+        annual[key] = {
+            'weights': [row[w] for w in WEIGHTS],
+            'n': row['_n'],
+            'fraction': float(row['_n']),
+            'flags': set(row['_flags']),
+        }
+        io.require(len(annual) <= len(product['years']), 'oversized annual carry')
+    if pair is not None:
+        yield pair, complete_components(annual, product)
+
+
+def _complete_native_facts(frame, product, workspace, *, batch_rows=4096, label='cells'):
+    io.require(_check_product(product, batch_rows) == 'decimal_text', 'native product required')
+    with _owned(workspace, 'completed-' + io.identifier(label)) as owner:
+        annual = owner / 'annual.parquet'
+        grouped = (
+            frame.group_by(*PAIR, 'YEAR')
+            .agg(
+                pl.len().alias('_n'),
+                *(pl.col(w).sum() for w in WEIGHTS),
+                pl.col('_flags').explode().drop_nulls().unique().sort().alias('_flags'),
+            )
+            .sort([*PAIR, 'YEAR'])
+        )
+        _sink(grouped, annual)
+        keys = [*PAIR, 'component_year']
+        writer = _FactWriter(
+            owner,
+            'cells',
+            _fact_schema(PAIR, 'decimal_text'),
+            keys,
+            product['product_id'],
+            'decimal_text',
+            batch_rows,
+        )
+        for _, completed in _complete_annual_rows(
+            _rows(pl.scan_parquet(annual), batch_rows), product
+        ):
+            for key in sorted(completed):
+                writer.append(_fact_row(keys, key, completed[key], 'decimal_text'))
+        result = writer.finish()
+        annual.unlink()
+        return result
+
+
+def _denominator_facts(cells, product, workspace, *, label='denominators', batch_rows=4096):
+    kind = _check_product(product, batch_rows)
+    with _owned(workspace, 'independent-' + io.identifier(label)) as owner:
+        keys = [*PAIR[:2], 'component_year']
+        writer = _FactWriter(
+            owner,
+            'denominators',
+            _fact_schema(PAIR[:2], kind),
+            keys,
+            product['product_id'],
+            kind,
+            batch_rows,
+        )
+        current, values = None, {}
+        for key, cell in _fact_rows(cells, product, batch_rows, pair=True):
+            if current is not None and key[:2] != current:
+                for year in sorted(values):
+                    writer.append(_fact_row(keys, (*current, year), values[year], kind))
+                values = {}
+            current = key[:2]
+            year = key[-1]
+            values[year] = add(values.get(year, zero(kind == 'float64')), cell)
+        if current is not None:
+            for year in sorted(values):
+                writer.append(_fact_row(keys, (*current, year), values[year], kind))
+        return writer.finish()
+
+
+def _group_facts(table, product, batch_rows, *, pair):
+    group, values = None, {}
+    for key, value in _fact_rows(table, product, batch_rows, pair=pair):
+        if group is not None and key[:-1] != group:
+            yield group, values
+            values = {}
+        group = key[:-1]
+        values[key] = value
+    if group is not None:
+        yield group, values
+
+
+class _FactMerge:
+    def __init__(self, groups):
+        self.groups = iter(groups)
+        self.current = next(self.groups, None)
+
+    def take(self, key):
+        while self.current is not None and self.current[0] < key:
+            self.current = next(self.groups, None)
+        if self.current is not None and self.current[0] == key:
+            return self.current[1]
+        return {}
+
+    def drain(self):
+        for _ in self.groups:
+            pass
+        self.current = None
+
+
+def _finalize_disk(cells, denominators, coverage, product, workspace, *, schemas, batch_rows=4096):
+    _check_product(product, batch_rows)
+    io.require(
+        set(schemas) >= {'target_support', 'replicate_estimates', 'targets'},
+        'missing independent output schema',
+    )
+    if coverage is not None:
+        io.require(product['view'] == 'canonical', 'coverage only for canonical product')
+    with _owned(workspace, 'independent-final-' + product['product_id']) as owner:
+        keys = {
+            'target_support': [*STAT, 'record_kind', 'component_year'],
+            'replicate_estimates': [*STAT, 'replicate'],
+            'targets': [n for n in STAT if n != 'view'],
+        }
+        writers = {
+            name: _FactWriter(
+                owner, name, schemas[name], key, product['product_id'], None, batch_rows
+            )
+            for name, key in keys.items()
+        }
+        den_groups = iter(_group_facts(denominators, product, batch_rows, pair=False))
+        den = next(den_groups, None)
+        cov = _FactMerge(
+            _group_facts(coverage, product, batch_rows, pair=False) if coverage is not None else []
+        )
+
+        emitted_a = None
+
+        def emit_status(group):
+            a, values = group
+            rows, _, _ = _finalize_values({}, cov.take(a), product, values)
+            for row in rows:
+                writers['target_support'].append(row)
+
+        for pair, values in _group_facts(cells, product, batch_rows, pair=True):
+            while den is not None and den[0] < pair[:2]:
+                if emitted_a != den[0]:
+                    emit_status(den)
+                den = next(den_groups, None)
+            io.require(den is not None and den[0] == pair[:2], 'missing matching denominator')
+            if emitted_a != den[0]:
+                emit_status(den)
+                emitted_a = den[0]
+            output = _finalize_values(
+                values, cov.take(pair[:2]), product, den[1], include_status=False
+            )
+            for name, rows in zip(writers, output, strict=True):
+                for row in rows:
+                    writers[name].append(row)
+        if den is not None:
+            if emitted_a != den[0]:
+                emit_status(den)
+            for group in den_groups:
+                emit_status(group)
+        cov.drain()
+        return {name: writer.finish(sort=True) for name, writer in writers.items()}
+
+
+def _expected_native_disk(
+    base, core, product, nodes, codes, usable, workspace, *, diagnostic_schema, batch_rows=4096
+):
+    io.require(_check_product(product, batch_rows) == 'decimal_text', 'native product required')
+    with _owned(workspace, 'independent-native-' + product['product_id']) as owner:
+        eligible, baseline, plans = _native_plans(base, core, product, nodes, codes, usable)
+        cells = _complete_native_facts(eligible, product, owner, batch_rows=batch_rows)
+        denominators = _denominator_facts(cells, product, owner, batch_rows=batch_rows)
+        coverage = None
+        if baseline is not None:
+            baseline_cells = _complete_native_facts(
+                baseline, product, owner, batch_rows=batch_rows, label='baseline'
+            )
+            coverage = _denominator_facts(
+                baseline_cells, product, owner, label='coverage', batch_rows=batch_rows
+            )
+            shutil.rmtree(baseline_cells.owner)
+        writer = _FactWriter(
+            owner,
+            'diagnostics',
+            diagnostic_schema,
+            DIAG_KEY,
+            product['product_id'],
+            None,
+            batch_rows,
+        )
+        for args, kwargs in plans:
+            frame, _, source, citation, schema = args
+            plan = _diagnostic_plan(
+                frame,
+                variable=kwargs.get('variable'),
+                evidence=kwargs.get('evidence'),
+                raw=kwargs.get('raw'),
+                reason=kwargs['reason'],
+                schema=schema,
+            )
+            for value in _rows(plan, batch_rows):
+                writer.append(
+                    _diagnostic_record(
+                        value,
+                        product,
+                        source,
+                        citation,
+                        schema,
+                        partition=kwargs['partition'],
+                        variable=kwargs.get('variable'),
+                    )
+                )
+        diagnostics = writer.finish(sort=True)
+        return _NativeFacts(owner, cells, denominators, coverage, diagnostics)
+
+
+class _AllocationFacts(NamedTuple):
+    owner: Path
+    cells: _FactTable
+    denominators: _FactTable
+    residuals: _FactTable
+    diagnostics: _FactTable
+    measurements: _FactTable
+
+
+def _allocation_ordered(table, owner, label, keys, batch_rows):
+    path = owner / (label + '.parquet')
+    _sink(pl.scan_parquet(table.paths, glob=False).sort(keys, nulls_last=False), path)
+    return _rows(pl.scan_parquet(path, glob=False), batch_rows)
+
+
+def _allocation_reduce(rows, keys, *, metadata=False, residual=False):
+    '''One complete vector carry; input order is the original independent arithmetic order.'''
+    current, value, previous_origin, origin_n, first_n = None, None, None, None, None
+    for row in rows:
+        key = tuple(row[n] for n in keys)
+        if key != current:
+            if current is not None:
+                if residual:
+                    value['n'] = first_n
+                yield current, value
+            current, value = key, zero(True)
+            previous_origin, origin_n, first_n = None, None, row['n']
+        incoming = {n: row[n] for n in ('weights', 'n', 'fraction')} | {'flags': set(row['flags'])}
+        if metadata:
+            value['fraction'] += incoming['fraction']
+            value['flags'] |= incoming['flags']
+            if previous_origin != row['origin']:
+                value['n'] += incoming['n']
+                previous_origin, origin_n = row['origin'], incoming['n']
+            io.require(origin_n == incoming['n'], 'inconsistent native origin support')
+        else:
+            value = add(value, incoming)
+    if current is not None:
+        if residual:
+            value['n'] = first_n
+        yield current, value
+
+
+def _allocation_summary(table, product, owner, label, batch_rows, *, residual=False):
+    group = (
+        ['code_unit_type', 'code_unit', 'component_year']
+        if residual
+        else ['unit_b_type', 'unit_b', 'component_year']
+    )
+    order = group + (['workplace_unit', 'residual_type', 'replicate'] if residual else PAIR[:2])
+    rows = _allocation_ordered(table, owner, label, order, batch_rows)
+    current, vector = None, None
+    decimal = table.weight_kind == 'decimal_text'
+    for row in rows:
+        key = tuple(row[n] for n in group)
+        if key != current:
+            if current is not None:
+                yield current, vector
+            current, vector = key, [Decimal(0) if decimal else 0.0] * 81
+        if residual:
+            vector[row['replicate']] += row['weighted_mass']
+        else:
+            values = [Decimal(v) for v in row['weights']] if decimal else row['weights']
+            with localcontext() as context:
+                context.prec = 80
+                vector = [a + b for a, b in zip(vector, values, strict=True)]
+    if current is not None:
+        yield current, vector
+
+
+def _allocation_measurements(
+    native, county, metro, residuals, observed, product, owner, batch_rows
+):
+    schema = pl.Schema(
+        {
+            'product_id': pl.String,
+            'code_unit_type': pl.String,
+            'code_unit': pl.String,
+            'component_year': pl.Int64,
+            'replicate': pl.UInt8,
+            'check': pl.String,
+            'expected_mass': pl.Float64,
+            'actual_mass': pl.Float64,
+            'status': pl.String,
+            '_check_order': pl.UInt8,
+        }
+    )
+    keys = ('code_unit_type', 'code_unit', 'component_year', 'replicate', '_check_order')
+    writer = _FactWriter(
+        owner, 'measurements', schema, keys, product['product_id'], None, batch_rows
+    )
+    summaries = [
+        iter(_allocation_summary(table, product, owner, label, batch_rows, residual=is_residual))
+        for table, label, is_residual in [
+            (county, 'county-summary', False),
+            (metro, 'metro-summary', False),
+            (residuals, 'residual-summary', True),
+        ]
+    ]
+    heads = [next(stream, None) for stream in summaries]
+    k = product['pool_divisor']
+    for key, native_vector in _allocation_summary(
+        native.cells, observed, owner, 'native-summary', batch_rows
+    ):
+        values = []
+        for i, head in enumerate(heads):
+            io.require(head is None or head[0] >= key, 'unexpected allocation summary key')
+            if head is not None and head[0] == key:
+                values.append(head[1])
+                heads[i] = next(summaries[i], None)
+            else:
+                values.append([0.0] * 81)
+        for rep in range(81):
+            county_mass = values[0][rep] / k
+            comparisons = [('native_to_county', float(native_vector[rep]) / k, county_mass)]
+            if product['view'] == 'allocated_msa':
+                comparisons.append(
+                    (
+                        'county_to_msa_and_residuals',
+                        county_mass,
+                        math.fsum((values[1][rep] / k, values[2][rep])),
+                    )
+                )
+            for order, (check, expected, actual) in enumerate(comparisons):
+                writer.append(
+                    dict(
+                        product_id=product['product_id'],
+                        code_unit_type=key[0],
+                        code_unit=key[1],
+                        component_year=key[2],
+                        replicate=rep,
+                        check=check,
+                        expected_mass=expected,
+                        actual_mass=actual,
+                        status='pass' if close_allocated_or_se(actual, expected) else 'fail',
+                        _check_order=order,
+                    )
+                )
+    io.require(all(head is None for head in heads), 'unexpected allocation summary tail')
+    return writer.finish()
+
+
+def _allocation_disk(
+    native,
+    product,
+    factors,
+    counties,
+    workspace,
+    *,
+    residual_schema,
+    diagnostic_schema,
+    batch_rows=4096,
+):
+    '''Persist independently ordered aggregate allocation facts with bounded Python carries.'''
+    _check_product(product, batch_rows)
+    io.require(
+        product['family'] == 'area_mix'
+        and product['view'] in ('allocated_county', 'allocated_msa'),
+        'allocation requires declared allocated area_mix product',
+    )
+    match = (
+        'family',
+        'dimension',
+        'base_universe',
+        'evidence_policy',
+        'years',
+        'sample_set',
+        'pool_divisor',
+    )
+    observed = next(
+        p for p in products() if p['view'] == 'observed' and all(p[n] == product[n] for n in match)
+    )
+    io.require(
+        native.cells.product_id == observed['product_id'] and native.coverage is None,
+        'allocation native counterpart differs',
+    )
+    # Validate all authenticated public relations before filtering zero contributions.
+    for relations in factors.values():
+        seen = set()
+        for county, factor in relations:
+            io.require(county not in seen, 'duplicate county factor')
+            seen.add(county)
+            io.require(
+                type(factor) in (int, float) and math.isfinite(factor) and 0 <= factor <= 1,
+                'invalid county factor',
+            )
+            io.require(county in counties, 'unknown allocation county')
+    for membership in counties.values():
+        kind, identity = membership['cbsa_type'], membership['cbsa_id']
+        io.require(
+            kind in (None, 'metropolitan', 'micropolitan')
+            and (
+                (kind is None and identity is None)
+                or (kind is not None and isinstance(identity, str) and bool(identity))
+            ),
+            'invalid typed county membership',
+        )
+    with _owned(workspace, 'independent-allocation-' + product['product_id']) as owner:
+        contribution_schema = pl.Schema(
+            {
+                **dict.fromkeys(
+                    [
+                        'source_a_type',
+                        'origin',
+                        'code_type',
+                        'code',
+                        'county_id',
+                        'cbsa_type',
+                        'cbsa_id',
+                        'residual_kind',
+                    ],
+                    pl.String,
+                ),
+                'component': pl.Int64,
+                'weights': pl.List(pl.Float64),
+                'n': pl.UInt64,
+                'fraction': pl.Float64,
+                'flags': pl.List(pl.String),
+            }
+        )
+        contributions = _FactWriter(
+            owner,
+            'contributions',
+            contribution_schema,
+            (),
+            product['product_id'],
+            None,
+            batch_rows,
+        )
+        for key, value in _fact_rows(native.cells, observed, batch_rows, pair=True):
+            a_type, origin, code_type, code, component = key
+            io.require(a_type == 'work_migration_puma', 'wrong native workplace type')
+            relations = factors.get(origin, [])
+            io.require(
+                relations and close_share(sum(f for _, f in relations), 1.0),
+                'workplace factors do not cover native origin',
+            )
+            for county, factor in sorted(relations):
+                if factor == 0:
+                    continue
+                membership = counties[county]
+                flags = value['flags'] | set(ALLOCATION_FLAGS)
+                if factor < 1:
+                    flags.add('flag_fractional_split')
+                contributions.append(
+                    dict(
+                        source_a_type=a_type,
+                        origin=origin,
+                        code_type=code_type,
+                        code=code,
+                        component=component,
+                        county_id=county,
+                        cbsa_type=membership['cbsa_type'],
+                        cbsa_id=membership['cbsa_id'],
+                        residual_kind=(
+                            'micropolitan'
+                            if membership['cbsa_type'] == 'micropolitan'
+                            else 'no_cbsa'
+                        ),
+                        weights=[float(w) * factor for w in value['weights']],
+                        n=value['n'],
+                        fraction=value['n'] * factor,
+                        flags=sorted(flags),
+                    )
+                )
+        contributions = contributions.finish()
+        checked_denominators = _denominator_facts(
+            native.cells, observed, owner, label='native-denominator-check', batch_rows=batch_rows
+        )
+        supplied = iter(_fact_rows(native.denominators, observed, batch_rows, pair=False))
+        for expected in _fact_rows(checked_denominators, observed, batch_rows, pair=False):
+            io.require(next(supplied, None) == expected, 'native denominator closure differs')
+        io.require(next(supplied, None) is None, 'native denominator closure has extra tail')
+        keys = [*PAIR, 'component_year']
+
+        def fact_writer(label):
+            return _FactWriter(
+                owner,
+                label,
+                _fact_schema(PAIR, 'float64'),
+                keys,
+                product['product_id'],
+                'float64',
+                batch_rows,
+            )
+
+        county_writer = fact_writer('county')
+        county_group = ['county_id', 'code_type', 'code', 'component']
+        county_rows = _allocation_ordered(
+            contributions,
+            owner,
+            'county-view',
+            [*county_group, 'source_a_type', 'origin'],
+            batch_rows,
+        )
+        for key, value in _allocation_reduce(county_rows, county_group):
+            county_writer.append(_fact_row(keys, ('county', *key), value, 'float64'))
+        county_cells = county_writer.finish()
+        residual_keys = list(residual_schema)[:13]
+        residual_writer = _FactWriter(
+            owner,
+            'residuals',
+            residual_schema,
+            residual_keys,
+            product['product_id'],
+            None,
+            batch_rows,
+        )
+        metro_writer = fact_writer('metro')
+        if product['view'] == 'allocated_msa':
+            metro_group = ['cbsa_id', 'code_type', 'code', 'component']
+            metadata = _allocation_reduce(
+                (
+                    r
+                    for r in _allocation_ordered(
+                        contributions,
+                        owner,
+                        'metadata-view',
+                        [*metro_group, 'origin', 'county_id'],
+                        batch_rows,
+                    )
+                    if r['cbsa_type'] == 'metropolitan'
+                ),
+                metro_group,
+                metadata=True,
+            )
+            rollup_schema = pl.Schema({**contribution_schema})
+            rollups = _FactWriter(
+                owner, 'county-rollups', rollup_schema, (), product['product_id'], None, batch_rows
+            )
+            for key, value in _fact_rows(county_cells, product, batch_rows, pair=True):
+                membership = counties[key[1]]
+                if membership['cbsa_type'] == 'metropolitan':
+                    rollups.append(
+                        dict(
+                            source_a_type='county',
+                            origin=key[1],
+                            code_type=key[2],
+                            code=key[3],
+                            component=key[4],
+                            county_id=key[1],
+                            cbsa_type='metropolitan',
+                            cbsa_id=membership['cbsa_id'],
+                            residual_kind=None,
+                            **{n: value[n] for n in ('weights', 'n', 'fraction')},
+                            flags=sorted(value['flags']),
+                        )
+                    )
+            mass = iter(
+                _allocation_reduce(
+                    _allocation_ordered(
+                        rollups.finish(),
+                        owner,
+                        'rollup-view',
+                        [*metro_group, 'county_id'],
+                        batch_rows,
+                    ),
+                    metro_group,
+                )
+            )
+            for key, value in metadata:
+                mass_row = next(mass, None)
+                io.require(
+                    mass_row is not None and mass_row[0] == key,
+                    'metropolitan metadata/mass keys differ',
+                )
+                value['weights'] = mass_row[1]['weights']
+                metro_writer.append(_fact_row(keys, ('cbsa', *key), value, 'float64'))
+            io.require(next(mass, None) is None, 'unexpected metropolitan mass tail')
+            residual_group = ['origin', 'code_type', 'code', 'component', 'residual_kind']
+            residual_rows = (
+                r
+                for r in _allocation_ordered(
+                    contributions,
+                    owner,
+                    'residual-view',
+                    [*residual_group, 'county_id'],
+                    batch_rows,
+                )
+                if r['cbsa_type'] != 'metropolitan'
+            )
+            for key, value in _allocation_reduce(residual_rows, residual_group, residual=True):
+                for rep in range(81):
+                    residual_writer.append(
+                        dict(
+                            source='acs',
+                            family='area_mix',
+                            workplace_unit_type='work_migration_puma',
+                            workplace_unit=key[0],
+                            code_unit_type=key[1],
+                            code_unit=key[2],
+                            component_year=key[3],
+                            residual_type=key[4],
+                            replicate=rep,
+                            sample_set=product['sample_set'],
+                            vintage=product['vintage'],
+                            product_id=product['product_id'],
+                            universe=product['base_universe'] + ':' + product['evidence_policy'],
+                            pool_divisor=product['pool_divisor'],
+                            weighted_mass=value['weights'][rep] / product['pool_divisor'],
+                            n_input_support=value['n'],
+                            fractional_support_mass=value['fraction'],
+                            flags=sorted(value['flags']),
+                        )
+                    )
+        metro_cells = metro_writer.finish()
+        residuals = residual_writer.finish(sort=True)
+        cells = county_cells if product['view'] == 'allocated_county' else metro_cells
+        denominators = _denominator_facts(cells, product, owner, batch_rows=batch_rows)
+        diagnostic_schema = pl.Schema(diagnostic_schema)
+        io.require(
+            native.diagnostics.product_id == observed['product_id']
+            and native.diagnostics.schema == diagnostic_schema
+            and native.diagnostics.weight_kind is None,
+            'native diagnostic identity/schema differs',
+        )
+        diagnostics_writer = _FactWriter(
+            owner,
+            'diagnostics',
+            diagnostic_schema,
+            DIAG_KEY,
+            product['product_id'],
+            None,
+            batch_rows,
+        )
+        for path in native.diagnostics.paths:
+            io.require(
+                io.safe(path).is_relative_to(io.safe(native.diagnostics.owner))
+                and pl.read_parquet_schema(path) == diagnostic_schema,
+                'invalid native diagnostic path/schema',
+            )
+        for row in _rows(pl.scan_parquet(native.diagnostics.paths, glob=False), batch_rows):
+            io.require(
+                all(
+                    row[n] == observed[n]
+                    for n in (
+                        'family',
+                        'dimension',
+                        'base_universe',
+                        'evidence_policy',
+                        'view',
+                        'product_id',
+                    )
+                ),
+                'native diagnostic row identity differs',
+            )
+            diagnostics_writer.append(
+                row
+                | {
+                    n: product[n]
+                    for n in (
+                        'family',
+                        'dimension',
+                        'base_universe',
+                        'evidence_policy',
+                        'view',
+                        'product_id',
+                    )
+                }
+            )
+        diagnostics = diagnostics_writer.finish(sort=True)
+        measurements = _allocation_measurements(
+            native, county_cells, metro_cells, residuals, observed, product, owner, batch_rows
+        )
+        return _AllocationFacts(owner, cells, denominators, residuals, diagnostics, measurements)
