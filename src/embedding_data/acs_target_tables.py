@@ -1,10 +1,16 @@
 '''Assemble the fixed ACS products within one authenticated source scan lifetime.'''
 
+import heapq
+import json
 import shutil
+import sys
+from contextlib import ExitStack
 from dataclasses import dataclass
 from pathlib import Path
 
 import polars as pl
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 from embedding_data import ipums_parity, target_io
 from embedding_data.acs_mapping_io import safe_path
@@ -21,7 +27,14 @@ from embedding_data.acs_target_contract import (
     observed_counterpart,
     validate_cross_tables,
 )
-from embedding_data.acs_target_estimation import _aggregate_native_spilled, _spill_estimates
+from embedding_data.acs_target_estimation import (
+    _ESTIMATE_DESCRIPTOR_BYTES as DESCRIPTOR_BYTES,
+)
+from embedding_data.acs_target_estimation import (
+    _aggregate_native_spilled,
+    _append_estimate_fragment,
+    _spill_estimate_fragments,
+)
 from embedding_data.acs_target_inputs import SelectedTargets
 from embedding_data.acs_target_membership import family_rows
 from embedding_data.acs_target_projection import _allocate_area_mix_spilled, canonical_rows
@@ -29,6 +42,477 @@ from embedding_data.acs_target_rules import read_rules
 from embedding_data.acs_target_units import build_units
 from embedding_data.acs_target_weights import weighted_source
 from embedding_data.target_contract import TARGET_KEY_COLUMNS, TARGET_SCHEMA, write_targets
+
+FAN_IN = 16
+BATCH_ROWS = 4096
+BATCH_BYTES = 8 * 1024**2
+PYTHON_STAGING_BYTES = 32 * 1024**2
+FOOTER_BYTES = 64 * 1024**2
+INPUT_GROUPS = 32768
+CHUNK_BYTES = 32 * 1024**2
+GROUP_BYTES = 64 * 1024**2
+GROUP_ROWS = 16384
+# Earlier private flushing leaves room below the mandatory decoded/chunk maxima.
+# This target is not an encoded-size proof: witness preflight remains authoritative.
+GROUP_TARGET_BYTES = 16 * 1024**2
+WRITER_GROUPS = 32768
+# A witness pays all variable metadata. Reserve layout-dependent integer growth:
+# column: nine i64 + two i32 fields <=144 bytes with worst compact headers;
+# group: four i64 + one i16 <=63 bytes. 256 also covers fixed framing slack.
+COLUMN_LAYOUT_BYTES = 256
+GROUP_LAYOUT_BYTES = 256
+FILE_LAYOUT_BYTES = 256
+_WRITER_OPTIONS = dict(use_dictionary=False, write_statistics=False, write_page_index=False,
+    compression='NONE', column_encoding='PLAIN', data_page_version='1.0', store_schema=True,
+    write_page_checksum=False)
+
+
+@dataclass(frozen=True)
+class MergedFragment:
+    path: Path
+    row_count: int
+    first_key: tuple | None
+    last_key: tuple | None
+    schema: tuple
+
+
+def _refuse(reason):
+    raise ValueError('ordered-merge resource-budget: ' + reason)
+
+
+def _emit(telemetry, event, **values):
+    if telemetry is not None:
+        telemetry(dict(event=event, **values))
+
+
+def _key(values):
+    return tuple((value is not None, value) for value in values)
+
+
+def append_fragment(output, path, schema, keys, row_count, first_key, last_key):
+    return _append_estimate_fragment(output, path, schema, keys, row_count, first_key, last_key,
+                                     descriptor_bytes=DESCRIPTOR_BYTES)
+
+
+def _records(manifest, schema, keys):
+    safe_path(manifest)
+    with manifest.open('rb') as source:
+        while raw := source.readline(DESCRIPTOR_BYTES + 1):
+            if len(raw) > DESCRIPTOR_BYTES:
+                _refuse('descriptor-record-bytes')
+            record = json.loads(raw)
+            if (set(record) != {'path', 'schema', 'keys', 'row_count', 'first_key', 'last_key'}
+                    or record['schema'] != str(pl.Schema(schema)) or record['keys'] != keys):
+                raise ValueError('ordered-merge descriptor schema/keys differ')
+            name = record['path']
+            if not isinstance(name, str) or Path(name).name != name or name in ('.', '..'):
+                raise ValueError('ordered-merge unsafe fragment path')
+            if (type(record['row_count']) is not int or record['row_count'] < 0
+                    or any(value is not None and not isinstance(value, list)
+                           for value in (record['first_key'], record['last_key']))):
+                raise ValueError('ordered-merge malformed fragment descriptor')
+            record['path'] = manifest.parent / name
+            yield record
+
+
+def _preflight(path, schema):
+    safe_path(path)
+    with path.open('rb') as source:
+        size = source.seek(0, 2)
+        if size < 12:
+            raise ValueError('ordered-merge invalid parquet extent')
+        source.seek(0)
+        magic = source.read(4)
+        source.seek(-8, 2)
+        trailer = source.read(8)
+        footer = int.from_bytes(trailer[:4], 'little')
+        if magic != b'PAR1' or trailer[4:] != b'PAR1' or footer > size - 12:
+            raise ValueError('ordered-merge invalid parquet footer')
+        if footer > FOOTER_BYTES:
+            _refuse('encoded-footer-bytes')
+        reader = pq.ParquetFile(source, pre_buffer=False, memory_map=False,
+            thrift_string_size_limit=FOOTER_BYTES, thrift_container_size_limit=FOOTER_BYTES)
+        try:
+            metadata = reader.metadata
+            if metadata.serialized_size != footer:
+                raise ValueError('ordered-merge inconsistent footer size')
+            actual = pl.from_arrow(pa.Table.from_batches([], schema=reader.schema_arrow)).schema
+            if actual != pl.Schema(schema):
+                raise ValueError('ordered-merge fragment schema differs')
+            if len(reader.schema_arrow.serialize()) > DESCRIPTOR_BYTES:
+                _refuse('schema-metadata-bytes')
+            _validate_schema(reader.schema_arrow)
+            if metadata.num_row_groups > INPUT_GROUPS:
+                _refuse('input-row-groups')
+            maximum_width = 0
+            for index in range(metadata.num_row_groups):
+                group = metadata.row_group(index)
+                declared = 0
+                for column_index in range(group.num_columns):
+                    column = group.column(column_index)
+                    uncompressed, compressed = (column.total_uncompressed_size,
+                                                column.total_compressed_size)
+                    if uncompressed < 0 or compressed < 0 or (group.num_rows and not compressed):
+                        raise ValueError('ordered-merge contradictory column size')
+                    if uncompressed > CHUNK_BYTES:
+                        _refuse('declared-column-chunk-bytes')
+                    declared += uncompressed
+                    if column.file_path:
+                        raise ValueError('ordered-merge external column chunk')
+                if group.total_byte_size < 0 or group.total_byte_size != declared:
+                    raise ValueError('ordered-merge contradictory row-group size')
+                if declared > GROUP_BYTES:
+                    _refuse('declared-row-group-bytes')
+                group_rows = max(group.num_rows, 1)
+                maximum_width = max(maximum_width, (declared + group_rows - 1) // group_rows)
+            return footer, metadata.num_rows, metadata.num_row_groups, maximum_width
+        finally:
+            reader.close(force=True)
+
+
+def _validate_schema(schema):
+    if schema.metadata:
+        raise ValueError('ordered-merge unsupported Arrow schema metadata')
+    for field in schema:
+        dtype = field.type
+        if field.metadata:
+            raise ValueError('ordered-merge unsupported Arrow field metadata')
+        if pa.types.is_large_list(dtype) or pa.types.is_list(dtype):
+            child = dtype.value_field
+            if child.metadata or not (pa.types.is_string(child.type)
+                                      or pa.types.is_large_string(child.type)
+                                      or pa.types.is_uint8(child.type)):
+                raise ValueError('ordered-merge unsupported list type')
+        elif not (pa.types.is_string(dtype) or pa.types.is_large_string(dtype)
+                  or pa.types.is_integer(dtype) or pa.types.is_floating(dtype)
+                  or pa.types.is_boolean(dtype) or pa.types.is_decimal128(dtype)):
+            raise ValueError('ordered-merge unsupported Arrow type')
+
+
+class _Reader:
+    def __init__(self, record, schema, keys, telemetry):
+        self.record, self.keys, self.telemetry = record, keys, telemetry
+        self.source = self.reader = self.batches = self.batch = None
+        self.count, self.previous, self.first = 0, None, None
+        self.position = 0
+        _, count, _, maximum_width = _preflight(record['path'], schema)
+        if count != record['row_count']:
+            raise ValueError('ordered-merge descriptor count differs')
+        requested = BATCH_ROWS
+        # Declared bytes only guide requests; actual backing buffers decide refusal.
+        while requested > 1 and maximum_width * requested > BATCH_BYTES // 2:
+            requested = max(1, requested // 2)
+        try:
+            self.source = record['path'].open('rb')
+            self.reader = pq.ParquetFile(self.source, pre_buffer=False, memory_map=False)
+            self.batches = self.reader.iter_batches(batch_size=requested, use_threads=False)
+            _emit(telemetry, 'reader-open', path=str(record['path']))
+        except BaseException:
+            self.close()
+            raise
+
+    def next(self):
+        if self.batch is None or self.position == self.batch.num_rows:
+            self.batch = None
+            try:
+                batch = next(self.batches)
+            except StopIteration:
+                expected_last = self.record['last_key']
+                if (self.count != self.record['row_count']
+                        or self.first != self.record['first_key']
+                        or (list(self.previous) if self.previous is not None else None)
+                        != expected_last):
+                    raise ValueError('ordered-merge descriptor boundaries/count differ')
+                return None
+            if batch.num_rows > BATCH_ROWS:
+                _refuse('input-batch-rows')
+            size = batch.get_total_buffer_size()
+            _emit(self.telemetry, 'input-batch', rows=batch.num_rows, bytes=size)
+            if size > BATCH_BYTES:
+                _refuse('input-batch-backing-bytes')
+            self.batch, self.position = batch, 0
+        row = tuple(column[self.position].as_py() for column in self.batch.columns)
+        self.position += 1
+        indices = [self.batch.schema.get_field_index(name) for name in self.keys]
+        key = tuple(row[index] for index in indices)
+        if any(not (value is None or isinstance(value, (str, int))) for value in key):
+            raise ValueError('ordered-merge unsupported key value')
+        if self.previous is not None and _key(key) < _key(self.previous):
+            raise ValueError('ordered-merge input is not ordered')
+        if self.count == 0:
+            self.first = list(key)
+        self.previous = key
+        self.count += 1
+        return key, row
+
+    def close(self):
+        self.batches = self.batch = None
+        if self.reader is not None:
+            self.reader.close(force=True)
+            self.reader = None
+            _emit(self.telemetry, 'reader-close', path=str(self.record['path']))
+        if self.source is not None:
+            self.source.close()
+            self.source = None
+
+
+def _value_buffer_bound(value, dtype):
+    # Per-row validity/initial-offset overpayment bounds fresh Arrow construction.
+    # Variable lists are restricted by _validate_schema to one scalar child level.
+    if pa.types.is_large_list(dtype) or pa.types.is_list(dtype):
+        return 25 + (sum(_value_buffer_bound(child, dtype.value_type) for child in value)
+                     if value is not None else 0)
+    if pa.types.is_string(dtype) or pa.types.is_large_string(dtype):
+        return 17 + (len(value.encode('utf-8')) if value is not None else 0)
+    if pa.types.is_decimal128(dtype):
+        return 17
+    if pa.types.is_boolean(dtype):
+        return 2
+    return dtype.bit_width // 8 + 1
+
+
+def _python_bytes(value):
+    size = sys.getsizeof(value)
+    if isinstance(value, (tuple, list)):
+        # Count shared values repeatedly: conservative, with no growing identity set.
+        size += sum(_python_bytes(child) for child in value)
+    return size
+
+
+def _row_sizes(row, schema):
+    arrow_bytes = sum(_value_buffer_bound(value, field.type)
+                      for value, field in zip(row, schema, strict=True))
+    # Arrow conversion can retain a newly cached UTF8 representation on Python strings.
+    # The entire prospective Arrow size overpays all such cache bytes conservatively.
+    return arrow_bytes, _python_bytes(row) + arrow_bytes
+
+
+class _Writer:
+    def __init__(self, path, schema, keys, telemetry):
+        self.path, self.schema, self.keys, self.telemetry = path, schema, keys, telemetry
+        self.arrow_schema = pl.DataFrame(schema=schema).to_arrow().schema
+        # Own both pending tuple-list and conversion dict-list, sharing value objects.
+        self.conversion_bytes_per_row = (sys.getsizeof(dict.fromkeys(schema))
+                                         + 2 * sys.getsizeof([None] * 4))
+        _validate_schema(self.arrow_schema)
+        if len(self.arrow_schema.serialize()) > DESCRIPTOR_BYTES:
+            _refuse('schema-metadata-bytes')
+        self.output = path.open('xb')
+        self.writer = None
+        try:
+            self.writer = pq.ParquetWriter(self.output, self.arrow_schema, **_WRITER_OPTIONS)
+        except BaseException:
+            self.output.close()
+            raise
+        self.groups, self.rows, self.footer_bound = 0, 0, FILE_LAYOUT_BYTES
+        self.first = self.last = None
+        self.batches, self.batch_rows, self.batch_bytes = [], 0, 0
+
+    def append(self, rows):
+        arrow_bound = python_bound = 0
+        for row in rows:
+            arrow_bytes, python_bytes = _row_sizes(row, self.arrow_schema)
+            arrow_bound += arrow_bytes
+            python_bound += python_bytes + self.conversion_bytes_per_row
+        if len(rows) > BATCH_ROWS or arrow_bound > BATCH_BYTES:
+            _refuse('oversized-output-row' if len(rows) == 1 else 'output-staging-bytes')
+        if python_bound > PYTHON_STAGING_BYTES:
+            _refuse('python-output-staging-bytes')
+        batch = pa.RecordBatch.from_pylist([dict(zip(self.schema, row, strict=True))
+                                           for row in rows], schema=self.arrow_schema)
+        size = batch.get_total_buffer_size()
+        if size > BATCH_BYTES:
+            _refuse('output-batch-backing-bytes')
+        _emit(self.telemetry, 'output-batch', rows=batch.num_rows, bytes=size)
+        if (self.batch_rows + batch.num_rows > GROUP_ROWS
+                or self.batch_bytes + size > min(GROUP_BYTES, GROUP_TARGET_BYTES)):
+            self.flush()
+        self.batches.append(batch)
+        self.batch_rows += batch.num_rows
+        self.batch_bytes += size
+
+    def flush(self):
+        if not self.batches:
+            return
+        if self.groups >= WRITER_GROUPS:
+            _refuse('writer-row-groups')
+        table = pa.Table.from_batches(self.batches, schema=self.arrow_schema)
+        witness = self.path.parent / (self.path.name + '.witness')
+        safe_path(witness)
+        try:
+            with witness.open('xb') as output:
+                with pq.ParquetWriter(output, self.arrow_schema, **_WRITER_OPTIONS) as writer:
+                    writer.write_table(table, row_group_size=table.num_rows)
+            footer, count, groups, _ = _preflight(witness, self.schema)
+            with witness.open('rb') as source:
+                metadata = pq.read_metadata(source)
+                leaves = metadata.num_columns
+                if groups != 1 or count != table.num_rows:
+                    raise ValueError('ordered-merge witness grouping differs')
+                for index in range(leaves):
+                    column = metadata.row_group(0).column(index)
+                    if (column.is_stats_set or column.has_dictionary_page
+                            or column.has_column_index or column.has_offset_index
+                            or column.is_geo_stats_set or column.metadata):
+                        raise ValueError('ordered-merge unexpected writer metadata')
+            reservation = footer + COLUMN_LAYOUT_BYTES * leaves + GROUP_LAYOUT_BYTES
+            if self.footer_bound + reservation > FOOTER_BYTES:
+                _refuse('prospective-writer-footer-bytes')
+            self.footer_bound += reservation
+            self.writer.write_table(table, row_group_size=table.num_rows)
+            self.groups += 1
+            self.rows += table.num_rows
+            first = tuple(table[name][0].as_py() for name in self.keys)
+            last = tuple(table[name][-1].as_py() for name in self.keys)
+            if self.first is None:
+                self.first = first
+            if self.last is not None and _key(first) < _key(self.last):
+                raise ValueError('ordered-merge output boundary is not ordered')
+            self.last = last
+            _emit(self.telemetry, 'writer-group', rows=table.num_rows,
+                  bytes=table.get_total_buffer_size(), witness_footer=footer,
+                  footer_bound=self.footer_bound, groups=self.groups)
+            self.batches.clear()
+            self.batch_rows = self.batch_bytes = 0
+        finally:
+            witness.unlink(missing_ok=True)
+
+    def close(self):
+        try:
+            if self.writer is not None:
+                self.writer.close()
+                self.writer = None
+        finally:
+            self.output.close()
+
+    def finish(self):
+        self.flush()
+        self.close()
+        footer, count, groups, _ = _preflight(self.path, self.schema)
+        if footer > self.footer_bound and count:
+            _refuse('serialized-writer-footer-envelope')
+        if count != self.rows or groups != self.groups:
+            # Arrow writes one physical empty group when an empty Table is written;
+            # no Table is appended here, so the empty run has zero groups.
+            raise ValueError('ordered-merge final writer count/group differs')
+        _emit(self.telemetry, 'writer-finished', rows=count, groups=groups, footer=footer,
+              footer_bound=self.footer_bound)
+        return MergedFragment(self.path, count, self.first, self.last, tuple(self.schema.items()))
+
+
+def _merge_group(records, path, schema, keys, telemetry):
+    writer = None
+    try:
+        with ExitStack() as stack:
+            readers = []
+            for record in records:
+                reader = _Reader(record, schema, keys, telemetry)
+                stack.callback(reader.close)
+                readers.append(reader)
+            writer = _Writer(path, schema, keys, telemetry)
+            stack.callback(writer.close)
+            heap = []
+            for index, reader in enumerate(readers):
+                item = reader.next()
+                if item is not None:
+                    key, row = item
+                    heapq.heappush(heap, (_key(key), index, row))
+            rows = []
+            staged_arrow_bytes = staged_python_bytes = 0
+            while heap:
+                _, index, row = heapq.heappop(heap)
+                arrow_bytes, python_bytes = _row_sizes(row, writer.arrow_schema)
+                python_bytes += writer.conversion_bytes_per_row
+                if arrow_bytes > BATCH_BYTES:
+                    _refuse('oversized-output-row')
+                if python_bytes > PYTHON_STAGING_BYTES:
+                    _refuse('python-output-staging-bytes')
+                if rows and (len(rows) == BATCH_ROWS
+                             or staged_arrow_bytes + arrow_bytes > BATCH_BYTES
+                             or staged_python_bytes + python_bytes > PYTHON_STAGING_BYTES):
+                    _emit(telemetry, 'output-staging', rows=len(rows),
+                          arrow_bound=staged_arrow_bytes, python_bytes=staged_python_bytes)
+                    writer.append(rows)
+                    rows.clear()
+                    staged_arrow_bytes = staged_python_bytes = 0
+                rows.append(row)
+                staged_arrow_bytes += arrow_bytes
+                staged_python_bytes += python_bytes
+                item = readers[index].next()
+                if item is not None:
+                    key, row = item
+                    heapq.heappush(heap, (_key(key), index, row))
+            if rows:
+                _emit(telemetry, 'output-staging', rows=len(rows),
+                      arrow_bound=staged_arrow_bytes, python_bytes=staged_python_bytes)
+                writer.append(rows)
+            return writer.finish()
+    except BaseException:
+        path.unlink(missing_ok=True)
+        raise
+
+
+def merge_fragments(manifest, destination, schema, keys, *, telemetry=None):
+    '''Consume a streamed manifest into one exact globally ordered compact file.'''
+    manifest, destination = Path(manifest), Path(destination)
+    safe_path(manifest)
+    safe_path(destination)
+    if destination.exists():
+        raise ValueError('ordered-merge destination already exists')
+    workspace = destination.parent / (destination.name + '.merge')
+    safe_path(workspace)
+    workspace.mkdir()
+    current, level = manifest, 0
+    try:
+        while True:
+            next_manifest = workspace / f'level-{level:04d}.jsonl'
+            emitted = 0
+            with next_manifest.open('x') as output:
+                iterator = iter(_records(current, schema, keys))
+                while True:
+                    group = []
+                    # Reserve one reader slot for bounded footer/witness checks.
+                    for _ in range(FAN_IN - 1):
+                        try:
+                            group.append(next(iterator))
+                        except StopIteration:
+                            break
+                    if not group and emitted:
+                        break
+                    path = workspace / f'level-{level:04d}-run-{emitted:08d}.parquet'
+                    result = _merge_group(group, path, schema, keys, telemetry)
+                    append_fragment(output, path, schema, keys, result.row_count,
+                                    result.first_key, result.last_key)
+                    emitted += 1
+                    if not group:
+                        break
+            _emit(telemetry, 'merge-level', level=level, runs=emitted,
+                  disk_bytes=sum(path.stat().st_size for path in workspace.iterdir()))
+            if emitted == 1:
+                # Validate descriptor and fully drain final output before exposing it.
+                record = next(_records(next_manifest, schema, keys))
+                reader = _Reader(record, schema, keys, telemetry)
+                try:
+                    while reader.next() is not None:
+                        pass
+                finally:
+                    reader.close()
+                # No-replacement publication of this operation's owned validated file.
+                import os
+                os.link(result.path, destination)
+                return MergedFragment(destination, result.row_count, result.first_key,
+                                      result.last_key, result.schema)
+            if current.parent == workspace:
+                for record in _records(current, schema, keys):
+                    record['path'].unlink()
+                current.unlink()
+            current = next_manifest
+            level += 1
+    except BaseException:
+        raise
+    finally:
+        shutil.rmtree(workspace)
+
 
 TABLES = (*TARGET_TABLES, *AUXILIARY_SCHEMAS)
 _ASSEMBLY_ROW_GROUP_SIZE = 16384
@@ -119,7 +603,7 @@ def _spill_product_outputs(aggregates, residuals, workspace):
     safe_path(directory)
     directory.mkdir()
     try:
-        estimates = _spill_estimates(aggregates, directory)
+        estimates = _spill_estimate_fragments(aggregates, directory)
         target = {
             'observed': 'targets_observed',
             'canonical': 'targets_canonical',
@@ -134,7 +618,13 @@ def _spill_product_outputs(aggregates, residuals, workspace):
             ('eligibility_diagnostics', aggregates.diagnostics),
             ('allocation_residuals', residuals),
         ]:
-            records.append(_sink_table_fragment(name, frame, directory / (name + '.parquet')))
+            destination = directory / (name + '.parquet')
+            if name in (target, 'target_support', 'replicate_estimates'):
+                schema, keys = _table_layout(name)
+                merged = merge_fragments(frame, destination, schema, keys)
+                records.append(_TableFragment(name, merged.path, merged.schema, merged.row_count))
+            else:
+                records.append(_sink_table_fragment(name, frame, destination))
         # Every returned scan now reads its compact durable file, not estimator shards.
         shutil.rmtree(directory / ('estimates-' + aggregates.product.product_id))
         return records

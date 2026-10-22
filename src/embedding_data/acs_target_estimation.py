@@ -1,8 +1,10 @@
 '''Exact native pooling and paired replicate uncertainty at aggregate cell grain.'''
 
+import json
 import math
 import re
 import shutil
+from contextlib import ExitStack
 from dataclasses import dataclass
 from decimal import Decimal, localcontext
 from pathlib import Path
@@ -24,6 +26,7 @@ PAIR_KEYS = ['unit_a_type', 'unit_a', 'unit_b_type', 'unit_b']
 DENOMINATOR_KEYS = ['unit_a_type', 'unit_a']
 REPLICATE_COUNT = 80
 DECIMAL_PRECISION = 38
+_ESTIMATE_DESCRIPTOR_BYTES = 64 * 1024
 
 
 @dataclass(frozen=True)
@@ -509,6 +512,19 @@ class _OrderedAggregateReader:
         return key, frame
 
 
+def _append_estimate_fragment(output, path, schema, keys, row_count, first_key, last_key,
+                              *, descriptor_bytes=None):
+    '''Append one bounded descriptor without retaining a product-wide collection.'''
+    descriptor_bytes = (_ESTIMATE_DESCRIPTOR_BYTES if descriptor_bytes is None
+                        else descriptor_bytes)
+    record = dict(path=Path(path).name, schema=str(pl.Schema(schema)), row_count=row_count,
+                  first_key=first_key, last_key=last_key, keys=keys)
+    encoded = json.dumps(record, ensure_ascii=True, allow_nan=False) + '\n'
+    if len(encoded.encode()) > descriptor_bytes:
+        raise ValueError('ordered-merge resource-budget: descriptor-record-bytes')
+    output.write(encoded)
+
+
 @dataclass(frozen=True)
 class _EstimateFragment:
     path: Path
@@ -532,7 +548,17 @@ def _sink_estimate_fragment(frame, directory, label, index, keys):
 
 def _spill_estimates(aggregates: AggregateSet, workspace: Path, *,
                      batch_size: int = 128) -> dict[str, pl.LazyFrame]:
-    '''Merge ordered aggregate scans; result scans live until caller removes workspace.'''
+    '''Compatibility adapter retaining the existing small/public scan interface.'''
+    return _spill_estimates_impl(aggregates, workspace, batch_size=batch_size, descriptors=False)
+
+
+def _spill_estimate_fragments(aggregates: AggregateSet, workspace: Path, *,
+                              batch_size: int = 128) -> dict[str, Path]:
+    '''Hand off streamed descriptors before building any product-wide scan union.'''
+    return _spill_estimates_impl(aggregates, workspace, batch_size=batch_size, descriptors=True)
+
+
+def _spill_estimates_impl(aggregates, workspace, *, batch_size, descriptors):
     product = aggregates.product
     if product.pool_divisor not in (1, 2) or not product.years:
         raise ValueError('unsupported declared pooling period')
@@ -548,11 +574,17 @@ def _spill_estimates(aggregates: AggregateSet, workspace: Path, *,
     safe_path(directory)
     directory.mkdir()
     cells = denominators = None
+    manifests = ExitStack()
     try:
         cells = _OrderedAggregateReader(aggregates.cells, PAIR_KEYS, product)
         denominators = _OrderedAggregateReader(aggregates.denominators, DENOMINATOR_KEYS, product)
         empty_cells = pl.DataFrame(schema=cells.schema).lazy()
-        fragments = {name: [] for name in ('targets', 'support', 'replicates')}
+        labels = ('targets', 'support', 'replicates')
+        fragments = {name: [] for name in labels} if not descriptors else None
+        counters = dict.fromkeys(labels, 0)
+        paths = {name: directory / (name + '.jsonl') for name in labels}
+        outputs = {name: manifests.enter_context(path.open('x'))
+                   for name, path in paths.items()} if descriptors else {}
         schemas = {'targets': TARGET_SCHEMA, 'support': SUPPORT_SCHEMA,
                    'replicates': REPLICATE_SCHEMA}
         keys = {'targets': TARGET_KEY_COLUMNS,
@@ -561,9 +593,15 @@ def _spill_estimates(aggregates: AggregateSet, workspace: Path, *,
 
         def sink(label, frame):
             fragment = _sink_estimate_fragment(frame, directory, label,
-                                               len(fragments[label]), keys[label])
+                                               counters[label], keys[label])
             if fragment is not None:
-                fragments[label].append(fragment)
+                counters[label] += 1
+                if descriptors:
+                    _append_estimate_fragment(
+                        outputs[label], fragment.path, schemas[label], keys[label],
+                        fragment.row_count, fragment.first_key, fragment.last_key)
+                else:
+                    fragments[label].append(fragment)
 
         def sink_cells(batch, denominator):
             bounded = AggregateSet(pl.concat(batch).lazy(), denominator.lazy(),
@@ -599,6 +637,15 @@ def _spill_estimates(aggregates: AggregateSet, workspace: Path, *,
             denominator = denominators.next_group()
         if cell is not None:
             raise ValueError('cell missing denominator aggregate')
+        if descriptors:
+            for label in labels:
+                if not counters[label]:
+                    path = directory / f'{label}-empty.parquet'
+                    _sink_native_aggregate(pl.LazyFrame(schema=schemas[label]), path)
+                    _append_estimate_fragment(outputs[label], path, schemas[label], keys[label],
+                                    0, None, None)
+            manifests.close()
+            return paths
         outputs = {}
         for label, records in fragments.items():
             paths = [fragment.path for fragment in records]
@@ -612,6 +659,7 @@ def _spill_estimates(aggregates: AggregateSet, workspace: Path, *,
         shutil.rmtree(directory)
         raise
     finally:
+        manifests.close()
         if cells is not None:
             cells.release()
         if denominators is not None:
