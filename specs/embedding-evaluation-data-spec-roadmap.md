@@ -52,6 +52,20 @@ Relevant code/dependency changes require fresh measurement IDs; doc-only
 commits leave frozen file hashes unchanged (plan 7, Handoff)
 (Resolved at resume, 2026-10-16).
 
+Resumed 2026-11-13 with Stage 9 in execution. Stages 1–8 are stamped, and
+the entries below already cite all eight Handoffs, plan 8's included, so no
+entry changes. Stage 9 stays unticked. Its approved
+[spec](acs-targets.md) and [plan 9](plans/9-acs-targets.md) are being executed.
+Tasks 1–9 merged to `main` at `3c3ccd0`, and Task 10 full-data acceptance is on
+hold. An uncommitted throughput follow-up, `specs/plans/10-acs-targets.md`,
+continues in the plan-9 worktree. Stage 9 therefore resumes through plan 9,
+not through its ROUTING line. Plan number 10 is taken by that file.
+
+Owner decision at this resume (2026-11-13): Stage 10 starts now, before
+Stage 9 is complete. Stage 10 consumes only ticked stages. Stage 10's full
+test-suite gates must not run during Stage 9's full-data runs on the same host.
+Stages 11–13 keep their order.
+
 ## Gap analysis
 
 `acs` = `src/embedding_data/acs_benchmark_extract.py`, `cps` =
