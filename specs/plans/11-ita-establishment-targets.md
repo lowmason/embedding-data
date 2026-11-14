@@ -21,8 +21,9 @@ Roadmap: specs/embedding-evaluation-data-spec-roadmap.md, Stage 10 — on plan c
 
 ## Global Constraints
 
-- **Branch.** Execute on `claude/nervous-maxwell-7ab7f8` or a worktree cut from it.
-  Only that branch has the spec and this plan.
+- **Branch.** Execute on a new branch cut from `main` at or after `e1470e7`, the
+  merge of lowmason/embedding-data#8. That commit is the first on `main` with the
+  spec and this plan.
 - **Stage 9 host rule.** Before every commit, every full `pytest` run and every
   full-data command, run
   `pgrep -fl 'embedding_data\.acs_targets|stage9_independent|reconcile_stage9'`.
@@ -132,6 +133,7 @@ Roadmap: specs/embedding-evaluation-data-spec-roadmap.md, Stage 10 — on plan c
 - **D1** (owner, brief, 2026-11-13): The planning session may download the three public Census NAICS index files to a scratch folder outside `data/`, only to fix URLs, layout and counts. Nothing is recorded, and production acquisition downloads the registered originals again. Applied in: Task 2 (registered facts), Task 11 (acquisition).
 - **D2** (owner, planning stop-and-ask, 2026-11-14): Each official index file ends with 25 cross-reference rows whose code is `******`. Keep them as a counted cross-reference class with the delivered code, and include their entries in the copied-index flags. Registered row counts are 19,280 / 20,082 / 20,398, each with 25 cross-references. The owner approved the amendment wording at plan review on 2026-11-14. Applied in: Task 2 (spec amendment).
 - **D3** (owner, plan review, 2026-11-14): Approve plan 11 with every settled default unchanged. Commit the plan on `claude/nervous-maxwell-7ab7f8` and do not merge to `main` until the owner decides. Applied in: Global Constraints (Branch, Merging).
+- **D4** (owner, after plan review, 2026-11-14): Merge the spec and this plan into `main` through lowmason/embedding-data#8 (merge commit `e1470e7`), and delete the remote planning branch. Execution starts from `main`. Applied in: Global Constraints (Branch).
 
 ## Settled Defaults (for owner review)
 
