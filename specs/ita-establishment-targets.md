@@ -1,11 +1,13 @@
 # ITA establishment targets
 
-> Required next skill: writing-plans in a fresh session, after owner review
-> of this committed specification. Do not implement during brainstorming.
+> Required next skill: writing-plans in a fresh session. The owner approved
+> this committed specification. Do not implement during brainstorming.
 
 The owner approved the headline window, the index-entry flag, the co-ownership
-measure, the build approach and the Stage 9 write coordination on 2026-11-13. This document records that
-design. Stage 10 implementation and measured acceptance remain planned.
+measure, the build approach and the Stage 9 write coordination on 2026-11-13.
+The owner then approved this written specification, including every call
+marked "My call", on 2026-11-13. Stage 10 implementation and measured
+acceptance remain planned.
 
 ## Scope and governing contracts
 
