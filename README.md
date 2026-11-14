@@ -662,13 +662,40 @@ uv run --locked pytest
 uv lock --check
 ```
 
-Install the [pre-commit](https://pre-commit.com/) hooks once per clone. They
-check whitespace and file syntax, run [Ruff](https://docs.astral.sh/ruff/) with
-autofix, and run the pytest suite under coverage before each commit:
+Install the [pre-commit](https://pre-commit.com/) hooks once per clone, from
+the primary checkout. Linked worktrees share its `.git/hooks` directory. The
+command installs three hook types. Before each commit, they check whitespace and
+file syntax and run [Ruff](https://docs.astral.sh/ruff/) with autofix. They also
+run the pytest suite under coverage without the slow tests. Before each push and
+on each merge commit, they run the full suite, slow tests included. A
+fast-forward merge creates no commit, so it runs no hook.
 
 ```bash
 uv run --locked pre-commit install
 uv run --locked pre-commit run --all-files
+uv run --locked pre-commit run coverage-check-full --hook-stage pre-push --all-files
+```
+
+Both test hooks skip a change when every changed file is under `specs/` or is a
+Markdown file at the repository root. No test reads those files. The hooks run
+pytest in parallel with
+[pytest-xdist](https://pytest-xdist.readthedocs.io/en/stable/). uv loads it from
+`tests/xdist-requirements.txt` as an overlay, so `pyproject.toml` and `uv.lock`
+stay unchanged. The stage software identities hash both files and record every
+installed package, so adding a test tool to the lock would break verification of
+the selected runs. `PYTEST_WORKERS` (default 7) sets the number of workers.
+`POLARS_MAX_THREADS` (default 2) sets the Polars threads in each worker. The
+hooks also select the Hypothesis profile `parallel`, which has no time limit for
+each example. Workers share the CPU, so a time limit measures that load and not
+the code.
+
+The `slow` marker covers the eight full-chain tests listed in
+`tests/conftest.py`. Each one builds real upstream bundles and took at least 60
+seconds in a serial run. Run only those tests, or everything else:
+
+```bash
+uv run --locked pytest -m slow
+uv run --locked pytest -m 'not network and not slow'
 ```
 
 The CPS checks cover CLI defaults, credential loading, catalog selection,
