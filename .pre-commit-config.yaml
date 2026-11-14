@@ -1,3 +1,9 @@
+# `pre-commit install` installs all three hook types. File checks, ruff and the fast suite
+# run at commit time. The full suite, slow tests included, runs before a push and on a
+# merge commit (a fast-forward merge creates no commit, so it runs no hook).
+default_install_hook_types: [pre-commit, pre-push, pre-merge-commit]
+default_stages: [pre-commit]
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
@@ -18,12 +24,39 @@ repos:
       - id: ruff-check
         args: ['--fix', '--exit-non-zero-on-fix']
 
+  # Both test hooks run pytest-xdist from a uv overlay (tests/xdist-requirements.txt explains
+  # why it is not in uv.lock). PYTEST_WORKERS and POLARS_MAX_THREADS override the defaults.
+  # The Hypothesis profile 'parallel' drops wall-clock deadlines (see tests/conftest.py).
+  # Both skip when every changed file is prose: specs/ and root-level Markdown, which no test
+  # reads. Fixture READMEs under tests/ and every other path still run them.
   - repo: local
     hooks:
       - id: coverage-check
-        name: Coverage Check
-        entry: bash -c 'THRESHOLD=${COVERAGE_THRESHOLD:-0}; uv run --locked pytest --cov=embedding_data --cov-report=term-missing --cov-fail-under=$THRESHOLD || exit 1'
+        name: Coverage Check (slow tests deselected)
+        entry: >-
+          bash -c 'THRESHOLD=${COVERAGE_THRESHOLD:-0};
+          POLARS_MAX_THREADS=${POLARS_MAX_THREADS:-2}
+          uv run --locked --with-requirements tests/xdist-requirements.txt
+          pytest -m "not network and not slow"
+          -n ${PYTEST_WORKERS:-7} --dist worksteal --hypothesis-profile=parallel
+          --cov=embedding_data --cov-report=term-missing --cov-fail-under=$THRESHOLD || exit 1'
         language: system
         pass_filenames: false
-        always_run: true
-        description: 'Run pytest with coverage and optionally fail if coverage drops below threshold'
+        always_run: false
+        exclude: '^(specs/|[^/]+\.md$)'
+        stages: [pre-commit]
+        description: 'Run the fast pytest suite with coverage before each commit'
+      - id: coverage-check-full
+        name: Coverage Check (full suite)
+        entry: >-
+          bash -c 'THRESHOLD=${COVERAGE_THRESHOLD:-0};
+          POLARS_MAX_THREADS=${POLARS_MAX_THREADS:-2}
+          uv run --locked --with-requirements tests/xdist-requirements.txt
+          pytest -n ${PYTEST_WORKERS:-7} --dist worksteal --hypothesis-profile=parallel
+          --cov=embedding_data --cov-report=term-missing --cov-fail-under=$THRESHOLD || exit 1'
+        language: system
+        pass_filenames: false
+        always_run: false
+        exclude: '^(specs/|[^/]+\.md$)'
+        stages: [pre-push, pre-merge-commit]
+        description: 'Run the full pytest suite, slow tests included, with coverage'

@@ -1,0 +1,17 @@
+# Parallel test runner for the coverage-check pre-commit hook, kept out of uv.lock.
+#
+# Stages 4-9 freeze the uv.lock hash, Stages 6-9 also hash pyproject.toml, and
+# Stages 7-9 record every installed distribution. Adding these packages to the
+# dev group would change those identities and break verification of the selected
+# runs. The hook loads them with `uv run --locked --with-requirements`, which
+# builds a cached overlay and leaves pyproject.toml, uv.lock and .venv unchanged.
+#
+# The overlay installs its own copies of pytest and its dependencies. Keep those
+# pins equal to the versions in uv.lock; tests/test_xdist_requirements.py checks it.
+pytest-xdist==3.8.0
+execnet==2.1.2
+pytest==9.1.1
+pluggy==1.6.0
+iniconfig==2.3.1
+packaging==26.3
+pygments==2.21.0
