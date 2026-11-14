@@ -681,9 +681,12 @@ Markdown file at the repository root. No test reads those files. The hooks run
 pytest in parallel with
 [pytest-xdist](https://pytest-xdist.readthedocs.io/en/stable/). uv loads it from
 `tests/xdist-requirements.txt` as an overlay, so `pyproject.toml` and `uv.lock`
-stay unchanged. The stage software identities hash both files and record every
-installed package, so adding a test tool to the lock would break verification of
-the selected runs. `PYTEST_WORKERS` (default 7) sets the number of workers.
+stay unchanged. Stages 4 to 9 record the hash of `uv.lock`. Stages 6 to 9 also
+hash `pyproject.toml`, and Stages 7 to 9 record every installed package. So a
+test tool added to the lock would break verification of the selected runs. uv
+needs network access once to download the overlay into its cache, which
+includes any `UV_CACHE_DIR` that you set. `PYTEST_WORKERS` (default 7) sets the
+number of workers.
 `POLARS_MAX_THREADS` (default 2) sets the Polars threads in each worker. The
 hooks also select the Hypothesis profile `parallel`, which has no time limit for
 each example. Workers share the CPU, so a time limit measures that load and not
