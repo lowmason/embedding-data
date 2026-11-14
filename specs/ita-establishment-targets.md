@@ -219,6 +219,12 @@ The parser fails loudly on:
 
 It never substitutes a local lookup or a partial file.
 
+The leaf rule above is an assumption about the official files that this
+design could not inspect. The plan's acquisition task inspects the actual
+originals first. If they contain rows with non-leaf, special or
+other-vintage codes, the plan stops and asks the owner. It neither refuses
+the official file nor drops those rows silently.
+
 ### Index keys
 
 An index key is `normalize_key(entry)`. One key can belong to several codes.
@@ -359,7 +365,8 @@ It also reproduces the adopted V1 table exactly, by filing year: `n_rows`,
 `n_empty`, `n_placeholder`, `n_copied_any`, `n_native_title_match`,
 `n_vintage_unknown`, `n_employer_unknown`, `n_employer_company`,
 `n_ein_padded`, `n_mojibake`, `n_repeat_rows` and `n_repeat_excess`. A
-mismatch fails the build. It adds the new index counts by year, with
+mismatch fails the build. The expected values are independent of the build
+(see [Expected values for the V1 and V2 gates](#expected-values-for-the-v1-and-v2-gates)). It adds the new index counts by year, with
 title-and-index overlap shown separately.
 
 ## Co-ownership target
@@ -551,9 +558,21 @@ confirmed changed-ID links equal `n_address_matches_different_id`. For
 example, 2023→2024 has 160,579 and 14,532. The candidate and diagnostic counts
 also match V2. After conflict handling, the report shows that the statuses
 partition the base records and that conflicts account for the exact
-difference. **My call:** the build computes the gate with
-`ita_verification.link_report` on the same selected rows. A mismatch fails the
-build.
+difference. A mismatch fails the build.
+
+### Expected values for the V1 and V2 gates
+
+A gate that compares the build with a recomputation from the same code proves
+little. **My call:** the expected values are integer constants transcribed
+from the adopted V1 and V2 tables in
+[the V1–V3 finding](findings/v1-v3-ita-verification.md), committed in a
+Stage 10 module. A unit test checks the constants against the finding's
+Markdown tables, so a transcription error fails the suite. The build compares
+its own counts, computed by the new Stage 10 code, with those constants.
+`ita_verification.link_report` and `description_report` serve as a second,
+independent cross-check in the full-data acceptance. They are not the source
+of the expected values. Stage 10 does not read the Stage 3 verification run
+directory. Those artifacts stay untouched evidence.
 
 ## Bundle, commands and provenance
 
