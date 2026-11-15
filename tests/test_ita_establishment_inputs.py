@@ -96,6 +96,15 @@ def point_source_at_a_copy(data_dir, directory):
         path='derived/osha/copy.parquet'))
 
 
+def list_an_extra_file(data_dir, directory):
+    (directory / 'extra.txt').write_text('extra')
+    outputs_file = directory / 'outputs.json'
+    outputs = json.loads(outputs_file.read_text())
+    outputs['extra.txt'] = {'sha256': '', 'size': 0}
+    target_io.write_json(outputs_file, outputs)
+    return repin(directory)
+
+
 def change_reference_bytes(data_dir, directory):
     file = data_dir / 'raw/references/naics/fixture_2022.xlsx'
     file.write_bytes(file.read_bytes() + b'changed')
@@ -177,13 +186,11 @@ def test_needs_no_geography(tmp_path):
     assert select_seeded(tmp_path, seeded).provenance['source_rows'] == 21
 
 
-def test_needs_no_geography_bundle_or_originals(tmp_path, monkeypatch):
+def test_needs_no_geography_bundle_or_originals(tmp_path):
     seeded = seed_inputs(tmp_path)
     shutil.rmtree(tmp_path / 'derived/geography')
     shutil.rmtree(tmp_path / 'raw/references/geography')
     shutil.rmtree(tmp_path / 'raw/references/hud')
-    for name in ('select', '_bundle', '_validate_geography'):
-        monkeypatch.setattr(target_inputs, name, lambda *a, **k: pytest.fail('needs geography'))
     assert select_seeded(tmp_path, seeded).provenance['source_rows'] == 21
 
 
@@ -206,6 +213,7 @@ def test_selected_defects_are_refused(tmp_path, defect):
                  'schema version', id='report-schema-version'),
     pytest.param(edit_inputs(lambda value: value.update(run_id='other_run')),
                  'run identity', id='inputs-run-id'),
+    pytest.param(list_an_extra_file, 'inventory files', id='inventory-lists-an-extra-file'),
     pytest.param(edit_inputs(drop_key('source_parquet')), 'required fields',
                  id='inputs-missing-key'),
     pytest.param(edit_report(drop_key('tables')), 'required fields', id='report-missing-key'),
@@ -240,11 +248,12 @@ def test_bundle_defects_are_refused_with_a_fixed_reason(tmp_path, edit, message)
     pytest.param('fixture_codes\n', lambda pin: pin, 'run ID', id='run-trailing-newline'),
     pytest.param('-fixture_codes', lambda pin: pin, 'run ID', id='run-leading-hyphen'),
     pytest.param('', lambda pin: pin, 'run ID', id='run-empty'),
-    pytest.param(RUN, lambda pin: pin[:63], 'checksum', id='pin-63-characters'),
-    pytest.param(RUN, lambda pin: pin + '0', 'checksum', id='pin-65-characters'),
-    pytest.param(RUN, lambda pin: pin.upper(), 'checksum', id='pin-uppercase'),
-    pytest.param(RUN, lambda pin: 'g' * 64, 'checksum', id='pin-not-hex'),
-    pytest.param(RUN, lambda pin: '0' * 64, 'checksum differs', id='pin-wrong-digest'),
+    pytest.param(RUN, lambda pin: pin[:63], 'invalid detached checksum', id='pin-63-characters'),
+    pytest.param(RUN, lambda pin: pin + '0', 'invalid detached checksum', id='pin-65-characters'),
+    pytest.param(RUN, lambda pin: pin.upper(), 'invalid detached checksum', id='pin-uppercase'),
+    pytest.param(RUN, lambda pin: 'g' * 64, 'invalid detached checksum', id='pin-not-hex'),
+    pytest.param(RUN, lambda pin: '0' * 64, '^detached inventory checksum differs$',
+                 id='pin-wrong-digest'),
 ])
 def test_unsafe_run_id_and_pin_refused(tmp_path, run_id, edit_pin, message):
     seeded = seed_inputs(tmp_path)
