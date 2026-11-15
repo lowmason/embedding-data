@@ -577,7 +577,7 @@ RECORDED_CASES = {
                   'detached inventory checksum differs'),
     'claimed_adopted_basis': (edit_copy('inputs.json',
                                         set_path('expectations', 'basis', ADOPTED_BASIS)),
-                              'must not claim the adopted basis'),
+                              'a bundle of another source must not claim the adopted basis'),
     'recorded_index_pin': (
         edit_copy('inputs.json', set_path('index_references', 'naics_index_2022', 'sha256',
                                           'f' * 64)),
