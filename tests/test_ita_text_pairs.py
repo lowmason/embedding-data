@@ -701,7 +701,8 @@ def test_tables_are_sorted_whatever_the_record_order():
         record('Steel', **UNKNOWN),
         record('Steel', **UNKNOWN),
     ]
-    records = keyed(rows).sort('source_row', descending=True)
+    # Reverse eagerly: a lazy sort that only feeds an unordered join can be optimized away.
+    records = keyed(rows).collect().reverse().lazy()
     result = build_pairs(records, NODES, CODE_PATHS)
     pairs, codes, members, _ = tables(result)
     assert pairs.height == 10
@@ -769,6 +770,14 @@ def test_report_reconciles_pairs_to_records():
             'count': 5, 'min': 1, 'p25': 1.0, 'median': 1.0, 'p75': 2.0, 'p95': 3.0, 'max': 3,
         },
     }
+
+
+def test_report_keeps_empty_and_placeholder_pairs_apart():
+    rows = [record(''), record('', ein='987654321'), record('N/A')]
+    assert build(rows).report['pairs_by_kind_headline_text'] == [
+        {'pair_kind': 'employer', 'flag_headline': False, 'text_state': 'empty', 'n': 2},
+        {'pair_kind': 'employer', 'flag_headline': False, 'text_state': 'placeholder', 'n': 1},
+    ]
 
 
 def test_headline_pair_record_distribution():
