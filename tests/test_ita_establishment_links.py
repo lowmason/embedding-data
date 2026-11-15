@@ -768,6 +768,29 @@ V_CHANGED_AMBIGUOUS = VALID.add(2023, 10, 'changed-ambiguous', ein='100000010')
 V_CHANGED_AMBIGUOUS_LATER = VALID.add(2024, 110, 'changed-ambiguous', ein='100000010')
 VALID.add(2024, 10, 'changed-ambiguous-a')
 VALID.add(2024, 10, 'changed-ambiguous-b')
+# Unlinked probes whose later records differ from the base tuple in one way each.
+V_PROBE = VALID.add(2023, 20, 'probe', ein='200000020')
+V_PROBE_NAME = VALID.add(2024, 201, 'probe', ein='200000020',
+                         establishment_name='Plant probe-renamed')
+V_PROBE_EIN = VALID.add(2024, 202, 'probe', ein='200000021')
+V_PROBE_ADDRESS = VALID.add(2024, 203, 'probe', ein='200000020', street_address='probe Moved St')
+V_PROBE_NULL_EIN = VALID.add(2024, 205, 'probe', ein=None)
+V_PROBE_LATER = VALID.add(2023, 21, 'probe-two', ein='200000022')
+V_PROBE_LATER_TWIN = VALID.add(2024, 210, 'probe-two', ein='200000022')
+VALID.add(2024, 210, 'probe-two-other', ein='200000022')
+V_PROBE_BASE = VALID.add(2023, 22, 'probe-three', ein='200000023')
+VALID.add(2023, 22, 'probe-three-other', ein='200000023')
+V_PROBE_BASE_LATER = VALID.add(2024, 220, 'probe-three', ein='200000023')
+# A same-ID and a changed-ID link to one record: both conflict.
+SHARED = {'ein': '300000030', 'street_address': 'shared Main St'}
+V_SHARED_SAME = VALID.add(2023, 30, 'shared-first', **SHARED)
+V_SHARED_CHANGED = VALID.add(2023, 31, 'shared-second', **SHARED)
+V_SHARED_LATER = VALID.add(2024, 30, 'shared-second', **SHARED)
+# A weaker same-ID link and a changed-ID link to one record: both keep their status.
+WEAK_SHARE = {'street_address': 'weakshare Main St'}
+V_WEAK_SHARE = VALID.add(2023, 40, 'weakshare-first', ein=None, **WEAK_SHARE)
+V_WEAK_SHARE_CHANGED = VALID.add(2023, 41, 'weakshare-second', ein='400000040', **WEAK_SHARE)
+V_WEAK_SHARE_LATER = VALID.add(2024, 40, 'weakshare-second', ein='400000040', **WEAK_SHARE)
 
 
 def test_valid_fixture_is_the_one_the_broken_tables_assume():
@@ -793,7 +816,23 @@ def test_valid_fixture_is_the_one_the_broken_tables_assume():
         V_ALONE: ('confirmed_changed_id', [V_ALONE], V_ALONE_LATER, 99, set(), False),
         V_CHANGED_AMBIGUOUS: ('confirmed_changed_id', [V_CHANGED_AMBIGUOUS],
                               V_CHANGED_AMBIGUOUS_LATER, 110, set(), True),
+        V_PROBE: ('no_candidate', [V_PROBE], None, None, set(), False),
+        V_PROBE_LATER: ('no_candidate', [V_PROBE_LATER], None, None, set(), False),
+        V_PROBE_BASE: ('ambiguous_id', [V_PROBE_BASE], None, None, set(), False),
+        V_PROBE_BASE + 1: ('ambiguous_id', [V_PROBE_BASE + 1], None, None, set(), False),
+        V_SHARED_SAME: ('conflict', [V_SHARED_SAME], None, None, set(), False),
+        V_SHARED_CHANGED: ('conflict', [V_SHARED_CHANGED], None, None, set(), False),
+        V_WEAK_SHARE: ('weaker_same_id', [V_WEAK_SHARE], V_WEAK_SHARE_LATER, 40,
+                       {'reason_ein_unknown'}, False),
+        V_WEAK_SHARE_CHANGED: ('confirmed_changed_id', [V_WEAK_SHARE_CHANGED],
+                               V_WEAK_SHARE_LATER, 40, set(), False),
     }
+    distinct = distinct_records(keyed(VALID.rows), 2024).collect()
+    eligible = dict(distinct.select('base_row', 'tuple_eligible').rows())
+    assert [eligible[row] for row in (V_PROBE_NAME, V_PROBE_EIN, V_PROBE_ADDRESS,
+                                      V_PROBE_NULL_EIN, V_PROBE_LATER_TWIN,
+                                      V_PROBE_BASE_LATER)] == [True, True, True, False, False,
+                                                               True]
 
 
 @pytest.mark.parametrize(
@@ -952,6 +991,50 @@ BROKEN = {
     'flag-missing-on-ambiguous-reappearance': (
         lambda f: edit(f, at(V_CHANGED_AMBIGUOUS), flag_id_reappears_elsewhere=False), FLAG),
     'flag-on-weaker': (lambda f: edit(f, at(V_WEAKER), flag_id_reappears_elsewhere=True), FLAG),
+    'confirmed-same-to-ambiguous-later': (
+        lambda f: edit(f, at(V_LATER_AMBIGUOUS), status='confirmed_same_id',
+                       later_row=V_LATER_AMBIGUOUS_A, later_establishment_id=6,
+                       reason_later_id_ambiguous=False),
+        SUCCESSORS,
+    ),
+    'changed-successor-other-tuple': (
+        lambda f: edit(f, at(V_CHANGED), later_row=V_ALONE_LATER, later_establishment_id=99),
+        SUCCESSORS,
+    ),
+    'changed-successors-shared': (
+        lambda f: edit(f, at(V_ALONE), later_row=V_CHANGED_LATER, later_establishment_id=44),
+        SUCCESSORS,
+    ),
+    **{f'changed-successor-{name}': ((lambda f, r=row, i=later_id: edit(
+        f, at(V_PROBE), status='confirmed_changed_id', later_row=r,
+        later_establishment_id=i)), SUCCESSORS)
+       for name, row, later_id in (('other-name', V_PROBE_NAME, 201),
+                                   ('other-ein', V_PROBE_EIN, 202),
+                                   ('other-address', V_PROBE_ADDRESS, 203),
+                                   ('null-ein', V_PROBE_NULL_EIN, 205))},
+    'changed-successor-later-ineligible': (
+        lambda f: edit(f, at(V_PROBE_LATER), status='confirmed_changed_id',
+                       later_row=V_PROBE_LATER_TWIN, later_establishment_id=210),
+        SUCCESSORS,
+    ),
+    'changed-successor-base-ineligible': (
+        lambda f: edit(f, at(V_PROBE_BASE), status='confirmed_changed_id',
+                       later_row=V_PROBE_BASE_LATER, later_establishment_id=220),
+        SUCCESSORS,
+    ),
+    'changed-successor-without-id': (
+        lambda f: edit(f, at(V_CHANGED), later_establishment_id=None), SUCCESSORS),
+    'changed-without-successor': (
+        lambda f: edit(f, at(V_CHANGED), later_row=None, later_establishment_id=None),
+        SUCCESSORS,
+    ),
+    'confirmed-successors-shared': (
+        lambda f: edit(edit(f, at(V_SHARED_SAME), status='confirmed_same_id',
+                            later_row=V_SHARED_LATER, later_establishment_id=30),
+                       at(V_SHARED_CHANGED), status='confirmed_changed_id',
+                       later_row=V_SHARED_LATER, later_establishment_id=30),
+        SUCCESSORS,
+    ),
 }
 
 

@@ -327,7 +327,12 @@ def _by_pair(distinct: pl.DataFrame, side: int) -> pl.DataFrame:
 
 
 def validate_links(links: pl.LazyFrame, records: pl.LazyFrame) -> None:
-    '''Check the link table against the distinct records of `records` and the link rules.'''
+    '''Check the link table against the distinct records of `records` and the link rules.
+
+    A confirmed same-ID successor needs a later-unique ID. A confirmed changed-ID successor
+    needs two tuple-eligible records with equal tuples. No two confirmed rows of a pair share
+    a successor.
+    '''
     _require_records(records)
     if list(links.collect_schema().items()) != list(LINK_SCHEMA.items()):
         raise ValueError('links do not have the link schema')
@@ -356,6 +361,8 @@ def validate_links(links: pl.LazyFrame, records: pl.LazyFrame) -> None:
         _base_ein_key=pl.col('ein_key'),
         _base_padded=pl.col('flag_ein_padded'),
         _base_address=pl.col('address_key'),
+        _base_name=pl.col('name_key'),
+        _base_eligible=pl.col('tuple_eligible'),
     )
     observed = table.select(*LINK_KEYS, 'base_rows', 'base_establishment_id')
     if not observed.equals(base.select(observed.columns)):
@@ -373,6 +380,8 @@ def validate_links(links: pl.LazyFrame, records: pl.LazyFrame) -> None:
         _later_ein_key=pl.col('ein_key'),
         _later_padded=pl.col('flag_ein_padded'),
         _later_address=pl.col('address_key'),
+        _later_name=pl.col('name_key'),
+        _later_eligible=pl.col('tuple_eligible'),
     )
     id_counts = later.filter(pl.col('establishment_id').is_not_null()).group_by(
         *PAIR_KEYS, 'establishment_id').agg(_n=pl.len()).rename(
@@ -388,12 +397,23 @@ def validate_links(links: pl.LazyFrame, records: pl.LazyFrame) -> None:
     base_id = pl.col('base_establishment_id')
     later_unique = pl.col('_n').eq(1).fill_null(False)
     has_row = row.is_not_null()
+    changed = status.eq('confirmed_changed_id')
+    same_tuple = (
+        pl.col('_base_eligible')
+        .and_(pl.col('_later_eligible'))
+        .and_(pl.col('_base_ein_key').eq(pl.col('_later_ein_key')))
+        .and_(pl.col('_base_name').eq(pl.col('_later_name')))
+        .and_(pl.col('_base_address').eq(pl.col('_later_address')))
+    )
+    confirmed = status.is_in(CONFIRMED)
     _reject(
         joined,
-        has_row.ne(status.is_in(CONFIRMED).or_(status.eq('weaker_same_id').and_(later_unique)))
+        has_row.ne(changed.or_(status.is_in(SAME_ID).and_(later_unique)))
         .or_(later_id.ne_missing(pl.col('_record_id')))
         .or_(status.is_in(SAME_ID).and_(has_row).and_(later_id.ne(base_id)))
-        .or_(status.eq('confirmed_changed_id').and_(later_id.eq(base_id))),
+        .or_(changed.and_(later_id.eq(base_id)))
+        .or_(changed.and_(same_tuple.not_()))
+        .or_(confirmed.and_(confirmed.sum().over(*PAIR_KEYS, 'later_row').gt(1))),
         'link successors do not follow the successor rules',
     )
     weaker = status.eq('weaker_same_id')
