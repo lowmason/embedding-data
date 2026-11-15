@@ -692,9 +692,9 @@ hooks also select the Hypothesis profile `parallel`, which has no time limit for
 each example. Workers share the CPU, so a time limit measures that load and not
 the code.
 
-The `slow` marker covers the eight full-chain tests listed in
-`tests/conftest.py`. Each one builds real upstream bundles and took at least 60
-seconds in a serial run. Run only those tests, or everything else:
+The `slow` marker covers the full-chain tests listed in `tests/conftest.py`.
+Each one builds real upstream bundles and took at least 60 seconds in a serial
+run with coverage. Run only those tests, or everything else:
 
 ```bash
 uv run --locked pytest -m slow
