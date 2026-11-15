@@ -108,8 +108,11 @@ def _snapshot(data_dir: Path, codes_run: str, outputs_sha256: str) -> SelectedCo
             or summary.stat().st_size != source.get('size')):
         raise ValueError('selected source hash or size differs')
     source_record = target_io.file_record(summary)
-    with tempfile.TemporaryDirectory() as work:
-        frame, source_citations = code_build.check_source(data_dir, Path(work))
+    try:
+        with tempfile.TemporaryDirectory() as work:
+            frame, source_citations = code_build.check_source(data_dir, Path(work))
+    except KeyError:
+        raise ValueError('cited raw file is not recorded') from None
     years = frame.select('year_filing_for').unique().collect().to_series().to_list()
     if sorted(years) != SOURCE_YEARS:
         raise ValueError('source years must be exactly 2016 through 2025')

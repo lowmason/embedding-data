@@ -328,6 +328,29 @@ def test_selection_writes_nothing_under_the_data_tree(tmp_path):
     assert snapshot_tree(tmp_path) == before
 
 
+def copy_release_as_a_later_unrecorded_one(data_dir):
+    '''Leave the file an interrupted download leaves: a later release with no manifest entry.'''
+    release = ita_summary.summary_files(data_dir)[2025]
+    later = release.with_name(release.name.replace('08-31-2026', '09-30-2026'))
+    assert later != release
+    shutil.copyfile(release, later)
+
+
+def test_unrecorded_summary_release_is_refused_with_a_fixed_reason(tmp_path):
+    seeded = seed_inputs(tmp_path)
+    copy_release_as_a_later_unrecorded_one(tmp_path)
+    with pytest.raises(ValueError, match='^cited raw file is not recorded$'):
+        select_seeded(tmp_path, seeded)
+
+
+def test_verify_detects_an_unrecorded_summary_release(tmp_path):
+    seeded = seed_inputs(tmp_path)
+    selected = select_seeded(tmp_path, seeded)
+    copy_release_as_a_later_unrecorded_one(tmp_path)
+    with pytest.raises(ValueError, match='^selected codes inputs changed$'):
+        selected.verify()
+
+
 def test_selection_never_rebuilds_an_upstream_table(tmp_path, monkeypatch):
     seeded = seed_inputs(tmp_path)
     for module, name in ((ita_summary, 'build_summary_table'), (code_build, 'build')):
