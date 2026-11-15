@@ -136,7 +136,7 @@ VALID = [
     rec(A, ein='23456789'),
     rec(D, ein='100000005'),
 ]
-# e1 {A,B}; e2 {A,C} with padded records in C and B; a padded-only EIN in D and E.
+# e1 {A,B}; e2 {A,C} with padded records in C and B; a padded-only EIN in A, D and E.
 PADDED = [
     rec(A, ein='100000001'),
     rec(B, ein='100000001'),
@@ -144,6 +144,7 @@ PADDED = [
     rec(C, ein='023456789'),
     rec(C, ein='23456789'),
     rec(B, ein='23456789'),
+    rec(A, ein='34567890'),
     rec(D, ein='34567890'),
     rec(E, ein='34567890'),
 ]
@@ -375,6 +376,7 @@ def test_padded_sensitivity_flags_and_counts():
     assert rows[A, C]['flags'] == [SIZE_LABEL]
     assert rows[C, A]['flags'] == [SIZE_LABEL]
     assert rows[A, B]['n_unweighted'] == 1
+    assert [rows[key]['value'] for key in ((A, B), (B, A), (A, C), (C, A))] == [0.5, 1, 0.5, 1]
     assert {key: row['j_including_padded'] for key, row in support_of(result).items()} == {
         (A, B): 2,
         (B, A): 2,
@@ -384,14 +386,25 @@ def test_padded_sensitivity_flags_and_counts():
     marginals = marginals_of(result)
     assert set(marginals) == {A, B, C}
     assert [marginals[code]['n_employers'] for code in (A, B, C)] == [2, 1, 1]
-    assert [marginals[code]['n_employers_including_padded'] for code in (A, B, C)] == [2, 2, 1]
+    assert [marginals[code]['n_employers_including_padded'] for code in (A, B, C)] == [3, 2, 1]
+    assert [marginals[code]['n_records'] for code in (A, B, C)] == [2, 1, 1]
     report = result.report
     assert report['N'] == 2
     assert report['N_including_padded'] == 3
     assert report['n_cells'] == 4
     assert report['n_cells_padded_label'] == 2
-    assert report['n_sensitivity_only_cells'] == 4
+    assert report['n_sensitivity_only_cells'] == 8
     assert report['n_padded_only_nodes'] == 2
+
+
+def test_cells_carry_no_partial_or_record_flag_label():
+    result = run([
+        rec(A, ein='100000001', flag_employment=True),
+        rec(B, ein='100000001', flag_employment=True),
+        rec(year=2023, ein='100000001', mapping=CROSSWALKED),
+    ])
+    assert marginals_of(result)[A]['n_employers_partial'] == 1
+    assert [row['flags'] for row in cells(result).values()] == [[SIZE_LABEL], [SIZE_LABEL]]
 
 
 def test_padded_records_outside_the_population_stay_out_of_the_sensitivity():
