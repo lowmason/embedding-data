@@ -328,6 +328,14 @@ def test_selection_writes_nothing_under_the_data_tree(tmp_path):
     assert snapshot_tree(tmp_path) == before
 
 
+def test_selection_never_rebuilds_an_upstream_table(tmp_path, monkeypatch):
+    seeded = seed_inputs(tmp_path)
+    for module, name in ((ita_summary, 'build_summary_table'), (code_build, 'build')):
+        monkeypatch.setattr(module, name, lambda *a, **k: pytest.fail('upstream builder ran'))
+    selected = select_seeded(tmp_path, seeded)
+    assert selected.provenance['source_rows'] == 21
+
+
 def test_snapshots_that_differ_are_refused(tmp_path, monkeypatch):
     seeded = seed_inputs(tmp_path)
     real = ita_establishment_inputs._snapshot
