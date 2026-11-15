@@ -11,8 +11,12 @@ from target_fixtures import forbid_external_access
 from typer.main import get_command
 
 from embedding_data import (
+    code_build,
+    geography_build,
     ita_establishment_bundle,
+    ita_establishment_targets,
     ita_index_references,
+    ita_summary,
     osha_benchmark_download,
 )
 from embedding_data.ita_establishment_targets import app
@@ -36,11 +40,15 @@ def offline(monkeypatch):
     forbid_external_access(monkeypatch)
 
     def forbidden(*args, **kwargs):
-        raise AssertionError('a Stage 10 command test constructed an HTTP client')
+        raise AssertionError('a Stage 10 command reached the network or an upstream builder')
 
     monkeypatch.setattr(osha_benchmark_download, 'make_client', forbidden)
     monkeypatch.setattr(ita_index_references, 'make_client', forbidden)
-    monkeypatch.setattr(httpx, 'Client', forbidden)
+    monkeypatch.setattr(httpx.Client, '__init__', forbidden)
+    monkeypatch.setattr(httpx.AsyncClient, '__init__', forbidden)
+    monkeypatch.setattr(ita_summary, 'build_summary_table', forbidden)
+    monkeypatch.setattr(code_build, 'build', forbidden)
+    monkeypatch.setattr(geography_build, 'build', forbidden)
 
 
 def original_file(data_directory):
@@ -213,7 +221,8 @@ def test_every_command_prints_only_the_fixed_failure_line(cli_runner, data_direc
     (subprocess.CalledProcessError(128, ['git', SECRET]), 'unexpected'),
     (pl.exceptions.ComputeError(SECRET), 'unexpected'),
     (KeyError(SECRET), 'unexpected'),
-])
+], ids=['value', 'missing_file', 'permission', 'connect', 'status', 'runtime', 'git',
+        'polars', 'key'])
 def test_failure_reason_follows_the_exception_type(cli_runner, data_directory, monkeypatch,
                                                    error, reason):
     def fail(*args, **kwargs):
@@ -230,7 +239,7 @@ def test_failure_reason_follows_the_exception_type(cli_runner, data_directory, m
     ('build', ['../escape', '--codes-run', 'codes_run', '--codes-outputs-sha256', CODES_PIN]),
     ('verify', ['../escape', '--outputs-sha256', OUTPUTS_PIN]),
     ('compare-runs', ['../escape', 'run_2']),
-])
+], ids=['build', 'verify', 'compare-runs'])
 def test_unsafe_run_id_gives_the_fixed_line(cli_runner, data_directory, monkeypatch, command,
                                            arguments):
     for name in ('verify_bundle', 'compare_runs'):
@@ -256,7 +265,8 @@ def test_unsafe_run_id_gives_the_fixed_line(cli_runner, data_directory, monkeypa
     ('verify', ['--outputs-sha256', OUTPUTS_PIN]),
     ('import-reference', ['naics_index_2022']),
     ('compare-runs', ['run_1']),
-])
+], ids=['build_codes_run', 'build_codes_pin', 'build_run_id', 'verify_pin', 'verify_run_id',
+        'import_file', 'compare_second'])
 def test_each_required_argument_fails_before_work(cli_runner, data_directory, monkeypatch,
                                                   command, arguments):
     forbid_operations(monkeypatch)
@@ -271,7 +281,7 @@ def test_each_required_argument_fails_before_work(cli_runner, data_directory, mo
     ('build', ['.hidden', '--codes-run', 'codes_run', '--codes-outputs-sha256', CODES_PIN]),
     ('verify', ['run_1', '--outputs-sha256', OUTPUTS_PIN]),
     ('compare-runs', ['run_1', 'run_2']),
-])
+], ids=['import-reference', 'build', 'verify', 'compare-runs'])
 def test_offline_commands_reach_the_real_refusals(cli_runner, data_directory, command,
                                                   arguments):
     # The real functions run under the offline guard: a loaded `.env` or a constructed
@@ -281,6 +291,15 @@ def test_offline_commands_reach_the_real_refusals(cli_runner, data_directory, co
     assert result.stderr.startswith(f'ITA establishment {command} failed: validation; run ')
     assert result.stdout == ''
     assert not data_directory.exists()
+
+
+def test_top_level_cli_does_not_register_stage_10():
+    from embedding_data import cli
+
+    assert all(command.callback.__module__ != ita_establishment_targets.__name__
+               for command in cli.app.registered_commands)
+    assert all(group.typer_instance is not app for group in cli.app.registered_groups)
+    assert not set(COMMANDS) & set(get_command(cli.app).commands)
 
 
 def test_app_disables_pretty_exceptions_and_locals():
