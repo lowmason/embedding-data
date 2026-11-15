@@ -293,6 +293,30 @@ def test_offline_commands_reach_the_real_refusals(cli_runner, data_directory, co
     assert not data_directory.exists()
 
 
+def tree_snapshot(root):
+    '''Every path under root, with the bytes of each file and None for each directory.'''
+    return sorted((path.relative_to(root).as_posix(), path.read_bytes() if path.is_file()
+                   else None) for path in root.rglob('*'))
+
+
+@pytest.mark.parametrize('occupied', ['run_1.part', 'run_1'], ids=['staging', 'final'])
+def test_build_failure_keeps_occupied_run_paths(cli_runner, data_directory, occupied):
+    # The real build refuses an occupied name before it reads anything. The failure must
+    # leave a killed run's staging (gate 4) and a published bundle exactly as they were.
+    root = data_directory / 'derived' / 'osha' / 'establishment-targets'
+    (root / occupied).mkdir(parents=True)
+    (root / occupied / 'kept.txt').write_bytes(b'owner evidence\n')
+    before = tree_snapshot(root)
+    result = invoke(cli_runner, 'build', data_directory)
+    assert result.exit_code == 2
+    assert result.stderr == (
+        'ITA establishment build failed: validation; run run_1; '
+        f'path {run_path(data_directory, "run_1")}\n')
+    assert result.stdout == ''
+    assert tree_snapshot(root) == before
+    assert (root / occupied / 'kept.txt').read_bytes() == b'owner evidence\n'
+
+
 def test_top_level_cli_does_not_register_stage_10():
     from embedding_data import cli
 
