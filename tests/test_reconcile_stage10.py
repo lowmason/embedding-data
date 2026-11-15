@@ -342,7 +342,8 @@ def test_reconcile_stage3_detects_v2_difference(script, chain, capsys, monkeypat
 
     def bumped(summary, base, later):
         counts = dict(real(summary, base, later))
-        if (base, later) == (2024, 2025):
+        # The one pair that is not consecutive.
+        if (base, later) == (2023, 2025):
             counts['n_address_matches_different_id'] += 1
         return counts
 
@@ -351,7 +352,7 @@ def test_reconcile_stage3_detects_v2_difference(script, chain, capsys, monkeypat
     assert status == 1
     assert result['v1_equal'] is True
     assert result['v2_equal'] is False
-    assert result['v2_differences'] == [['2024-2025', 'n_address_matches_different_id']]
+    assert result['v2_differences'] == [['2023-2025', 'n_address_matches_different_id']]
 
 
 @pytest.mark.parametrize(('pinned', 'expected'), [(True, 0), (False, 1)])
