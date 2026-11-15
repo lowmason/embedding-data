@@ -1,13 +1,30 @@
 import hashlib
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from zipfile import ZipFile
 
 import polars as pl
 from code_fixtures import write_xlsx
+from ita_fixtures import record, write_release, year_file
 
-from embedding_data import code_references
+from embedding_data import (
+    code_build,
+    code_references,
+    ita_index_references,
+    ita_references,
+    ita_summary,
+    ita_verification,
+    manifest,
+    paths,
+)
 from embedding_data.classification_tables import naics_tables
+from embedding_data.ita_establishment_expected import (
+    V1_COLUMNS,
+    V2_COLUMNS,
+    YEAR_PAIRS,
+    Expectations,
+)
 from embedding_data.ita_index_references import (
     CROSS_REFERENCE,
     IndexReference,
@@ -279,3 +296,106 @@ def canonical_frame(rows: list[dict]) -> pl.LazyFrame:
             }
         )
     return pl.DataFrame(records, schema=CANONICAL_SCHEMA).lazy()
+
+
+FIXTURE_BASIS = 'fixture_stage3_recomputation'
+CODES_RUN = 'fixture_codes'
+
+
+def _row(year: int, identifier: str, establishment_id: str, name: str, street: str,
+         **fields: str) -> dict[str, str]:
+    '''One added summary row with its own record ID, establishment ID, name and street.'''
+    return record(year, id=identifier, establishment_id=establishment_id,
+                  establishment_name=name, street_address=street, **fields)
+
+
+def golden_releases() -> dict[int, list[dict[str, str]]]:
+    '''Raw summary rows by filing year, covering each case the Stage 10 fixture names.
+
+    Every year keeps the default `record(year)`: an ID equal to the year under one EIN, name
+    and address (the changed-ID links), with dictionary-2012 codes through 2022 and native
+    332312 from 2023 (the mixed native and crosswalked pair). The added rows use only codes
+    present in the 2012, 2017 and 2022 structures.
+    '''
+    releases = {year: [record(year)] for year in range(2016, 2026)}
+    releases[2023] += [
+        # A copied title, and a copied index cross-reference entry.
+        _row(2023, '230001', '9001', 'Bean Farm', '11 Field Rd', ein='701234561',
+             industry_description='Soybean Farming', naics_code='111110'),
+        _row(2023, '230002', '9002', 'Car Depot', '12 Lot Rd', ein='702345612',
+             industry_description='Wholesale -- see type of product', naics_code='423110'),
+        # A placeholder description, and an unknown employer.
+        _row(2023, '230003', '9003', 'Blank Shop', '13 Elm St', ein='703456123',
+             industry_description='N/A'),
+        _row(2023, '230004', '9004', 'Nobody Works', '14 Pine St', ein='', company_name=''),
+        # A padded EIN in the co-owned cell, and the co-owned pair itself.
+        _row(2023, '230005', '9005', 'Pipe Works', '15 Ash St', ein='23456789',
+             industry_description='Plumbing contractor', naics_code='238220'),
+        _row(2023, '230006', '9006', 'Corner Diner', '16 Ash St', ein='23456789',
+             industry_description='Restaurant', naics_code='722511'),
+        _row(2023, '230007', '9007', 'Heat Works', '17 Oak Ave', ein='123456789',
+             industry_description='Plumbing contractor', naics_code='238220'),
+        _row(2023, '230008', '9008', 'Main Grill', '18 Oak Ave', ein='123456789',
+             industry_description='Restaurant', naics_code='722511'),
+        # One description under one EIN with a different headline code in 2024.
+        _row(2023, '230009', '9009', 'Volt Shop', '19 Elm Ave', ein='345678912',
+             industry_description='Building contractor', naics_code='238220'),
+        # The confirmed same-ID link, from 2023 to 2024.
+        _row(2023, '230010', '501', 'River Plant', '5 River Rd', ein='567891234'),
+    ]
+    releases[2024] += [
+        _row(2024, '240001', '9010', 'Volt Annex', '20 Elm Ave', ein='345678912',
+             industry_description='Building contractor', naics_code='238210'),
+        _row(2024, '240002', '501', 'River Plant', '5 River Rd', ein='567891234'),
+        # Two base records whose confirmed links share one 2025 successor.
+        _row(2024, '240003', '701', 'East Plant', '10 Oak St', ein='456789123'),
+        _row(2024, '240004', '702', 'East Annex', '10 Oak St', ein='456789123'),
+    ]
+    releases[2025] += [
+        _row(2025, '250001', '701', 'East Annex', '10 Oak St', ein='456789123'),
+    ]
+    return releases
+
+
+def stage3_expectations(data_dir: Path) -> Expectations:
+    '''The V1 and V2 tables that the frozen Stage 3 reports measure on the fixture summary.'''
+    summary = pl.scan_parquet(paths.derived_dir(data_dir, 'osha') / ita_summary.TABLE_NAME)
+    report = ita_verification.description_report(summary, ita_references.read_titles(data_dir))
+    v1 = {
+        row['year_filing_for']: {column: int(row[column]) for column in V1_COLUMNS}
+        for row in report.iter_rows(named=True)
+    }
+    v2 = {}
+    for base, later in YEAR_PAIRS:
+        counts = ita_verification.link_report(summary, base, later)
+        v2[(base, later)] = {column: int(counts[column]) for column in V2_COLUMNS}
+    rows = summary.select(pl.len()).collect().item()
+    return Expectations(FIXTURE_BASIS, rows, v1, v2)
+
+
+@dataclass
+class EstablishmentInputs:
+    codes_run: str
+    codes_outputs_sha256: str
+    index_registry: dict
+    expectations: Expectations
+
+
+def seed_establishment_inputs(data_dir: Path, directory: Path) -> EstablishmentInputs:
+    '''Seed raw releases, the Stage 2 summary, a real Stage 4 bundle and fixture indexes.'''
+    for year, rows in golden_releases().items():
+        write_release(data_dir, year, year_file(year, rows))
+    ita_summary.build_summary_table(data_dir)
+    import_stage4_originals(data_dir, directory / 'stage4')
+    codes = code_build.build(data_dir, CODES_RUN)
+    registry = fixture_index_registry(directory / 'index')
+    for kind, reference in registry.items():
+        ita_index_references.import_reference(
+            data_dir, kind, directory / 'index' / reference.relative, registry=registry
+        )
+    return EstablishmentInputs(
+        codes_run=CODES_RUN,
+        codes_outputs_sha256=manifest.sha256_file(codes / 'outputs.json'),
+        index_registry=registry,
+        expectations=stage3_expectations(data_dir),
+    )
