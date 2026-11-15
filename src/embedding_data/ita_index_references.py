@@ -97,9 +97,7 @@ def parse_index(file: Path, reference: IndexReference, leaves: frozenset[str]) -
     if list(sheets) != [reference.sheet] or sheets[reference.sheet].width != 2:
         raise ValueError(f'{reference.kind}: expected one sheet {reference.sheet} of two columns')
     raw = sheets[reference.sheet]
-    first = None if raw.is_empty() else tuple(
-        None if cell is None else cell.strip() for cell in raw.row(0)
-    )
+    first = tuple(None if cell is None else cell.strip() for cell in raw.row(0))
     if first != reference.header:
         raise ValueError(f'{reference.kind}: ambiguous or unexpected index header')
     body = raw.slice(1).select(

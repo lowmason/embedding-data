@@ -1,5 +1,6 @@
 import shutil
 from dataclasses import asdict, fields, replace
+from datetime import UTC, datetime, timedelta
 from functools import partial
 from importlib.metadata import version
 from urllib.parse import urlparse
@@ -43,6 +44,8 @@ def parse(tmp_path, rows=GOOD_ROWS, *, sheet=SHEET, header=HEADER, extra=None, *
     file = tmp_path / reference.relative
     if extra == 'column':
         write_xlsx(file, [[*header, 'x'], *[[*row, 'x'] for row in rows]], sheet=sheet)
+    elif extra == 'narrow':
+        write_xlsx(file, [[header[0]], *[[row[0]] for row in rows]], sheet=sheet)
     else:
         write_index_workbook(file, sheet, header, rows)
     if extra == 'sheet':
@@ -96,6 +99,7 @@ def test_parse_keeps_cross_references_and_delivered_entries(tmp_path):
         pytest.param({'sheet': 'Sheet1'}, 'expected one sheet', id='wrong-sheet-name'),
         pytest.param({'extra': 'sheet'}, 'expected one sheet', id='extra-sheet'),
         pytest.param({'extra': 'column'}, 'expected one sheet', id='three-columns'),
+        pytest.param({'extra': 'narrow'}, 'expected one sheet', id='one-column'),
         pytest.param(
             {'header': ('NAICS 22', HEADER[1])}, 'unexpected index header', id='first-header'
         ),
@@ -139,6 +143,7 @@ def test_parse_keeps_cross_references_and_delivered_entries(tmp_path):
             {'rows': with_row(3, ('*****', 'Laboratories (see specific type)'))},
             'neither a leaf', id='short-marker',
         ),
+        pytest.param({'rows': []}, 'row count changed', id='header-only'),
         pytest.param({'expected_rows': 6}, 'row count changed', id='one-row-short'),
         pytest.param({'expected_rows': 4}, 'row count changed', id='one-row-extra'),
         pytest.param(
@@ -185,7 +190,10 @@ def test_repeated_rows_are_kept_in_file_order(tmp_path):
 
 
 def test_leaves_by_vintage_keeps_six_digit_codes_of_each_vintage():
-    codes = {2012: ['11', '1111', '111110', '111120'], 2017: ['11', '111110', '517311']}
+    codes = {
+        2012: ['11', '1111', '11111', '111110', '111120'],
+        2017: ['11', '11111', '111110', '517311'],
+    }
     titles = pl.DataFrame(
         [(v, c, 'Fixture') for v, items in codes.items() for c in items],
         schema={'vintage': pl.Int64, 'code': pl.String, 'title': pl.String},
@@ -290,6 +298,12 @@ def index_entries(data_dir):
     ]
 
 
+def assert_retrieved_now(entry):
+    retrieved = datetime.fromisoformat(entry.retrieved_at)
+    assert retrieved.tzinfo is not None
+    assert abs(datetime.now(UTC) - retrieved) < timedelta(minutes=10)
+
+
 def published(data_dir, vintage):
     relative = INDEX_PATHS[vintage].removeprefix('references/')
     return ita_references.reference_path(data_dir, relative)
@@ -311,6 +325,7 @@ def test_acquire_downloads_missing_and_records_once(data_dir, mirror):
         assert entry.client == 'httpx'
         assert entry.client_version == version('httpx')
         assert entry.proxies == ()
+        assert_retrieved_now(entry)
         assert entry.source_url == reference.url
         assert (entry.sha256, entry.size) == (reference.sha256, reference.size)
     before = paths.manifest_path(data_dir).read_bytes()
@@ -331,7 +346,7 @@ def test_acquire_skips_recorded_originals_and_downloads_the_rest(data_dir, mirro
 
 
 @pytest.mark.parametrize('state', ['unrecorded', 'part', 'symlink'])
-def test_acquire_refuses_unsafe_state_before_any_request(data_dir, mirror, state):
+def test_acquire_refuses_unrecorded_present_file(data_dir, mirror, state):
     before = paths.manifest_path(data_dir).read_bytes()
     last = published(data_dir, 2022)
     last.parent.mkdir(parents=True, exist_ok=True)
@@ -445,6 +460,7 @@ def test_import_records_proxy_time(data_dir, mirror):
     assert entry.client == 'manual-import'
     assert entry.client_version == version('embedding-data')
     assert entry.proxies == ('retrieved_at',)
+    assert_retrieved_now(entry)
     assert entry.source_url == mirror.registry['naics_index_2012'].url
     assert entry == manifest.entry_for(paths.manifest_path(data_dir), destination)
     before = paths.manifest_path(data_dir).read_bytes()
@@ -505,15 +521,18 @@ def test_import_refuses_an_unknown_kind(data_dir, mirror):
         )
 
 
-@pytest.mark.parametrize('state', ['unrecorded', 'part'])
+@pytest.mark.parametrize('state', ['unrecorded', 'part', 'symlink'])
 def test_import_refuses_unsafe_state(data_dir, mirror, state):
     destination = published(data_dir, 2012)
     destination.parent.mkdir(parents=True, exist_ok=True)
     if state == 'unrecorded':
         destination.write_bytes(mirror.original(2012).read_bytes())
         message = 'without recorded provenance'
-    else:
+    elif state == 'part':
         destination.with_name(destination.name + '.part').write_bytes(b'interrupted')
+        message = 'symlink or interrupted'
+    else:
+        destination.symlink_to(mirror.original(2012))
         message = 'symlink or interrupted'
     with pytest.raises(ValueError, match=message):
         iir.import_reference(
@@ -596,7 +615,8 @@ def test_read_index_checks_each_pin_field(data_dir, mirror, titles, change, mess
 
 def test_read_index_parses_with_the_leaves_of_the_given_titles(data_dir, mirror, titles):
     registry = published_registry(data_dir, mirror)
-    without_leaf = titles.filter(~(pl.col('vintage').eq(2022) & pl.col('code').eq('517111')))
+    # 111110 stays a leaf of 2012 and 2017. Only the 2022 titles lose it.
+    without_leaf = titles.filter(~(pl.col('vintage').eq(2022) & pl.col('code').eq('111110')))
     with pytest.raises(ValueError, match='neither a leaf'):
         iir.read_index(data_dir, without_leaf, registry=registry)
 
