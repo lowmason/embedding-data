@@ -76,8 +76,9 @@ def toy_reference_tables():
     return structures, relations, canonical_paths
 
 
-def write_xlsx(file: Path, rows: list[list[str | None]]) -> None:
+def write_xlsx(file: Path, rows: list[list[str | None]], *, sheet: str = 'Fixture') -> None:
     namespace = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
+    sheet_name = escape(sheet, {'"': '&quot;'})
     sheet_rows = []
     for i, row in enumerate(rows, 1):
         cells = ''.join(
@@ -109,7 +110,7 @@ def write_xlsx(file: Path, rows: list[list[str | None]]) -> None:
         archive.writestr(
             'xl/workbook.xml',
             f"""<workbook xmlns="{namespace}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-<sheets><sheet name="Fixture" sheetId="1" r:id="rId1"/></sheets></workbook>""",
+<sheets><sheet name="{sheet_name}" sheetId="1" r:id="rId1"/></sheets></workbook>""",
         )
         archive.writestr(
             'xl/_rels/workbook.xml.rels',
