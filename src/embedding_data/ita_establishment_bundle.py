@@ -82,6 +82,7 @@ SOFTWARE_FILES = (
     'src/embedding_data/ita_establishment_inputs.py',
     'src/embedding_data/ita_establishment_links.py',
     'src/embedding_data/ita_establishment_records.py',
+    'src/embedding_data/ita_establishment_targets.py',
     'src/embedding_data/ita_index_references.py',
     'src/embedding_data/ita_naics_mapping.py',
     'src/embedding_data/ita_references.py',

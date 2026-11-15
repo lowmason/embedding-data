@@ -334,3 +334,35 @@ conditional on allocation and exclude allocation/mapping uncertainty. Keep
 size_gate_pending without a minimum count. Publish aggregate evidence only; never use
 evaluation inputs for embedder training, mining or model selection. Migration is
 domestic geographic movement, not a prior-job/job-related claim.
+
+**ITA establishment targets (Stage 10).** `python -m embedding_data.ita_establishment_targets`
+exposes exactly `acquire-references`, `import-reference`, `build`, `verify` and
+`compare-runs`, separate from the frozen top-level CLI. Always pass an explicit
+`--data-dir`. README gives the exact production invocations. Only `acquire-references`
+uses the network. The other four load no `.env`, read no credential, construct no HTTP
+client and run no upstream builder. `build` takes codes run `stage4_v11_20261013_r2`
+with detached pin `15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a`.
+That bundle cites the adopted Stage 2 summary, SHA-256
+`6335cda7adb40a41c4a11d57d22048999449ac8d078a2ec0291f0198cd9136a8` (139,930,636 bytes).
+Gate scope: for the adopted source, the V1/V2 constants in `ita_establishment_expected`,
+all 3,206,055 source records and the production index registry are mandatory, and
+explicit expectations are refused. Any other source needs explicit `expectations=`
+through the Python API, which only tests use, so the command group cannot build it.
+D2: each NAICS index file ends with 25 `******` cross-reference rows. Keep them with the
+delivered code, count them and include their entries in the copied-index flags. Changed
+index bytes or a failed parse need an owner decision, never a relaxed parser. Bundles
+live in `derived/osha/establishment-targets/<RUN_ID>/` (eight Parquets, `inputs.json`,
+`report.json`, detached `outputs.json`). Build scratch stays in `<RUN_ID>.part/.scratch/`.
+Success prints one sorted JSON line. Failure prints only `ITA establishment <command>
+failed: <reason>; run <run_id>; path <path>` and exits 2. Unequal comparison exits 1.
+Stage 10 adds modules only. Never edit a frozen module (Stage 6 `FROZEN_MODULES` and
+`TARGET_MODULES`, the Stage 7–9 software files, `cli.py`, `code_references.py`). Stop and
+ask the owner if a reused function cannot serve unchanged. Before every commit, full
+pytest run and full-data command, run `pgrep -fl
+'embedding_data\.acs_targets|stage9_independent|reconcile_stage9'` and stop if it prints
+anything. Each of the four production writes (index acquisition or import, first build,
+replay build, cleanup of leftover staging) needs the owner's go-ahead and a confirmed
+closed Stage 9 freeze window. Fixture results are software readiness, never benchmarks.
+Measured full-data acceptance is pending until
+`specs/findings/stage-10-ita-establishment-targets.md` exists. No Stage 10 output may
+feed embedder training, curriculum, hard-negative mining or model selection (R8.4).

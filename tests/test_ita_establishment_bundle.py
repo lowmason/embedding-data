@@ -309,6 +309,7 @@ def test_software_files_cover_loaded_modules():
         'import json, sys',
         'from pathlib import Path',
         'import embedding_data.ita_establishment_bundle',
+        'import embedding_data.ita_establishment_targets',
         'from embedding_data import paths',
         'names = [n for n in sys.modules if n == "embedding_data" '
         'or n.startswith("embedding_data.")]',
