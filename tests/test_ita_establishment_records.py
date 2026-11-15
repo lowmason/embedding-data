@@ -1,3 +1,6 @@
+import subprocess
+import sys
+
 import polars as pl
 import pytest
 from code_fixtures import toy_reference_tables
@@ -698,3 +701,11 @@ def test_mapping_builders_agree_with_build_lookup(lookup, built, key, same_vinta
         # assume each code belongs to the vintage that names it.
         expected['naics_matching_vintages'] = built['naics_matching_vintages']
     assert built == expected
+
+
+def test_records_module_loads_no_ipums_or_dotenv_module():
+    code = ('import sys; import embedding_data.ita_establishment_records as m; '
+            'bad = [n for n in sys.modules if n.split(".")[0] in {"dotenv", "ipumspy"} '
+            'or n.startswith(("embedding_data.ipums", "embedding_data.acs"))]; '
+            'sys.exit(1 if bad else 0)')
+    assert subprocess.run([sys.executable, '-c', code], check=False).returncode == 0
