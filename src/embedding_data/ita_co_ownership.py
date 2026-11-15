@@ -337,7 +337,8 @@ def validate_co_ownership(result: CoOwnership, nodes: pl.DataFrame) -> None:
     '''Check the targets, marginals and support against each other and the NAICS nodes.
 
     `nodes` is the Stage 4 `naics_nodes` frame. Every unit must be one of its NAICS 2022
-    national-industry nodes.
+    national-industry nodes. A null key or count in the support or the marginals fails, and
+    each marginal node has at least as many eligible records as employers.
     '''
     validate_targets(result.targets)
     if (_schema(result.marginals) != list(MARGINAL_SCHEMA.items())
@@ -381,17 +382,21 @@ def validate_co_ownership(result: CoOwnership, nodes: pl.DataFrame) -> None:
     joined = targets.select(*CELL, 'n_unweighted', 'flags').join(support, on=CELL, how='left')
     _reject(joined, pl.col('j_employers').ne(j)
             .or_(pl.max_horizontal(YEAR_COUNTS).gt(j))
-            .or_(pl.sum_horizontal(YEAR_COUNTS).lt(j)),
+            .or_(pl.sum_horizontal(YEAR_COUNTS).lt(j))
+            .or_(pl.any_horizontal(pl.col(YEAR_COUNTS).is_null())),
             'co-ownership support counts disagree with the targets')
     padded = pl.col('j_including_padded')
     _reject(joined, padded.lt(j), 'co-ownership padded counts fall below J')
     _reject(joined, pl.col('flags').ne(_flags(padded.ne(j))),
             'co-ownership flags disagree with the support')
+    if marginals['node_id'].is_null().any():
+        raise ValueError('co-ownership marginal nodes are null')
     if marginals['node_id'].is_duplicated().any():
         raise ValueError('co-ownership marginal nodes repeat')
     n = pl.col('n_employers')
     multi = pl.col('n_multi_industry_employers')
     _reject(marginals, n.lt(1).or_(multi.gt(n)).or_(pl.col('n_employers_partial').gt(n))
+            .or_(pl.col('n_records').lt(n))
             .or_(pl.col('n_employers_including_padded').lt(n)),
             'co-ownership marginal counts are out of bounds')
     widest = targets.group_by('unit_a').agg(_widest=j.max()).rename({'unit_a': 'node_id'})

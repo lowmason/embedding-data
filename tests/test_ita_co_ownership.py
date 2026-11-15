@@ -361,6 +361,28 @@ def test_ein_spellings_count_once():
     assert marginals_of(result)[B]['n_employers'] == 1
 
 
+def test_company_names_never_establish_co_ownership():
+    result = run([
+        rec(A, ein=None, company_name='Acme'),
+        rec(B, ein='', company_name='Acme'),
+        rec(C, ein='111111111', company_name='Acme'),
+        rec(D, ein='100000001', company_name='Acme'),
+    ])
+    assert result.targets.collect().is_empty()
+    assert result.support.collect().is_empty()
+    assert set(marginals_of(result)) == {D}
+    assert result.report['N'] == 1
+    assert result.report['N_including_padded'] == 1
+    assert result.report['n_sensitivity_only_cells'] == 0
+
+
+def test_company_names_alone_give_no_employer():
+    result = run([rec(A, ein=None, company_name='Acme'), rec(B, ein=None, company_name='Acme')])
+    assert result.targets.collect().is_empty()
+    assert result.marginals.collect().is_empty()
+    assert result.report['N'] == 0
+
+
 def test_spaced_ein_spelling_is_the_same_employer():
     result = run([rec(A, ein=' 123456789 '), rec(B, ein='12-3456789')])
     assert cells(result)[A, B]['n_unweighted'] == 1
@@ -780,6 +802,7 @@ SUPPORT_COUNTS = 'co-ownership support counts disagree with the targets'
 PADDED_BELOW = 'co-ownership padded counts fall below J'
 FLAGS = 'co-ownership flags disagree with the support'
 MARGINAL_KEYS = 'co-ownership marginal nodes repeat'
+NULL_NODES = 'co-ownership marginal nodes are null'
 BOUNDS = 'co-ownership marginal counts are out of bounds'
 MULTI = 'co-ownership multi-industry counts disagree with the targets'
 AB, BA, AC, CA = cell(A, B), cell(B, A), cell(A, C), cell(C, A)
@@ -850,6 +873,12 @@ BROKEN = {
     'support-j': (lambda t, m, s: (t, m, edit(s, AB, j_employers=1)), SUPPORT_COUNTS),
     'support-year-above': (lambda t, m, s: (t, m, edit(s, AB, j_2024=3)), SUPPORT_COUNTS),
     'support-years-below': (lambda t, m, s: (t, m, edit(s, AB, j_2023=1)), SUPPORT_COUNTS),
+    'support-year-null': (lambda t, m, s: (t, m, edit(s, AB, j_2024=None)), SUPPORT_COUNTS),
+    'support-years-null': (lambda t, m, s: (t, m, edit(s, AB, j_2024=None, j_2025=None)),
+                           SUPPORT_COUNTS),
+    'support-j-null': (lambda t, m, s: (t, m, edit(s, AB, j_employers=None)), SUPPORT_COUNTS),
+    'support-padded-null': (lambda t, m, s: (t, m, edit(s, AB, j_including_padded=None)),
+                            PADDED_BELOW),
     'padded-below': (lambda t, m, s: (t, m, edit(s, AB, j_including_padded=1)), PADDED_BELOW),
     'label-missing': (lambda t, m, s: (edit(t, AC, flags=[SIZE_LABEL]), m, s), FLAGS),
     'label-extra': (lambda t, m, s: (edit(t, AB, flags=[PADDED_LABEL, SIZE_LABEL]), m, s),
@@ -870,6 +899,20 @@ BROKEN = {
     ),
     'marginal-null': (lambda t, m, s: (t, edit(m, node(A), n_employers_partial=None), s),
                       BOUNDS),
+    'records-null': (lambda t, m, s: (t, edit(m, node(A), n_records=None), s), BOUNDS),
+    'employers-null': (lambda t, m, s: (t, edit(m, node(D), n_employers=None), s), BOUNDS),
+    'multi-null': (lambda t, m, s: (t, edit(m, node(D), n_multi_industry_employers=None), s),
+                   BOUNDS),
+    'padded-marginal-null': (
+        lambda t, m, s: (t, edit(m, node(A), n_employers_including_padded=None), s),
+        BOUNDS,
+    ),
+    'records-zero': (lambda t, m, s: (t, edit(m, node(A), n_records=0), s), BOUNDS),
+    'records-below-employers': (lambda t, m, s: (t, edit(m, node(A), n_records=2), s), BOUNDS),
+    'marginal-node-null': (
+        lambda t, m, s: (t, pl.concat([m, edit(only(m, node(D)), node(D), node_id=None)]), s),
+        NULL_NODES,
+    ),
     'multi-below-cell': (lambda t, m, s: (t, edit(m, node(B), n_multi_industry_employers=1), s),
                          MULTI),
     'multi-without-cell': (
