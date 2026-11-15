@@ -98,7 +98,6 @@ CODE_FIELDS = [
     'flag_copied_title_native',
     'flag_copied_index_native',
 ]
-DISTRIBUTION = ('count', 'min', 'p25', 'median', 'p75', 'p95', 'max')
 
 
 @dataclass(frozen=True)
@@ -193,6 +192,21 @@ def _strings(members: pl.LazyFrame) -> pl.LazyFrame:
     )
 
 
+def _headline_rule() -> pl.Expr:
+    '''The headline rule over pair columns.
+
+    A headline pair has an eligible record, a description key that is neither empty nor a
+    placeholder, and a known employer. The build and the validator share this rule.
+    '''
+    return (
+        pl.col('n_headline_records')
+        .gt(0)
+        .and_(pl.col('flag_empty').not_())
+        .and_(pl.col('flag_placeholder').not_())
+        .and_(pl.col('pair_kind').eq('employer'))
+    )
+
+
 def _pairs(members: pl.LazyFrame) -> pl.DataFrame:
     basis = pl.col('flag_headline_basis')
     summary = members.group_by('pair_id').agg(
@@ -210,16 +224,11 @@ def _pairs(members: pl.LazyFrame) -> pl.DataFrame:
         n_records_ein_padded=pl.col('flag_ein_padded').sum().cast(pl.UInt64),
         n_headline_nodes=pl.col('naics_2022_node_id').filter(basis).drop_nulls().n_unique(),
     )
-    headline = (
-        pl.col('n_headline_records')
-        .gt(0)
-        .and_(pl.col('flag_empty').not_())
-        .and_(pl.col('flag_placeholder').not_())
-        .and_(pl.col('pair_kind').eq('employer'))
-    )
     return (
         summary.join(_strings(members), on='pair_id', how='left', validate='1:1')
-        .with_columns(employer_basis=_basis(pl.col('employer_key')), flag_headline=headline)
+        .with_columns(
+            employer_basis=_basis(pl.col('employer_key')), flag_headline=_headline_rule()
+        )
         .with_columns(
             flag_headline_codes_conflict=pl.col('flag_headline').and_(
                 pl.col('n_headline_nodes').gt(1)
@@ -425,18 +434,11 @@ def validate_pairs(result: TextPairs, records: pl.LazyFrame, code_paths: pl.Data
         pl.col('n_records').ne(pl.col('_codes')),
         'pair code counts differ from n_records',
     )
-    headline = (
-        pl.col('n_headline_records')
-        .gt(0)
-        .and_(pl.col('flag_empty').not_())
-        .and_(pl.col('flag_placeholder').not_())
-        .and_(pl.col('pair_kind').eq('employer'))
-    )
     _reject(
         joined,
         pl.col('n_headline_records')
         .ne(pl.col('_basis'))
-        .or_(pl.col('flag_headline').ne(headline)),
+        .or_(pl.col('flag_headline').ne(_headline_rule())),
         'headline invariants fail',
     )
     _reject(
