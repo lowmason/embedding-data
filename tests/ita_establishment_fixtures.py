@@ -4,13 +4,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from zipfile import ZipFile
 
+import httpx
 import polars as pl
 from code_fixtures import write_xlsx
 from ita_fixtures import record, write_release, year_file
+from target_fixtures import forbid_external_access
 
 from embedding_data import (
     code_build,
     code_references,
+    ita_establishment_bundle,
     ita_index_references,
     ita_references,
     ita_summary,
@@ -399,3 +402,40 @@ def seed_establishment_inputs(data_dir: Path, directory: Path) -> EstablishmentI
         index_registry=registry,
         expectations=stage3_expectations(data_dir),
     )
+
+
+V12_RUNS = ('v12_first', 'v12_replay')
+
+
+def _no_client(*args, **kwargs):
+    raise AssertionError('the V12 fixture chain attempted external access')
+
+
+def run_establishment_v12(tmp_path: Path, monkeypatch) -> dict:
+    '''Raw summaries to two verified, replay-equal Stage 10 bundles, with external access blocked.
+
+    The guards go in first, so seeding, both builds, both verifications and the comparison
+    run under them. The returned dict holds `data_dir`, the `first` and `replay` bundle
+    directories, their detached pins, both verification results and the comparison.
+    '''
+    forbid_external_access(monkeypatch)
+    monkeypatch.setattr(httpx.Client, '__init__', _no_client)
+    monkeypatch.setattr(httpx.AsyncClient, '__init__', _no_client)
+    data_dir = tmp_path / 'data'
+    inputs = seed_establishment_inputs(data_dir, tmp_path / 'originals')
+    published = {}
+    for name, run_id in zip(('first', 'replay'), V12_RUNS, strict=True):
+        published[name] = ita_establishment_bundle.build(
+            data_dir, run_id, codes_run=inputs.codes_run,
+            codes_outputs_sha256=inputs.codes_outputs_sha256,
+            index_registry=inputs.index_registry, expectations=inputs.expectations)
+    result = {'data_dir': data_dir}
+    for name, run in published.items():
+        directory = Path(run['directory'])
+        result[name] = directory
+        result[name + '_pin'] = run['outputs_sha256']
+        result[name + '_verification'] = ita_establishment_bundle.verify_bundle(
+            directory, data_dir, expected_outputs_sha256=run['outputs_sha256'])
+    result['comparison'] = ita_establishment_bundle.compare_runs(result['first'],
+                                                                 result['replay'])
+    return result
