@@ -1,4 +1,5 @@
 import json
+import platform
 import shutil
 import subprocess
 import sys
@@ -15,9 +16,11 @@ from embedding_data import (
     ita_establishment_bundle,
     ita_establishment_expected,
     ita_establishment_inputs,
+    ita_establishment_links,
     ita_index_references,
     ita_references,
     ita_summary,
+    ita_text_pairs,
     manifest,
     paths,
     target_contract,
@@ -362,9 +365,17 @@ def test_ordered_equal_accepts_empty_frames():
         'schema_equal': True, 'values_equal': True, 'first_rows': 0, 'second_rows': 0}
 
 
-def test_verify_accepts_published_bundle(seeded):
+def test_verify_accepts_published_bundle(seeded, monkeypatch):
     before = tree(seeded.data_dir)
     directory = run_directory(seeded.data_dir, FIRST)
+    real = ita_co_ownership.estimate
+    during = []
+
+    def observe(records):
+        during.append(tree(seeded.data_dir))
+        return real(records)
+
+    monkeypatch.setattr(ita_co_ownership, 'estimate', observe)
     verified = verify_bundle(directory, seeded.data_dir,
                              expected_outputs_sha256=seeded.first['outputs_sha256'])
     report = read(directory, 'report.json')
@@ -377,6 +388,7 @@ def test_verify_accepts_published_bundle(seeded):
     }
     assert report['reproduction'] == {'basis': FIXTURE_BASIS, 'source_records': 'equal',
                                       'v1': 'equal', 'v2': 'equal'}
+    assert during == [before]
     assert tree(seeded.data_dir) == before
 
 
@@ -499,6 +511,8 @@ JSON_CASES = {
     'report_noncanonical': ('report.json', extra_newline, 'report.json: not canonical JSON'),
     'inputs_noncanonical': ('inputs.json', extra_newline, 'inputs.json: not canonical JSON'),
     'outputs_noncanonical': ('outputs.json', extra_newline, 'outputs.json: not canonical JSON'),
+    'report_not_json': ('report.json', lambda text: 'not json\n', 'report.json: not valid JSON'),
+    'report_not_object': ('report.json', lambda text: '[]\n', 'report.json: not a JSON object'),
 }
 
 
@@ -587,7 +601,8 @@ def test_verify_refuses_recorded_differences(seeded, tmp_path, case):
         verify_bundle(directory, seeded.data_dir, expected_outputs_sha256=pin)
 
 
-def test_verify_requires_adopted_expectations_for_adopted_source(seeded, monkeypatch, tmp_path):
+def test_verify_requires_adopted_expectations_and_registry(seeded, monkeypatch, tmp_path):
+    production = ita_index_references.REGISTRY
     adopt_fixture(monkeypatch, seeded)
     result = build_run(seeded.data_dir, seeded.inputs, 'adopted_edited', expectations=None)
     directory = tmp_path / 'adopted_edited'
@@ -597,8 +612,13 @@ def test_verify_requires_adopted_expectations_for_adopted_source(seeded, monkeyp
         inputs['expectations']['v1']['2016']['n_rows'] += 1
 
     pin = edit_json(directory, 'inputs.json', change)
-    with pytest.raises(ValueError, match='adopted expectations'):
+    with pytest.raises(ValueError, match='an adopted bundle must record the adopted expectations'):
         verify_bundle(directory, seeded.data_dir, expected_outputs_sha256=pin)
+    monkeypatch.setattr(ita_index_references, 'REGISTRY', production)
+    with pytest.raises(ValueError,
+                       match='an adopted bundle must record the production index registry'):
+        verify_bundle(Path(result['directory']), seeded.data_dir,
+                      expected_outputs_sha256=result['outputs_sha256'])
 
 
 def no_publication(data_dir, run_id):
@@ -798,6 +818,12 @@ def test_compare_runs_refuses_unpublished_or_uninventoried(seeded, tmp_path):
     change_unpinned(changed)
     with pytest.raises(ValueError, match='inventory hash or size differs'):
         compare_runs(changed, first)
+    with pytest.raises(ValueError, match='compared bundles must be published'):
+        compare_runs(first, tmp_path / 'absent')
+    uninventoried = copy_bundle(seeded, tmp_path, name='uninventoried')
+    (uninventoried / 'outputs.json').unlink()
+    with pytest.raises(ValueError, match='outputs.json: bundle JSON file is missing'):
+        compare_runs(first, uninventoried)
 
 
 def test_compare_runs_reports_a_report_difference(seeded, tmp_path):
@@ -809,3 +835,192 @@ def test_compare_runs_reports_a_report_difference(seeded, tmp_path):
     assert result['equal'] is False
     assert all(table['values_equal'] and table['schema_equal']
                for table in result['tables'].values())
+
+
+def test_contract_constants():
+    assert TABLES == (
+        'ita_establishment_links', 'ita_text_pairs', 'ita_text_pair_codes',
+        'ita_text_pair_members', 'naics_2022_paths', 'ita_co_ownership',
+        'co_ownership_marginals', 'co_ownership_support',
+    )
+    assert FILES == (*(name + '.parquet' for name in TABLES), 'inputs.json', 'report.json')
+    assert CONTRACTS == {
+        'links': 'ita-establishment-links-v1',
+        'pairs': 'ita-text-pairs-v1',
+        'co_ownership': 'ita-co-ownership-v1',
+        'index': 'naics-index-v1',
+        'targets': 'targets-v1',
+    }
+    assert CONTRACTS == {
+        'links': ita_establishment_links.LINKS_VERSION,
+        'pairs': ita_text_pairs.PAIRS_VERSION,
+        'co_ownership': ita_co_ownership.CO_OWNERSHIP_VERSION,
+        'index': ita_index_references.INDEX_VERSION,
+        'targets': target_contract.SCHEMA_VERSION,
+    }
+
+
+def test_freeze_software_records_files_python_and_dependencies():
+    frozen = freeze_software()
+    assert set(frozen) == {
+        'files', 'python', 'python_full', 'implementation', 'dependencies', 'uv_lock_sha256'}
+    assert list(frozen['files']) == list(SOFTWARE_FILES)
+    for name, record in frozen['files'].items():
+        file = paths.PROJECT_ROOT / name
+        assert record == {'sha256': manifest.sha256_file(file), 'size': file.stat().st_size}
+    assert frozen['uv_lock_sha256'] == manifest.sha256_file(paths.PROJECT_ROOT / 'uv.lock')
+    assert frozen['python'] == platform.python_version()
+    assert frozen['python_full'] == sys.version
+    assert frozen['implementation'] == platform.python_implementation()
+    assert frozen['dependencies']['polars'] == pl.__version__
+
+
+def test_fixture_bundle_covers_each_case(seeded):
+    '''The golden releases yield every case that the fixture table names.'''
+    directory = run_directory(seeded.data_dir, FIRST)
+    pairs = pl.read_parquet(directory / 'ita_text_pairs.parquet')
+    codes = pl.read_parquet(directory / 'ita_text_pair_codes.parquet')
+
+    def keys(condition):
+        return sorted(pairs.filter(condition)['description_key'].to_list())
+
+    assert 'soybean farming' in keys(pl.col('flag_copied_title_any'))
+    assert keys(pl.col('flag_copied_index_any')) == [
+        'soybean farming', 'wholesale -- see type of product']
+    assert keys(pl.col('flag_placeholder')) == ['n/a']
+    assert pairs.filter(pl.col('pair_kind').eq('unknown_employer')).height == 1
+    assert pairs.filter(pl.col('n_records_ein_padded').gt(0))['employer_key'].to_list() == [
+        'ein:023456789', 'ein:023456789']
+    mixed = pairs.filter(pl.col('employer_key').eq('ein:012345678'))
+    assert mixed['flag_headline'].to_list() == [True]
+    mixed_codes = codes.join(mixed.select('pair_id'), on='pair_id')
+    assert sorted(mixed_codes.select('naics_year', 'flag_headline_basis').rows()) == [
+        (2012, False), (2022, True)]
+    conflict = pairs.filter(pl.col('flag_headline_codes_conflict'))
+    assert conflict['employer_key'].to_list() == ['ein:345678912']
+
+    targets = pl.read_parquet(directory / 'ita_co_ownership.parquet')
+    cell = targets.filter(pl.col('unit_a').eq('naics:2022:national_industry:238220'),
+                          pl.col('unit_b').eq('naics:2022:national_industry:722511'))
+    assert cell.select('n_unweighted', 'flags').rows() == [
+        (1, [ita_co_ownership.PADDED_LABEL, ita_co_ownership.SIZE_LABEL])]
+
+    links = pl.read_parquet(directory / 'ita_establishment_links.parquet')
+
+    def linked(status):
+        return links.filter(pl.col('status').eq(status)).select(
+            'base_year', 'later_year', 'base_establishment_id').rows()
+
+    assert linked('confirmed_same_id') == [(2023, 2024, 501)]
+    assert (2019, 2020, 2019) in linked('confirmed_changed_id')
+    assert linked('conflict') == [(2024, 2025, 701), (2024, 2025, 702)]
+
+
+def change_first(column, change):
+    return lambda frame: frame.with_columns(
+        pl.when(pl.int_range(pl.len()).eq(0)).then(change(pl.col(column)))
+        .otherwise(pl.col(column)).cast(frame.schema[column]).alias(column)
+    )
+
+
+TABLE_TAMPERS = {
+    'ita_establishment_links': change_first('flag_id_reappears_elsewhere', pl.Expr.not_),
+    'ita_text_pairs': change_first('representative_string', lambda c: pl.lit('tampered')),
+    'ita_text_pair_codes': change_first('n_records', lambda c: c.add(1)),
+    'ita_text_pair_members': change_first('pair_id', lambda c: pl.lit('tampered')),
+    'naics_2022_paths': change_first('node_id', lambda c: pl.lit('tampered')),
+    'ita_co_ownership': change_first('value', lambda c: c.add(1.0)),
+    'co_ownership_marginals': change_first('n_records', lambda c: c.add(1)),
+    'co_ownership_support': change_first('j_2023', lambda c: c.add(1)),
+}
+
+
+@pytest.mark.parametrize('name', TABLES)
+def test_verify_detects_each_table_tamper(seeded, tmp_path, name):
+    directory = copy_bundle(seeded, tmp_path)
+    pin = edit_table(directory, name, TABLE_TAMPERS[name])
+    with pytest.raises(ValueError, match=name + ': published table differs'):
+        verify_bundle(directory, seeded.data_dir, expected_outputs_sha256=pin)
+
+
+def broken_pairs(real):
+    def build_pairs(records, nodes, code_paths):
+        result = real(records, nodes, code_paths)
+        return replace(result, pairs=result.pairs.with_columns(pl.col('n_records').add(1)))
+    return build_pairs
+
+
+def broken_links(real):
+    def build_links(records):
+        result = real(records)
+        return replace(result, links=result.links.with_columns(
+            pl.col('status').replace('no_candidate', 'unknown_status')))
+    return build_links
+
+
+def broken_co_ownership(real):
+    def estimate(records):
+        result = real(records)
+        return replace(result, support=result.support.with_columns(pl.col('j_employers').add(1)))
+    return estimate
+
+
+RECOMPUTED_CASES = {
+    'pairs': (ita_text_pairs, 'build_pairs', broken_pairs,
+              'pair record counts do not sum to the record count'),
+    'links': (ita_establishment_links, 'build_links', broken_links,
+              'link statuses are not link statuses'),
+    'co_ownership': (ita_co_ownership, 'estimate', broken_co_ownership,
+                     'co-ownership support counts disagree with the targets'),
+}
+
+
+@pytest.mark.parametrize('case', RECOMPUTED_CASES)
+def test_verify_validates_the_recomputation(seeded, monkeypatch, case):
+    module, name, breaker, message = RECOMPUTED_CASES[case]
+    monkeypatch.setattr(module, name, breaker(getattr(module, name)))
+    with pytest.raises(ValueError, match=message):
+        verify_bundle(run_directory(seeded.data_dir, FIRST), seeded.data_dir,
+                      expected_outputs_sha256=seeded.first['outputs_sha256'])
+
+
+def test_unrecorded_reference_original_is_a_validation_failure(seeded):
+    registry = dict(seeded.inputs.index_registry)
+    registry['naics_index_2012'] = replace(registry['naics_index_2012'],
+                                           relative='naics/unrecorded.xlsx')
+    with pytest.raises(ValueError, match='a reference original is not recorded'):
+        build_run(seeded.data_dir, seeded.inputs, 'unrecorded', index_registry=registry)
+    assert no_publication(seeded.data_dir, 'unrecorded')
+
+
+def remove_index_entry(data_dir, registry):
+    relative = 'references/' + registry['naics_index_2022'].relative
+    file = paths.manifest_path(data_dir)
+    lines = [line for line in file.read_text().splitlines()
+             if json.loads(line)['path'] != relative]
+    file.write_text('\n'.join(lines) + '\n')
+
+
+@pytest.mark.parametrize('moment', ['before_inputs', 'before_publication'])
+def test_unrecorded_citation_mid_build_is_a_validation_failure(fresh, monkeypatch, moment):
+    registry = fresh.inputs.index_registry
+    if moment == 'before_inputs':
+        real_targets = target_contract.write_targets
+
+        def write_targets(frame, destination):
+            remove_index_entry(fresh.data_dir, registry)
+            return real_targets(frame, destination)
+
+        monkeypatch.setattr(target_contract, 'write_targets', write_targets)
+    else:
+        real_json = target_io.write_json
+
+        def write_json(file, value):
+            real_json(file, value)
+            if file.name == 'report.json':
+                remove_index_entry(fresh.data_dir, registry)
+
+        monkeypatch.setattr(target_io, 'write_json', write_json)
+    with pytest.raises(ValueError, match='a cited raw file is not recorded'):
+        build_run(fresh.data_dir, fresh.inputs, 'unrecorded_' + moment)
+    assert no_publication(fresh.data_dir, 'unrecorded_' + moment)
