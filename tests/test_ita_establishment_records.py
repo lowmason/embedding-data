@@ -224,6 +224,8 @@ def test_keys_match_stage3_semantics(keys):
     assert len(added) == 15
     assert_frame_equal(keyed.select(added), expected.select(added))
     assert keyed.columns == ['source_row', *CANONICAL_SCHEMA, *added, *COPY_FLAGS]
+    assert keyed.schema['source_row'] == pl.UInt64
+    assert keyed['source_row'].to_list() == list(range(len(rows)))
     assert keyed.select(*CANONICAL_SCHEMA).equals(frame.collect())
     assert keyed.select(*COPY_FLAGS).schema == {name: pl.Boolean for name in COPY_FLAGS}
 
@@ -332,7 +334,16 @@ def test_keyed_records_refuse_a_non_canonical_frame(keys, defect):
 
 @pytest.mark.parametrize(
     'defect',
-    ['extra-column', 'column-order', 'vintage-string', 'empty-key', 'null-key', 'unknown-kind'],
+    [
+        'extra-column',
+        'column-order',
+        'vintage-string',
+        'empty-key',
+        'null-key',
+        'null-vintage',
+        'null-kind',
+        'unknown-kind',
+    ],
 )
 def test_keyed_records_refuse_defective_keys(keys, defect):
     frame = canonical_frame([record('Steel')])
@@ -347,6 +358,12 @@ def test_keyed_records_refuse_defective_keys(keys, defect):
         bad = pl.concat([keys, extra])
     elif defect == 'null-key':
         extra = pl.DataFrame([('index', 2022, None)], schema=keys.schema, orient='row')
+        bad = pl.concat([keys, extra])
+    elif defect == 'null-vintage':
+        extra = pl.DataFrame([('index', None, 'a key')], schema=keys.schema, orient='row')
+        bad = pl.concat([keys, extra])
+    elif defect == 'null-kind':
+        extra = pl.DataFrame([(None, 2022, 'a key')], schema=keys.schema, orient='row')
         bad = pl.concat([keys, extra])
     else:
         bad = keys.with_columns(kind=pl.lit('titles'))
@@ -377,6 +394,11 @@ def v1_rows():
         record('Unknown thing', year_filing_for=2024, ein='', company_name=''),
         record('X', year_filing_for=2024, ein='111111111', company_name='Delta'),
         record('Soybean farming', 2022, year_filing_for=2024, ein='123456789'),
+        # An index entry that is not a title, a repeat of two, and one pair of 2023 again.
+        record('Telephone carriers, wired', 2017, year_filing_for=2024, ein='123456789'),
+        record('Gadget', year_filing_for=2024, ein='890123456'),
+        record('gadget', year_filing_for=2024, ein='890123456'),
+        record('Steel Mill', year_filing_for=2024, ein='123456789'),
         # 2025: no employer is known, so the year has no repeat groups at all.
         record('Z', year_filing_for=2025, ein='', company_name=''),
         record('Z', year_filing_for=2025, ein=None, company_name=None),
@@ -412,9 +434,10 @@ def v1_rows():
 
 
 # Counts by hand. 2023 holds 21 rows. A group repeats when an employer repeats a nonempty
-# description: steel mill (3), sawmills (2, one per vintage), the long title (2), widgets by
-# company (2) and n/a (2), so 11 rows and 6 excess rows. Empty descriptions and unknown
-# employers never repeat.
+# description in one year: steel mill (3), sawmills (2, one per vintage), the long title (2),
+# widgets by company (2) and n/a (2), so 11 rows and 6 excess rows. Empty descriptions and
+# unknown employers never repeat. 2024 holds 8 rows. Its one repeat is gadget (2), and its
+# steel mill row repeats nothing in 2024, because the 2023 group is another year's.
 V1_EXPECTED = {
     2023: {
         'n_rows': 21,
@@ -431,7 +454,7 @@ V1_EXPECTED = {
         'n_repeat_excess': 6,
     },
     2024: {
-        'n_rows': 4,
+        'n_rows': 8,
         'n_empty': 0,
         'n_placeholder': 0,
         'n_copied_any': 1,
@@ -441,8 +464,8 @@ V1_EXPECTED = {
         'n_employer_company': 1,
         'n_ein_padded': 0,
         'n_mojibake': 0,
-        'n_repeat_rows': 0,
-        'n_repeat_excess': 0,
+        'n_repeat_rows': 2,
+        'n_repeat_excess': 1,
     },
     2025: {
         'n_rows': 2,
