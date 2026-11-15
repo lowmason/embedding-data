@@ -1022,6 +1022,11 @@ BROKEN = {
                        later_row=V_PROBE_BASE_LATER, later_establishment_id=220),
         SUCCESSORS,
     ),
+    'changed-successor-with-the-base-id': (
+        lambda f: edit(f, at(V_SAME), status='confirmed_changed_id',
+                       flag_id_reappears_elsewhere=True),
+        SUCCESSORS,
+    ),
     'changed-successor-without-id': (
         lambda f: edit(f, at(V_CHANGED), later_establishment_id=None), SUCCESSORS),
     'changed-without-successor': (
