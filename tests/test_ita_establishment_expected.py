@@ -245,6 +245,25 @@ def test_check_reproduction_missing_and_extra_rows():
         check(v2=v2.vstack(v2.head(1)))
 
 
+def test_check_reproduction_extra_year_row_differs():
+    v1 = v1_frame(expected.ADOPTED)
+    extra = v1.filter(pl.col('year_filing_for').eq(2025)).with_columns(
+        pl.lit(2026, dtype=pl.Int64).alias('year_filing_for'))
+    with pytest.raises(ValueError) as caught:
+        check(v1=v1.vstack(extra))
+    assert str(caught.value) == 'V1 reproduction differs'
+
+
+def test_check_reproduction_extra_pair_row_differs():
+    v2 = v2_frame(expected.ADOPTED)
+    extra = v2.filter(pl.col('base_year').eq(2024) & pl.col('later_year').eq(2025)).with_columns(
+        pl.lit(2025, dtype=pl.Int64).alias('base_year'),
+        pl.lit(2026, dtype=pl.Int64).alias('later_year'))
+    with pytest.raises(ValueError) as caught:
+        check(v2=v2.vstack(extra))
+    assert str(caught.value) == 'V2 reproduction differs'
+
+
 def test_check_reproduction_pair_keys_are_not_swapped():
     v2 = copy.deepcopy(expected.V2)
     v2[(2023, 2025)], v2[(2024, 2025)] = v2[(2024, 2025)], v2[(2023, 2025)]
