@@ -151,7 +151,7 @@ def test_text_keys_with_no_index_rows_hold_titles_only():
     'kind,vintage,value',
     [
         pytest.param('title', 2022, '', id='title-blank'),
-        pytest.param('title', 2012, '   \t', id='title-only-whitespace'),
+        pytest.param('title', 2012, ' \u00a0 \t', id='title-only-whitespace'),
         pytest.param('title', 2017, None, id='title-null'),
         pytest.param('index', 2022, '   ', id='index-blank'),
         pytest.param('index', 2012, None, id='index-null'),
