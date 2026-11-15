@@ -391,7 +391,6 @@ def validate_links(links: pl.LazyFrame, records: pl.LazyFrame) -> None:
     _reject(
         joined,
         has_row.ne(status.is_in(CONFIRMED).or_(status.eq('weaker_same_id').and_(later_unique)))
-        .or_(later_id.is_not_null().ne(has_row))
         .or_(later_id.ne_missing(pl.col('_record_id')))
         .or_(status.is_in(SAME_ID).and_(has_row).and_(later_id.ne(base_id)))
         .or_(status.eq('confirmed_changed_id').and_(later_id.eq(base_id))),

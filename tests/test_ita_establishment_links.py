@@ -103,9 +103,12 @@ ORACLE.add(2023, 2, 'duplicate', ein='100000002', id=900)
 ORACLE.add(2023, 2, 'duplicate', ein='100000002', id=900)
 ORACLE.add(2024, 2, 'duplicate', ein='100000002', id=901)
 ORACLE.add(2024, 2, 'duplicate', ein='100000002', id=901)
-ORACLE.add(2023, None, 'null-base', ein='100000003')
+ORACLE.add(2023, None, 'null-base', ein='100000003', id=902)
+ORACLE.add(2023, None, 'null-base', ein='100000003', id=902)
 ORACLE.add(2024, None, 'null-later-a', ein='100000003')
-ORACLE.add(2024, None, 'null-later-b')
+ORACLE.add(2024, None, 'null-later-b', id=903)
+ORACLE.add(2024, None, 'null-later-b', id=903)
+ORACLE.add(2024, None, 'null-later-c')
 ORACLE.add(2023, 4, 'competing-base-a', ein='100000004')
 ORACLE.add(2023, 4, 'competing-base-b', ein='100000004')
 ORACLE.add(2024, 4, 'competing-base-a', ein='100000004')
@@ -171,8 +174,8 @@ def test_oracle_fixture_counts():
         'n_reappeared_ein_unknown': 2,
         'n_reappeared_ein_conflict': 2,
         'n_reappeared_address_conflict': 3,
-        'n_base_missing_id_rows': 2,
-        'n_later_missing_id_rows': 2,
+        'n_base_missing_id_rows': 3,
+        'n_later_missing_id_rows': 4,
         'n_unique_address_matches': 5,
         'n_address_matches_different_id': 2,
     }
@@ -475,14 +478,37 @@ def test_later_row_is_the_smallest_source_row_of_the_successor():
 
 def test_2023_links_to_2025_without_2024():
     rows = [rec(2023, 1, 'skips', ein='100000001'), rec(2025, 1, 'skips', ein='100000001'),
-            rec(2024, 2, 'other')]
+            rec(2024, 2, 'other'), rec(2023, 3, 'gap'), rec(2024, 3, 'gap')]
     result = build(rows)
     links = result.links.collect()
     assert set(links.select('base_year', 'later_year').unique().rows()) == {
         (2023, 2024), (2023, 2025), (2024, 2025)}
     assert pair_rows(result, (2023, 2024))[0]['status'] == 'no_candidate'
+    assert pair_rows(result, (2023, 2024))[3]['status'] == 'confirmed_same_id'
+    assert pair_rows(result, (2023, 2025))[3]['status'] == 'no_candidate'
     assert (pair_rows(result, (2023, 2025))[0]['status'],
             pair_rows(result, (2023, 2025))[0]['later_row']) == ('confirmed_same_id', 1)
+
+
+def test_reasons_stay_false_off_weaker_when_the_later_id_is_ambiguous():
+    rows = Rows()
+    changed = rows.add(2023, 1, 'changed', ein='100000001')
+    successor = rows.add(2024, 11, 'changed', ein='100000001')
+    rows.add(2024, 1, 'elsewhere-a')
+    rows.add(2024, 1, 'elsewhere-b')
+    ambiguous = rows.add(2023, 2, 'ambiguous-a')
+    twin = rows.add(2023, 2, 'ambiguous-b')
+    rows.add(2024, 2, 'ambiguous-a', ein=None)
+    rows.add(2024, 2, 'ambiguous-c')
+    links = pair_rows(build(rows.rows))
+    observed = {base: (row['status'], row['later_row'], true_reasons(row),
+                       row['flag_id_reappears_elsewhere'])
+                for base, row in links.items() if base in (changed, ambiguous, twin)}
+    assert observed == {
+        changed: ('confirmed_changed_id', successor, set(), True),
+        ambiguous: ('ambiguous_id', None, set(), False),
+        twin: ('ambiguous_id', None, set(), False),
+    }
 
 
 def test_other_years_never_supply_a_candidate():
@@ -673,6 +699,19 @@ def test_report_identities_fail_the_build(field, nested):
         ita_establishment_links._check_pair_report(broken)
 
 
+def test_build_fails_when_an_identity_does_not_hold(monkeypatch):
+    original = ita_establishment_links._link_pair
+
+    def miscounted(base, later, pair):
+        links, report = original(base, later, pair)
+        return links, {**report,
+                       'n_conflict_with_same_link': report['n_conflict_with_same_link'] + 1}
+
+    monkeypatch.setattr(ita_establishment_links, '_link_pair', miscounted)
+    with pytest.raises(ValueError, match=message('link report identities do not hold')):
+        build(PRECEDENCE.rows)
+
+
 KEYED_GAPS = [
     pytest.param(lambda lf: lf.drop('ein_key'), id='missing-ein-key'),
     pytest.param(lambda lf: lf.drop('address_key'), id='missing-address-key'),
@@ -701,7 +740,7 @@ def test_validator_refuses_records_without_the_keyed_columns(transform):
 
 
 # A valid build whose 2023 -> 2024 rows hold every status, both weaker kinds, a duplicate
-# base record and a changed-ID link with and without its base ID reappearing.
+# base record and changed-ID links whose base ID is absent, unique or competing in 2024.
 VALID = Rows()
 V_MISSING = VALID.add(2023, None, 'missing')
 V_AMBIGUOUS = VALID.add(2023, 2, 'ambiguous-a')
@@ -723,6 +762,12 @@ V_CONFLICT_CHANGED = VALID.add(2024, 77, 'conflict', ein='700000007')
 V_NONE = VALID.add(2023, 8, 'none')
 V_ALONE = VALID.add(2023, 9, 'changed-alone', ein='900000009')
 V_ALONE_LATER = VALID.add(2024, 99, 'changed-alone', ein='900000009')
+VALID.add(2024, 2, 'ambiguous-a')
+VALID.add(2024, 2, 'ambiguous-c')
+V_CHANGED_AMBIGUOUS = VALID.add(2023, 10, 'changed-ambiguous', ein='100000010')
+V_CHANGED_AMBIGUOUS_LATER = VALID.add(2024, 110, 'changed-ambiguous', ein='100000010')
+VALID.add(2024, 10, 'changed-ambiguous-a')
+VALID.add(2024, 10, 'changed-ambiguous-b')
 
 
 def test_valid_fixture_is_the_one_the_broken_tables_assume():
@@ -746,6 +791,8 @@ def test_valid_fixture_is_the_one_the_broken_tables_assume():
         V_CONFLICT: ('conflict', [V_CONFLICT], None, None, set(), False),
         V_NONE: ('no_candidate', [V_NONE], None, None, set(), False),
         V_ALONE: ('confirmed_changed_id', [V_ALONE], V_ALONE_LATER, 99, set(), False),
+        V_CHANGED_AMBIGUOUS: ('confirmed_changed_id', [V_CHANGED_AMBIGUOUS],
+                              V_CHANGED_AMBIGUOUS_LATER, 110, set(), True),
     }
 
 
@@ -830,6 +877,8 @@ BROKEN = {
     'pair-unknown': (lambda f: edit(f, LATER_2025, later_year=2026), PAIRS),
     'base-rows-unsorted': (lambda f: edit(f, at(V_SAME), base_rows=[V_SAME_TWIN, V_SAME]),
                            ROW_ORDER),
+    'base-rows-unsorted-from-base': (
+        lambda f: edit(f, at(V_SAME), base_rows=[V_SAME, V_SAME_TWIN, V_MISSING]), ROW_ORDER),
     'base-rows-empty': (lambda f: edit(f, at(V_NONE), base_rows=[]), ROW_ORDER),
     'base-row-not-first': (lambda f: edit(f, at(V_SAME), base_rows=[V_SAME_TWIN]), ROW_ORDER),
     'base-record-extra': (
@@ -900,6 +949,8 @@ BROKEN = {
         lambda f: edit(f, at(V_CHANGED), flag_id_reappears_elsewhere=False), FLAG),
     'flag-without-reappearance': (
         lambda f: edit(f, at(V_ALONE), flag_id_reappears_elsewhere=True), FLAG),
+    'flag-missing-on-ambiguous-reappearance': (
+        lambda f: edit(f, at(V_CHANGED_AMBIGUOUS), flag_id_reappears_elsewhere=False), FLAG),
     'flag-on-weaker': (lambda f: edit(f, at(V_WEAKER), flag_id_reappears_elsewhere=True), FLAG),
 }
 
