@@ -269,6 +269,23 @@ def test_variant_spellings_share_one_pair():
     assert pair['representative_string'] == 'STEEL MILL'
 
 
+def test_no_break_space_spelling_shares_the_pair():
+    variants = ['Steel Mill', 'steel  mill', 'STEEL MILL', 'Ｓｔｅｅｌ Mill', 'Steel\u00a0Mill']
+    pairs = build([record(text) for text in variants]).pairs.collect()
+    assert pairs.height == 1
+    pair = pairs.row(0, named=True)
+    assert pair['description_key'] == 'steel mill'
+    assert pair['original_strings'] == [
+        'STEEL MILL',
+        'Steel Mill',
+        'Steel\u00a0Mill',
+        'steel  mill',
+        'Ｓｔｅｅｌ Mill',
+    ]
+    assert pair['n_records'] == 5
+    assert pair['representative_string'] == 'STEEL MILL'
+
+
 @pytest.mark.parametrize(
     ('texts', 'originals', 'representative'),
     [
@@ -622,6 +639,18 @@ def test_paths_cover_candidates_and_scalars():
     paths = build([record('Bolt', mapping=INVALID)]).paths.collect()
     assert paths.is_empty()
     assert list(paths.schema.items()) == list(PATH_SCHEMA.items())
+
+
+def test_unresolved_candidates_reference_their_paths():
+    records = keyed([record('Line', year=2021, mapping=UNKNOWN_VINTAGE)])
+    result = build_pairs(records, NODES, CODE_PATHS)
+    codes = result.pair_codes.collect().row(0, named=True)
+    assert codes['flag_naics_unresolved'] is True
+    assert codes['naics_2022_node_id'] is None
+    assert codes['naics_2022_candidate_node_ids'] == [leaf('517111')]
+    stage4 = CODE_PATHS.filter(pl.col('node_id').eq(leaf('517111')))
+    assert_frame_equal(result.paths.collect(), stage4)
+    validate_pairs(result, records, CODE_PATHS)
 
 
 def test_paths_cover_a_scalar_node_outside_the_candidates():
