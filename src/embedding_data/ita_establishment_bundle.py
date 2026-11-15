@@ -128,9 +128,9 @@ LIMITS = (
     'Codes are self-reported and unvalidated. A pair is a noisy label.',
     'Copied-text flags catch exact normalized identity only. Near-copies and reworded index '
     'entries stay unflagged.',
-    "Restricting to native 2022 codes drops many 2024–2025 records. Some employers' industry "
-    'sets are partial, so co-ownership can be undercounted. The marginals table measures this '
-    'per industry.',
+    'Restricting to native 2022 codes drops about 40% of 2024–2025 records. '
+    "Some employers' industry sets are partial, so co-ownership can be undercounted. "
+    'The marginals table measures this per industry.',
     'An EIN is a tax-filing entity. One firm can hold several EINs, so co-ownership within '
     'EIN can miss relationships across a firm.',
     'Which establishments file is shaped by the filing rule. Co-ownership can over-represent '

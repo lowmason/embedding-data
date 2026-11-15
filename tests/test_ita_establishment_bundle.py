@@ -14,6 +14,8 @@ from ita_establishment_fixtures import FIXTURE_BASIS, seed_establishment_inputs
 from target_fixtures import forbid_external_access
 
 from embedding_data import (
+    code_build,
+    geography_build,
     ita_co_ownership,
     ita_establishment_bundle,
     ita_establishment_expected,
@@ -411,6 +413,10 @@ def test_bundle_records_inputs_report_and_inventory(seeded):
     indexes = {'references/' + reference.relative
                for reference in seeded.inputs.index_registry.values()}
     assert titles | indexes <= set(raw_paths)
+    stage4 = {citation['path'] for citation in read(codes, 'inputs.json')['raw']}
+    assert stage4 <= set(raw_paths)
+    for family in ('osha/summary/', 'references/soc/', 'references/filing-rules/'):
+        assert any(path.startswith(family) for path in raw_paths)
     entries = {entry.path: entry for entry in manifest.read_manifest(
         paths.manifest_path(seeded.data_dir))}
     for citation in inputs['raw']:
@@ -1041,4 +1047,19 @@ def test_build_verify_and_compare_use_no_network_or_credentials(seeded, monkeypa
     verified = verify_bundle(directory, seeded.data_dir,
                              expected_outputs_sha256=result['outputs_sha256'])
     assert verified['run_id'] == 'offline'
+    assert compare_runs(run_directory(seeded.data_dir, FIRST), directory)['equal'] is True
+
+
+def test_build_verify_and_compare_run_no_upstream_builder(seeded, monkeypatch):
+    def forbidden(*args, **kwargs):
+        raise AssertionError('Stage 10 ran an upstream builder')
+
+    monkeypatch.setattr(ita_summary, 'build_summary_table', forbidden)
+    monkeypatch.setattr(code_build, 'build', forbidden)
+    monkeypatch.setattr(geography_build, 'build', forbidden)
+    result = build_run(seeded.data_dir, seeded.inputs, 'no_upstream')
+    directory = Path(result['directory'])
+    verified = verify_bundle(directory, seeded.data_dir,
+                             expected_outputs_sha256=result['outputs_sha256'])
+    assert verified['run_id'] == 'no_upstream'
     assert compare_runs(run_directory(seeded.data_dir, FIRST), directory)['equal'] is True
