@@ -28,7 +28,10 @@ Roadmap: specs/embedding-evaluation-data-spec-roadmap.md, Stage 10 — on plan c
   full-data command, run
   `pgrep -fl 'embedding_data\.acs_targets|stage9_independent|reconcile_stage9'`.
   If it prints anything, stop. Leave the files uncommitted and tell the owner.
-  Never skip a hook. The `coverage-check` hook runs the full suite on every commit.
+  Never skip a hook. At commit, `coverage-check` runs the suite without the eight
+  `slow` tests and skips a commit whose files are all under `specs/` or root-level
+  Markdown. `coverage-check-full` runs the whole suite before a push and on a merge
+  commit (lowmason/embedding-data#10).
   The check cannot see an open Stage 9 freeze window. That is enough for commits,
   which write nothing under `data/`. Production writes need the owner's
   confirmation (Owner Checkpoints).
@@ -51,8 +54,9 @@ Roadmap: specs/embedding-evaluation-data-spec-roadmap.md, Stage 10 — on plan c
   `data_dir` or `--data-dir` explicitly.
 - **Frozen code.** Edit no existing file under `src/` or `scripts/`. The only
   existing `.py` file that changes is `tests/code_fixtures.py` (Task 2). Do not edit
-  `pyproject.toml` or `uv.lock`, because Stages 6, 8 and 9 hash them. Add no
-  dependency and no console script. If a reused function cannot serve unchanged,
+  `pyproject.toml` or `uv.lock`: Stages 4 to 9 record the `uv.lock` hash, and Stages
+  6 to 9 also hash `pyproject.toml`. Add no dependency and no console script. If a
+  reused function cannot serve unchanged,
   stop and ask the owner (spec "Frozen modules").
 - **Reused interfaces, imported unchanged.** `ita_verification.normalize_key`,
   `with_keys`, `PLACEHOLDERS`, `description_report`, `link_report`;
