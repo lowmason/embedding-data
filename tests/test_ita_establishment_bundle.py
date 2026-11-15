@@ -7,9 +7,11 @@ from dataclasses import asdict, replace
 from pathlib import Path
 from types import SimpleNamespace
 
+import httpx
 import polars as pl
 import pytest
 from ita_establishment_fixtures import FIXTURE_BASIS, seed_establishment_inputs
+from target_fixtures import forbid_external_access
 
 from embedding_data import (
     ita_co_ownership,
@@ -1024,3 +1026,19 @@ def test_unrecorded_citation_mid_build_is_a_validation_failure(fresh, monkeypatc
     with pytest.raises(ValueError, match='a cited raw file is not recorded'):
         build_run(fresh.data_dir, fresh.inputs, 'unrecorded_' + moment)
     assert no_publication(fresh.data_dir, 'unrecorded_' + moment)
+
+
+def test_build_verify_and_compare_use_no_network_or_credentials(seeded, monkeypatch):
+    def forbidden(*args, **kwargs):
+        raise AssertionError('offline command attempted external access')
+
+    forbid_external_access(monkeypatch)
+    monkeypatch.setattr(ita_index_references, 'make_client', forbidden)
+    monkeypatch.setattr(httpx.Client, '__init__', forbidden)
+    monkeypatch.setattr(httpx.AsyncClient, '__init__', forbidden)
+    result = build_run(seeded.data_dir, seeded.inputs, 'offline')
+    directory = Path(result['directory'])
+    verified = verify_bundle(directory, seeded.data_dir,
+                             expected_outputs_sha256=result['outputs_sha256'])
+    assert verified['run_id'] == 'offline'
+    assert compare_runs(run_directory(seeded.data_dir, FIRST), directory)['equal'] is True
