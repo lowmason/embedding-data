@@ -163,6 +163,13 @@ def test_expectations_json_keys():
     assert value['v2']['2023-2025']['n_same_raw_ein_address'] == 133795
 
 
+def test_to_json_is_its_own_json_form():
+    value = expected.ADOPTED.to_json()
+    assert all(isinstance(key, str) for key in value['v1'])
+    assert all(isinstance(key, str) for key in value['v2'])
+    assert json.loads(json.dumps(value)) == value
+
+
 def test_expectations_are_frozen():
     with pytest.raises(AttributeError):
         expected.ADOPTED.basis = 'changed'
