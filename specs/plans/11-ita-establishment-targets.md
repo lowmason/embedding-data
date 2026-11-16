@@ -17,7 +17,7 @@ directory by rename.
 
 **Spec:** `specs/ita-establishment-targets.md` (owner-approved, commit `49b394c`).
 
-Roadmap: specs/embedding-evaluation-data-spec-roadmap.md, Stage 10 — on plan completion, tick the stage and re-validate later stages against what shipped.
+Roadmap: specs/naics-evaluation-data-roadmap.md, Stage 1 — tick Stage 1 when its Exit holds; on plan completion, tick Stage 4 and re-validate later stages against what shipped. (Moved from Stage 10 of the parked `specs/completed/embedding-evaluation-data-spec-roadmap.md` on 2026-11-16.)
 
 ## Global Constraints
 

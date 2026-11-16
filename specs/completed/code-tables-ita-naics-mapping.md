@@ -4,7 +4,7 @@
 
 ## Scope and decisions
 
-Stage 4 of [the roadmap](../embedding-evaluation-data-spec-roadmap.md) implements
+Stage 4 of [the roadmap](embedding-evaluation-data-spec-roadmap.md) implements
 R5.1 (ITA), R5.2, R5.4 (ITA vintages), R2.5, R2.9's industry flag, and V11
 (ITA) in [the source spec](../embedding-evaluation-data-spec.md). It produces the
 canonical classification graphs, reusable NAICS mapping references, and an

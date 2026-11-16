@@ -11,7 +11,7 @@ acceptance remain planned.
 
 ## Scope and governing contracts
 
-Stage 10 of [the roadmap](embedding-evaluation-data-spec-roadmap.md)
+Stage 10 of [the roadmap](completed/embedding-evaluation-data-spec-roadmap.md)
 implements R2.6, R2.7 and the text–code pair and co-ownership rows of R7.2 in
 [the source spec](embedding-evaluation-data-spec.md). R7.1, R7.4, R8 and R9
 govern outputs, provenance, disclosure, leakage and offline operation. The

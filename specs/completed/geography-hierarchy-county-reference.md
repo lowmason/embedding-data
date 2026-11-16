@@ -4,7 +4,7 @@
 
 ## Scope and adopted design
 
-Stage 5 of [the roadmap](../embedding-evaluation-data-spec-roadmap.md) implements
+Stage 5 of [the roadmap](embedding-evaluation-data-spec-roadmap.md) implements
 R6.1, R6.2 and R6.4 and supplies the production references for the adopted R2.8
 method in [the source spec](../embedding-evaluation-data-spec.md). The owner
 approved the design on 2026-10-13:

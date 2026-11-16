@@ -2550,6 +2550,6 @@ Behave scenarios/ten steps passed, ruff and lock checks passed; scoped final
 rereview CLEAN at `cd4639d`. Source audit closure and implementation correction
 are settled; no review finding or plan step is deferred.
 
-Resume the [roadmap](../../embedding-evaluation-data-spec-roadmap.md) through
+Resume the [roadmap](../../completed/embedding-evaluation-data-spec-roadmap.md) through
 its reconcile step after root selects the integration outcome. This completed
 stage does not plan or execute any later stage in this session.

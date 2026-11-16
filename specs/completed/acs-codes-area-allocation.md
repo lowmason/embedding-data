@@ -4,7 +4,7 @@
 
 ## Scope and approved decisions
 
-Stage 8 of [the roadmap](../embedding-evaluation-data-spec-roadmap.md) implements
+Stage 8 of [the roadmap](embedding-evaluation-data-spec-roadmap.md) implements
 R3.9, R3.11's crosswalks, R5.1 (ACS), R5.3, R5.4 (ACS comparator), R6.3, V8 and
 V11 (ACS) in [the source spec](../embedding-evaluation-data-spec.md). R3.10 supplies
 the geographic-role keys. This is one mapping and reference-allocation cycle;

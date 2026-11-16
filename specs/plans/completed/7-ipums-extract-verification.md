@@ -23,7 +23,7 @@ stdlib gzip, shutil, tempfile, csv, decimal, json, hashlib, dataclasses and
 xml.etree.ElementTree. No new dependency or lockfile change.
 
 **Spec:** [Source spec](../../embedding-evaluation-data-spec.md), scoped to Stage 7
-of the [roadmap](../../embedding-evaluation-data-spec-roadmap.md): V4–V7,
+of the [roadmap](../../completed/embedding-evaluation-data-spec-roadmap.md): V4–V7,
 V10 (ACS/CPS), R3.2/R3.5/R4.5/R4.9/R4.11 and Design provenance XA/XC.
 Read completed plans 1 and 3's Handoff sections and the Stage 7-targeted items
 in [deferred items](../../deferred_items.md).

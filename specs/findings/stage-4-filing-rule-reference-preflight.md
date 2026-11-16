@@ -1,7 +1,7 @@
 # Stage 4 filing-rule reference preflight
 
 Measured 2026-10-13 against `main` at `6f8c190` while planning Stage 4 of
-[the roadmap](../embedding-evaluation-data-spec-roadmap.md). This is reference
+[the roadmap](../completed/embedding-evaluation-data-spec-roadmap.md). This is reference
 compatibility evidence, not a completed V11 finding, an adopted rule
 interpretation, or a canonical ITA build. No project raw file, raw-manifest
 entry, source Parquet, or Stage 3 verification run was changed.

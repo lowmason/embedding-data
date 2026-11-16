@@ -138,3 +138,51 @@
       field/year-specific evidence resolves the 2026 category and Stage 11 has
       regression-tested explicit special/mapping behavior retaining original
       values and provenance, with no silent leaf assignment or headline inclusion.
+
+## embedding-evaluation-data-spec-roadmap — 2026-11-16
+- [ ] ACS targets (old Stage 9): ACS staffing-pattern, workplace area-mix,
+      commuting and migration targets in the shared schema (spec R3.6–R3.8,
+      R3.10, R3.11 and the ACS rows of R7.2). Parked with the roadmap on
+      2026-11-16, because the owner chose the ITA NAICS targets as the first
+      answer. Plan 9 (`specs/plans/9-acs-targets.md`) has Tasks 1–9 merged at
+      `3c3ccd0`. Its Task 10 is on hold after three failed full builds
+      (`stage9_acs_targets_20261019_r1`, `_20261021_r2`, `_20261021_r3`, each
+      `.part` only) and eight probes. Plan 10 (untracked, only in the
+      `codex/acs-targets-design` worktree) and 12 unpushed commits on that
+      branch hold the throughput work. Both plans stay on hold outside any
+      roadmap (owner, 2026-11-16). See
+      `specs/completed/embedding-evaluation-data-spec-roadmap.md` (Stage 9) and
+      `specs/findings/stage-9-acs-targets.md`. Size: plan. Done when: a Stage 9
+      ACS target bundle, with its universe, pooling, replicate-SE and
+      allocation-flag helpers, is published and verified on real data, or the
+      owner retires plan 9.
+- [ ] CPS panel linkage and job-change flows (old Stage 11): CPS codes mapped
+      to NAICS and SOC, linked person-month pairs, and occupation→occupation and
+      industry→industry job-change flows (spec R4.3, R4.6–R4.9, R4.11, R5.1, the
+      job-change row of R7.2 and V11 for CPS). Parked on 2026-11-16, because the
+      owner chose the ITA NAICS targets as the first answer. Not started. The
+      `9890` item in section `7-ipums-extract-verification` closes first. See
+      `specs/completed/embedding-evaluation-data-spec-roadmap.md` (Stage 11).
+      Size: design. Done when: the CPS code mapping, the linked person-month
+      pairs and the CPS weight and SE helpers exist, and job-change flows are
+      built on real data.
+- [ ] Worker profiles and CPS cross-sections (old Stage 12): worker profiles,
+      the CPS staffing check and CPS state-migration targets (spec R4.4,
+      R4.10–R4.12 and the worker-profile, staffing and migration rows of R7.2).
+      Parked on 2026-11-16, because the owner chose the ITA NAICS targets as the
+      first answer. It needs the ACS helpers of old Stage 9 and the CPS helpers of
+      old Stage 11. See `specs/completed/embedding-evaluation-data-spec-roadmap.md`
+      (Stage 12). Size: design. Done when: profile tables in the
+      feature-for-`unit_b` schema and ASEC state-to-state flows with the
+      job-related subset are built on real data.
+- [ ] Full build, size gate and comparators (old Stage 13): the V9 headline
+      minimum count for all families, the complete eight-family V12 offline
+      contract test, the five-year and 2022 vintage comparators, and IPUMS
+      citations (spec V9, V12, R3.2, R3.3, R7.3, R8.2). Parked on 2026-11-16.
+      Stage 3 of `specs/naics-evaluation-data-roadmap.md` sets the minimum count
+      for the ITA NAICS targets only. This item covers the other families and the
+      rest of old Stage 13. See
+      `specs/completed/embedding-evaluation-data-spec-roadmap.md` (Stage 13).
+      Size: design. Done when: a recorded decision sets the minimum count for the
+      remaining families, V12 covers all eight families offline, the comparators
+      are built, and IPUMS citations appear in README and the output manifests.
