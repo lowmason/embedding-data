@@ -9,7 +9,7 @@ Stage 9 implementation and measured acceptance remain planned.
 
 ## Scope and governing contracts
 
-Stage 9 of [the roadmap](embedding-evaluation-data-spec-roadmap.md) implements
+Stage 9 of [the roadmap](completed/embedding-evaluation-data-spec-roadmap.md) implements
 R3.6, R3.7, R3.8, R3.10, R3.11 use, and the staffing-pattern, area-mix,
 commuting and migration ACS rows of R7.2 in
 [the source spec](embedding-evaluation-data-spec.md). R7.1, R7.4, R8 and R9

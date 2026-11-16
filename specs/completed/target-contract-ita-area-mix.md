@@ -4,7 +4,7 @@
 
 ## Scope and adopted design
 
-Stage 6 of [the roadmap](../embedding-evaluation-data-spec-roadmap.md) implements
+Stage 6 of [the roadmap](embedding-evaluation-data-spec-roadmap.md) implements
 R7.1, R7.4, R7.3's count reporting, the ITA part of R7.2 area mix, R2.2 and
 R2.8, and seeds V12 from [the source spec](../embedding-evaluation-data-spec.md).
 The owner approved these decisions on 2026-10-14:

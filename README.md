@@ -28,7 +28,7 @@ the [Stage 8 finding](specs/findings/stage-8-acs-codes-area-allocation.md) recor
 the three profile companions in each of two full-data bundles, replay and independent
 reconciliation. Repository completion is recorded in that finding, the
 [retired plan](specs/plans/completed/8-acs-codes-area-allocation.md) and the
-[roadmap](specs/embedding-evaluation-data-spec-roadmap.md). CPS code parsing,
+[roadmap](specs/completed/embedding-evaluation-data-spec-roadmap.md). CPS code parsing,
 person-month linkage and other target families remain planned. Raw downloads are
 recorded in `data/raw/manifest.jsonl`.
 The OSHA case-detail files are acquired but feed no target; the specification's

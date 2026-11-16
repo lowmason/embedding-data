@@ -11,7 +11,7 @@ acceptance remain planned.
 
 ## Scope and governing contracts
 
-Stage 10 of [the roadmap](embedding-evaluation-data-spec-roadmap.md)
+Stage 10 of [the roadmap](completed/embedding-evaluation-data-spec-roadmap.md)
 implements R2.6, R2.7 and the text–code pair and co-ownership rows of R7.2 in
 [the source spec](embedding-evaluation-data-spec.md). R7.1, R7.4, R8 and R9
 govern outputs, provenance, disclosure, leakage and offline operation. The
@@ -770,7 +770,7 @@ R7.2's co-ownership row needs no amendment. This spec defines its measure.
 
 ## Rollout and later-stage handoff
 
-Roadmap: specs/embedding-evaluation-data-spec-roadmap.md, Stage 10 — on plan completion, tick the stage and re-validate later stages against what shipped.
+Roadmap: specs/naics-evaluation-data-roadmap.md, Stage 1 — tick Stage 1 when its Exit holds; on plan completion, tick Stage 4 and re-validate later stages against what shipped. (Moved from Stage 10 of the parked `specs/completed/embedding-evaluation-data-spec-roadmap.md` on 2026-11-16.)
 
 - Plan number 10 is taken by an uncommitted Stage 9 file. The Stage 10 plan
   takes the next free number after 10.
