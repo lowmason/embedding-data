@@ -5,9 +5,8 @@
 > below. Each stage designs its own tables (brainstorming), then plans its build.
 > Do not plan this document as a whole. Do not download or build from it.
 
-Status: for owner review, Stage 2 design session, 2026-11-16. The owner made
-the decisions in Owner decisions. Calls marked "My call" are proposals for the
-owner to check. No file was downloaded. Every fact below comes from a public HTML page read on 2026-11-16,
+Status: the owner approved this committed spec on 2026-11-16, including every
+call marked "My call". Stage 2 design session. No file was downloaded. Every fact below comes from a public HTML page read on 2026-11-16,
 or is marked *unverified*.
 
 ## Intent
