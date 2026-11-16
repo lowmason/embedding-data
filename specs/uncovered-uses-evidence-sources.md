@@ -283,15 +283,15 @@ codes places by NAICS or has an official mapping to NAICS.
 
 | Source | Use | Why not adopted |
 |---|---|---|
-| FFIEC NIC, Federal Reserve | Peer, holding company | Option 2 alternate. Bank holding company structure with ownership shares and EINs. Finance only. Its NAICS field is not confirmed, and ffiec.gov returned HTTP 403 to automated reads. |
+| FFIEC NIC, Federal Reserve | Peer, holding company | Option 2 alternate. Bank holding company structure with ownership shares and EINs *(unverified: third-party guide only)*. Finance only. Its NAICS field is not confirmed, and ffiec.gov returned HTTP 403 to automated reads. |
 | IRS Form 990 Schedule R | Peer, holding company | Option 2 alternate. Filer EIN → related EIN with ownership share ([instructions](https://www.irs.gov/instructions/i990sr)). Nonprofits only. No NAICS: needs a join to ITA by EIN. |
 | GLEIF Level 2 | Peer, holding company | CC0 parent links, but no industry code and no EIN ([terms](https://www.gleif.org/en/meta/lei-data-terms-of-use)). |
 | SEC Exhibit 21 | Peer, holding company | Subsidiary names only ([17 CFR 229.601](https://www.law.cornell.edu/cfr/text/17/229.601)). Needs name matching. SIC, not NAICS. |
 | SAM.gov owner fields, USAspending parent UEI | Peer, holding company | Public owner fields give a name and CAGE code only. The UEI hierarchy is restricted. One ultimate parent for each firm. |
-| DOL Form 5500 | Peer, holding company | NAICS-based business code, but no ownership link. |
+| DOL Form 5500 | Peer, holding company | NAICS-based business code, but no ownership link *(unverified: third-party copy of the instructions)*. |
 | BLS input–output matrices | Supply chain, look-alike | Option 2 alternate. Annual, derived from BEA ([page](https://www.bls.gov/emp/data/input-output-matrix.htm)). Its NAICS route sits in a ZIP file and is not confirmed. |
 | SEC major-customer disclosures | Look-alike, KYB | Customers are company-specific XBRL members with no identifier ([DQC 0109](https://xbrl.us/data-rule/dqc_0109/)). |
-| Census Commodity Flow Survey | Supply chain | Destination is a place, not an industry ([about](https://www.census.gov/programs-surveys/cfs/about.html)). |
+| Census Commodity Flow Survey | Supply chain | Records shipments by origin and destination. The survey page names no destination industry ([about](https://www.census.gov/programs-surveys/cfs/about.html)). That destination is a place only is *unverified*: the data dictionary is a spreadsheet, not opened. |
 | Open Supply Hub | KYB, supply chain | Share-alike license and no NAICS ([FAQ](https://info.opensupplyhub.org/faqs)). |
 | State open-checkbook payments | KYB | No NAICS field found. The government is the buyer. |
 
