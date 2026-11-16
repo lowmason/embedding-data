@@ -186,3 +186,15 @@
       Size: design. Done when: a recorded decision sets the minimum count for the
       remaining families, V12 covers all eight families offline, the comparators
       are built, and IPUMS citations appear in README and the output manifests.
+
+## naics-evaluation-data-roadmap — 2026-11-16
+- [ ] Co-visitation evidence (Track B, O11): no free source records visit
+      sequences between business types and reaches NAICS without a mapping this
+      project would write. ATUS is the nearest miss: ordered diary episodes, but
+      its place types have no official route to NAICS. Advan and Placer.ai are
+      paid or internal-use only. NHTS records trip purpose, not place. Parked by
+      the owner on 2026-11-16. See `specs/uncovered-uses-evidence-sources.md`
+      (Uncovered: co-visitation) and `specs/naics-evaluation-data-stage-2-findings.md`.
+      Size: design. Revisit if: the owner names a free source that records visit
+      order and either codes visited places by NAICS or has an official
+      published mapping to NAICS.
