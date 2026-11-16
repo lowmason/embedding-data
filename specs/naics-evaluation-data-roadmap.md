@@ -52,7 +52,7 @@ nothing from Stage 1. The order diverges from the old spec's Rollout, which put
 ACS before the remaining ITA targets. The owner chose the ITA NAICS targets as the
 first answer. The owner approved this partition on 2026-11-16.
 
-- [ ] Stage 1: ITA NAICS targets, first build
+- [x] Stage 1: ITA NAICS targets, first build
       Objective: Plan 11's bundle is built once on real ITA data and verified.
       Outcomes: O1, O2, O3
       Track: A
@@ -61,6 +61,7 @@ first answer. The owner approved this partition on 2026-11-16.
       Exit: O1: the bundle's text–code pair tables exist, `verify` with the detached pin passes, and pair records sum to 3,206,055 and to each year's V1 `n_rows` (plan 11 Task 11 Step 7). O2: the bundle's co-ownership `targets-v1` rows exist, each `size_gate_pending`, and `scripts/reconcile_stage10.py co-ownership` reports equal. O3: the bundle's establishment-link table exists and `scripts/reconcile_stage10.py stage3` reports equal. Plan 11 Task 11 Step 8 (preservation) passes (owner, 2026-11-16). The findings file records the run ID, the pin, and the wall time, maximum RSS and bundle size of the real run
       Leaves out: exact replay check (Task 11 Steps 5–6: replay build and `compare-runs`) → Stage 4. Long-form acceptance finding (Step 9) → Stage 4. README and CLAUDE.md run pins (Step 9) → Stage 4. Plan 11 retirement → Stage 4. Headline minimum count → Stage 3 (O4)
       ROUTING: writing-plans
+> Stage 1: COMPLETE (2026-11-16) — implemented by plan 11 (specs/plans/11-ita-establishment-targets.md), Task 11 first build; findings in specs/naics-evaluation-data-stage-1-findings.md.
 
 - [ ] Stage 2: Evidence sources for six uncovered uses
       Objective: For each of the six uses, decide which free source could supply the missing evidence, or record that none exists.

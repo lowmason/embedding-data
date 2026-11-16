@@ -17,7 +17,7 @@ directory by rename.
 
 **Spec:** `specs/ita-establishment-targets.md` (owner-approved, commit `49b394c`).
 
-Roadmap: specs/naics-evaluation-data-roadmap.md, Stage 1 — tick Stage 1 when its Exit holds; on plan completion, tick Stage 4 and re-validate later stages against what shipped. (Moved from Stage 10 of the parked `specs/completed/embedding-evaluation-data-spec-roadmap.md` on 2026-11-16.)
+Roadmap: specs/naics-evaluation-data-roadmap.md, Stage 4 — tick Stage 1 when its Exit holds; on plan completion, tick Stage 4 and re-validate later stages against what shipped. (Moved from Stage 10 of the parked `specs/completed/embedding-evaluation-data-spec-roadmap.md` on 2026-11-16.)
 
 Process: lighter — first build (Gate 2), verify, the reconciliation script and the preservation checks, plus a one-screen findings file with measured wall time, peak memory and bundle size. The replay build, the long-form finding, the README/CLAUDE.md pins and plan 11's retirement go to Stage 4.
 
