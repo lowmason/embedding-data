@@ -87,9 +87,9 @@ first answer. The owner approved this partition on 2026-11-16.
       Objective: Stage 1's bundle gets its exact replay check, long-form acceptance finding and README and CLAUDE.md run pins, and plan 11 retires.
       Outcomes: O1, O2, O3 (hardening)
       Track: A
-      Consumes: Stage 1's bundle, pin and findings file. Plan 11 Task 11 Steps 5, 6, 9 and 10. The plan 11 ledger's rulings, for the Plan Completion Protocol
+      Consumes: Stage 1's bundle, pin and findings file. Plan 11 Task 11 Steps 5, 6, 9 and 10. The plan 11 ledger's 47 rulings, 3 of them `Ruling (unclear):`, from the backup that the Stage 1 findings file names, for the Plan Completion Protocol (Resolved at resume, 2026-11-16: owner; Stage 1 findings, "For Stages 3 and 4")
       Produces: exact replay check: a replay bundle and its `compare-runs` result. Long-form acceptance finding: `specs/findings/stage-10-ita-establishment-targets.md`. README and CLAUDE.md run pins. Plan 11 in `specs/plans/completed/`
-      Exit: the replay bundle's `verify` passes and `compare-runs` against Stage 1's run reports `"equal": true`. The long-form acceptance finding is committed. README and CLAUDE.md name the selected runs and pins. Plan 11 retires through the Plan Completion Protocol
+      Exit: `verify` of Stage 1's run with its detached pin passes from Stage 4's checkout and venv, because `compare-runs` does not check software identity (Resolved at resume, 2026-11-16: owner; Stage 1 findings, "For Stages 3 and 4"). The replay bundle's `verify` passes and `compare-runs` against Stage 1's run reports `"equal": true`. The long-form acceptance finding is committed. README and CLAUDE.md name the selected runs and pins. Plan 11 retires through the Plan Completion Protocol
       Leaves out: nothing
       ROUTING: writing-plans
 
