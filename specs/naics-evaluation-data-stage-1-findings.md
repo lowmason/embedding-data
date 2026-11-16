@@ -38,8 +38,14 @@ software files, `uv.lock` SHA-256 `f57c3280a7c8286711bf6804ca4c02f0a19619c9db52f
 - O3: the link table exists. The `stage3` reconciler reports V1 and V2 equal.
 - Step 8: the summary, codes and both Stage 6 `outputs.json` hashes are unchanged, and
   their inventories verify. The manifest's first 3,007 lines equal the first snapshot.
-  All 3,010 lines equal the Stage 1 snapshot (SHA-256 `0c610ce188e6ecc0a987db1726b34280c65bd7d42d3fbcd9448afeebdcddbb71`,
-  2026-11-16T17:09:04Z). The audit reports 0 raw provenance discrepancies.
+  All 3,010 lines equal the Stage 1 snapshot. The audit reports 0 raw provenance
+  discrepancies. A scratch script made the O1 sums and the inventory checks:
+  `stage1_checks.py` and its output `stage-1-checks.out`, in the ledger backup below.
+
+**Stage 1 snapshot** (2026-11-16T17:09:04Z, before Gate 2). Manifest
+`0c610ce188e6ecc0a987db1726b34280c65bd7d42d3fbcd9448afeebdcddbb71`, 3,010 lines.
+Summary `6335cda7…36a8`, 139,930,636 bytes. Codes `outputs.json` `15b95846…9c3a`.
+Stage 6 `084292b6…2473` and `_replay` `78fd21e3…be71`. `establishment-targets/` absent.
 
 **For Stages 3 and 4.** Stage 3 reads the co-ownership `n_unweighted` counts of this
 run. Stage 4 picks its own replay ID. `compare-runs` reads only tables and reports, so
