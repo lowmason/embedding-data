@@ -19,7 +19,7 @@ Choices made:
 - Smallest usable standard: plan 11 as specified. That is the pooled 2023–2025 native-2022 window, SE `none`, every target `size_gate_pending` and `verify` passing, with no minimum-count gate in the first answer.
 - Target for the first answer: one session.
 - Built inputs, cited and never rebuilt: `derived/osha/ita_300a_summary.parquet`, codes `stage4_v11_20261013_r2`, geography `stage5_geography_20261014`, Stage 6 `stage6_ita_area_mix_20261014_1000_csv` and its preparation, Stage 7 `stage7_ipums_verification_20261015_r2`, Stage 8 `stage8_acs_mapping_20261018_r7`, plan 11's merged software (PR #11, `118b231`) and its Gate 1 NAICS index files.
-- Stage 1 process (owner, 2026-11-16): lighter. Stage 1 runs the first build, `verify` and the existing reconciliation script, and writes a one-screen findings file. The exact replay check, the preservation checks, the long-form acceptance finding, the README and CLAUDE.md run pins and plan 11's retirement move to Stage 4.
+- Stage 1 process (owner, 2026-11-16): lighter. Stage 1 runs the first build, `verify`, the existing reconciliation script and the preservation checks, and writes a one-screen findings file. The exact replay check, the long-form acceptance finding, the README and CLAUDE.md run pins and plan 11's retirement move to Stage 4.
 - Plans: plan 11 finishes in this roadmap (Stages 1 and 4). Plans 9 and 10 (ACS targets) stay on hold outside any roadmap, with their files and branch `codex/acs-targets-design` unchanged.
 - Old roadmap: parked (the roadmap file only). Its Stages 9, 11, 12 and 13 are deferred items. Old Stage 10 continues here through plan 11. The spec and the methodology stay in place, because `CLAUDE.md` names the spec as the source of truth and plan 11 cites it.
 - Repository: `embedding-data` continues the work. No sibling repository builds this system.
@@ -52,15 +52,16 @@ nothing from Stage 1. The order diverges from the old spec's Rollout, which put
 ACS before the remaining ITA targets. The owner chose the ITA NAICS targets as the
 first answer. The owner approved this partition on 2026-11-16.
 
-- [ ] Stage 1: ITA NAICS targets, first build
+- [x] Stage 1: ITA NAICS targets, first build
       Objective: Plan 11's bundle is built once on real ITA data and verified.
       Outcomes: O1, O2, O3
       Track: A
       Consumes: plan 11 (`specs/plans/11-ita-establishment-targets.md`) with Tasks 1–10 merged in PR #11 (`118b231`) and Task 11 Step 2 (Gate 1) done on 2026-11-16: three NAICS index files in `raw/references/naics/` and their three manifest lines (3,010 lines in all). Its spec `specs/ita-establishment-targets.md`. Codes run `stage4_v11_20261013_r2` with detached pin `15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a` and the adopted Stage 2 summary (SHA-256 `6335cda7adb40a41c4a11d57d22048999449ac8d078a2ec0291f0198cd9136a8`). The plan 11 execution ledger, 44 rulings, in the gitignored `.sdd/11-ita-establishment-targets/` of worktree `.claude/worktrees/vigilant-mirzakhani-bee453`. The owner's go-ahead for each production write and a confirmed closed Stage 9 freeze window (`CLAUDE.md`, Stage 10)
       Produces: one verified Stage 10 bundle in `data/derived/osha/establishment-targets/<RUN_ID>/` with its detached `outputs.json` pin. `specs/naics-evaluation-data-stage-1-findings.md`
-      Exit: O1: the bundle's text–code pair tables exist, `verify` with the detached pin passes, and pair records sum to 3,206,055 and to each year's V1 `n_rows` (plan 11 Task 11 Step 7). O2: the bundle's co-ownership `targets-v1` rows exist, each `size_gate_pending`, and `scripts/reconcile_stage10.py co-ownership` reports equal. O3: the bundle's establishment-link table exists and `scripts/reconcile_stage10.py stage3` reports equal. The findings file records the run ID, the pin, and the wall time, maximum RSS and bundle size of the real run
-      Leaves out: exact replay check (Task 11 Steps 5–6: replay build and `compare-runs`) → Stage 4. Preservation checks (Step 8, including the whole-tree audit) → Stage 4. Long-form acceptance finding (Step 9) → Stage 4. README and CLAUDE.md run pins (Step 9) → Stage 4. Plan 11 retirement → Stage 4. Headline minimum count → Stage 3 (O4)
+      Exit: O1: the bundle's text–code pair tables exist, `verify` with the detached pin passes, and pair records sum to 3,206,055 and to each year's V1 `n_rows` (plan 11 Task 11 Step 7). O2: the bundle's co-ownership `targets-v1` rows exist, each `size_gate_pending`, and `scripts/reconcile_stage10.py co-ownership` reports equal. O3: the bundle's establishment-link table exists and `scripts/reconcile_stage10.py stage3` reports equal. Plan 11 Task 11 Step 8 (preservation) passes (owner, 2026-11-16). The findings file records the run ID, the pin, and the wall time, maximum RSS and bundle size of the real run
+      Leaves out: exact replay check (Task 11 Steps 5–6: replay build and `compare-runs`) → Stage 4. Long-form acceptance finding (Step 9) → Stage 4. README and CLAUDE.md run pins (Step 9) → Stage 4. Plan 11 retirement → Stage 4. Headline minimum count → Stage 3 (O4)
       ROUTING: writing-plans
+> Stage 1: COMPLETE (2026-11-16) — implemented by plan 11 (specs/plans/11-ita-establishment-targets.md), Task 11 first build; findings in specs/naics-evaluation-data-stage-1-findings.md.
 
 - [ ] Stage 2: Evidence sources for six uncovered uses
       Objective: For each of the six uses, decide which free source could supply the missing evidence, or record that none exists.
@@ -83,12 +84,12 @@ first answer. The owner approved this partition on 2026-11-16.
       ROUTING: brainstorming
 
 - [ ] Stage 4: ITA NAICS targets, hardening
-      Objective: Stage 1's bundle gets its exact replay check, preservation checks, long-form acceptance finding and README and CLAUDE.md run pins, and plan 11 retires.
+      Objective: Stage 1's bundle gets its exact replay check, long-form acceptance finding and README and CLAUDE.md run pins, and plan 11 retires.
       Outcomes: O1, O2, O3 (hardening)
       Track: A
-      Consumes: Stage 1's bundle, pin and findings file. Plan 11 Task 11 Steps 5, 6, 8, 9 and 10. The plan 11 ledger's rulings, for the Plan Completion Protocol
-      Produces: exact replay check: a replay bundle and its `compare-runs` result. Preservation checks: the Step 8 results. Long-form acceptance finding: `specs/findings/stage-10-ita-establishment-targets.md`. README and CLAUDE.md run pins. Plan 11 in `specs/plans/completed/`
-      Exit: the replay bundle's `verify` passes and `compare-runs` against Stage 1's run reports `"equal": true`. Plan 11 Task 11 Step 8 (preservation, including the whole-tree audit) passes. The long-form acceptance finding is committed. README and CLAUDE.md name the selected runs and pins. Plan 11 retires through the Plan Completion Protocol
+      Consumes: Stage 1's bundle, pin and findings file. Plan 11 Task 11 Steps 5, 6, 9 and 10. The plan 11 ledger's rulings, for the Plan Completion Protocol
+      Produces: exact replay check: a replay bundle and its `compare-runs` result. Long-form acceptance finding: `specs/findings/stage-10-ita-establishment-targets.md`. README and CLAUDE.md run pins. Plan 11 in `specs/plans/completed/`
+      Exit: the replay bundle's `verify` passes and `compare-runs` against Stage 1's run reports `"equal": true`. The long-form acceptance finding is committed. README and CLAUDE.md name the selected runs and pins. Plan 11 retires through the Plan Completion Protocol
       Leaves out: nothing
       ROUTING: writing-plans
 

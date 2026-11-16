@@ -17,7 +17,9 @@ directory by rename.
 
 **Spec:** `specs/ita-establishment-targets.md` (owner-approved, commit `49b394c`).
 
-Roadmap: specs/naics-evaluation-data-roadmap.md, Stage 1 — tick Stage 1 when its Exit holds; on plan completion, tick Stage 4 and re-validate later stages against what shipped. (Moved from Stage 10 of the parked `specs/completed/embedding-evaluation-data-spec-roadmap.md` on 2026-11-16.)
+Roadmap: specs/naics-evaluation-data-roadmap.md, Stage 4 — tick Stage 1 when its Exit holds; on plan completion, tick Stage 4 and re-validate later stages against what shipped. (Moved from Stage 10 of the parked `specs/completed/embedding-evaluation-data-spec-roadmap.md` on 2026-11-16.)
+
+Process: lighter — first build (Gate 2), verify, the reconciliation script and the preservation checks, plus a one-screen findings file with measured wall time, peak memory and bundle size. The replay build, the long-form finding, the README/CLAUDE.md pins and plan 11's retirement go to Stage 4.
 
 ## Global Constraints
 
@@ -138,6 +140,8 @@ Roadmap: specs/naics-evaluation-data-roadmap.md, Stage 1 — tick Stage 1 when i
 - **D2** (owner, planning stop-and-ask, 2026-11-14): Each official index file ends with 25 cross-reference rows whose code is `******`. Keep them as a counted cross-reference class with the delivered code, and include their entries in the copied-index flags. Registered row counts are 19,280 / 20,082 / 20,398, each with 25 cross-references. The owner approved the amendment wording at plan review on 2026-11-14. Applied in: Task 2 (spec amendment).
 - **D3** (owner, plan review, 2026-11-14): Approve plan 11 with every settled default unchanged. Commit the plan on `claude/nervous-maxwell-7ab7f8` and do not merge to `main` until the owner decides. Applied in: Global Constraints (Branch, Merging).
 - **D4** (owner, after plan review, 2026-11-14): Merge the spec and this plan into `main` through lowmason/embedding-data#8 (merge commit `e1470e7`), and delete the remote planning branch. Execution starts from `main`. Applied in: Global Constraints (Branch).
+- **D5** (owner, brief, 2026-11-16): Plan 11 finishes in `specs/naics-evaluation-data-roadmap.md` as Stages 1 and 4, with the lighter Stage 1 process. Stage 1 runs Task 11 Step 1 (a new snapshot), Step 3 (the first run's ID only), Step 4 (Gate 2), Step 6 for the first run only (`verify`, no `compare-runs`), Steps 7 and 8, and Step 8a, which writes `specs/naics-evaluation-data-stage-1-findings.md`. Stage 4 runs Steps 5, 6 (the replay's `verify` and `compare-runs`), 9 and 10, then the Plan Completion Protocol. When Stage 1's Exit holds, Stage 1 ticks its roadmap box with the stamp `> Stage 1: COMPLETE (<date>) — implemented by plan 11 (specs/plans/11-ita-establishment-targets.md), Task 11 first build; findings in specs/naics-evaluation-data-stage-1-findings.md.` and changes `Stage 1` to `Stage 4` in this plan's Roadmap line. Stage 1 does not run the Plan Completion Protocol. Applied in: header (Process line), Task 11.
+- **D6** (owner, brief, 2026-11-16): Preservation (Task 11 Step 8) runs in Stage 1, reversing `cbeaf2b`'s move to Stage 4. Applied in: `specs/naics-evaluation-data-roadmap.md` (Choices made, Stage 1 Exit and Leaves out, Stage 4), Task 11 Step 8.
 
 ## Settled Defaults (for owner review)
 
@@ -1392,15 +1396,20 @@ Message: `test: add Stage 10 raw-to-target V12 chain and reconciliation`.
 ### Task 11: Full-data acceptance (owner-gated)
 
 **Files:**
-- Create: `specs/findings/stage-10-ita-establishment-targets.md`
-- Modify: `README.md`, `CLAUDE.md` (selected runs and pins)
+- Create (Stage 1): `specs/naics-evaluation-data-stage-1-findings.md`
+- Modify (Stage 1): `specs/naics-evaluation-data-roadmap.md` (Stage 1 tick and stamp),
+  this plan's Roadmap line
+- Create (Stage 4): `specs/findings/stage-10-ita-establishment-targets.md`
+- Modify (Stage 4): `README.md`, `CLAUDE.md` (selected runs and pins)
 
 `ROOT` below is `/Users/lowell/Projects/embedding-data/data`. Run every command from the
-execution checkout. Run the `pgrep` check before each command.
+execution checkout. Run the `pgrep` check before each command. Each step names the
+roadmap stage that runs it (D5).
 
-- [ ] **Step 1: Snapshot (read-only)**
+- [ ] **Step 1 (Stage 1): Snapshot (read-only)**
 
-Record these for the finding:
+Stage 1 takes this snapshot again before Gate 2 and keeps the first one (2026-11-15,
+before Gate 1). Record these for the finding:
 - the SHA-256 and line count of `ROOT/raw/manifest.jsonl`
 - whether `ROOT/derived/osha/establishment-targets/` exists
 - the SHA-256 of the Stage 2 summary, the codes `outputs.json` and both Stage 6 target
@@ -1410,7 +1419,7 @@ Expected Stage 6 pins: `stage6_ita_area_mix_20261014_1000_csv` is
 `084292b6835eb09ce27ecc4a3aef03a6f43bfe7b39b815665c29190a431e2473`, and `_replay` is
 `78fd21e37ba0c5b1cd396ff0961b557650788fdccd3c84a911e8c6c3b7fabe71`.
 
-- [ ] **Step 2: GATE 1, index acquisition**
+- [ ] **Step 2 (done 2026-11-16, before Stage 1): GATE 1, index acquisition**
 
 Ask the owner for a go-ahead and confirm that no Stage 9 freeze window is open. Then:
 
@@ -1423,15 +1432,17 @@ the registered SHA-256. If Census refuses, the owner downloads the files by hand
 the same go-ahead, run `import-reference naics_index_<year> <file> --data-dir …` per
 kind. If bytes or counts differ from the registry, stop and ask (checkpoint 2).
 
-- [ ] **Step 3: Choose fresh run IDs**
+- [ ] **Step 3 (Stage 1): Choose a fresh run ID**
 
-Use `stage10_ita_establishment_<YYYYMMDD>_r1` and `_r1_replay`. Confirm that neither a
-final nor a `.part` exists for either.
+Use `stage10_ita_establishment_<YYYYMMDD>_r1`. Confirm that neither a final nor a
+`.part` exists for it. Stage 4 picks the replay ID and checks it the same way.
 
-- [ ] **Step 4: GATE 2, first build**
+- [ ] **Step 4 (Stage 1): GATE 2, first build**
 
-After the go-ahead, run the build in the background and record wall time and maximum
-resident set size:
+Build from a committed checkout: `git status --porcelain --untracked-files=normal` prints
+nothing at launch, and nothing in the checkout outside `.sdd/` changes until the JSON
+line prints, because `inputs.json` records `dirty` for good. After the go-ahead, run the
+build in the background and record wall time and maximum resident set size:
 
 ```bash
 /usr/bin/time -l uv run --locked python -m embedding_data.ita_establishment_targets build <RUN> --data-dir /Users/lowell/Projects/embedding-data/data --codes-run stage4_v11_20261013_r2 --codes-outputs-sha256 15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a
@@ -1441,17 +1452,25 @@ Expected: one JSON line with `outputs_sha256`. If the process dies and leaves
 `<RUN>.part`, leave it in place. Ask the owner (gate 4), record the event, and use a
 new ID afterwards.
 
-- [ ] **Step 5: GATE 3, replay build**
+- [ ] **Step 5 (Stage 4): GATE 3, replay build**
 
 Repeat Step 4 with the replay ID after its own go-ahead.
 
-- [ ] **Step 6: Verify and compare**
+- [ ] **Step 6 (Stage 1: first run's `verify`; Stage 4: replay's `verify` and `compare-runs`): Verify and compare**
 
-- `verify <RUN> --data-dir … --outputs-sha256 <pin>` for each run reports the basis
-  `adopted_v1_v3_finding`.
+`verify` reruns every product, so record its wall time and maximum resident set size as
+Step 4 does. Run it from the checkout and venv that built the run, with no `uv sync` or
+`--with` overlay in between: the recorded software identity includes every installed
+distribution.
+
+```bash
+/usr/bin/time -l uv run --locked python -m embedding_data.ita_establishment_targets verify <RUN> --data-dir /Users/lowell/Projects/embedding-data/data --outputs-sha256 <pin>
+```
+
+- `verify` for each run reports the basis `adopted_v1_v3_finding`.
 - `compare-runs <RUN> <REPLAY> --data-dir …` reports `"equal": true` and exits 0.
 
-- [ ] **Step 7: Independent checks**
+- [ ] **Step 7 (Stage 1): Independent checks**
 
 - `uv run --locked python scripts/reconcile_stage10.py co-ownership --data-dir … --run <RUN> --outputs-sha256 <pin>`
   reports equal.
@@ -1460,16 +1479,28 @@ Repeat Step 4 with the replay ID after its own go-ahead.
 - From `report.json`, pair records sum to 3,206,055 in total, and to each year's V1
   `n_rows`.
 
-- [ ] **Step 8: Preservation**
+- [ ] **Step 8 (Stage 1): Preservation**
 
 - The summary, codes and both Stage 6 `outputs.json` SHA-256 values equal the snapshot,
   and `target_io.verify_inventory` passes on each bundle.
-- The manifest's first N lines (from the snapshot) are byte-identical, and only the
-  index lines were added.
+- The manifest's first 3,007 lines are byte-identical to the first snapshot
+  (2026-11-15), and only the three Gate 1 index lines were added. All 3,010 lines are
+  byte-identical to the Stage 1 snapshot: `build` and `verify` append nothing.
 - `uv run --locked embedding-data audit --data-dir /Users/lowell/Projects/embedding-data/data`
   reports zero discrepancies.
 
-- [ ] **Step 9: Write the finding and update the docs**
+- [ ] **Step 8a (Stage 1): Findings file, tick and commit**
+
+- Write `specs/naics-evaluation-data-stage-1-findings.md`, one screen: the run ID, the
+  `outputs.json` pin, the `inputs.json` and `report.json` SHA-256, the Stage 1 snapshot
+  values, the wall time and maximum RSS of `build` and `verify`, the bundle size, the
+  Step 7 and Step 8 outcomes, and where the ledger's backup lives.
+- Tick the roadmap's Stage 1 box, put the D5 stamp under it, and change `Stage 1` to
+  `Stage 4` in this plan's Roadmap line.
+- Commit. Message: `docs: record Stage 1 first build of the ITA NAICS targets`.
+- Do not run the Plan Completion Protocol or tick any Task 11 box. Stage 4 does both.
+
+- [ ] **Step 9 (Stage 4): Write the finding and update the docs**
 
 `specs/findings/stage-10-ita-establishment-targets.md` records:
 - the index originals (path, size, SHA-256, retrieval)
@@ -1482,8 +1513,8 @@ Repeat Step 4 with the replay ID after its own go-ahead.
 - what is not claimed: V9 size gate, scoring, null models and Stage 13
 
 Then put the selected runs and pins into the README section and the `CLAUDE.md`
-paragraph. Do not tick the roadmap. The Plan Completion Protocol does that.
+paragraph. Do not tick the roadmap's Stage 4. The Plan Completion Protocol does that.
 
-- [ ] **Step 10: Commit**
+- [ ] **Step 10 (Stage 4): Commit**
 
 Message: `docs: record Stage 10 full-data acceptance`.
