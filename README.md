@@ -378,12 +378,14 @@ requires the executing software to equal the recorded software. `compare-runs` s
 exact replay only. It does not establish trust, so verify each run with its own pin.
 
 `build` stages into an exclusive `<RUN_ID>.part` directory. Its scratch files stay in
-`<RUN_ID>.part/.scratch/`, so a build writes nothing outside its own run. It rechecks
-its pinned inputs and its software just before publication, then renames the
-directory. An existing final or `.part` name fails the run. A later run never reuses,
-overwrites or deletes it. A failed build removes only its own staging directory. A
-killed build can leave a `<RUN_ID>.part` directory. Choose a fresh run ID, and get the
-owner's go-ahead before you clean up any leftover staging (gate 4).
+`<RUN_ID>.part/.scratch/`. A build writes nothing under the data root outside its own
+run. The source check (`check_source`) and `verify` write their work files to system
+temporary directories. `build` rechecks its pinned inputs and its software just before
+publication, then renames the directory. An existing final or `.part` name fails the
+run. A later run never reuses, overwrites or deletes it. A failed build removes only
+its own staging directory. A killed build can leave a `<RUN_ID>.part` directory.
+Choose a fresh run ID, and get the owner's go-ahead before you clean up any leftover
+staging (gate 4).
 
 The build reproduces the adopted V1 and V2 tables of the
 [V1–V3 finding](specs/findings/v1-v3-ita-verification.md) exactly. V1 holds the

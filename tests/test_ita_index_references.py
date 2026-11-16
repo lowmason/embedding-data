@@ -1,8 +1,10 @@
+import json
 import shutil
 from dataclasses import asdict, fields, replace
 from datetime import UTC, datetime, timedelta
 from functools import partial
 from importlib.metadata import version
+from pathlib import Path
 from urllib.parse import urlparse
 from zipfile import ZipFile
 
@@ -19,6 +21,7 @@ from ita_establishment_fixtures import (
 
 from embedding_data import ita_index_references as iir
 from embedding_data import ita_references, manifest, osha_benchmark_download, paths
+from embedding_data.ita_establishment_targets import app
 
 CROSS = iir.CROSS_REFERENCE
 SHEET = '2022NAICS'
@@ -332,6 +335,36 @@ def test_acquire_downloads_missing_and_records_once(data_dir, mirror):
     assert iir.acquire(data_dir, registry=mirror.registry) == destinations
     assert len(mirror.requests) == 3
     assert paths.manifest_path(data_dir).read_bytes() == before
+
+
+def test_acquire_writes_no_progress_line_to_stdout(data_dir, mirror, capsys):
+    acquired = iir.acquire(data_dir, registry=mirror.registry)
+    captured = capsys.readouterr()
+    assert captured.out == ''
+    lines = captured.err.splitlines()
+    assert len(lines) == len(acquired) == 3
+    for line, reference in zip(lines, mirror.registry.values(), strict=True):
+        assert line.startswith('wrote ')
+        assert Path(reference.relative).name in line
+
+
+def test_acquire_references_command_prints_one_json_line(cli_runner, data_dir, mirror,
+                                                        monkeypatch):
+    real = iir.acquire
+    # The registry default is bound at definition time, so the command needs a wrapper.
+    monkeypatch.setattr(
+        iir, 'acquire', lambda directory: real(directory, registry=mirror.registry)
+    )
+    result = cli_runner.invoke(app, ['acquire-references', '--data-dir', str(data_dir)])
+    assert result.exit_code == 0, result.output
+    assert len(mirror.requests) == 3
+    assert len(result.stdout.splitlines()) == 1
+    assert json.loads(result.stdout) == [
+        f'raw/references/naics/{Path(reference.relative).name}'
+        for reference in mirror.registry.values()
+    ]
+    assert result.stdout.endswith('\n')
+    assert result.stderr.count('wrote ') == 3
 
 
 def test_acquire_skips_recorded_originals_and_downloads_the_rest(data_dir, mirror):

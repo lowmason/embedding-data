@@ -6,8 +6,10 @@ row as delivered and counts the cross-references. Originals are immutable and pi
 size and SHA-256.
 '''
 
+import contextlib
 import os
 import shutil
+import sys
 import tempfile
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
@@ -226,7 +228,9 @@ def acquire(
                 continue
             with tempfile.TemporaryDirectory() as temporary:
                 original = Path(temporary) / Path(reference.relative).name
-                download(client, reference.url, original)
+                # `download` echoes a progress line; stdout carries only the JSON result.
+                with contextlib.redirect_stdout(sys.stderr):
+                    download(client, reference.url, original)
                 acquired.append(
                     publish_original(data_dir, reference, original, leaves, imported=False)
                 )
