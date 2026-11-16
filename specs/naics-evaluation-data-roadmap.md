@@ -83,9 +83,9 @@ promoted Track B item, follows Track A's Stages 3 and 4 (owner, 2026-11-16).
       Objective: A minimum cell count for headline use of the NAICS targets is set from their observed counts.
       Outcomes: O4
       Track: A
-      Consumes: Stage 1's verified bundle and findings file. The 2023 ITA area mix `stage6_ita_area_mix_20261014_1000_csv`. Spec R7.3 and V9 in `specs/embedding-evaluation-data-spec.md`
+      Consumes: Stage 1's verified bundle and findings file, including the bundle's text–code pair counts (plan 11's `headline_pair_record_distribution` report key, "the V9 handoff") (Resolved at resume, 2026-11-16: owner; spec R7.2). The 2023 ITA area mix `stage6_ita_area_mix_20261014_1000_csv`. Spec R7.3 and V9 in `specs/embedding-evaluation-data-spec.md`
       Produces: a committed minimum-count decision for the NAICS targets
-      Exit: O4: a committed decision sets the minimum count from the observed `n_unweighted` distributions of the Stage 1 co-ownership target and the 2023 ITA area mix, and reports for each family how many cells meet it
+      Exit: O4: a committed decision sets the minimum count from the observed `n_unweighted` distributions of the Stage 1 co-ownership target and the 2023 ITA area mix, and from the observed `n_records` distribution of Stage 1's headline text–code pairs (Resolved at resume, 2026-11-16: owner; spec R7.2, plan 11). It reports for each family how many cells, or headline pairs, meet it. Cross-year links are a support table, not an R7.2 family, and get no minimum count
       Leaves out: the minimum count for SOC, geography, ACS and CPS families → the deferred item for old Stage 13. The minimum count for each new Track B family → that family's own stages, O13 for TRI (Resolved at resume, 2026-11-16: Stage 2 spec, "Rules for every new family")
       ROUTING: brainstorming
 
