@@ -223,9 +223,12 @@ uses NFKC, Unicode casefold and collapsed/trimmed whitespace, preserving
 punctuation and the original delivered string. Empty keys and exact
 placeholder keys `n/a`, `na`, `none`, `unknown`, `not applicable`,
 `not specified`, `-`, `--`, and `.` are flagged. Identity to any official
-2012, 2017 or 2022 NAICS title at levels 2–6 is flagged as copied text;
-native-vintage identity is also reported, with unknown vintage kept
-unknown. Suspected mojibake is flagged rather than automatically repaired.
+2012, 2017 or 2022 NAICS title at levels 2–6, or to any official 2012, 2017
+or 2022 NAICS index entry, is flagged as copied text. Titles and index
+entries are flagged separately. Native-vintage identity is also reported,
+with unknown vintage kept unknown. *(owner, Stage 10 design, 2026-11-13;
+[stage spec](ita-establishment-targets.md))* Suspected mojibake is flagged
+rather than automatically repaired.
 Employer grouping uses a usable EIN, else a non-empty normalized company
 name, with name fallback and reconstructed EIN marked separately; blank
 employer fields never form a shared employer. Unknown-employer rows

@@ -281,6 +281,152 @@ is detached. Cached replay must match ordered logical rows and canonical JSON
 apart from documented run IDs, creation times and consequential inventories.
 Physical Parquet hashes describe each particular serialization.
 
+## ITA establishment targets (Stage 10)
+
+Stage 10 builds three products from data that is already on disk. The
+establishment-link table links establishment records across filing years. The
+text–code pair tables pair each employer's own industry text with every candidate
+NAICS 2022 code path. The co-ownership target measures how often one EIN operates
+establishments in two NAICS 2022 industries in the same year. It is the only
+`targets-v1` family in this stage. The [stage spec](specs/ita-establishment-targets.md)
+defines all three.
+
+The standalone module `embedding_data.ita_establishment_targets` has five commands.
+It is separate from the top-level `embedding-data` CLI. Every command requires an
+explicit `--data-dir`. Only `acquire-references` uses the network. The other four
+commands load no `.env` file, read no credentials and construct no HTTP client.
+No command runs an upstream builder or rewrites an earlier bundle.
+
+| Command | Network | Purpose |
+| --- | --- | --- |
+| `acquire-references` | Yes | Download the missing Census NAICS index originals |
+| `import-reference KIND FILE` | No | Register an index original that the owner downloaded |
+| `build RUN_ID --codes-run ID --codes-outputs-sha256 PIN` | No | Build one immutable bundle |
+| `verify RUN_ID --outputs-sha256 PIN` | No | Authenticate the detached pin, then recompute and compare every table |
+| `compare-runs FIRST SECOND` | No | Compare two bundles exactly, table by table and report by report |
+
+The production commands select the Stage 4 codes run `stage4_v11_20261013_r2` and its
+detached `outputs.json` pin. Replace `RUN_ID` and `REPLAY_ID` with fresh run IDs.
+Replace `RUN_PIN` and `REPLAY_PIN` with the `outputs_sha256` values that the two
+builds print:
+
+```bash
+uv run --locked python -m embedding_data.ita_establishment_targets acquire-references --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked python -m embedding_data.ita_establishment_targets import-reference KIND /path/to/exact-official-original --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked python -m embedding_data.ita_establishment_targets build RUN_ID --codes-run stage4_v11_20261013_r2 --codes-outputs-sha256 15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked python -m embedding_data.ita_establishment_targets build REPLAY_ID --codes-run stage4_v11_20261013_r2 --codes-outputs-sha256 15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked python -m embedding_data.ita_establishment_targets verify RUN_ID --outputs-sha256 RUN_PIN --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked python -m embedding_data.ita_establishment_targets verify REPLAY_ID --outputs-sha256 REPLAY_PIN --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked python -m embedding_data.ita_establishment_targets compare-runs RUN_ID REPLAY_ID --data-dir /Users/lowell/Projects/embedding-data/data
+```
+
+`KIND` is `naics_index_2012`, `naics_index_2017` or `naics_index_2022`. In a
+restricted workspace, put `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache` before
+each command. `uv --offline` stops only package downloads. It does not stop the Census
+requests of `acquire-references`.
+
+The registry pins the size and SHA-256 of each index original.
+`acquire-references` downloads only the missing originals into `raw/references/naics/`,
+beside the NAICS structure files, and records each one in the raw manifest. If Census
+refuses the download, save the official original by hand and register it with
+`import-reference`. The import keeps the exact bytes and records the local import time
+as a flagged retrieval-time proxy. Existing originals are never downloaded again or
+replaced. Changed Census bytes or a failed parse stop the command and need an owner
+decision. Each index file ends with 25 cross-reference rows whose code is `******`
+(decision D2). The parser keeps them with the delivered code and counts them. Their
+entries take part in the copied-index flags.
+
+Success prints one JSON line with sorted keys and exits 0. `acquire-references` prints
+the data-relative paths of the three originals. `import-reference` prints the
+data-relative path of one original. `build` prints the run ID, the run directory and
+the detached `outputs_sha256`. Save that output outside the bundle. `compare-runs`
+exits 1 when the bundles differ. Any failure prints one fixed line to stderr and
+exits 2:
+
+```text
+ITA establishment <command> failed: <reason>; run <run_id>; path <path>
+```
+
+The reason is `validation`, `filesystem`, `network` or `unexpected`. For
+`acquire-references` and `import-reference`, the run ID is `-` and the path is
+`raw/references/naics`. For `compare-runs`, the line names both run IDs and both run
+directories, separated by a comma. The line never holds exception text, EINs, names
+or addresses.
+
+Each run lives in `data/derived/osha/establishment-targets/<RUN_ID>/`. A bundle holds
+eight Parquet tables and three JSON files:
+
+| File | Contents |
+| --- | --- |
+| `ita_establishment_links.parquet` | Link table |
+| `ita_text_pairs.parquet` | Text–code pairs |
+| `ita_text_pair_codes.parquet` | Codes of each pair |
+| `ita_text_pair_members.parquet` | Record-to-pair membership |
+| `naics_2022_paths.parquet` | Stage 4 code paths that the pair codes reference |
+| `ita_co_ownership.parquet` | `targets-v1` rows, written by the shared target writer |
+| `co_ownership_marginals.parquet` | Industry marginals |
+| `co_ownership_support.parquet` | Support of each directed cell |
+| `inputs.json` | Selection and provenance |
+| `report.json` | Accounting, reproductions, distributions and limits |
+| `outputs.json` | Detached inventory of the other ten files |
+
+`outputs.json` records the byte size, SHA-256, row count and exact schema of each
+Parquet and the hash of both other JSON files. It excludes itself, so its checksum is
+the detached pin. `inputs.json` records the codes run and its pin, the source hashes,
+the raw citations, the five contract versions and the software identity. `verify`
+requires the executing software to equal the recorded software. `compare-runs` shows
+exact replay only. It does not establish trust, so verify each run with its own pin.
+
+`build` stages into an exclusive `<RUN_ID>.part` directory. Its scratch files stay in
+`<RUN_ID>.part/.scratch/`. A build writes nothing under the data root outside its own
+run. The source check (`check_source`) and `verify` write their work files to system
+temporary directories. `build` rechecks its pinned inputs and its software just before
+publication, then renames the directory. An existing final or `.part` name fails the
+run. A later run never reuses, overwrites or deletes it. A failed build removes only
+its own staging directory. A killed build can leave a `<RUN_ID>.part` directory.
+Choose a fresh run ID, and get the owner's go-ahead before you clean up any leftover
+staging (gate 4).
+
+The build reproduces the adopted V1 and V2 tables of the
+[V1–V3 finding](specs/findings/v1-v3-ita-verification.md) exactly. V1 holds the
+record and description counts by filing year. V2 holds the link counts before conflict
+handling, for all ten year pairs. The expected values are integer constants in
+`ita_establishment_expected`, and a unit test checks them against the finding's
+tables. A mismatch fails the build. The gate applies when the Stage 4 bundle cites the
+adopted Stage 2 summary, `derived/osha/ita_300a_summary.parquet` with SHA-256
+`6335cda7adb40a41c4a11d57d22048999449ac8d078a2ec0291f0198cd9136a8`. Then the V1 and V2
+constants and all 3,206,055 source records are mandatory, and the build also requires
+the production index registry. Any other source needs explicit expectations through
+the Python API, which only tests use. The command group therefore cannot build a
+bundle from a different source. `report.json` records the basis.
+
+Four steps write to the production data root. Each one needs the owner's go-ahead
+first:
+
+1. The index acquisition or import.
+2. The first full-data build.
+3. The replay build.
+4. Any cleanup of a failed run's leftover staging.
+
+Each time, the owner confirms that no Stage 9 freeze window is open. Stage 9
+full-data acceptance shares this host and this data root. Its preservation check
+fails on a new file under `data/raw` or `data/derived` that appears after its freeze,
+and Stage 10 cannot see that window. Before each commit, full test run and full-data
+command, run `pgrep -fl 'embedding_data\.acs_targets|stage9_independent|reconcile_stage9'`.
+If it prints anything, stop. Stage 10 never reads or writes Stage 9 paths, plans,
+probes or evidence. Code, tests and fixture runs use temporary data roots and need no
+go-ahead.
+
+ITA is a program-selected filing population, so no product here represents all
+establishments or firms. Codes are self-reported and unvalidated, so a pair is a noisy
+label. Copied-text flags catch exact normalized identity only. `report.json` lists all
+the limits of the stage spec. Under R8.4, no Stage 10 output may feed embedder
+training, curriculum, hard-negative mining or model selection.
+
+The tests and the fixture chain show software readiness only. Fixture results are
+never benchmarks. Full-data acceptance is pending until the finding
+`specs/findings/stage-10-ita-establishment-targets.md` exists.
+
 ## Data sources
 
 | Source | Samples or coverage | Purpose |

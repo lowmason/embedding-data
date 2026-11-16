@@ -216,16 +216,18 @@ The parser fails loudly on:
 
 - An ambiguous or unexpected header.
 - An empty code or an empty entry.
-- A code that is not a six-digit leaf of that vintage's official structure.
-- An entry count that differs from the registered expected count.
+- A code that is neither a six-digit leaf of that vintage's official structure
+  nor the exact cross-reference marker `******`.
+- An entry count or a cross-reference count that differs from its registered
+  expected count.
 
 It never substitutes a local lookup or a partial file.
 
-The leaf rule above is an assumption about the official files that this
-design could not inspect. The plan's acquisition task inspects the actual
-originals first. If they contain rows with non-leaf, special or
-other-vintage codes, the plan stops and asks the owner. It neither refuses
-the official file nor drops those rows silently.
+Each official index file ends with 25 cross-reference rows whose code is
+`******`, such as "Wholesale -- see type of product". The parser keeps them
+with the delivered code and counts them. Their entries are official index
+entries, so they take part in the copied-index flags. Every other row is a
+six-digit leaf of its own vintage. *(owner, plan 11, 2026-11-14)*
 
 ### Index keys
 
