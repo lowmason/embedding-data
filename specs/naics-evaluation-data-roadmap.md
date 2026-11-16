@@ -38,11 +38,14 @@ Choices made:
 | O9 | Evidence for supply-chain dependency | B | 5 | BEA 2017 benchmark input–output tables: a few tables, no account, non-headline. One build gives O9 and O10. Small (estimate) (`specs/uncovered-uses-evidence-sources.md`) |
 | O10 | Evidence for look-alike prospecting | B | 6 | Same build as O9 |
 | O11 | Evidence for co-visitation | B | parked | None: uncovered, no free source (`specs/uncovered-uses-evidence-sources.md`). No build |
+| O12 | TRI hardening: Stage 5's TRI bundle gets an exact replay check and a long-form acceptance finding (owner, 2026-11-16) | B | 7 | One replay build plus `compare-runs`. Estimate from Stage 5's measured run cost |
+| O13 | A headline minimum count for the TRI family, set from its observed counts (owner, 2026-11-16) | B | 8 | Small: one pass over the TRI family's `n_unweighted` counts, like O4 |
 
 Tracks: A — ITA NAICS targets (known progression). B — Evidence for six uncovered
 uses (research). B is split from A because each answer stands without the other.
 Track order: A, then B (owner, 2026-11-16). After Stage 2 reported, the owner
-re-ranked Track B (2026-11-16): O7 and O8 (TRI) first, then O6, then O9 and O10.
+re-ranked Track B (2026-11-16): O7 and O8 (TRI) first, then O6, then O9 and O10,
+then the new O12 and O13.
 O11 is uncovered and parked in `specs/deferred_items.md`.
 
 ## Stages
@@ -103,7 +106,7 @@ promoted Track B item, follows Track A's Stages 3 and 4 (owner, 2026-11-16).
       Consumes: the Stage 2 spec `specs/uncovered-uses-evidence-sources.md` (Source 3, Rules for every new family, Source spec amendment) and `specs/naics-evaluation-data-stage-2-findings.md`. The official NAICS concordances of codes run `stage4_v11_20261013_r2`, for reporting years coded in NAICS 2017. The owner's go-ahead for each file fetch
       Produces: one verified TRI parent-link bundle under `data/derived/` with its detached pin. `specs/naics-evaluation-data-stage-5-findings.md`
       Exit: Preflight: open checks E7–E9 are settled before any data is trusted. A failed check stops the stage for an owner decision (Stage 2 spec, Rules for every new family). O7: the bundle relates two NAICS 2022 industries through facilities that report one parent, grouped by a parent identifier or EPA's standardized parent name and never by a name match of this project's own, and `verify` with the detached pin passes. O8: for each parent, the bundle lists its facilities' NAICS 2022 industries. The TRI rows of R1.1 and R7.2 are applied to the source spec. The findings file records the run ID, the pin, and the wall time, maximum RSS and bundle size of the real run
-      Leaves out: TRI hardening (replay check, long-form acceptance finding): suggested, see the approval question. Headline minimum count for the TRI family: suggested, see the approval question. The R8.4 training-role amendment → a separate owner decision after naics-embedder's spec (reset prompt, Leave alone)
+      Leaves out: TRI hardening (replay check, long-form acceptance finding) → O12. Headline minimum count for the TRI family → O13. The R8.4 training-role amendment → a separate owner decision after naics-embedder's spec (reset prompt, Leave alone)
       ROUTING: brainstorming
 
 ## Ranked list — Track B
@@ -114,6 +117,8 @@ is uncovered and parked in `specs/deferred_items.md`.
 1. O6 — USAspending with SAM.gov. Owner-created account, terms risk E6, size unknown
 2. O9 — BEA 2017 benchmark tables. Small, no account, non-headline. Same build as O10
 3. O10 — same build as O9
+4. O12 — TRI hardening. One replay build plus `compare-runs`
+5. O13 — TRI minimum count. Small: one pass over its counts
 
 ## Stage-spec stamp
 
@@ -130,7 +135,7 @@ completion ticks Stage 4.
 ## Completion
 
 Retire this roadmap only after a conformance audit of the accumulated system: re-run
-the gap rubric over every outcome O1–O11, with evidence for each verdict (implementing
+the gap rubric over every outcome O1–O13, with evidence for each verdict (implementing
 stage and plan, `> Deviation:` notes, `specs/deferred_items.md` entries). Ranked-list
 items that the owner never promoted park as deferred items. Each unmet outcome either
 becomes a new stage, keeping this roadmap live, or is deferred consciously with a
