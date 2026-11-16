@@ -80,6 +80,16 @@ def bump_first(name, column):
     return apply
 
 
+def drop_first(name):
+    '''Delete the first row of one bundle table, checking that exactly one row went.'''
+    def apply(directory):
+        file = directory / (name + '.parquet')
+        frame = pl.read_parquet(file)
+        frame.slice(1).write_parquet(file)
+        assert pl.read_parquet(file).height == frame.height - 1
+    return apply
+
+
 def row(script, **changes):
     '''One canonical row in the script's column order: an eligible record unless changed.'''
     record = {
@@ -173,6 +183,8 @@ EIN_CASES = {
     'nine_digits': ('123456789', ('123456789', False)),
     'edge_whitespace': (' 123456789\t', ('123456789', False)),
     'hyphen': ('12-3456789', ('123456789', False)),
+    'two_hyphens': ('12-345-6789', ('123456789', False)),
+    'two_hyphens_padded': ('1-234-5678', ('012345678', True)),
     'eight_digits_padded': ('23456789', ('023456789', True)),
     'eight_digits_hyphen_and_spaces': (' 2-3456789 ', ('023456789', True)),
     'zero_filled_then_same_digit_test': ('11111111', ('011111111', True)),
@@ -253,23 +265,31 @@ def test_counts_follow_the_estimand(script):
     assert cells == {(a, b): 2, (b, a): 2}
 
 
+NO_EXTRA = {'n_industries': 0, 'n_cells': 0}
 BUNDLE_CASES = {
     'report_N': (edit_json('report.json', lambda report: report['co_ownership'].update(
-        N=report['co_ownership']['N'] + 1)), 'N_equal'),
-    'marginal': (bump_first('co_ownership_marginals', 'n_employers'), 'marginals_equal'),
-    'cell': (bump_first('ita_co_ownership', 'n_unweighted'), 'cells_equal'),
+        N=report['co_ownership']['N'] + 1)), 'N_equal', NO_EXTRA),
+    'marginal': (bump_first('co_ownership_marginals', 'n_employers'), 'marginals_equal',
+                 NO_EXTRA),
+    'cell': (bump_first('ita_co_ownership', 'n_unweighted'), 'cells_equal', NO_EXTRA),
+    # The recount has a key that the bundle lacks.
+    'missing_marginal': (drop_first('co_ownership_marginals'), 'marginals_equal',
+                         {'n_industries': 1, 'n_cells': 0}),
+    'missing_cell': (drop_first('ita_co_ownership'), 'cells_equal',
+                     {'n_industries': 0, 'n_cells': 1}),
 }
 
 
 @pytest.mark.parametrize('case', BUNDLE_CASES)
 def test_reconcile_detects_bundle_difference(script, chain, capsys, case):
-    change, flag = BUNDLE_CASES[case]
+    change, flag, extra = BUNDLE_CASES[case]
     directory, pin = tampered_copy(chain, 'bundle_' + case, change)
     status, line, result = reconcile(script, capsys, 'co-ownership', chain, directory, pin)
     assert status == 1
     assert result['equal'] is False
     assert result[flag] is False
     assert sum(not result[name] for name in ('N_equal', 'marginals_equal', 'cells_equal')) == 1
+    assert {name: result[name]['independent'] - result[name]['bundle'] for name in extra} == extra
 
 
 @pytest.mark.parametrize('check', ['co-ownership', 'stage3'])
