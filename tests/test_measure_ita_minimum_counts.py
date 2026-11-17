@@ -7,7 +7,7 @@ from pathlib import Path
 
 import polars as pl
 import pytest
-from ita_establishment_fixtures import crosswalked
+from ita_establishment_fixtures import canonical_frame, crosswalked
 from minimum_count_fixtures import build_frames, golden_rows, publish, republish, row
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'scripts' / 'measure_ita_minimum_counts.py'
@@ -437,6 +437,23 @@ def test_employer_eligibility_follows_the_co_ownership_classification(script):
     assert records['industry_eligible'].to_list() == [True, False, True, True]
     assert records['employer_eligible'].to_list() == [True, False, False, False]
     assert records['ein_key'].to_list() == ['123456789', '123456789', None, '023456789']
+
+
+@pytest.mark.parametrize('change', [
+    {'flag_naics_crosswalked': True},
+    {'flag_naics_ambiguous': True},
+    {'flag_naics_unresolved': True},
+    {'naics_2022_node_id': None},
+    {'flag_naics_unresolved': None},
+], ids=['crosswalked flag', 'ambiguous flag', 'unresolved flag', 'no node', 'null flag'])
+def test_industry_eligibility_is_the_frozen_rule(script, change):
+    canonical = canonical_frame([
+        row(2023, 1, '238220', 'Plumbing contractor'),
+        row(2023, 2, '238220', 'Plumbing contractor', **change),
+    ])
+    records = script.record_frame(canonical)
+    assert records['industry_eligible'].to_list() == [True, False]
+    assert records['employer_eligible'].to_list() == [True, False]
 
 
 def test_two_year_link_is_not_visible(script):
