@@ -1542,3 +1542,17 @@ def test_self_checks_run_before_any_cells(script, published, capsys, monkeypatch
     code, _line, result = run_main(script, capsys, published.argv())
     assert code == 2
     assert result == {'complete': False, 'reason': 'text-pair recount differs'}
+
+
+def test_unexpected_error_exits_two_with_a_fixed_reason(script, published, capsys,
+                                                        monkeypatch):
+    def broken(_inputs):
+        raise ValueError('a polars error')
+
+    monkeypatch.setattr(script, 'measure', broken)
+    code = script.main(published.argv())
+    captured = capsys.readouterr()
+    assert code == 2
+    assert captured.out == json.dumps(
+        {'complete': False, 'reason': 'unexpected error'}, sort_keys=True) + '\n'
+    assert 'ValueError: a polars error' in captured.err

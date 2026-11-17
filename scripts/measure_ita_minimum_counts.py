@@ -13,6 +13,7 @@ import json
 import math
 import re
 import sys
+import traceback
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -695,7 +696,11 @@ def parse(argv: list[str] | None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
-    '''Print one sorted JSON line. Exit 0 with every minimum, 1 without, 2 on a refusal.'''
+    '''Print one sorted JSON line. Exit 0 with every minimum, 1 without, 2 on a refusal.
+
+    Any other error also exits 2, with a fixed reason on stdout and its traceback on stderr,
+    so exit 1 always means a family without a minimum.
+    '''
     options = parse(argv)
     selections = {
         'establishment_targets': (options.establishment_run,
@@ -709,6 +714,10 @@ def main(argv: list[str] | None = None) -> int:
         result = measure(inputs)
     except Refused as refusal:
         print(json.dumps({'complete': False, 'reason': str(refusal)}, sort_keys=True))
+        return 2
+    except Exception:
+        traceback.print_exc()
+        print(json.dumps({'complete': False, 'reason': 'unexpected error'}, sort_keys=True))
         return 2
     result['inputs'] = {role: {'run': run_id, 'outputs_sha256': pin}
                         for role, (run_id, pin) in selections.items()}
