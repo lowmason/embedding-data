@@ -300,8 +300,9 @@ of kept cells whose largest single-year count is below the minimum.
 ## Rollout
 
 The plan executes in a fresh session. The decision record, the spec amendments and the
-`CLAUDE.md` sentence land in one branch with the script. The plan's Handoff names the
-`n_headline_records` deviation for the roadmap's resume.
+`CLAUDE.md` sentence land in one branch with the script. The `n_headline_records` change
+departs from Stage 3's own Exit, which names `n_records`. So the plan records it as a
+`> Deviation:` note against the Stage 3 Exit, and the Stage 3 stamp cites that note.
 
 > Roadmap: specs/naics-evaluation-data-roadmap.md, Stage 3 — on plan
 > completion, tick the stage and re-validate later stages against what shipped.
