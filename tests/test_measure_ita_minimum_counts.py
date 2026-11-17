@@ -8,7 +8,14 @@ from pathlib import Path
 import polars as pl
 import pytest
 from ita_establishment_fixtures import canonical_frame, crosswalked
-from minimum_count_fixtures import build_frames, golden_rows, publish, republish, row
+from minimum_count_fixtures import (
+    COUNTY,
+    build_frames,
+    golden_rows,
+    publish,
+    republish,
+    row,
+)
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'scripts' / 'measure_ita_minimum_counts.py'
 
@@ -802,3 +809,87 @@ def test_co_ownership_ineligible_linked_base_record_is_not_testable(script):
     assert 1 in linked(links, 2023)
     found = cell(script.co_ownership_cells(records, links, 2023))
     assert (found['base_count'], found['testable']) == (1, False)
+
+
+OTHER_COUNTY = 'county:2025:39093'
+ELECTRICAL = '238210'
+
+
+def assign(script, rows, counties=None):
+    '''The frames, record frame, assignment frame and confirmed links of override rows.'''
+    frames = build_frames(rows, counties)
+    records = script.record_frame(frames.canonical.lazy())
+    assigned = script.assignment_frame(frames.assignments.lazy(), records)
+    return frames, records, assigned, script.confirmed_links(frames.links.lazy(), records)
+
+
+def area_cells(script, rows, counties=None, base_year=2023):
+    _frames, _records, assigned, links = assign(script, rows, counties)
+    return script.area_mix_cells(assigned, links, base_year)
+
+
+def area_cell(found, code, county=COUNTY):
+    '''The one area-mix cell of a county and a code as a dict.'''
+    match = found.filter((pl.col('county_id') == county)
+                         & (pl.col('naics_2022_node_id') == node(code)))
+    assert match.height == 1
+    return match.row(0, named=True)
+
+
+def two_counties():
+    '''Golden rows: establishment 1 in COUNTY, establishment 2 in OTHER_COUNTY.'''
+    return golden_rows(), [COUNTY, OTHER_COUNTY] * 3
+
+
+def disagree(script, records, assignments):
+    with pytest.raises(script.Refused,
+                       match='^assignment rows disagree with canonical rows$'):
+        script.assignment_frame(assignments.lazy(), records)
+
+
+def test_area_mix_counts_equal_frozen_estimate(script):
+    frames, _records, assigned, _links = assign(script, *two_counties())
+    assert script.check_area_mix(assigned, frames.area_mix, frames.area_mix_report) is None
+
+
+@pytest.mark.parametrize('change', ['n_unweighted', 'row dropped', 'eligible 2024'])
+def test_area_mix_recount_difference_refused(script, change):
+    frames, _records, assigned, _links = assign(script, *two_counties())
+    area_mix, report = frames.area_mix, frames.area_mix_report
+    if change == 'n_unweighted':
+        area_mix = perturb('n_unweighted', pl.col('n_unweighted') + 1)(area_mix)
+    elif change == 'row dropped':
+        area_mix = area_mix.slice(1)
+    else:
+        report = {'partition_by_year': [
+            entry | {'eligible': entry['eligible'] + (entry['year_filing_for'] == 2024)}
+            for entry in report['partition_by_year']]}
+    with pytest.raises(script.Refused, match='^area-mix recount differs$'):
+        script.check_area_mix(assigned, area_mix, report)
+
+
+def test_assignment_disagreement_refused(script):
+    frames = build_frames(golden_rows())
+    records = script.record_frame(frames.canonical.lazy())
+    other_code = perturb('naics_code', pl.lit(ELECTRICAL))(frames.assignments)
+    disagree(script, records, other_code)
+    disagree(script, records, frames.assignments.slice(1))
+
+
+def test_area_mix_successor_without_county_is_not_testable(script):
+    counties = [COUNTY] * 6
+    counties[2] = None
+    found = area_cells(script, golden_rows(), counties)
+    assert area_cell(found, PLUMBING)['testable'] is False
+
+
+def test_area_mix_recurs_through_another_record(script):
+    rows = [
+        row(2023, 1, PLUMBING, 'Plumbing contractor'),
+        row(2024, 1, ELECTRICAL, 'Electrical contractor'),
+        row(2024, 3, PLUMBING, 'Plumbing contractor', ein=OTHER_EIN),
+    ]
+    _frames, _records, _assigned, links = assign(script, rows)
+    assert linked(links, 2023) == {0}
+    found = area_cell(area_cells(script, rows), PLUMBING)
+    assert (found['testable'], found['recurs']) == (True, True)

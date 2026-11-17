@@ -29,6 +29,7 @@ YEAR_PAIRS = ((2023, 2024), (2024, 2025))
 FAMILIES = ('co_ownership', 'area_mix', 'text_pairs')
 COUNTS = ('base_cells', 'testable_cells', 'recurring_cells')
 CELL = ['unit_a', 'unit_b']
+AREA_CELL = ['county_id', 'naics_2022_node_id']
 EMPLOYER_YEAR = ['ein_key', 'year_filing_for']
 YEAR_COUNTS = [f'j_{year}' for year in ita_co_ownership.YEARS]
 
@@ -371,5 +372,94 @@ def co_ownership_cells(records: pl.DataFrame, links: pl.DataFrame,
         .select(*CELL, base_count=base, testable=pl.col('testable').fill_null(False),
                 recurs=later.ge(1))
         .sort(CELL)
+        .collect()
+    )
+
+
+def assignment_frame(assignments: pl.LazyFrame, records: pl.DataFrame) -> pl.DataFrame:
+    '''The 2023-2025 Stage 6 assignments with their area-mix eligibility.
+
+    `area_eligible` is the Stage 6 rule on the assignment columns: a county is assigned and
+    the industry passes `eligible_industry()`. Refuse unless the assignments' 2023-2025
+    source rows are the records' source rows, each once, and `year_filing_for` and
+    `naics_code` agree on every joined row, nulls included.
+    '''
+    window = (
+        assignments
+        .filter(pl.col('year_filing_for').is_in(ita_co_ownership.YEARS))
+        .select(
+            'source_row', 'year_filing_for', 'naics_code', 'county_id', 'naics_2022_node_id',
+            area_eligible=pl.col('county_id').is_not_null().and_(eligible_industry()),
+        )
+        .collect()
+    )
+    canonical = records.select('source_row', 'year_filing_for', 'naics_code')
+    joined = window.join(canonical, on='source_row', how='inner', suffix='_canonical')
+    agree = (pl.col('year_filing_for').eq_missing(pl.col('year_filing_for_canonical'))
+             .and_(pl.col('naics_code').eq_missing(pl.col('naics_code_canonical'))))
+    if (window['source_row'].is_duplicated().any()
+            or window.join(canonical, on='source_row', how='anti').height
+            or canonical.join(window, on='source_row', how='anti').height
+            or not joined.select(agree.all()).item()):
+        raise Refused('assignment rows disagree with canonical rows')
+    return window.drop('naics_code')
+
+
+def area_mix_counts(assigned: pl.DataFrame, year: int) -> pl.DataFrame:
+    '''The `n_unweighted` of each county and industry over the year's eligible records.'''
+    return (
+        assigned.lazy()
+        .filter(pl.col('year_filing_for').eq(year).and_(pl.col('area_eligible')))
+        .group_by(AREA_CELL)
+        .agg(n_unweighted=pl.len().cast(pl.UInt64))
+        .sort(AREA_CELL)
+        .collect()
+    )
+
+
+def check_area_mix(assigned: pl.DataFrame, area_mix: pl.DataFrame, report: dict) -> None:
+    '''Refuse unless the recount equals the published 2023 cells and yearly eligible totals.
+
+    The 2023 counts must equal `area_mix`'s `unit_a`, `unit_b` and `n_unweighted` rows, and
+    each year's eligible total must equal `eligible` in that year's `partition_by_year`
+    entry of `report`. A year without an entry has no source rows, so its total is 0.
+    '''
+    published = area_mix.select(
+        pl.col('unit_a').alias('county_id'), pl.col('unit_b').alias('naics_2022_node_id'),
+        'n_unweighted').sort(AREA_CELL)
+    entries = report.get('partition_by_year') if isinstance(report, dict) else None
+    if not isinstance(entries, list) or not all(isinstance(e, dict) for e in entries):
+        raise Refused('area-mix recount differs')
+    expected = {entry.get('year_filing_for'): entry.get('eligible') for entry in entries}
+    totals = dict(assigned.group_by('year_filing_for').agg(pl.col('area_eligible').sum())
+                  .iter_rows())
+    if not area_mix_counts(assigned, 2023).equals(published) or any(
+            expected.get(year, 0) != totals.get(year, 0) for year in ita_co_ownership.YEARS):
+        raise Refused('area-mix recount differs')
+
+
+def area_mix_cells(assigned: pl.DataFrame, links: pl.DataFrame,
+                   base_year: int) -> pl.DataFrame:
+    '''The area-mix cells of one base year t, keyed by `county_id` and `naics_2022_node_id`.
+
+    `base_count` is the cell's eligible year-t records. A cell is testable when one of
+    them has a visible link: a confirmed link to an `area_eligible` year t + 1 record.
+    It recurs when it has an eligible t + 1 record, through any establishment.
+    '''
+    eligible = assigned.filter(pl.col('area_eligible'))
+    linked = visible(links, eligible['source_row']).filter(pl.col('base_year').eq(base_year))
+    later = (eligible.lazy().filter(pl.col('year_filing_for').eq(base_year + 1))
+             .select(AREA_CELL).unique())
+    year = pl.col('year_filing_for')
+    return (
+        eligible.lazy()
+        .filter(year.eq(base_year))
+        .group_by(AREA_CELL)
+        .agg(base_count=pl.len().cast(pl.UInt64),
+             testable=pl.col('source_row').is_in(linked['source_row'].implode()).any())
+        .join(later.with_columns(recurs=pl.lit(True)), on=AREA_CELL, how='left',
+              validate='1:1')
+        .with_columns(pl.col('recurs').fill_null(False))
+        .sort(AREA_CELL)
         .collect()
     )
