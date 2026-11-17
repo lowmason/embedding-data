@@ -785,3 +785,20 @@ def test_co_ownership_untestable_cell_recurs_through_another_employer(script):
     rows = [*pair(2023, 1, 2), *pair(2024, 3, 4, ein=OTHER_EIN)]
     found = cell(co_cells(script, rows))
     assert (found['base_count'], found['testable'], found['recurs']) == (1, False, True)
+
+
+def test_co_ownership_ineligible_linked_base_record_is_not_testable(script):
+    rows = [
+        row(2023, 1, PLUMBING, 'Plumbing contractor'),
+        row(2023, 2, RESTAURANT, 'Restaurant',
+            mapping=crosswalked(RESTAURANT, 2017, [RESTAURANT])),
+        row(2023, 3, RESTAURANT, 'Restaurant'),
+        *pair(2024, 1, 2),
+    ]
+    _frames, records, links = derive(script, rows)
+    crosswalk = records.filter(pl.col('source_row') == 1)
+    assert crosswalk['naics_2022_node_id'].to_list() == [node(RESTAURANT)]
+    assert crosswalk['employer_eligible'].to_list() == [False]
+    assert 1 in linked(links, 2023)
+    found = cell(script.co_ownership_cells(records, links, 2023))
+    assert (found['base_count'], found['testable']) == (1, False)
