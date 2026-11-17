@@ -1,5 +1,6 @@
 '''The V9 minimum-count script, on small synthetic cells frames and fixture bundles.'''
 
+import ast
 import hashlib
 import importlib.util
 import json
@@ -1308,3 +1309,236 @@ def test_text_pair_cells_of_the_second_year_pair(script):
     earlier = script.text_pair_cells(paired, links, 2023)
     assert earlier.rows() == sorted([(pair_of(paired, 0), 1, True, True),
                                      (pair_of(paired, 3), 1, False, False)])
+
+
+def test_kept_counts_cells_support_and_lenient(script):
+    published = pl.DataFrame({'count': [2, 3, 1], 'largest_year_count': [1, 3, 1]},
+                             schema={'count': pl.UInt64, 'largest_year_count': pl.UInt64})
+    assert script.kept(published, 2) == {
+        'cells': 3, 'support': 6, 'kept_cells': 2, 'kept_cell_share': 2 / 3,
+        'kept_support': 5, 'kept_support_share': 5 / 6, 'lenient_kept_cells': 1}
+    assert script.kept(published, None) == {
+        'cells': 3, 'support': 6, 'kept_cells': None, 'kept_cell_share': None,
+        'kept_support': None, 'kept_support_share': None, 'lenient_kept_cells': None}
+
+
+def run_main(script, capsys, argv):
+    '''The exit code and the one printed line of `main`, parsed.'''
+    code = script.main(argv)
+    out = capsys.readouterr().out
+    lines = out.splitlines()
+    assert len(lines) == 1 and out == lines[0] + '\n'
+    return code, lines[0], json.loads(lines[0])
+
+
+def test_cli_golden_run_exits_zero(script, published, capsys):
+    code, line, result = run_main(script, capsys, published.argv())
+    assert code == 0
+    assert line == json.dumps(json.loads(line), sort_keys=True)
+    assert result['complete'] is True
+    assert {family: result['families'][family]['minimum']
+            for family in script.FAMILIES} == dict.fromkeys(script.FAMILIES, 1)
+    assert result['inputs'] == {
+        'establishment_targets': {'run': published.establishment.name,
+                                  'outputs_sha256': published.establishment_pin},
+        'area_mix': {'run': published.area_mix.name, 'outputs_sha256': published.area_mix_pin},
+        'codes': {'run': published.codes.name, 'outputs_sha256': published.codes_pin},
+    }
+    assert result['constants'] == {'level': 0.9, 'top_band': 10, 'min_band_cells': 50,
+                                   'wilson_z': 1.959963984540054}
+
+
+def refiled_rows(years):
+    '''The golden rows with establishments 1 and 2 refiling under other codes in `years`.'''
+    other = {1: '238210', 2: '722513'}
+    return [
+        {**found, **row(found['year_filing_for'], found['establishment_id'],
+                        other[found['establishment_id']], found['industry_description'])}
+        if found['year_filing_for'] in years else found
+        for found in golden_rows()
+    ]
+
+
+def test_cli_without_recurrence_exits_one(script, tmp_path, capsys):
+    published = publish(tmp_path, build_frames(refiled_rows({2024, 2025})))
+    code, _line, result = run_main(script, capsys, published.argv())
+    assert code == 1
+    assert result['complete'] is False
+    assert all(result['families'][family]['minimum'] is None for family in script.FAMILIES)
+    assert result['families']['co_ownership']['year_pairs']['2023-2024']['bands']
+
+
+def test_cli_refusal_exits_two(script, published, capsys):
+    argv = published.argv()
+    argv[argv.index('--establishment-outputs-sha256') + 1] = '0' * 64
+    code, _line, result = run_main(script, capsys, argv)
+    assert code == 2
+    assert result == {'complete': False, 'reason': 'establishment-target pin differs'}
+
+
+def tamper_support(published):
+    '''Add 1 to the first support row's `j_2023` and return the new argv.'''
+    file = published.establishment / 'co_ownership_support.parquet'
+    support = pl.read_parquet(file)
+    support.with_columns(
+        pl.when(pl.int_range(pl.len()) == 0).then(pl.col('j_2023') + 1)
+        .otherwise(pl.col('j_2023')).alias('j_2023')).write_parquet(file)
+    argv = published.argv()
+    argv[argv.index('--establishment-outputs-sha256') + 1] = republish(published.establishment)
+    return argv
+
+
+def test_self_check_refusal_prints_no_curves(script, published, capsys):
+    code, _line, result = run_main(script, capsys, tamper_support(published))
+    assert code == 2
+    assert result == {'complete': False, 'reason': 'co-ownership recount differs'}
+
+
+def test_two_runs_are_byte_identical(script, published, capsys):
+    first = run_main(script, capsys, published.argv())
+    second = run_main(script, capsys, published.argv())
+    assert first[1] == second[1]
+
+
+def test_output_holds_no_identifiers(script, published, capsys):
+    _code, line, _result = run_main(script, capsys, published.argv())
+    canonical = build_frames(golden_rows()).canonical
+    strings = set()
+    for column in ('ein', 'company_name', 'establishment_name', 'industry_description',
+                   'street_address'):
+        strings.update(canonical[column].drop_nulls().to_list())
+    assert strings
+    assert [found for found in sorted(strings) if found in line] == []
+
+
+def tree(directory):
+    return sorted((path.relative_to(directory).as_posix(),
+                   hashlib.sha256(path.read_bytes()).hexdigest())
+                  for path in directory.rglob('*') if path.is_file())
+
+
+def test_cli_writes_nothing_under_data_dir(script, published, capsys):
+    before = tree(published.data_dir)
+    run_main(script, capsys, published.argv())
+    assert tree(published.data_dir) == before
+
+
+FORBIDDEN_IMPORTS = {'httpx', 'dotenv', 'ipumspy', 'requests', 'urllib', 'socket',
+                     'subprocess', 'typer'}
+FORBIDDEN_MODULES = {'ita_establishment_bundle', 'ita_target_build',
+                     'ita_establishment_targets', 'targets_cli', 'cli'}
+
+
+def test_script_imports_are_offline():
+    imported = []
+    for node_ in ast.walk(ast.parse(SCRIPT.read_text())):
+        if isinstance(node_, ast.Import):
+            imported += [alias.name.split('.') for alias in node_.names]
+        elif isinstance(node_, ast.ImportFrom):
+            module = (node_.module or '').split('.')
+            imported += [module + [alias.name] for alias in node_.names]
+    assert imported
+    assert [parts for parts in imported if parts[0] in FORBIDDEN_IMPORTS] == []
+    assert [parts for parts in imported
+            if parts[0] == 'embedding_data' and FORBIDDEN_MODULES & set(parts[1:])] == []
+
+
+def test_cli_one_family_without_minimum_exits_one(script, tmp_path, capsys):
+    counties = [COUNTY] * 6
+    counties[3] = OTHER_COUNTY
+    published = publish(tmp_path, build_frames(golden_rows(), counties))
+    code, _line, result = run_main(script, capsys, published.argv())
+    assert (code, result['complete']) == (1, False)
+    assert {family: result['families'][family]['minimum'] for family in script.FAMILIES} == {
+        'co_ownership': 1, 'area_mix': None, 'text_pairs': 1}
+    assert result['families']['area_mix']['published']['kept_cells'] is None
+
+
+@pytest.mark.parametrize('years, minimums', [({2024, 2025}, (None, 1)), ({2025}, (1, None))])
+def test_family_minimum_needs_every_year_pair(script, tmp_path, capsys, years, minimums):
+    published = publish(tmp_path, build_frames(refiled_rows(years)))
+    code, _line, result = run_main(script, capsys, published.argv())
+    assert code == 1
+    for family in script.FAMILIES:
+        found = result['families'][family]
+        assert (found['year_pairs']['2023-2024']['minimum'],
+                found['year_pairs']['2024-2025']['minimum']) == minimums
+        assert found['minimum'] is None
+
+
+def test_year_pair_counts_and_bands(script, published, capsys):
+    _code, _line, result = run_main(script, capsys, published.argv())
+    found = result['families']['co_ownership']['year_pairs']
+    assert set(found) == {'2023-2024', '2024-2025'}
+    expected_band = {'low': 1, 'high': None, 'base_cells': 2, 'testable_cells': 2,
+                     'recurring_cells': 2, 'rate': 1.0}
+    for pair in found.values():
+        assert {key: pair[key] for key in ('base_cells', 'testable_cells',
+                                           'recurring_cells', 'minimum')} == {
+            'base_cells': 2, 'testable_cells': 2, 'recurring_cells': 2, 'minimum': 1}
+        (band,) = pair['bands']
+        assert {key: band[key] for key in expected_band} == expected_band
+        assert 0 < band['wilson_low'] < band['wilson_high'] == 1.0
+
+
+def test_year_pair_totals_count_cells_and_recurring_testable_cells(script):
+    frame = cells((1, 60, 30, 5), (10, 3, 3, 2))
+    frame = frame.with_columns(
+        pl.when(pl.col('testable').not_()).then(True).otherwise(pl.col('recurs'))
+        .alias('recurs'))
+    found = script.curve(frame)
+    assert {key: found[key] for key in ('base_cells', 'testable_cells',
+                                        'recurring_cells', 'minimum')} == {
+        'base_cells': 70, 'testable_cells': 63, 'recurring_cells': 33, 'minimum': 2}
+    assert found['bands'] == script.bands(frame)
+
+
+def published_rows():
+    '''Pooled counts above every single-year count, a count-2 area cell, a non-headline pair.
+
+    EIN A files a plumbing contractor and a restaurant in 2023 and the plumbing contractor
+    again in 2025. EIN B files both in 2025. EIN A also files an 'N/A' plumbing record in
+    2023.
+    '''
+    return [
+        row(2023, 1, PLUMBING, 'Plumbing contractor'),
+        row(2023, 2, RESTAURANT, 'Restaurant'),
+        row(2023, 5, PLUMBING, 'N/A'),
+        row(2025, 1, PLUMBING, 'Plumbing contractor'),
+        row(2025, 3, PLUMBING, 'Plumbing contractor', ein=OTHER_EIN),
+        row(2025, 4, RESTAURANT, 'Restaurant', ein=OTHER_EIN),
+    ]
+
+
+def test_published_counts_per_family(script, tmp_path, capsys, monkeypatch):
+    published = publish(tmp_path, build_frames(published_rows()))
+    monkeypatch.setattr(script, 'pair_minimum', lambda bands: 2)
+    code, _line, result = run_main(script, capsys, published.argv())
+    assert code == 0
+    found = {family: result['families'][family]['published'] for family in script.FAMILIES}
+    assert found == {
+        'co_ownership': {'cells': 2, 'support': 4, 'kept_cells': 2, 'kept_cell_share': 1.0,
+                         'kept_support': 4, 'kept_support_share': 1.0,
+                         'lenient_kept_cells': 2},
+        'area_mix': {'cells': 2, 'support': 3, 'kept_cells': 1, 'kept_cell_share': 0.5,
+                     'kept_support': 2, 'kept_support_share': 2 / 3,
+                     'lenient_kept_cells': 0},
+        'text_pairs': {'cells': 4, 'support': 5, 'kept_cells': 1, 'kept_cell_share': 0.25,
+                       'kept_support': 2, 'kept_support_share': 0.4,
+                       'lenient_kept_cells': 1},
+    }
+
+
+def test_self_checks_run_before_any_cells(script, published, capsys, monkeypatch):
+    def fail(*_args):
+        pytest.fail('a cells frame was built before every self-check passed')
+
+    def refuse(*_args):
+        raise script.Refused('text-pair recount differs')
+
+    for name in ('co_ownership_cells', 'area_mix_cells', 'text_pair_cells'):
+        monkeypatch.setattr(script, name, fail)
+    monkeypatch.setattr(script, 'check_text_pairs', refuse)
+    code, _line, result = run_main(script, capsys, published.argv())
+    assert code == 2
+    assert result == {'complete': False, 'reason': 'text-pair recount differs'}

@@ -7,10 +7,12 @@ band that misses `LEVEL` leaves the family with no minimum. The source is the sp
 "From curves to a minimum" in `specs/ita-naics-minimum-counts.md`.
 '''
 
+import argparse
 import hashlib
 import json
 import math
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -574,3 +576,147 @@ def text_pair_cells(paired: pl.DataFrame, links: pl.DataFrame,
         .sort('pair_id')
         .collect()
     )
+
+
+def curve(cells: pl.DataFrame) -> dict:
+    '''One year pair's bands, their summed cell counts and the year pair's minimum.'''
+    found = bands(cells)
+    return {
+        **{key: sum(band[key] for band in found) for key in COUNTS},
+        'bands': found,
+        'minimum': pair_minimum(found),
+    }
+
+
+def kept(published: pl.DataFrame, minimum: int | None) -> dict:
+    '''The published cells and support that a minimum keeps, and the lenient-kept cells.
+
+    `published` has `count` and `largest_year_count`, one row per published cell. A cell is
+    kept when its count is at least `minimum`, and lenient when it is kept but its largest
+    single-year count is below `minimum`. With no minimum, nothing is kept.
+    '''
+    cells = published.height
+    support = int(published['count'].sum())
+    if minimum is None:
+        return {'cells': cells, 'support': support, 'kept_cells': None,
+                'kept_cell_share': None, 'kept_support': None, 'kept_support_share': None,
+                'lenient_kept_cells': None}
+    kept_rows = published.filter(pl.col('count').ge(minimum))
+    kept_support = int(kept_rows['count'].sum())
+    return {
+        'cells': cells,
+        'support': support,
+        'kept_cells': kept_rows.height,
+        'kept_cell_share': kept_rows.height / cells,
+        'kept_support': kept_support,
+        'kept_support_share': kept_support / support,
+        'lenient_kept_cells': kept_rows.filter(
+            pl.col('largest_year_count').lt(minimum)).height,
+    }
+
+
+def co_ownership_published(targets: pl.DataFrame, support: pl.DataFrame) -> pl.DataFrame:
+    '''Each co-ownership cell's pooled `n_unweighted` and its largest `j_t`.'''
+    return targets.join(support, on=CELL, how='inner', validate='1:1').select(
+        count=pl.col('n_unweighted').cast(pl.UInt64),
+        largest_year_count=pl.max_horizontal(YEAR_COUNTS).cast(pl.UInt64))
+
+
+def area_mix_published(area_mix: pl.DataFrame) -> pl.DataFrame:
+    '''Each area-mix cell's 2023 `n_unweighted`, itself the largest single-year count.'''
+    count = pl.col('n_unweighted').cast(pl.UInt64)
+    return area_mix.select(count=count, largest_year_count=count)
+
+
+def text_pair_published(pairs: pl.DataFrame, counts: pl.DataFrame) -> pl.DataFrame:
+    '''Each headline pair's pooled `n_headline_records` and its largest yearly count.'''
+    years = [f'n_{t}' for t in ita_co_ownership.YEARS]
+    return (
+        pairs.filter(pl.col('flag_headline'))
+        .join(counts, on='pair_id', how='inner', validate='1:1')
+        .select(count=pl.col('n_headline_records').cast(pl.UInt64),
+                largest_year_count=pl.max_horizontal(years).cast(pl.UInt64))
+    )
+
+
+def measure(inputs: Inputs) -> dict:
+    '''The rule constants and, per family, the curves, minimums and kept counts.
+
+    Each Parquet is scanned for the columns it needs. All three self-checks run before
+    any cells frame is built, so a recount that differs stops the run before any curve.
+    '''
+    records = record_frame(pl.scan_parquet(inputs.canonical))
+    links = confirmed_links(pl.scan_parquet(inputs.links), records)
+
+    support = pl.read_parquet(inputs.support, columns=[*CELL, *YEAR_COUNTS])
+    targets = pl.read_parquet(inputs.co_ownership, columns=[*CELL, 'n_unweighted'])
+    check_co_ownership(co_ownership_counts(records), support, targets)
+
+    assigned = assignment_frame(pl.scan_parquet(inputs.assignments), records)
+    area_mix = pl.read_parquet(inputs.area_mix, columns=['unit_a', 'unit_b', 'n_unweighted'])
+    check_area_mix(assigned, area_mix, json.loads(inputs.area_mix_report.read_text()))
+
+    pairs = pl.read_parquet(inputs.pairs,
+                            columns=['pair_id', 'flag_headline', 'n_headline_records'])
+    paired = pair_frame(pl.scan_parquet(inputs.members), pairs.lazy(), records)
+    pair_counts = text_pair_counts(paired)
+    check_text_pairs(paired, pair_counts, pairs,
+                     json.loads(inputs.establishment_report.read_text()))
+
+    sources = {
+        'co_ownership': (lambda t: co_ownership_cells(records, links, t),
+                         co_ownership_published(targets, support)),
+        'area_mix': (lambda t: area_mix_cells(assigned, links, t),
+                     area_mix_published(area_mix)),
+        'text_pairs': (lambda t: text_pair_cells(paired, links, t),
+                       text_pair_published(pairs, pair_counts)),
+    }
+    families = {}
+    for family in FAMILIES:
+        cells_of, published = sources[family]
+        year_pairs = {f'{base}-{later}': curve(cells_of(base)) for base, later in YEAR_PAIRS}
+        minimum = family_minimum([pair['minimum'] for pair in year_pairs.values()])
+        families[family] = {'year_pairs': year_pairs, 'minimum': minimum,
+                            'published': kept(published, minimum)}
+    return {
+        'constants': {'level': LEVEL, 'top_band': TOP_BAND, 'min_band_cells': MIN_BAND_CELLS,
+                      'wilson_z': WILSON_Z},
+        'families': families,
+    }
+
+
+def parse(argv: list[str] | None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description='Measure the V9 ITA NAICS minimum counts.')
+    parser.add_argument('--data-dir', type=Path, required=True)
+    for option in ('establishment', 'area-mix', 'codes'):
+        parser.add_argument(f'--{option}-run', required=True)
+        parser.add_argument(f'--{option}-outputs-sha256', required=True)
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    '''Print one sorted JSON line. Exit 0 with every minimum, 1 without, 2 on a refusal.'''
+    options = parse(argv)
+    selections = {
+        'establishment_targets': (options.establishment_run,
+                                  options.establishment_outputs_sha256),
+        'area_mix': (options.area_mix_run, options.area_mix_outputs_sha256),
+        'codes': (options.codes_run, options.codes_outputs_sha256),
+    }
+    try:
+        inputs = authenticate(options.data_dir, selections['establishment_targets'],
+                              selections['area_mix'], selections['codes'])
+        result = measure(inputs)
+    except Refused as refusal:
+        print(json.dumps({'complete': False, 'reason': str(refusal)}, sort_keys=True))
+        return 2
+    result['inputs'] = {role: {'run': run_id, 'outputs_sha256': pin}
+                        for role, (run_id, pin) in selections.items()}
+    result['complete'] = all(result['families'][family]['minimum'] is not None
+                             for family in FAMILIES)
+    print(json.dumps(result, sort_keys=True))
+    return 0 if result['complete'] else 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())
