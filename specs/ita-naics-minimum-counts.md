@@ -16,8 +16,8 @@ use. R7.3 says the minimum comes "by measurement, not argument". Every ITA targe
 
 The owner chose a measured rule: **a cell is headline evidence when cells of its count
 recur in the next year.** A relation that recurs is not a one-year coding accident. The
-minimum count is the smallest count at which recurrence reaches a level fixed before any
-curve is measured.
+minimum count is the smallest count at which recurrence reaches a level fixed before the
+deciding curves are measured.
 
 ## Goals
 
@@ -45,6 +45,14 @@ curve is measured.
 - **A rule picked after seeing its result.** The level, the bands and every other rule
   constant are committed before the first run on real data. No constant changes after
   that run. A failed rule goes to the owner (below), never to a retuned constant.
+  *Disclosure (owner, 2026-11-17):* during design, the owner saw plain recurrence curves
+  for co-ownership before fixing `LEVEL`. They came from the published per-year counts in
+  `co_ownership_support.parquet`, with no testability filter. For 2023 → 2024, recurrence
+  at counts 1, 2, 3, 4, 5, 6 and 10+ was 29%, 53%, 68%, 80%, 84%, 93% and 99%. For
+  2024 → 2025, it was 68%, 93%, 98%, 100%, 99%, 100% and 100%. The designer also saw
+  counts 7–9, the cell count of each band and the number of years each pooled cell
+  appears in before proposing `TOP_BAND` and `MIN_BAND_CELLS`. No testable curve, no
+  area-mix or text-pair curve and no minimum had been measured.
 - **Embedder results as input.** No embedder output, score or ranking is read. Choosing a
   minimum against scores is selection on evaluation data (R8.4).
 - **A broken Stage 4.** Stage 4 must `verify` the Stage 1 run from its own checkout and
@@ -235,7 +243,8 @@ of kept cells whose largest single-year count is below the minimum.
 3. **The decision record** `specs/findings/v9-ita-naics-minimum-counts.md`. It gives the
    rule and constants with the commit that fixed them before the first run, the inputs and
    pins, the curves, each family's minimum, the kept counts, the lenient-kept counts, the
-   recorded deviation from the Exit wording (`n_headline_records`) and the limits below.
+   recorded deviation from the Exit wording (`n_headline_records`), the design-time
+   disclosure under Anti-goals and the limits below.
 4. **Spec amendments** in `specs/embedding-evaluation-data-spec.md`:
    - R7.3 (lines 528–530): the minimum is set per family. It is set for ITA co-ownership,
      the 2023 ITA area mix and ITA text–code pairs by the decision record. It stays open
