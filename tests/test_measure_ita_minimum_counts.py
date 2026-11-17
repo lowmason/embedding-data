@@ -7,7 +7,7 @@ from pathlib import Path
 
 import polars as pl
 import pytest
-from ita_establishment_fixtures import canonical_frame, crosswalked
+from ita_establishment_fixtures import canonical_frame, crosswalked, unresolved
 from minimum_count_fixtures import (
     COUNTY,
     build_frames,
@@ -893,3 +893,184 @@ def test_area_mix_recurs_through_another_record(script):
     assert linked(links, 2023) == {0}
     found = area_cell(area_cells(script, rows), PLUMBING)
     assert (found['testable'], found['recurs']) == (True, True)
+
+
+def windowed_rows():
+    '''Golden rows between a 2022 and a 2026 row, with ineligible and repeated records.'''
+    return [
+        row(2022, 1, PLUMBING, 'Plumbing contractor',
+            mapping=crosswalked(PLUMBING, 2017, [PLUMBING])),
+        *golden_rows(),
+        row(2023, 1, PLUMBING, 'Plumbing contractor'),
+        row(2023, 6, PLUMBING, 'Plumbing contractor'),
+        row(2023, 7, RESTAURANT, 'Restaurant',
+            mapping=crosswalked(RESTAURANT, 2017, [RESTAURANT])),
+        row(2024, 8, ELECTRICAL, 'Electrical contractor', ein=OTHER_EIN),
+        row(2026, 1, PLUMBING, 'Plumbing contractor',
+            mapping=crosswalked(PLUMBING, 2017, [PLUMBING])),
+    ]
+
+
+WINDOWED_COUNTIES = [COUNTY, COUNTY, OTHER_COUNTY, COUNTY, OTHER_COUNTY, None, COUNTY,
+                     COUNTY, COUNTY, COUNTY, COUNTY, None]
+
+
+def test_assignment_frame_keeps_the_window_and_eligibility(script):
+    _frames, records, assigned, _links = assign(script, windowed_rows(), WINDOWED_COUNTIES)
+    assert assigned.columns == ['source_row', 'year_filing_for', 'county_id',
+                                'naics_2022_node_id', 'area_eligible']
+    assert assigned['source_row'].to_list() == list(range(1, 11))
+    assert assigned['source_row'].to_list() == records['source_row'].to_list()
+    assert assigned['county_id'].to_list() == WINDOWED_COUNTIES[1:11]
+    assert assigned['area_eligible'].to_list() == [
+        True, True, True, True, False, True, True, True, False, True]
+
+
+def test_area_mix_counts_count_eligible_records_of_the_year(script):
+    frames, _records, assigned, _links = assign(script, windowed_rows(), WINDOWED_COUNTIES)
+    counts = script.area_mix_counts(assigned, 2023)
+    assert counts.schema == pl.Schema({'county_id': pl.String,
+                                       'naics_2022_node_id': pl.String,
+                                       'n_unweighted': pl.UInt64})
+    assert counts.rows() == [(COUNTY, node(PLUMBING), 3), (OTHER_COUNTY, node(RESTAURANT), 1)]
+    assert script.area_mix_counts(assigned, 2024).rows() == [
+        (COUNTY, node(ELECTRICAL), 1), (COUNTY, node(PLUMBING), 1),
+        (OTHER_COUNTY, node(RESTAURANT), 1)]
+    years = [entry['year_filing_for'] for entry in frames.area_mix_report['partition_by_year']]
+    assert years == [2022, 2023, 2024, 2025, 2026]
+    assert script.check_area_mix(assigned, frames.area_mix, frames.area_mix_report) is None
+
+
+def swapped_records(script, rows):
+    '''The record frame of `rows` with the first two rows in the other order.'''
+    rows = [rows[1], rows[0], *rows[2:]]
+    return script.record_frame(build_frames(rows).canonical.lazy())
+
+
+@pytest.mark.parametrize('change', [
+    'row twice', 'other year', 'year outside the window', 'extra row', 'null code',
+    'record missing', 'records of another canonical table'])
+def test_assignment_disagreements_refused(script, change):
+    frames = build_frames(golden_rows())
+    records = script.record_frame(frames.canonical.lazy())
+    assignments = frames.assignments
+    if change == 'row twice':
+        assignments = pl.concat([assignments, assignments.slice(0, 1)])
+    elif change == 'other year':
+        assignments = perturb('year_filing_for', pl.lit(2024))(assignments)
+    elif change == 'year outside the window':
+        assignments = perturb('year_filing_for', pl.lit(2022))(assignments)
+    elif change == 'extra row':
+        assignments = pl.concat([
+            assignments,
+            perturb('source_row', pl.lit(6, dtype=pl.UInt64))(assignments.slice(0, 1))])
+    elif change == 'null code':
+        assignments = perturb('naics_code', pl.lit(None, dtype=pl.String))(assignments)
+    elif change == 'record missing':
+        records = records.slice(1)
+    else:
+        records = swapped_records(script, golden_rows())
+        assert sorted(records['source_row'].to_list()) == list(range(6))
+    disagree(script, records, assignments)
+
+
+def test_assignment_codes_missing_on_both_sides_agree(script):
+    rows = golden_rows()
+    rows[0] = row(2023, 1, PLUMBING, 'Plumbing contractor', mapping=unresolved(None, None))
+    frames = build_frames(rows)
+    records = script.record_frame(frames.canonical.lazy())
+    assert records['naics_code'][0] is None
+    assigned = script.assignment_frame(frames.assignments.lazy(), records)
+    assert assigned.height == 6
+
+
+@pytest.mark.parametrize('change', [
+    'eligible 2023', 'eligible 2025', 'no 2025 entry', 'other unit_b', 'row twice',
+    'report without partition'])
+def test_area_mix_recount_differences_refused(script, change):
+    frames, _records, assigned, _links = assign(script, *two_counties())
+    area_mix, report = frames.area_mix, frames.area_mix_report
+    entries = report['partition_by_year']
+    if change in ('eligible 2023', 'eligible 2025'):
+        year = int(change[-4:])
+        report = {'partition_by_year': [
+            entry | {'eligible': entry['eligible'] + (entry['year_filing_for'] == year)}
+            for entry in entries]}
+    elif change == 'no 2025 entry':
+        report = {'partition_by_year': [e for e in entries if e['year_filing_for'] != 2025]}
+    elif change == 'other unit_b':
+        area_mix = perturb('unit_b', pl.lit(node(ELECTRICAL)))(area_mix)
+    elif change == 'row twice':
+        area_mix = pl.concat([area_mix, area_mix.slice(0, 1)])
+    else:
+        report = {}
+    with pytest.raises(script.Refused, match='^area-mix recount differs$'):
+        script.check_area_mix(assigned, area_mix, report)
+
+
+def test_area_mix_ineligible_linked_base_record_is_not_testable(script):
+    rows = [
+        row(2023, 2, RESTAURANT, 'Restaurant',
+            mapping=crosswalked(RESTAURANT, 2017, [RESTAURANT])),
+        row(2023, 3, RESTAURANT, 'Restaurant'),
+        row(2024, 2, RESTAURANT, 'Restaurant'),
+    ]
+    _frames, records, assigned, links = assign(script, rows)
+    assert records['naics_2022_node_id'][0] == node(RESTAURANT)
+    assert assigned['area_eligible'].to_list() == [False, True, True]
+    assert linked(links, 2023) == {0}
+    found = script.area_mix_cells(assigned, links, 2023)
+    assert found.rows() == [(COUNTY, node(RESTAURANT), 1, False, True)]
+
+
+def test_area_mix_linked_base_record_without_county_is_not_testable(script):
+    rows = [
+        row(2023, 1, PLUMBING, 'Plumbing contractor'),
+        row(2023, 3, PLUMBING, 'Plumbing contractor'),
+        row(2024, 1, PLUMBING, 'Plumbing contractor'),
+    ]
+    _frames, _records, assigned, links = assign(script, rows, [None, COUNTY, COUNTY])
+    assert linked(links, 2023) == {0}
+    found = script.area_mix_cells(assigned, links, 2023)
+    assert found.rows() == [(COUNTY, node(PLUMBING), 1, False, True)]
+
+
+def test_area_mix_recurrence_needs_an_eligible_record_in_the_cell(script):
+    rows = [
+        row(2023, 1, PLUMBING, 'Plumbing contractor'),
+        row(2023, 2, RESTAURANT, 'Restaurant'),
+        row(2024, 1, PLUMBING, 'Plumbing contractor'),
+        row(2024, 2, RESTAURANT, 'Restaurant',
+            mapping=crosswalked(RESTAURANT, 2017, [RESTAURANT])),
+        row(2024, 3, RESTAURANT, 'Restaurant', ein=OTHER_EIN),
+    ]
+    found = area_cells(script, rows, [COUNTY, COUNTY, OTHER_COUNTY, COUNTY, OTHER_COUNTY])
+    assert found.rows() == [
+        (COUNTY, node(PLUMBING), 1, True, False),
+        (COUNTY, node(RESTAURANT), 1, False, False),
+    ]
+
+
+def test_area_mix_cells_of_the_second_year_pair(script):
+    rows = [
+        *golden_rows(),
+        row(2024, 3, ELECTRICAL, 'Electrical contractor', ein=OTHER_EIN),
+        row(2024, 4, ELECTRICAL, 'Electrical contractor', ein=OTHER_EIN),
+        row(2025, 3, ELECTRICAL, 'Electrical contractor', ein=OTHER_EIN),
+    ]
+    counties = [COUNTY, COUNTY, COUNTY, OTHER_COUNTY, COUNTY, None, OTHER_COUNTY,
+                OTHER_COUNTY, COUNTY]
+    found = area_cells(script, rows, counties, base_year=2024)
+    assert found.columns == ['county_id', 'naics_2022_node_id', 'base_count', 'testable',
+                             'recurs']
+    assert found.schema['base_count'] == pl.UInt64
+    assert found.rows() == [
+        (COUNTY, node(PLUMBING), 1, True, True),
+        (OTHER_COUNTY, node(ELECTRICAL), 2, True, False),
+        (OTHER_COUNTY, node(RESTAURANT), 1, False, False),
+    ]
+    earlier = area_cells(script, rows, counties)
+    assert earlier.rows() == [
+        (COUNTY, node(PLUMBING), 1, True, True),
+        (COUNTY, node(RESTAURANT), 1, True, False),
+    ]
