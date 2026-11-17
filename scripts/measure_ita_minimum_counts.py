@@ -28,6 +28,9 @@ WILSON_Z = 1.959963984540054
 YEAR_PAIRS = ((2023, 2024), (2024, 2025))
 FAMILIES = ('co_ownership', 'area_mix', 'text_pairs')
 COUNTS = ('base_cells', 'testable_cells', 'recurring_cells')
+CELL = ['unit_a', 'unit_b']
+EMPLOYER_YEAR = ['ein_key', 'year_filing_for']
+YEAR_COUNTS = [f'j_{year}' for year in ita_co_ownership.YEARS]
 
 SAFE_RUN_ID = re.compile('[A-Za-z0-9][A-Za-z0-9_-]*')
 SAFE_PIN = re.compile('[0-9a-f]{64}')
@@ -291,3 +294,82 @@ def visible(links: pl.DataFrame, eligible_rows: pl.Series) -> pl.DataFrame:
     '''The linked year-t source rows whose `later_row` is in `eligible_rows`.'''
     return links.filter(pl.col('later_row').is_in(eligible_rows.implode())).select(
         'base_year', 'source_row')
+
+
+
+def _industry_pairs(presence: pl.LazyFrame, keys: list[str]) -> pl.LazyFrame:
+    '''Self-join presence rows on `keys` into ordered pairs of distinct industries.'''
+    node = 'naics_2022_node_id'
+    left = presence.rename({node: 'unit_a'})
+    right = presence.rename({node: 'unit_b'})
+    return left.join(right, on=keys, suffix='_b').filter(pl.col('unit_a').ne(pl.col('unit_b')))
+
+
+def co_ownership_counts(records: pl.DataFrame) -> pl.DataFrame:
+    '''The co-ownership `j_t` of each directed industry pair, as `ita_co_ownership` counts it.
+
+    `j_t` counts the distinct `ein_key` values with both nodes among their
+    `employer_eligible` year-t records. Records are deduplicated to `(ein_key, year, node)`
+    before the self-join on `(ein_key, year)`, so record multiplicity adds nothing.
+    '''
+    year = pl.col('year_filing_for')
+    presence = (
+        records.lazy()
+        .filter(pl.col('employer_eligible'))
+        .select(*EMPLOYER_YEAR, 'naics_2022_node_id')
+        .unique()
+    )
+    return (
+        _industry_pairs(presence, EMPLOYER_YEAR)
+        .group_by(CELL)
+        .agg(**{f'j_{t}': year.eq(t).sum().cast(pl.UInt64) for t in ita_co_ownership.YEARS})
+        .sort(CELL)
+        .collect()
+    )
+
+
+def check_co_ownership(counts: pl.DataFrame, support: pl.DataFrame,
+                       targets: pl.DataFrame) -> None:
+    '''Refuse unless the recount equals the published support and target cells exactly.
+
+    `counts` must equal the `unit_a`, `unit_b` and `j_*` columns of `support` row for row
+    after sorting, and `targets` must hold the same `(unit_a, unit_b)` cells.
+    '''
+    published = support.select(*CELL, *YEAR_COUNTS).sort(CELL)
+    recounted = counts.select(*CELL, *YEAR_COUNTS).sort(CELL)
+    cells = targets.select(CELL).sort(CELL)
+    if not (recounted.equals(published) and recounted.select(CELL).equals(cells)):
+        raise Refused('co-ownership recount differs')
+
+
+def co_ownership_cells(records: pl.DataFrame, links: pl.DataFrame,
+                       base_year: int) -> pl.DataFrame:
+    '''The co-ownership cells of one base year t, keyed by `unit_a` and `unit_b`.
+
+    `base_count` is `j_t` and `recurs` is `j_{t+1} >= 1`, through any employer. A cell is
+    testable when one of its EINs has year-t `employer_eligible` records at both nodes
+    with a visible link: a confirmed link to an `employer_eligible` year t + 1 record.
+    '''
+    eligible = records.filter(pl.col('employer_eligible'))
+    linked = visible(links, eligible['source_row']).filter(pl.col('base_year').eq(base_year))
+    presence = (
+        eligible.lazy()
+        .filter(pl.col('year_filing_for').eq(base_year))
+        .group_by('ein_key', 'naics_2022_node_id')
+        .agg(linked=pl.col('source_row').is_in(linked['source_row'].implode()).any())
+    )
+    testable = (
+        _industry_pairs(presence, ['ein_key'])
+        .group_by(CELL)
+        .agg(testable=pl.col('linked').and_(pl.col('linked_b')).any())
+    )
+    base, later = pl.col(f'j_{base_year}'), pl.col(f'j_{base_year + 1}')
+    return (
+        co_ownership_counts(records).lazy()
+        .filter(base.ge(1))
+        .join(testable, on=CELL, how='left', validate='1:1')
+        .select(*CELL, base_count=base, testable=pl.col('testable').fill_null(False),
+                recurs=later.ge(1))
+        .sort(CELL)
+        .collect()
+    )

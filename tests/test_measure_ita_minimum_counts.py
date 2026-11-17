@@ -564,3 +564,105 @@ def test_link_year_disagreement_refused(script):
         'source twice', 'link twice'])
 def test_link_row_disagreements_refused(script, change):
     assert refused_links(script, change) == 'link rows disagree with canonical rows'
+
+
+OTHER_EIN = '987654321'
+PLUMBING, RESTAURANT = '238220', '722511'
+
+
+def node(code):
+    return f'naics:2022:national_industry:{code}'
+
+
+def co_cells(script, rows, base_year=2023):
+    '''The co-ownership cells of canonical override rows for one base year.'''
+    _frames, records, links = derive(script, rows)
+    return script.co_ownership_cells(records, links, base_year)
+
+
+def cell(found, a=PLUMBING, b=RESTAURANT):
+    '''The one cell of the industry pair (a, b) as a dict.'''
+    match = found.filter((pl.col('unit_a') == node(a)) & (pl.col('unit_b') == node(b)))
+    assert match.height == 1
+    return match.row(0, named=True)
+
+
+def pair(year, first, second, *, ein='123456789', codes=(PLUMBING, RESTAURANT)):
+    '''Two establishments of one EIN in one year, with the plumbing and restaurant codes.'''
+    return [row(year, first, codes[0], 'Plumbing contractor', ein=ein),
+            row(year, second, codes[1], 'Restaurant', ein=ein)]
+
+
+def golden_with_second_ein():
+    return [*golden_rows(), *pair(2024, 3, 4, ein=OTHER_EIN)]
+
+
+def recount(script, rows):
+    frames = build_frames(rows)
+    records = script.record_frame(frames.canonical.lazy())
+    return frames, script.co_ownership_counts(records)
+
+
+def test_co_ownership_counts_equal_frozen_support(script):
+    frames, counts = recount(script, golden_with_second_ein())
+    assert script.check_co_ownership(counts, frames.support, frames.co_ownership) is None
+
+
+def test_co_ownership_recount_difference_refused(script):
+    frames, counts = recount(script, golden_with_second_ein())
+    support = frames.support.with_columns(
+        pl.when(pl.int_range(pl.len()) == 0).then(pl.col('j_2024') + 1)
+        .otherwise(pl.col('j_2024')).alias('j_2024'))
+    with pytest.raises(script.Refused, match='^co-ownership recount differs$'):
+        script.check_co_ownership(counts, support, frames.co_ownership)
+    with pytest.raises(script.Refused, match='^co-ownership recount differs$'):
+        script.check_co_ownership(counts, frames.support, frames.co_ownership.slice(1))
+
+
+def test_co_ownership_testable_needs_both_industries_linked(script):
+    first = [
+        row(2023, 1, PLUMBING, 'Plumbing contractor'),
+        row(2024, 1, PLUMBING, 'Plumbing contractor'),
+        row(2023, 2, RESTAURANT, 'Restaurant'),
+    ]
+    second = [*pair(2023, 3, 4, ein=OTHER_EIN), *pair(2024, 3, 4, ein=OTHER_EIN)]
+    both = cell(co_cells(script, [*first, *second]))
+    assert (both['base_count'], both['testable']) == (2, True)
+    alone = cell(co_cells(script, first))
+    assert (alone['base_count'], alone['testable']) == (1, False)
+
+
+def test_co_ownership_recurs_through_any_employer(script):
+    rows = [
+        *pair(2023, 1, 2),
+        *pair(2024, 1, 2, codes=('238210', '722513')),
+        *pair(2024, 3, 4, ein=OTHER_EIN),
+    ]
+    found = cell(co_cells(script, rows))
+    assert (found['testable'], found['recurs']) == (True, True)
+
+
+def test_co_ownership_crosswalked_successor_is_not_testable(script):
+    rows = golden_rows()
+    rows[3] = row(2024, 2, RESTAURANT, 'Restaurant',
+                  mapping=crosswalked(RESTAURANT, 2017, [RESTAURANT]))
+    found = cell(co_cells(script, rows))
+    assert found['testable'] is False
+
+
+def test_co_ownership_directed_cells_agree(script):
+    rows = [
+        *pair(2023, 1, 2),
+        row(2023, 5, '238210', 'Electrical contractor'),
+        *pair(2024, 1, 2),
+        *pair(2023, 3, 4, ein=OTHER_EIN),
+        *pair(2024, 3, 4, ein=OTHER_EIN, codes=('238210', RESTAURANT)),
+        *pair(2025, 3, 4, ein=OTHER_EIN, codes=('238210', RESTAURANT)),
+    ]
+    for base_year in (2023, 2024):
+        found = co_cells(script, rows, base_year)
+        mirror = found.select(
+            unit_a='unit_b', unit_b='unit_a', base_count='base_count', testable='testable',
+            recurs='recurs').sort('unit_a', 'unit_b')
+        assert found.height >= 2
+        assert found.equals(mirror)
