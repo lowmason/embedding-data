@@ -7,7 +7,12 @@ band that misses `LEVEL` leaves the family with no minimum. The source is the sp
 "From curves to a minimum" in `specs/ita-naics-minimum-counts.md`.
 '''
 
+import hashlib
+import json
 import math
+import re
+from dataclasses import dataclass
+from pathlib import Path
 
 import polars as pl
 
@@ -18,6 +23,42 @@ WILSON_Z = 1.959963984540054
 YEAR_PAIRS = ((2023, 2024), (2024, 2025))
 FAMILIES = ('co_ownership', 'area_mix', 'text_pairs')
 COUNTS = ('base_cells', 'testable_cells', 'recurring_cells')
+
+SAFE_RUN_ID = re.compile('[A-Za-z0-9][A-Za-z0-9_-]*')
+SAFE_PIN = re.compile('[0-9a-f]{64}')
+CANONICAL = 'ita_300a_canonical.parquet'
+# Each role in table order: its bundle root, the refusal of a wrong pin and the files read.
+ROLES = {
+    'establishment': (Path('derived/osha/establishment-targets'),
+                      'establishment-target pin differs',
+                      ('ita_establishment_links.parquet', 'ita_text_pairs.parquet',
+                       'ita_text_pair_members.parquet', 'ita_co_ownership.parquet',
+                       'co_ownership_support.parquet', 'inputs.json', 'report.json')),
+    'area_mix': (Path('derived/targets'), 'area-mix pin differs',
+                 ('ita_county_assignments.parquet', 'ita_area_mix.parquet', 'inputs.json',
+                  'report.json')),
+    'codes': (Path('derived/codes'), 'codes pin differs', (CANONICAL,)),
+}
+
+
+class Refused(Exception):
+    '''An input that the pins do not authenticate. The message is a fixed reason.'''
+
+
+@dataclass(frozen=True)
+class Inputs:
+    '''The authenticated files that the measurement reads.'''
+
+    canonical: Path
+    links: Path
+    pairs: Path
+    members: Path
+    co_ownership: Path
+    support: Path
+    establishment_report: Path
+    assignments: Path
+    area_mix: Path
+    area_mix_report: Path
 
 
 def wilson(recurring: int, testable: int) -> tuple[float, float] | None:
@@ -107,3 +148,83 @@ def family_minimum(minimums: list[int | None]) -> int | None:
     if not minimums or any(minimum is None for minimum in minimums):
         return None
     return max(minimums)
+
+
+def sha256(file: Path) -> str:
+    with file.open('rb') as stream:
+        return hashlib.file_digest(stream, 'sha256').hexdigest()
+
+
+def check_inventory(directory: Path, names: tuple[str, ...]) -> dict[str, str]:
+    '''The `sha256` record of each named file, once each file matches it.
+
+    Call it only after `outputs.json` matched its detached pin.
+    '''
+    inventory = json.loads((directory / 'outputs.json').read_text())
+    records = {}
+    for name in names:
+        record = inventory.get(name) if isinstance(inventory, dict) else None
+        expected = record.get('sha256') if isinstance(record, dict) else None
+        file = directory / name
+        if not file.is_file() or sha256(file) != expected:
+            raise Refused('file differs from its inventory')
+        records[name] = expected
+    return records
+
+
+def check_identity(establishment: Path, area_mix: Path, codes: tuple[str, str],
+                   canonical_sha256: str) -> None:
+    '''Refuse unless both `inputs.json` name the selected codes run and canonical table.'''
+    run_id, pin = codes
+    expected = {'path': f'derived/codes/{run_id}/{CANONICAL}', 'sha256': canonical_sha256}
+    documents = [json.loads((directory / 'inputs.json').read_text())
+                 for directory in (establishment, area_mix)]
+    for inputs in documents:
+        canonical = inputs.get('canonical') if isinstance(inputs, dict) else None
+        if not isinstance(canonical, dict) or any(
+                canonical.get(key) != value for key, value in expected.items()):
+            raise Refused('inputs name another canonical table or codes run')
+    selected = documents[0].get('codes')
+    if not isinstance(selected, dict) or (
+            selected.get('run_id'), selected.get('outputs_sha256')) != (run_id, pin):
+        raise Refused('inputs name another canonical table or codes run')
+
+
+def authenticate(data_dir: Path, establishment: tuple[str, str], area_mix: tuple[str, str],
+                 codes: tuple[str, str]) -> Inputs:
+    '''The pinned input files, once every pin, file record and cross-bundle name agrees.
+
+    Each selection is `(run_id, outputs_sha256)`. The checks run in order: safe run IDs and
+    pins, the three detached pins in table order, the record of every file read, then the
+    canonical table and codes run that both `inputs.json` files name.
+    '''
+    selections = {'establishment': establishment, 'area_mix': area_mix, 'codes': codes}
+    for run_id, pin in selections.values():
+        if not (isinstance(run_id, str) and isinstance(pin, str)
+                and SAFE_RUN_ID.fullmatch(run_id) and SAFE_PIN.fullmatch(pin)):
+            raise Refused('unsafe run id or pin')
+    directories = {}
+    for role, (run_id, pin) in selections.items():
+        root, reason, _names = ROLES[role]
+        directory = data_dir / root / run_id
+        outputs = directory / 'outputs.json'
+        if not outputs.is_file() or sha256(outputs) != pin:
+            raise Refused(reason)
+        directories[role] = directory
+    records = {role: check_inventory(directory, ROLES[role][2])
+               for role, directory in directories.items()}
+    check_identity(directories['establishment'], directories['area_mix'], codes,
+                   records['codes'][CANONICAL])
+    first, second = directories['establishment'], directories['area_mix']
+    return Inputs(
+        canonical=directories['codes'] / CANONICAL,
+        links=first / 'ita_establishment_links.parquet',
+        pairs=first / 'ita_text_pairs.parquet',
+        members=first / 'ita_text_pair_members.parquet',
+        co_ownership=first / 'ita_co_ownership.parquet',
+        support=first / 'co_ownership_support.parquet',
+        establishment_report=first / 'report.json',
+        assignments=second / 'ita_county_assignments.parquet',
+        area_mix=second / 'ita_area_mix.parquet',
+        area_mix_report=second / 'report.json',
+    )
