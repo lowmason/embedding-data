@@ -666,3 +666,122 @@ def test_co_ownership_directed_cells_agree(script):
             recurs='recurs').sort('unit_a', 'unit_b')
         assert found.height >= 2
         assert found.equals(mirror)
+
+
+def mixed_rows():
+    '''Golden rows plus duplicates, ineligible records and a second EIN in 2024 only.'''
+    return [
+        *golden_with_second_ein(),
+        row(2023, 1, PLUMBING, 'Plumbing contractor'),
+        row(2023, 6, PLUMBING, 'Plumbing contractor'),
+        row(2023, 7, '238210', 'Electrical contractor',
+            mapping=crosswalked('238210', 2017, ['238210'])),
+        row(2024, 8, '238210', 'Electrical contractor', ein='23456789'),
+        row(2024, 9, RESTAURANT, 'Restaurant', ein='23456789'),
+        row(2025, 10, '238210', 'Electrical contractor', ein=''),
+        row(2025, 11, RESTAURANT, 'Restaurant', ein=''),
+    ]
+
+
+def test_co_ownership_recount_counts_eligible_employers_once(script):
+    frames, counts = recount(script, mixed_rows())
+    assert script.check_co_ownership(counts, frames.support, frames.co_ownership) is None
+    assert counts.schema == pl.Schema({
+        'unit_a': pl.String, 'unit_b': pl.String, 'j_2023': pl.UInt64, 'j_2024': pl.UInt64,
+        'j_2025': pl.UInt64})
+    assert counts.rows() == [
+        (node(PLUMBING), node(RESTAURANT), 1, 2, 1),
+        (node(RESTAURANT), node(PLUMBING), 1, 2, 1),
+    ]
+
+
+def test_co_ownership_counts_are_sorted_by_cell(script):
+    rows = [*golden_rows(), *pair(2023, 3, 4, codes=('238210', '722513'))]
+    _frames, counts = recount(script, rows)
+    keys = counts.select('unit_a', 'unit_b')
+    assert keys.height == 12
+    assert keys.rows() == sorted(keys.rows())
+    assert keys.rows() != sorted(keys.rows(), key=lambda key: (key[1], key[0]))
+
+
+def perturb(column, change):
+    '''Change one column of the first row of a frame.'''
+    first = pl.int_range(pl.len()) == 0
+    return lambda frame: frame.with_columns(
+        pl.when(first).then(change).otherwise(pl.col(column)).alias(column))
+
+
+@pytest.mark.parametrize('side, change', [
+    ('support', perturb('j_2023', pl.col('j_2023') + 1)),
+    ('support', perturb('j_2025', pl.col('j_2025') + 1)),
+    ('support', perturb('unit_b', pl.lit(node('238210')))),
+    ('support', lambda frame: frame.slice(1)),
+    ('counts', perturb('j_2024', pl.col('j_2024') + 1)),
+    ('counts', lambda frame: frame.slice(1)),
+    ('targets', perturb('unit_b', pl.lit(node('238210')))),
+    ('targets', lambda frame: pl.concat([frame, frame.slice(0, 1)])),
+], ids=['support j_2023', 'support j_2025', 'support unit', 'support row missing',
+        'counts j_2024', 'counts row missing', 'targets other cell', 'targets row twice'])
+def test_co_ownership_recount_differences_refused(script, side, change):
+    frames, counts = recount(script, golden_with_second_ein())
+    tables = {'counts': counts, 'support': frames.support, 'targets': frames.co_ownership}
+    tables[side] = change(tables[side])
+    with pytest.raises(script.Refused, match='^co-ownership recount differs$'):
+        script.check_co_ownership(tables['counts'], tables['support'], tables['targets'])
+
+
+def test_co_ownership_testable_needs_both_links_through_one_ein(script):
+    rows = [
+        *pair(2023, 1, 2),
+        row(2024, 1, PLUMBING, 'Plumbing contractor'),
+        *pair(2023, 3, 4, ein=OTHER_EIN),
+        row(2024, 4, RESTAURANT, 'Restaurant', ein=OTHER_EIN),
+    ]
+    found = cell(co_cells(script, rows))
+    assert (found['base_count'], found['testable']) == (2, False)
+
+
+def test_co_ownership_one_linked_record_at_a_node_suffices(script):
+    rows = [
+        *pair(2023, 1, 2),
+        row(2023, 5, PLUMBING, 'Plumbing contractor'),
+        *pair(2024, 1, 2),
+    ]
+    found = cell(co_cells(script, rows))
+    assert (found['base_count'], found['testable']) == (1, True)
+
+
+def test_co_ownership_cell_without_next_year_pair_does_not_recur(script):
+    rows = golden_rows()
+    rows[3] = row(2024, 2, RESTAURANT, 'Restaurant',
+                  mapping=crosswalked(RESTAURANT, 2017, [RESTAURANT]))
+    found = cell(co_cells(script, rows))
+    assert (found['base_count'], found['testable'], found['recurs']) == (1, False, False)
+
+
+def test_co_ownership_cells_of_the_second_year_pair(script):
+    rows = [
+        *pair(2023, 1, 2),
+        row(2023, 5, '238210', 'Electrical contractor'),
+        *pair(2024, 1, 2),
+        *pair(2024, 3, 4, ein=OTHER_EIN, codes=('238210', RESTAURANT)),
+        *pair(2025, 3, 4, ein=OTHER_EIN, codes=('238210', RESTAURANT)),
+    ]
+    found = co_cells(script, rows, 2024)
+    assert found.columns == ['unit_a', 'unit_b', 'base_count', 'testable', 'recurs']
+    assert found.schema['base_count'] == pl.UInt64
+    assert found.select('unit_a', 'unit_b').rows() == [
+        (node('238210'), node(RESTAURANT)), (node(PLUMBING), node(RESTAURANT)),
+        (node(RESTAURANT), node('238210')), (node(RESTAURANT), node(PLUMBING))]
+    assert cell(found)['base_count'] == 1
+    assert (cell(found)['testable'], cell(found)['recurs']) == (False, False)
+    other = cell(found, '238210', RESTAURANT)
+    assert (other['base_count'], other['testable'], other['recurs']) == (1, True, True)
+    earlier = cell(co_cells(script, rows, 2023))
+    assert (earlier['base_count'], earlier['testable'], earlier['recurs']) == (1, True, True)
+
+
+def test_co_ownership_untestable_cell_recurs_through_another_employer(script):
+    rows = [*pair(2023, 1, 2), *pair(2024, 3, 4, ein=OTHER_EIN)]
+    found = cell(co_cells(script, rows))
+    assert (found['base_count'], found['testable'], found['recurs']) == (1, False, True)
