@@ -1254,7 +1254,8 @@ def test_text_pair_recount_differences_refused(script, change):
     elif change == 'report not a dict':
         report = []
     elif change == 'entries not a list':
-        report = {'pairs': {'records_by_year_status_basis': {}}}
+        entries = report['pairs']['records_by_year_status_basis']
+        report = {'pairs': {'records_by_year_status_basis': tuple(entries)}}
     else:
         report = {'pairs': {'records_by_year_status_basis': [1]}}
     recount_refused(script, paired, counts, frames.pairs, report)
