@@ -1074,3 +1074,12 @@ def test_area_mix_cells_of_the_second_year_pair(script):
         (COUNTY, node(PLUMBING), 1, True, True),
         (COUNTY, node(RESTAURANT), 1, True, False),
     ]
+
+
+def test_area_mix_recount_sorts_cells_by_county_first(script):
+    rows = [row(2023, 1, RESTAURANT, 'Restaurant'),
+            row(2023, 2, PLUMBING, 'Plumbing contractor')]
+    frames, _records, assigned, _links = assign(script, rows, [COUNTY, OTHER_COUNTY])
+    assert script.area_mix_counts(assigned, 2023).rows() == [
+        (COUNTY, node(RESTAURANT), 1), (OTHER_COUNTY, node(PLUMBING), 1)]
+    assert script.check_area_mix(assigned, frames.area_mix, frames.area_mix_report) is None
