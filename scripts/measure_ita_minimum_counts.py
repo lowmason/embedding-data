@@ -463,3 +463,114 @@ def area_mix_cells(assigned: pl.DataFrame, links: pl.DataFrame,
         .sort(AREA_CELL)
         .collect()
     )
+
+
+def pair_frame(members: pl.LazyFrame, pairs: pl.LazyFrame,
+               records: pl.DataFrame) -> pl.DataFrame:
+    '''The records with their published `pair_id` and their pair's `flag_headline`.
+
+    Refuse unless every record has exactly one member row and every member `pair_id` is a
+    row of `pairs`. Members of rows outside the records' years are allowed.
+    '''
+    published = members.select('source_row', 'pair_id').collect()
+    headline = pairs.select('pair_id', 'flag_headline').collect()
+    rows = records.select('source_row')
+    own = published.join(rows, on='source_row', how='semi')
+    if (own['source_row'].is_duplicated().any()
+            or rows.join(own, on='source_row', how='anti').height
+            or published.join(headline, on='pair_id', how='anti').height
+            or headline['pair_id'].is_duplicated().any()):
+        raise Refused('pair members disagree with canonical rows')
+    return (
+        records.join(own, on='source_row', how='left', validate='1:1')
+        .join(headline, on='pair_id', how='left', validate='m:1')
+        .select('source_row', 'pair_id', 'year_filing_for', 'naics_2022_node_id',
+                'industry_eligible', 'flag_headline')
+    )
+
+
+def text_pair_counts(paired: pl.DataFrame) -> pl.DataFrame:
+    '''The `industry_eligible` records of each headline pair in each year, zero-filled.'''
+    eligible = pl.col('industry_eligible')
+    year = pl.col('year_filing_for')
+    return (
+        paired.lazy()
+        .filter(pl.col('flag_headline'))
+        .group_by('pair_id')
+        .agg(**{f'n_{t}': eligible.and_(year.eq(t)).sum().cast(pl.UInt64)
+                for t in ita_co_ownership.YEARS})
+        .sort('pair_id')
+        .collect()
+    )
+
+
+def check_text_pairs(paired: pl.DataFrame, counts: pl.DataFrame, pairs: pl.DataFrame,
+                     report: dict) -> None:
+    '''Refuse unless the recount equals the published pairs and the yearly basis totals.
+
+    Every headline pair's `n_headline_records` must equal its summed per-year counts, with
+    the same set of headline pairs on both sides. Each year's `industry_eligible` total
+    over all records must equal the summed `n` of that year's `flag_headline_basis` rows
+    in `records_by_year_status_basis`.
+    '''
+    years = [f'n_{t}' for t in ita_co_ownership.YEARS]
+    published = (pairs.filter(pl.col('flag_headline'))
+                 .select('pair_id', 'n_headline_records').sort('pair_id'))
+    recounted = counts.select(
+        'pair_id', n_headline_records=pl.sum_horizontal(years).cast(pl.UInt64)).sort('pair_id')
+    section = report.get('pairs') if isinstance(report, dict) else None
+    entries = (section.get('records_by_year_status_basis')
+               if isinstance(section, dict) else None)
+    if not isinstance(entries, list) or not all(isinstance(e, dict) for e in entries):
+        raise Refused('text-pair recount differs')
+    expected = {}
+    for entry in entries:
+        if entry.get('flag_headline_basis') is True:
+            year = entry.get('year_filing_for')
+            expected[year] = expected.get(year, 0) + entry.get('n', 0)
+    totals = dict(paired.group_by('year_filing_for').agg(pl.col('industry_eligible').sum())
+                  .iter_rows())
+    if not recounted.equals(published) or any(
+            expected.get(year, 0) != totals.get(year, 0) for year in ita_co_ownership.YEARS):
+        raise Refused('text-pair recount differs')
+
+
+def text_pair_cells(paired: pl.DataFrame, links: pl.DataFrame,
+                    base_year: int) -> pl.DataFrame:
+    '''The text-pair cells of one base year t, keyed by `pair_id`.
+
+    A cell is a headline pair with an `industry_eligible` year-t record, and `base_count`
+    counts those records. It recurs when the pair has an eligible t + 1 record whose node
+    is one of its eligible year-t nodes. It is testable when one of its eligible year-t
+    records has a confirmed link to an eligible t + 1 record of the same pair (D1).
+    '''
+    eligible = paired.lazy().filter(pl.col('flag_headline').and_(pl.col('industry_eligible')))
+    year = pl.col('year_filing_for')
+    base = eligible.filter(year.eq(base_year))
+    nodes = ['pair_id', 'naics_2022_node_id']
+    recurring = (
+        eligible.filter(year.eq(base_year + 1)).select(nodes)
+        .join(base.select(nodes), on=nodes, how='semi')
+        .select('pair_id').unique()
+        .with_columns(recurs=pl.lit(True))
+    )
+    successors = eligible.select(pl.col('source_row').alias('later_row'),
+                                 pl.col('pair_id').alias('later_pair_id'))
+    testable = (
+        links.lazy().filter(pl.col('base_year').eq(base_year))
+        .join(base.select('source_row', 'pair_id'), on='source_row')
+        .join(successors, on='later_row')
+        .filter(pl.col('pair_id').eq(pl.col('later_pair_id')))
+        .select('pair_id').unique()
+        .with_columns(testable=pl.lit(True))
+    )
+    return (
+        base.group_by('pair_id')
+        .agg(base_count=pl.len().cast(pl.UInt64))
+        .join(testable, on='pair_id', how='left', validate='1:1')
+        .join(recurring, on='pair_id', how='left', validate='1:1')
+        .select('pair_id', 'base_count', pl.col('testable').fill_null(False),
+                pl.col('recurs').fill_null(False))
+        .sort('pair_id')
+        .collect()
+    )
