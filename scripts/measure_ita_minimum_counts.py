@@ -16,6 +16,11 @@ from pathlib import Path
 
 import polars as pl
 
+from embedding_data import ita_co_ownership
+from embedding_data.ita_area_mix import eligible_industry
+from embedding_data.ita_establishment_links import CONFIRMED
+from embedding_data.ita_establishment_records import KEY_SCHEMA, keyed_records
+
 LEVEL = 0.90
 TOP_BAND = 10
 MIN_BAND_CELLS = 50
@@ -228,3 +233,61 @@ def authenticate(data_dir: Path, establishment: tuple[str, str], area_mix: tuple
         area_mix=second / 'ita_area_mix.parquet',
         area_mix_report=second / 'report.json',
     )
+
+
+def record_frame(canonical: pl.LazyFrame) -> pl.DataFrame:
+    '''The 2023-2025 keyed records with their industry and employer eligibility.
+
+    No title or index keys are given, so the copied-text flags are all false, and no rule
+    reads them. `employer_eligible` is the co-ownership classification: a year in
+    `ita_co_ownership.YEARS`, an industry that passes `eligible_industry()`, a known
+    `ein_key` and an EIN that is not padded, with a null padded flag counted as padded.
+    '''
+    year = pl.col('year_filing_for').is_in(ita_co_ownership.YEARS)
+    employer = (year.and_(eligible_industry())
+                .and_(pl.col('ein_key').is_not_null())
+                .and_(pl.col('flag_ein_padded').fill_null(True).not_()))
+    return (
+        keyed_records(canonical, pl.DataFrame(schema=KEY_SCHEMA))
+        .filter(year)
+        .select(
+            'source_row', 'year_filing_for', 'naics_code', 'naics_2022_node_id', 'ein_key',
+            industry_eligible=eligible_industry(),
+            employer_eligible=employer,
+        )
+        .collect()
+    )
+
+
+def confirmed_links(links: pl.LazyFrame, records: pl.DataFrame) -> pl.DataFrame:
+    '''One row per year-t source row with a confirmed link to year t + 1.
+
+    A link row counts when its `(base_year, later_year)` is in `YEAR_PAIRS` and its
+    `status` is in `CONFIRMED`. Every source row in its `base_rows` gets its `later_row`,
+    so exact duplicates all count as linked. Refuse unless each `(base_year, source_row)`
+    occurs once, each source row is a record of `base_year` and each later row is a record
+    of `base_year + 1`.
+    '''
+    pairs = pl.DataFrame(YEAR_PAIRS, schema={'base_year': pl.Int64, 'later_year': pl.Int64},
+                         orient='row')
+    found = (
+        links.join(pairs.lazy(), on=['base_year', 'later_year'], how='semi')
+        .filter(pl.col('status').is_in(CONFIRMED))
+        .select('base_year', pl.col('base_rows').alias('source_row'), 'later_row')
+        .explode('source_row')
+        .collect()
+    )
+    years = records.select('source_row', pl.col('year_filing_for').alias('base_year'))
+    later = records.select(pl.col('source_row').alias('later_row'),
+                           (pl.col('year_filing_for') - 1).alias('base_year'))
+    if (found.select('base_year', 'source_row').is_duplicated().any()
+            or found.join(years, on=['base_year', 'source_row'], how='anti').height
+            or found.join(later, on=['base_year', 'later_row'], how='anti').height):
+        raise Refused('link rows disagree with canonical rows')
+    return found
+
+
+def visible(links: pl.DataFrame, eligible_rows: pl.Series) -> pl.DataFrame:
+    '''The linked year-t source rows whose `later_row` is in `eligible_rows`.'''
+    return links.filter(pl.col('later_row').is_in(eligible_rows.implode())).select(
+        'base_year', 'source_row')

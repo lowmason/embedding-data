@@ -7,7 +7,8 @@ from pathlib import Path
 
 import polars as pl
 import pytest
-from minimum_count_fixtures import build_frames, golden_rows, publish, republish
+from ita_establishment_fixtures import crosswalked
+from minimum_count_fixtures import build_frames, golden_rows, publish, republish, row
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'scripts' / 'measure_ita_minimum_counts.py'
 
@@ -367,3 +368,182 @@ def test_unsafe_forms_refused(script, published, role, form):
     }[form]
     arguments = selections(published, **{role: (run_id, pin)})
     assert refusal(script, arguments) == 'unsafe run id or pin'
+
+
+def derive(script, rows):
+    '''The frames, record frame and confirmed links of canonical override rows.'''
+    frames = build_frames(rows)
+    records = script.record_frame(frames.canonical.lazy())
+    return frames, records, script.confirmed_links(frames.links.lazy(), records)
+
+
+def rows_of(records, year, establishment, canonical):
+    '''The source rows of one establishment's records in one year.'''
+    wanted = canonical.with_row_index('source_row').filter(
+        (pl.col('year_filing_for') == year)
+        & (pl.col('establishment_name') == f'Plant {establishment}'))
+    return sorted(wanted['source_row'].cast(pl.UInt64).to_list())
+
+
+def linked(links, year):
+    return set(links.filter(pl.col('base_year') == year)['source_row'].to_list())
+
+
+def test_record_frame_keeps_2023_to_2025(script):
+    golden = golden_rows()
+    frames = build_frames(
+        [*golden, row(2022, 1, '238220', 'Plumbing contractor',
+                      mapping=crosswalked('238220', 2017, ['238220']))])
+    records = script.record_frame(frames.canonical.lazy())
+    assert records.height == 6
+    assert records['industry_eligible'].all()
+    assert records['employer_eligible'].all()
+
+
+def test_record_frame_columns(script):
+    frames = build_frames(golden_rows())
+    records = script.record_frame(frames.canonical.lazy())
+    assert records.columns == ['source_row', 'year_filing_for', 'naics_code',
+                               'naics_2022_node_id', 'ein_key', 'industry_eligible',
+                               'employer_eligible']
+    assert records.schema['source_row'] == pl.UInt64
+    assert records['source_row'].to_list() == list(range(6))
+    assert sorted(set(records['year_filing_for'].to_list())) == [2023, 2024, 2025]
+    assert records['ein_key'].to_list() == ['123456789'] * 6
+    assert records['naics_code'].to_list() == ['238220', '722511'] * 3
+
+
+def test_record_frame_drops_the_years_outside_the_window(script):
+    frames = build_frames([
+        row(2022, 1, '238220', 'Plumbing contractor',
+            mapping=crosswalked('238220', 2017, ['238220'])),
+        *golden_rows(),
+        row(2026, 1, '238220', 'Plumbing contractor',
+            mapping=crosswalked('238220', 2017, ['238220'])),
+    ])
+    records = script.record_frame(frames.canonical.lazy())
+    assert records['source_row'].to_list() == list(range(1, 7))
+
+
+def test_employer_eligibility_follows_the_co_ownership_classification(script):
+    frames = build_frames([
+        row(2023, 1, '238220', 'Plumbing contractor'),
+        row(2023, 2, '238220', 'Plumbing contractor',
+            mapping=crosswalked('238220', 2017, ['238220'])),
+        row(2023, 3, '238220', 'Plumbing contractor', ein=''),
+        row(2023, 4, '238220', 'Plumbing contractor', ein='23456789'),
+    ])
+    records = script.record_frame(frames.canonical.lazy())
+    assert records['industry_eligible'].to_list() == [True, False, True, True]
+    assert records['employer_eligible'].to_list() == [True, False, False, False]
+    assert records['ein_key'].to_list() == ['123456789', '123456789', None, '023456789']
+
+
+def test_two_year_link_is_not_visible(script):
+    rows = [r for r in golden_rows()
+            if not (r['year_filing_for'] == 2024 and r['establishment_name'] == 'Plant 1')]
+    frames, _records, links = derive(script, rows)
+    base = rows_of(_records, 2023, 1, frames.canonical)
+    guard = frames.links.filter(
+        (pl.col('base_year') == 2023) & (pl.col('later_year') == 2025)
+        & (pl.col('status') == 'confirmed_same_id'))
+    assert any(base[0] in rows for rows in guard['base_rows'].to_list())
+    assert base[0] not in linked(links, 2023)
+
+
+def test_duplicate_rows_link_through_base_rows(script):
+    rows = [
+        row(2023, 1, '238220', 'Plumbing contractor', id=7),
+        row(2023, 1, '238220', 'Plumbing contractor', id=7),
+        row(2024, 1, '238220', 'Plumbing contractor'),
+    ]
+    _frames, _records, links = derive(script, rows)
+    found = links.filter(pl.col('base_year') == 2023)
+    assert sorted(found['source_row'].to_list()) == [0, 1]
+    assert found['later_row'].to_list() == [2, 2]
+
+
+def test_unconfirmed_links_are_not_visible(script):
+    rows = golden_rows()
+    rows[2] = {**rows[2], 'street_address': '1 Other St'}
+    frames, records, links = derive(script, rows)
+    status = frames.links.filter(
+        (pl.col('base_year') == 2023) & (pl.col('later_year') == 2024)
+        & (pl.col('base_row') == 0))['status'].to_list()
+    assert status == ['weaker_same_id']
+    assert 0 not in linked(links, 2023)
+    assert 1 in linked(links, 2023)
+
+
+def test_changed_id_link_is_visible(script):
+    rows = golden_rows()
+    rows[2] = {**rows[2], 'establishment_id': 999}
+    frames, _records, links = derive(script, rows)
+    status = frames.links.filter(
+        (pl.col('base_year') == 2023) & (pl.col('later_year') == 2024)
+        & (pl.col('base_row') == 0))['status'].to_list()
+    assert status == ['confirmed_changed_id']
+    assert links.filter(pl.col('base_year') == 2023).sort('source_row').rows() == [
+        (2023, 0, 2), (2023, 1, 3)]
+
+
+def test_confirmed_links_cover_both_year_pairs(script):
+    _frames, _records, links = derive(script, golden_rows())
+    assert links.columns == ['base_year', 'source_row', 'later_row']
+    assert links.sort('base_year', 'source_row').rows() == [
+        (2023, 0, 2), (2023, 1, 3), (2024, 2, 4), (2024, 3, 5)]
+
+
+def test_ineligible_successor_is_not_visible(script):
+    rows = golden_rows()
+    rows[2] = row(2024, 1, '238220', 'Plumbing contractor',
+                  mapping=crosswalked('238220', 2017, ['238220']))
+    _frames, records, links = derive(script, rows)
+    found = script.visible(links, records.filter('industry_eligible')['source_row'])
+    assert 0 not in linked(found, 2023)
+    assert 1 in linked(found, 2023)
+
+
+def test_visible_keeps_base_year_and_source_row(script):
+    _frames, records, links = derive(script, golden_rows())
+    found = script.visible(links, records.filter('industry_eligible')['source_row'])
+    assert found.columns == ['base_year', 'source_row']
+    assert found.sort('base_year', 'source_row').rows() == [
+        (2023, 0), (2023, 1), (2024, 2), (2024, 3)]
+
+
+def refused_links(script, change):
+    frames = build_frames(golden_rows())
+    records = script.record_frame(frames.canonical.lazy())
+    links = change(frames.links)
+    with pytest.raises(script.Refused) as raised:
+        script.confirmed_links(links.lazy(), records)
+    return str(raised.value)
+
+
+def point(column, value):
+    '''Set one column of the 2023 -> 2024 link of source row 0.'''
+    target = ((pl.col('base_year') == 2023) & (pl.col('later_year') == 2024)
+              & (pl.col('base_row') == 0))
+    return lambda links: links.with_columns(
+        pl.when(target).then(value).otherwise(pl.col(column)).alias(column))
+
+
+def test_link_year_disagreement_refused(script):
+    reason = refused_links(script, point('later_row', pl.lit(1, pl.UInt64)))
+    assert reason == 'link rows disagree with canonical rows'
+
+
+@pytest.mark.parametrize('change', [
+    point('later_row', pl.lit(4, pl.UInt64)),
+    point('later_row', pl.lit(99, pl.UInt64)),
+    point('base_rows', pl.lit([2], pl.List(pl.UInt64))),
+    point('base_rows', pl.lit([99], pl.List(pl.UInt64))),
+    point('base_rows', pl.lit([0, 1], pl.List(pl.UInt64))),
+    lambda links: pl.concat([links, links.filter(
+        (pl.col('base_year') == 2023) & (pl.col('later_year') == 2024)
+        & (pl.col('base_row') == 0))]),
+], ids=['later two years on', 'later absent', 'source in later year', 'source absent',
+        'source twice', 'link twice'])
+def test_link_row_disagreements_refused(script, change):
+    assert refused_links(script, change) == 'link rows disagree with canonical rows'
