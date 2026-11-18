@@ -422,7 +422,10 @@ ITA is a program-selected filing population, so no product here represents all
 establishments or firms. Codes are self-reported and unvalidated, so a pair is a noisy
 label. Copied-text flags catch exact normalized identity only. `report.json` lists all
 the limits of the stage spec. Under R8.4, no Stage 10 output may feed embedder
-training, curriculum, hard-negative mining or model selection.
+training, curriculum, hard-negative mining or model selection. The owner's amendment
+of 2026-11-18 to the stage spec makes one exception. Selection may read the validation
+part of the text–code pairs, which are split by `description_key`. The sealed part
+only judges, and no pair trains.
 
 The tests and the fixture chain show software readiness only. Fixture results are
 never benchmarks. The measured production runs are
