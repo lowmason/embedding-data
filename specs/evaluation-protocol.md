@@ -1,11 +1,11 @@
 # Evaluation protocol
 
-> Next step after the owner approves this committed spec: apply the pointer
-> edits in "Edits on approval" in one docs commit. No plan is needed, because
-> the spec adds no code (my call). Then resume naics-embedder's roadmap
+> Next step: resume naics-embedder's roadmap
 > `specs/naics-artifact-redesign-roadmap.md`, which re-reads its gates here.
+> The pointer edits in "Edits on approval" were applied with the approval. No
+> plan was needed, because the spec adds no code (my call).
 
-Status: DRAFT, written 2026-11-18. Not yet approved.
+Status: APPROVED (2026-11-18, owner: "Approve the spec"). Written 2026-11-18.
 
 This is the successor evaluation-protocol spec that the
 [source spec](embedding-evaluation-data-spec.md) requires "before any embedder

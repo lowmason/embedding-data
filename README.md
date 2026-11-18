@@ -425,7 +425,9 @@ the limits of the stage spec. Under R8.4, no Stage 10 output may feed embedder
 training, curriculum, hard-negative mining or model selection. The owner's amendment
 of 2026-11-18 to the stage spec makes one exception. Selection may read the validation
 part of the text–code pairs, which are split by `description_key`. The sealed part
-only judges, and no pair trains.
+only judges, and no pair trains. Reads of the text–code pairs follow
+[the evaluation protocol](specs/evaluation-protocol.md), Section 1. A family with no
+section there is not scored.
 
 The tests and the fixture chain show software readiness only. Fixture results are
 never benchmarks. The measured production runs are
