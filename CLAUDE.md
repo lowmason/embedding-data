@@ -367,6 +367,9 @@ closed Stage 9 freeze window. Fixture results are software readiness, never benc
 Measured full-data acceptance is pending until
 `specs/findings/stage-10-ita-establishment-targets.md` exists. No Stage 10 output may
 feed embedder training, curriculum, hard-negative mining or model selection (R8.4).
+One exception (owner, 2026-11-18, the stage spec's amendment): selection may read the
+validation part of the text–code pairs, split by `description_key`. The sealed part
+only judges, and no pair trains.
 The published Stage 6 and Stage 10 bundles keep `size_gate_pending`, and
 `specs/findings/v9-ita-naics-minimum-counts.md` holds the headline minimum counts for ITA
 co-ownership, the 2023 ITA area mix and ITA text–code pairs.
