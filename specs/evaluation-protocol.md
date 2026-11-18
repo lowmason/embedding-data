@@ -128,7 +128,14 @@ the first run only. *(owner, 2026-11-18)*
 | `ita_text_pairs.parquet` | 644,265 rows, SHA-256 `60aad7642961e70b987e9d3222d660147861458e12ac52d71d2739d2d21e1e1c` |
 | `ita_text_pair_codes.parquet` | 771,971 rows, SHA-256 `c8084e4ad297e3f78391e035ebe51119b07982639ae4daf47f1d47caeb1f8916` |
 | Headline pairs | 239,364 pairs with `flag_headline = true`. Of these, 527 have `flag_headline_codes_conflict = true` (Stage 10 finding, "Text–code pairs"). A reader's C2 filter gives these counts *(owner, 2026-11-18)* |
+| Copied headline pairs | 221,176 of the 239,364 (92.4%) have `flag_copied_title_any` or `flag_copied_index_any`: 25,846 with the title flag and 213,683 with the index flag. They hold 11,920 distinct `description_key` values *(owner, 2026-11-18)* |
+| Headline pairs not copied | 18,188, with 7,567 distinct `description_key` values. Of these, 329 have `flag_headline_codes_conflict = true`. Text→code's headline score rests on these pairs *(owner, 2026-11-18)* |
 | Count gate | Minimum 1 on `n_headline_records` of pairs with `flag_headline` (V9 decision). The headline rule needs at least one eligible record, so every headline pair meets it |
+
+The copied and not-copied counts come from one read-only count on the selected
+run's `ita_text_pairs.parquet` on 2026-11-18. No finding records them. They are
+counts only and contain no description text. They describe the evidence and set
+no rule. The V9 count gate does not use the copied flags.
 
 ### Assignment
 
@@ -246,6 +253,8 @@ Findings, retired specs and retired plans are records and are not edited.
       run's `outputs.json`, and the SHA-256 of that file equals the pin.
 - [ ] The headline-pair and conflict counts in the Evidence table equal the
       Stage 10 finding's counts and a count on the selected run's table.
+- [ ] The copied and not-copied counts equal a count on the selected run's
+      table, and the two sets of pairs and of keys sum to 239,364 and 19,487.
 - [ ] A reader can answer from this file alone: who decides the split, who
       decides the scoring, which run and pin to read, and which families are
       still unscored.
