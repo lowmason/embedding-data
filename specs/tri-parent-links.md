@@ -8,8 +8,11 @@ Status: draft for owner review, 2026-11-18. Stage 5 design session of
 [the roadmap](naics-evaluation-data-roadmap.md). On 2026-11-18 the owner chose
 all five decisions below ("Accept all picks"), with the calls listed under
 Accepted proposals. Calls marked "My call" elsewhere in this file were made
-while writing it. They stand unless the owner corrects them at review. No TRI
-file was fetched for this design.
+while writing it. They stand unless the owner corrects them at review. A
+builder check by a separate reviewer raised four questions on 2026-11-18. Two
+follow from the owner's decisions (the "no parent" basis and partial owners).
+Two are process calls (document checks and the Stage 9 freeze window). All four
+are answered in place. No TRI file was fetched for this design.
 
 ## Scope and governing contracts
 
@@ -48,7 +51,8 @@ model for the measure, the bundle and the commands.
   parent keeps every value, is flagged and is excluded from headline cells. No
   value is picked.
 - A facility that reports no parent is its own owner. It counts in `n(a)` and
-  never joins another facility.
+  never joins another facility. "No parent" means no standardized parent name
+  (see [Owner keys](#owner-keys)).
 - Only the U.S. parent forms groups. The foreign parent stays a field.
 - The O8 table is a companion table, because `targets-v1` cannot hold a parent
   unit.
@@ -105,7 +109,8 @@ The design fails, even if it runs, when it:
 - Groups facilities by a name match of this project's own. Groups come only
   from EPA's standardized parent name or the reported D&B number, compared as
   exact strings.
-- Lets two facilities that report no parent form a shared group.
+- Lets two facility-years with no standardized parent name form a shared
+  group.
 - Picks one value when a facility-year's forms disagree.
 - Lets a code that is not a native NAICS 2022 national industry enter a
   headline cell.
@@ -271,17 +276,29 @@ parent D&B number and standardized foreign parent name.
 ## Preflight: open checks E7–E9
 
 The preflight runs after the three files are recorded and before any build. It
-is read-only and offline over the manifested files. **My call:** a script,
-`scripts/preflight_tri.py`, prints a JSON report. Its results go into the
-Stage 5 findings file. Each covered verdict holds only while these checks pass.
+has two parts. **My calls:**
+
+- **Data checks.** A script, `scripts/preflight_tri.py`, reads only the
+  manifested files and the pinned Stage 4 nodes, offline, and prints a JSON
+  report.
+- **Document checks**, marked "(read)" below. The operator reads the named EPA
+  pages and records the URL, the read date and a short quote in the findings
+  file. Reading the documentation PDF needs the owner's go-ahead. These
+  documents are not manifest-registered and are not stored under the data
+  root, because no build step reads them. `acquire` reads the "processed as
+  of" date from the basic data files page and does not save the page. The date
+  lives in the raw path and the manifest's `through_date`.
+
+The results of both parts go into the Stage 5 findings file. Each covered
+verdict holds only while these checks pass.
 A failed check stops the stage. The owner then records O7 and O8 as uncovered
 or promotes a named alternate, and the Stage 2 spec's verdict table is amended.
 
 | Check | Measures and records | Stops the stage when |
 |---|---|---|
-| **E7** codes | Each year's exact header row. Rows by form type. The primary NAICS field. The share of facility-years whose primary code is a six-digit NAICS 2022 national industry. Secondary-code fill. Bytes that are not valid UTF-8. State codes present. Document control number uniqueness. | A window year has no primary NAICS field. EPA's documentation names a NAICS edition other than 2022 for a window year. More than 1% of a year's facility-years have a primary code outside the NAICS 2022 national-industry set (**my call:** a trigger to ask the owner, not an acceptance threshold). |
-| **E8** parents | The parent fields present by year. The exact strings that mean "no parent" or "no D&B number" (for example `NA` and blank). Fill rates of the standardized name and the D&B number. Standardized names with more than one D&B number, and D&B numbers with more than one standardized name (counts only). The share of facility-years whose standardized name differs from the reported name. EPA's documented time basis of the standardized name. Reading the documentation PDF needs the owner's go-ahead. | A window year has no standardized parent field. Or the field is blank for every facility-year that reports a parent. The owner then chooses between the D&B key and an uncovered verdict. A "current owner" time basis is recorded as a limit and does not stop the stage. |
-| **E9** terms | EPA's data license statement and its date. Any TRI-specific terms on the basic data files page or in the documentation. | An EPA statement restricts publishing aggregates or facility-level rows. A failed terms check never becomes "build it but keep the aggregates local" (Stage 2 rule). |
+| **E7** codes | Each year's exact header row. Rows by form type. The primary NAICS field. The share of facility-years whose primary code is a six-digit NAICS 2022 national industry. Secondary-code fill. Bytes that are not valid UTF-8. State codes present. Document control number uniqueness. | A window year has no primary NAICS field. EPA's documentation names a NAICS edition other than 2022 for a window year (read). More than 1% of a year's facility-years have a primary code outside the NAICS 2022 national-industry set (**my call:** a trigger to ask the owner, not an acceptance threshold). |
+| **E8** parents | The parent fields present by year. The exact strings that mean "no parent" or "no D&B number" (for example `NA` and blank). Fill rates of the standardized name and the D&B number. Standardized names with more than one D&B number, and D&B numbers with more than one standardized name (counts only). The share of facility-years whose standardized name differs from the reported name. The counts of cases (a), (b) and (c) under [Owner keys](#owner-keys). EPA's documented time basis of the standardized name (read). | A window year has no standardized parent field. Or the field is blank for every facility-year that reports a parent. The owner then chooses between the D&B key and an uncovered verdict. A "current owner" time basis is recorded as a limit and does not stop the stage. |
+| **E9** terms | EPA's data license statement and its date (read). Any TRI-specific terms on the basic data files page or in the documentation (read). | An EPA statement restricts publishing aggregates or facility-level rows. A failed terms check never becomes "build it but keep the aggregates local" (Stage 2 rule). |
 
 ## Facility-year table
 
@@ -332,8 +349,21 @@ disjoint and checked in this order:
 - D&B sensitivity: `dnb:<number>` when the facility-year's forms give exactly
   one usable D&B number, else `facility:<TRIFD>`.
 
-Keys are compared as exact strings. A facility that reports no parent never
-shares a key with another facility.
+Keys are compared as exact strings. A facility-year with no standardized parent
+name never shares a key with another facility.
+
+**My call: EPA's standardized name alone decides "no parent".** The owner chose
+it as the key (decision 2). The reported parent name is a diagnostic only. Three
+cases follow, and E8 counts each:
+
+- (a) The reported parent is a "no parent" string, but EPA gives a standardized
+  name. The facility-year is grouped under EPA's name, as EPA's own resolution.
+- (b) The reported parent is named, but the standardized name is blank. The
+  facility-year is self-owned and is not in the O8 table. This can only lower
+  `J`.
+- (c) The D&B sensitivity reads the D&B field alone. A usable D&B number groups
+  facility-years under the sensitivity even when the standardized name is
+  blank.
 
 ### Table
 
@@ -428,9 +458,19 @@ none. Federal facilities are excluded."
 | `n_facility_years` | UInt64 | Eligible facility-years in `a` |
 | `n_owners_dnb` | UInt64 | `n(a)` under the D&B sensitivity |
 | `n_owners_including_federal` | UInt64 | `n(a)` under the federal sensitivity |
+| `n_owners_partial` | UInt64 | Owners in `n(a)` that, in at least one year with an eligible facility-year in `a`, also had a facility-year excluded as `naics_missing`, `naics_conflict`, `naics_not_2022` or `parent_conflict` in that same year |
 
 `n_parent_owners` lets the scoring protocol use parent-only denominators with
 no rebuild.
+
+Partial industry sets are measured per industry, not per cell, as in Stage 10.
+An owner with an excluded facility-year may operate an industry that the target
+cannot see. It can only be missing from some `J(a,b)`. It can never inflate
+one. So no per-cell label is derived from it. An excluded facility-year belongs
+to the owner key it would have had: its one standardized parent name, else
+`facility:<TRIFD>`. **My call:** a `parent_conflict` facility-year belongs to
+each of its named parents. Facility-years excluded as `federal` are not counted
+here, because the federal sensitivity covers them.
 
 `tri_parent_link_support.parquet`, one row per target cell, sorted by
 `unit_a`, `unit_b`:
@@ -539,6 +579,7 @@ findings file records its detached checksum.
 - Facility-years with `flag_parent_mixed_blank`, with foreign parents and with
   secondary codes. Facility-years in territories.
 - Facilities whose owner key changes across years.
+- The counts of the "no parent" cases (a), (b) and (c), and partial owners.
 - Standardized names that collide under case folding and whitespace collapse
   (a count only, never merged).
 - Cells that exist only under a sensitivity.
@@ -570,6 +611,8 @@ Write the failing tests first. Small typed frames cover:
 - "No parent" strings never forming a shared group.
 - Same-year co-presence, one count per owner, mirror rows and no diagonal.
 - Both sensitivity counts and their support labels.
+- The three "no parent" cases (a), (b) and (c), and partial owners, including
+  a `parent_conflict` facility-year that counts for each named parent.
 - The O8 table, including self-owned facilities left out.
 - Header refusal, reporting-year mismatch, occupied run names, changed pins
   and changed software.
@@ -591,7 +634,8 @@ never benchmarks.
 `scripts/reconcile_tri_parent_links.py` is written separately from the build
 modules and does not import them. It reads the three cited raw files and the
 pinned Stage 4 nodes directly. It recomputes the facility-year reduction,
-eligibility, `n(a)`, `J(a,b)`, `N`, both sensitivities and the O8 counts. It
+eligibility, `n(a)`, `J(a,b)`, `N`, both sensitivities, the partial-owner
+counts and the O8 counts. It
 compares them exactly with the bundle and reports equal or unequal.
 
 ### Host rule
@@ -601,6 +645,14 @@ compares them exactly with the bundle and reports equal or unequal.
 - Before each acquisition and each full-data build, confirm with the owner that
   no other stage's acquisition or build is running, and run
   `pgrep -fl 'embedding_data|embedding-data'`. Stop if it shows another run.
+- **My call: no write inside a Stage 9 freeze window.** Each go-ahead also
+  confirms that no Stage 9 freeze window is open, as `CLAUDE.md` required for
+  Stage 10. Stage 9's preservation check (`scripts/stage9_independent_io.py`)
+  fails on any new file under `data/raw` or `data/derived` that no manifest
+  append explains. A recorded TRI raw file passes it. A TRI bundle or a
+  leftover `.part` written inside the window fails it. Also run
+  `pgrep -fl 'embedding_data\.acs_targets|stage9_independent|reconcile_stage9'`
+  and stop if it prints anything.
 - Each production write needs the owner's go-ahead first: each file fetch or
   import, the build, and any cleanup of a failed run's staging.
 
