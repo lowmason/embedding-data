@@ -11,7 +11,8 @@ Application establishment summaries, American Community Survey microdata through
 IPUMS USA, and Current Population Survey microdata through IPUMS CPS — plus the
 code harmonization, geography hierarchy, and output tables they share. The
 *evaluation protocol* that scores embeddings against these targets is
-deliberately excluded and belongs to a successor spec (see Out of scope). Every
+deliberately excluded and belongs to a successor spec (see Out of scope), which
+is [evaluation-protocol.md](evaluation-protocol.md) *(owner, 2026-11-18)*. Every
 input is free to access and every output is an aggregate; no paid data and no
 microdata release is required to run, test, or reproduce any requirement here.
 
@@ -641,7 +642,10 @@ bullet here.
 - **Evaluation protocol.** Distance measures, rank correlations, hierarchical
   scoring of text–code pairs, data splits, and acceptance thresholds are a
   distinct subsystem. **Successor spec required before any embedder is scored.**
-  R7 delivers the targets it consumes.
+  R7 delivers the targets it consumes. The successor spec is
+  [evaluation-protocol.md](evaluation-protocol.md). It covers the ITA text–code
+  pairs. Every other family waits for its own section there. *(owner,
+  2026-11-18)*
 - **Sources considered and not adopted** (D):
   - SBA Paycheck Protection Program loans: borrower-level, a 2020–21 snapshot,
     with applicant-reported job counts.
