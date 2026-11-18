@@ -174,6 +174,7 @@ Stage 4 process: inline execution (executing-plans) on branch `stage-4-ita-naics
 - **D8** (owner, Stage 4 planning stop-and-ask, 2026-11-18): Keep the `n_multi_industry_employers` reading (the EIN has `a` and at least one other industry in the same year), and clarify the spec to match. Applied in: Task 11 Step 9a (spec amendment).
 - **D9** (owner, Stage 4 planning stop-and-ask, 2026-11-18): Keep both link readings: `later_row` takes the confirmed successor for confirmed rows and is null for `conflict`, and an ambiguous later ID sets only `reason_later_id_ambiguous`. Clarify the spec to match. Applied in: Task 11 Step 9a (spec amendment).
 - **D10** (owner, Stage 4 planning stop-and-ask, 2026-11-18): Keep the path reading: only a pair-code row with an empty candidate list references no path, and an unresolved row that keeps candidates references their paths. Clarify the spec to match. Applied in: Task 11 Step 9a (spec amendment).
+- **D11** (owner, plan review, 2026-11-18): Approve the Stage 4 amendments to this plan as committed, including the four Step 9a spec replacements word for word, the replay ID, the PR-lifecycle merge and inline execution. Applied in: header (Stage 4 process), Task 11.
 
 ## Settled Defaults (for owner review)
 
