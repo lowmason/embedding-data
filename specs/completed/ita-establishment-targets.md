@@ -1,13 +1,12 @@
 # ITA establishment targets
 
-> Required next skill: writing-plans in a fresh session. The owner approved
-> this committed specification. Do not implement during brainstorming.
+**Status: COMPLETE (2026-11-18)** — implemented by [plan 11](../plans/completed/11-ita-establishment-targets.md); measured runs in the [Stage 10 finding](../findings/stage-10-ita-establishment-targets.md).
 
 The owner approved the headline window, the index-entry flag, the co-ownership
 measure, the build approach and the Stage 9 write coordination on 2026-11-13.
 The owner then approved this written specification, including every call
-marked "My call", on 2026-11-13. Stage 10 implementation and measured
-acceptance remain planned.
+marked "My call", on 2026-11-13. At that approval, Stage 10 implementation and measured
+acceptance remained planned.
 
 **Amendment: selection on the validation part (owner, 2026-11-18).** The
 anti-goal against model selection now has one exception. Checkpoint and
@@ -29,12 +28,12 @@ held-out part is reported as evaluation." R8.4 itself is unchanged. The limits:
 
 ## Scope and governing contracts
 
-Stage 10 of [the roadmap](completed/embedding-evaluation-data-spec-roadmap.md)
+Stage 10 of [the roadmap](embedding-evaluation-data-spec-roadmap.md)
 implements R2.6, R2.7 and the text–code pair and co-ownership rows of R7.2 in
-[the source spec](embedding-evaluation-data-spec.md). R7.1, R7.4, R8 and R9
+[the source spec](../embedding-evaluation-data-spec.md). R7.1, R7.4, R8 and R9
 govern outputs, provenance, disclosure, leakage and offline operation. The
 adopted V1–V3 rules in
-[the V1–V3 finding](findings/v1-v3-ita-verification.md) govern text keys,
+[the V1–V3 finding](../findings/v1-v3-ita-verification.md) govern text keys,
 employer keys and linkage.
 
 Stage 10 produces three products from data that is already on disk:
@@ -376,7 +375,7 @@ exactly-one-pair property and lets later work trace a pair to its records.
 `naics_2022_paths.parquet`: the exact Stage 4 `code_paths` rows for every node
 that any pair-code row references, as a candidate or as a scalar node. Schema
 `node_id: String, path: List(String)`, root to node. This carries the full
-2022 path for every supported candidate. Unresolved rows reference no path.
+2022 path for every supported candidate. A pair-code row references no path only when its candidate list is empty. An unresolved row that keeps unknown-vintage candidates references their paths. *(owner, plan 11, 2026-11-18)*
 
 ### Accounting
 
@@ -473,7 +472,7 @@ protocol can use them with `n(a)`.
 | --- | --- | --- |
 | `node_id` | String | Industry `a` |
 | `n_employers` | UInt64 | `n(a)` |
-| `n_multi_industry_employers` | UInt64 | EINs in `n(a)` with two or more industries in one year |
+| `n_multi_industry_employers` | UInt64 | EINs in `n(a)` with `a` and at least one other industry in the same year *(owner, plan 11, 2026-11-18)* |
 | `n_records` | UInt64 | Eligible records in `a` |
 | `n_employers_including_padded` | UInt64 | `n(a)` with padded EINs admitted |
 | `n_employers_partial` | UInt64 | EINs in `n(a)` that, in at least one year with an eligible record in `a`, also filed an ineligible record in that same year |
@@ -555,7 +554,7 @@ precedence:
 A `weaker_same_id` row carries the reasons as separate Boolean columns:
 `reason_later_id_ambiguous`, `reason_ein_unknown`, `reason_ein_reconstructed`,
 `reason_ein_conflict`, `reason_address_incomplete` and
-`reason_address_conflict`. Several reasons can be true. Weaker evidence and
+`reason_address_conflict`. Several reasons can be true. When the later ID is not unique, `reason_later_id_ambiguous` is the only reason set. *(owner, plan 11, 2026-11-18)* Weaker evidence and
 conflicts never count as confirmed. Relocation can break address confirmation
 without proving a different establishment.
 
@@ -569,7 +568,7 @@ record, sorted by `base_year`, `later_year`, `base_row`:
 | `base_year`, `later_year` | Int64 | Year pair |
 | `base_row` | UInt64 | Smallest source row of the base record |
 | `base_rows` | List(UInt64) | All source rows of the base record |
-| `later_row` | UInt64, nullable | Successor's smallest source row, for confirmed links and for unique same-ID candidates |
+| `later_row` | UInt64, nullable | Successor's smallest source row: the confirmed successor for a confirmed status, the unique same-ID candidate for `weaker_same_id`, otherwise null (`conflict` included) *(owner, plan 11, 2026-11-18)* |
 | `base_establishment_id`, `later_establishment_id` | Int64, nullable | Delivered IDs |
 | `status` | String | One status from the table above |
 | `reason_*` | Boolean | Weaker-evidence reasons |
@@ -590,7 +589,7 @@ difference. A mismatch fails the build.
 A gate that compares the build with a recomputation from the same code proves
 little. **My call:** the expected values are integer constants transcribed
 from the adopted V1 and V2 tables in
-[the V1–V3 finding](findings/v1-v3-ita-verification.md), committed in a
+[the V1–V3 finding](../findings/v1-v3-ita-verification.md), committed in a
 Stage 10 module. A unit test checks the constants against the finding's
 Markdown tables, so a transcription error fails the suite. The build compares
 its own counts, computed by the new Stage 10 code, with those constants.

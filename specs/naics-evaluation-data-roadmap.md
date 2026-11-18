@@ -92,7 +92,7 @@ promoted Track B item, follows Track A's Stages 3 and 4 (owner, 2026-11-16).
 > Stage 3: COMPLETE (2026-11-17) — implemented by plan 12 (specs/plans/completed/12-ita-naics-minimum-counts.md); decision in specs/findings/v9-ita-naics-minimum-counts.md. The text-pair gate counts `n_headline_records`, not the Exit's `n_records`, per that plan's Deviation note.
 > Next: resume the roadmap.
 
-- [ ] Stage 4: ITA NAICS targets, hardening
+- [x] Stage 4: ITA NAICS targets, hardening
       Objective: Stage 1's bundle gets its exact replay check, long-form acceptance finding and README and CLAUDE.md run pins, and plan 11 retires.
       Outcomes: O1, O2, O3 (hardening)
       Track: A
@@ -101,6 +101,9 @@ promoted Track B item, follows Track A's Stages 3 and 4 (owner, 2026-11-16).
       Exit: `verify` of Stage 1's run with its detached pin passes from Stage 4's checkout and venv, because `compare-runs` does not check software identity (Resolved at resume, 2026-11-16: owner; Stage 1 findings, "For Stages 3 and 4"). The replay bundle's `verify` passes and `compare-runs` against Stage 1's run reports `"equal": true`. The long-form acceptance finding is committed. README and CLAUDE.md name the selected runs and pins. Plan 11 retires through the Plan Completion Protocol
       Leaves out: nothing
       ROUTING: writing-plans
+
+> Stage 4: COMPLETE (2026-11-18) — implemented by plan 11 (specs/plans/completed/11-ita-establishment-targets.md).
+> Next: resume the roadmap.
 
 - [ ] Stage 5: TRI parent links, first build
       Objective: EPA TRI facility parent links are built once on real data as a new evidence family and verified.

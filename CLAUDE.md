@@ -364,8 +364,19 @@ pytest run and full-data command, run `pgrep -fl
 anything. Each of the four production writes (index acquisition or import, first build,
 replay build, cleanup of leftover staging) needs the owner's go-ahead and a confirmed
 closed Stage 9 freeze window. Fixture results are software readiness, never benchmarks.
-Measured full-data acceptance is pending until
-`specs/findings/stage-10-ita-establishment-targets.md` exists. No Stage 10 output may
+Measured full-data acceptance is recorded in the
+[Stage 10 finding](specs/findings/stage-10-ita-establishment-targets.md). The selected
+first and replay runs are `stage10_ita_establishment_20261116_r1` / `_replay`, with
+detached output pins
+`e19b0d58f61f106c3994aa6fe51f4fb71244188145dd90f8cccaa8dc8a8b09df` /
+`e38e820b6e999f751687918d8f578b0f9d69ce145bbcb672b966a19a78d536a4`. The replay is
+`build stage10_ita_establishment_20261116_r1_replay --data-dir
+/Users/lowell/Projects/embedding-data/data --codes-run stage4_v11_20261013_r2
+--codes-outputs-sha256 15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a`,
+built at commit `be4e8da` (first run `1f3abf0`, both `dirty: false`). Both runs pass
+`verify` with the `adopted_v1_v3_finding` basis, and `compare-runs` reports equal with
+`trust_established` false. The independent reconcilers ran on the first run only. The
+finding records the exact verifiers, counts and limits. No Stage 10 output may
 feed embedder training, curriculum, hard-negative mining or model selection (R8.4).
 One exception (owner, 2026-11-18, the stage spec's amendment): selection may read the
 validation part of the text–code pairs, split by `description_key`. The sealed part
