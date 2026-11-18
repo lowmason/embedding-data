@@ -26,8 +26,9 @@ SHA-256 of `outputs.json`. `verify` needs it as `--outputs-sha256`.
 | | `inputs.json` | `bb86ecbc8003775731b4deac79a8190780fe460daf486122ccdec225f8bf0883` |
 | | `report.json` | `7f1edba024bc7a290bb2682b95126450b921e6e3cba602aa9b887d3d2c587629` |
 
-The two `report.json` files have the same bytes. The two pins differ, because `inputs.json`
-records the run ID and the creation time. Each bundle has 11 files: eight Parquet tables,
+The two `report.json` files have the same bytes. The two pins differ. `inputs.json` records the run ID,
+the executing commit and the creation time, and two Parquet files differ in bytes (see
+Results). Each bundle has 11 files: eight Parquet tables,
 `inputs.json`, `report.json` and `outputs.json`. The first bundle is 160,736,016 bytes. The
 replay bundle is 160,752,463 bytes.
 
@@ -148,8 +149,10 @@ these unchanged:
   and `78fd21e37ba0c5b1cd396ff0961b557650788fdccd3c84a911e8c6c3b7fabe71`. The codes
   inventory and both Stage 6 inventories pass `target_io.verify_inventory`.
 - The manifest, SHA-256 `0c610ce188e6ecc0a987db1726b34280c65bd7d42d3fbcd9448afeebdcddbb71`,
-  3,010 lines. `build`, `verify` and `compare-runs` append nothing to it.
-- The first run's `outputs.json`.
+  3,010 lines. `build` and `verify` append nothing to it.
+
+Only Stage 4 (Step 6a) checked two more things. The first run's `outputs.json` still has
+the pin in the table above, and `compare-runs` appended nothing to the manifest.
 
 After the replay, `establishment-targets/` holds exactly the two runs and no `.part`
 directory. The whole-tree audit exits 0 with 0 raw provenance discrepancies. The Stage 1
@@ -214,7 +217,7 @@ under padded EINs. Every row keeps `size_gate_pending`.
 
 The partition sorts every record by filing year and eligibility. Its cells sum to
 3,206,055. The industry-ineligible counts equal the non-`native_2022` counts above in
-each year.
+each window year (2023–2025). The years 2016–2022 fall outside the window first.
 
 | Year | eligible | ein_padded | ein_unusable | industry_ineligible | year_outside_window | Total |
 |---|---:|---:|---:|---:|---:|---:|
@@ -256,7 +259,7 @@ establishment. Weaker evidence and conflicts never count as confirmed.
 ## Rulings
 
 The ledger of plan 11 holds the rulings made during execution. Six of them carry the
-label "unclear". On 2026-11-18 the owner settled them.
+label "unclear". On 2026-11-18 the owner settled five of them.
 
 - The owner kept the five live unclear readings (ledger lines 36, 45, 46, 66 and 68).
   D7 settles two: `compare-runs` prints both run IDs and both paths on failure, and
@@ -298,7 +301,10 @@ The measured value for limit 4 is 41.8% (333,721 of 798,908 records).
 - No cause is given for the byte differences in two replay Parquet files.
 - Coverage and agreement between runs do not show accuracy or representativeness.
 - No Stage 10 output feeds embedder training, curriculum, hard-negative mining or model
-  selection (R8.4).
+  selection (R8.4). One exception (owner, 2026-11-18, the stage spec's amendment):
+  selection may read the validation part of the text–code pairs, which are split by
+  `description_key`. The sealed part only judges. Co-ownership and the link table keep the
+  full exclusion. This stage builds and reads no split.
 
 ## Where the evidence lives
 

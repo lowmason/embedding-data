@@ -5,8 +5,8 @@
 The owner approved the headline window, the index-entry flag, the co-ownership
 measure, the build approach and the Stage 9 write coordination on 2026-11-13.
 The owner then approved this written specification, including every call
-marked "My call", on 2026-11-13. Stage 10 implementation and measured
-acceptance remain planned.
+marked "My call", on 2026-11-13. At that approval, Stage 10 implementation and measured
+acceptance remained planned.
 
 **Amendment: selection on the validation part (owner, 2026-11-18).** The
 anti-goal against model selection now has one exception. Checkpoint and

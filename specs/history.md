@@ -27,8 +27,8 @@ Differences from the design:
 - Deviation (Task 2): the final review's fix commit `5426170` narrowed `acquire-references` stdout to one JSON line. Source: plan, Task 2.
 - Deviation (Task 3): the module adds one public helper, `merge_citations`, beyond the plan. Source: plan, Task 3.
 - Deviation (Task 10): behave plus the parallel `coverage-check-full` hook replaced the serial `pytest`. Source: plan, Task 10.
-- Deviation (Task 11, Steps 1–8a): Stage 1 ran these steps under D5 and D6, and Step 2 was Gate 1 on 2026-11-16, before Stage 1. Source: plan, Task 11.
-- Deviation (Task 11, Steps 4a, 4b, 6a, 9a, 11, 12): added for Stage 4. Stage 4 also ran Step 6's replay `verify` and `compare-runs`. Source: plan, Task 11.
+- Deviation (Task 11, Steps 1, 3, 4, 6 (first run), 7, 8, 8a): Stage 1 ran these steps under D5 and D6. Step 2 was Gate 1 on 2026-11-16, before Stage 1. Source: plan, Task 11.
+- Deviation (Task 11, Steps 4a, 4b, 6a, 9a, 11, 12): added for Stage 4. Stage 4 also ran Step 5 (the replay build) and Step 6's replay `verify` and `compare-runs`. Source: plan, Task 11.
 - Decision D2 (spec amendment): the 25 `******` cross-reference rows in each index file stay as a counted class with the delivered code. Source: plan, `## Decisions`.
 - Decision D8 (spec amendment): `n_multi_industry_employers` counts EINs with `a` and at least one other industry in the same year. Source: plan, `## Decisions`.
 - Decision D9 (spec amendment): `later_row` is the confirmed successor for confirmed rows and null for `conflict`, and an ambiguous later ID sets only `reason_later_id_ambiguous`. Source: plan, `## Decisions`.
