@@ -56,6 +56,12 @@ task.
   stage's acquisition or full-data build is running. Show the owner the output of `pgrep
   -fl 'embedding_data|embedding-data'` at each go-ahead. The controller runs Task 9
   itself, because a subagent cannot ask the owner.
+- **Stage 17's own preservation window.** *Default, flagged at plan review.* The window
+  opens at the freeze (Task 9 Step 4) and closes at the preservation check (Step 10).
+  Spec item 7 is strict: the manifest stays byte-identical, and no file appears outside
+  the two runs and the control directory. During the window the owner holds every other
+  stage's acquisition, build and other write under `data/`. Plan 13 (Stage 5 TRI) is
+  merged and can run at any time. Run Steps 4 to 10 in one sitting where possible.
 - **Production root.** Every production command passes `--data-dir
   /Users/lowell/Projects/embedding-data/data`. Every test passes a temporary data
   directory.
@@ -289,6 +295,7 @@ def test_summarize_counts_the_funnel_flags_and_categories():
     # six rows built to hit each funnel step once in 2023 and once in 2024
     assert report == {expected dict written out in the test}
 
+@settings(deadline=None)   # Polars aggregates on shared CPUs exceed 200 ms
 @given(rows=st.lists(core_rows(), min_size=1, max_size=30))
 def test_headline_is_the_conjunction_of_its_parts(rows):
     persons = rules.wage_persons(core_frame(rows)).collect()
@@ -656,8 +663,11 @@ because it loads `ipumspy` (Global Constraints, Imports). Batch equality uses
 3. `wage_persons(pl.scan_parquet(selected.core)).sink_parquet(staging /
    'acs_wage_persons.parquet')`.
 4. On the staged file: refuse an ordered schema other than `OUTPUT_COLUMNS` with the
-   carried types of the core table and the `NEW` types. Then run `check_headline` and
-   `check_nodes` with the Stage 4 tables.
+   carried types of the core table and the `NEW` types. Refuse a `source_row` that is
+   not strictly increasing, and a row count that differs from the core table's count of
+   `INCWAGE > 0` rows (`'staged rows differ from the earners'`). The input check runs
+   before the streaming join and sink, so only this check sees a reorder at scale. Then
+   run `check_headline` and `check_nodes` with the Stage 4 tables.
 5. Write `report.json` (`summarize` of the staged file) and `inputs.json`:
    `{'run_id', 'contract', 'mapping', 'codes', 'ddi'}` from the provenance, `labels`,
    `rules` (`RULES`), `software`, and `execution` = `{'commit', 'dirty', 'created_at'}`
@@ -676,7 +686,8 @@ reading any other file; check the exact file set, `verify_inventory` and the inv
 exact records; read `inputs.json` strictly with exactly `INPUT_FIELDS`, the directory's
 run ID and `CONTRACT`; `select_wage_inputs` from the recorded runs and pins; require
 `inputs['software'] == freeze_software()`; recompute `wage_persons` and compare it with
-the published table by `ordered_compare`; run both checks; require `report.json ==
+the published table by `ordered_compare`; run the step 4 order, count and both checks
+on the published table; require `report.json ==
 summarize(published)` and `inputs.json` equal to the recomputed inputs with the recorded
 `execution`.
 
@@ -728,6 +739,12 @@ def test_leftover_part_blocks_only_its_own_run_id(chain):
 
 def test_failed_build_removes_only_its_staging(chain, monkeypatch):
     # summarize raises: no final, no .part, an existing sibling run unchanged
+
+@pytest.mark.parametrize('distortion', ['reverse', 'drop_last_row'])
+def test_build_refuses_reordered_or_missing_staged_rows(chain, monkeypatch, distortion):
+    # monkeypatch acs_wage_rules.wage_persons to return the distorted plan
+    with pytest.raises(ValueError, match='staged rows differ from the earners'): ...
+    # no final and no .part remain
 
 def test_symlinked_run_root_is_refused(chain): ...
 def test_verify_passes_with_the_pin(chain): ...
@@ -1062,8 +1079,9 @@ each command's stdout, stderr and `time` output to the ledger
 
 - [ ] **Step 1: Preconditions.** `.sdd/` is not ignored in this repository. If `git
   check-ignore -q .sdd/` fails, append `.sdd/` to `$(git rev-parse
-  --git-common-dir)/info/exclude`, a local file that is never committed. Ledger files then
-  cannot make the tree dirty. Tasks 1–8 are committed, and the full suite passed at this
+  --git-common-dir)/info/exclude`, a local file that is never committed. It applies to
+  every worktree of this clone, including the primary checkout. Ledger files then cannot
+  make the tree dirty. Tasks 1–8 are committed, and the full suite passed at this
   HEAD. `git status --porcelain --untracked-files=normal` prints nothing. Record
   `git rev-parse HEAD`. Choose `FIRST=stage17_acs_wage_microdata_<YYYYMMDD>_r1`,
   `REPLAY=${FIRST}_replay`, `CONTROL=$ROOT/derived/acs/wage-microdata-controls/$FIRST`.
@@ -1072,7 +1090,9 @@ each command's stdout, stderr and `time` output to the ledger
 - [ ] **Step 2: GATE 1.** Ask the owner for the go-ahead for the freeze and the first
   build. Confirm that no Stage 9 freeze window is open and that no other stage's
   acquisition or full-data build is running. Show the output of `pgrep -fl
-  'embedding_data|embedding-data'`.
+  'embedding_data|embedding-data'`. Tell the owner that Stage 17's preservation window
+  opens at Step 4 and closes at Step 10, and that other stages' writes under `data/`
+  wait until then.
 
 - [ ] **Step 3: Stage 8 preflight (read-only).**
 
