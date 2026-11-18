@@ -217,7 +217,10 @@ go-ahead.
 
 ## Decisions
 
-None.
+- **D1** (owner, plan review, 2026-11-18): Run the document checks, acquisition and the data checks (Tasks 1 and 9) before the targets, the bundle and V12, so that V12 uses the header layout that E4 records. The first build stays after V12. This amends the stage spec's Rollout bullet ("Approve"). Applied in: task order (Tasks 1–13), Task 16 Step 6 (spec amendment).
+- **D2** (owner, plan review, 2026-11-18): A blank or invalid last update date on any extract row of a UEI makes that firm `dnb_era_record`, and the report counts such rows (Settled Default 12, "Exclude, count"). Applied in: Task 7.
+- **D3** (owner, plan review, 2026-11-18): `compare-runs` compares the four Parquets and `report.json` exactly and skips `inputs.json` (Settled Default 19, "Skip inputs.json"). Applied in: Task 11.
+- **D4** (owner, plan review, 2026-11-18): Approve plan 15 as committed at `d1769a2`, with the other Settled Defaults unchanged ("Approve plan 15"). Applied in: Settled Defaults.
 
 ## Settled Defaults (for owner review)
 
@@ -228,7 +231,8 @@ None.
    only E4 records that layout. The two texts cannot both hold. Plan 13 met the same
    conflict and the owner approved this order there (plan 13, D1). This plan runs the
    data checks as Task 9, before the targets, the bundle and V12. The first build stays
-   after V12. Task 16 Step 6 amends the Rollout bullet with the exact text shown there.
+   after V12. The owner approved this order and the wording as D1. Task 16 Step 6 amends
+   the Rollout bullet with the exact text shown there.
 2. **Document checks before any code.** The spec runs them before any acquisition. This
    plan runs them as Task 1, before any code too, so a failed E6 wastes no work.
 3. **Registries are committed JSON.** `src/embedding_data/sam_extract_layout.json` is
