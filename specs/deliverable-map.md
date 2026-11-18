@@ -1,10 +1,10 @@
-The deliverable map:
+The deliverable map, as of 2026-11-18 at `9011b71`:
 
 | embedding-data deliverable | Status | 1. Relatedness | 2. Text→code | 3. Economic | Still blocked by |
 |---|---|---|---|---|---|
-| ITA text–code pairs | Built, count gate met (minimum 1) | No | **Yes.** Validation part selects, sealed part judges, no pair trains *(changed: selection allowed by lowmason/embedding-data#21)* | No | The evaluation-protocol spec for the ITA pairs |
-| ITA co-ownership | Built, count gate met | **Yes.** Role not assigned | No | No | A protocol for this family. R8.4, if it trains |
-| ITA area mix, 2023 | Built, count gate met | **Yes.** Role not assigned | No | No | A protocol for this family. R8.4, if it trains |
+| ITA text–code pairs | Built and replayed, count gate met (minimum 1). 18,188 of 239,364 headline pairs are not copied taxonomy text | No | **Yes.** Validation part selects, sealed part judges, no pair trains. Reads follow [the evaluation protocol](evaluation-protocol.md), Section 1 | No | Nothing in this repository. naics-embedder must resume its roadmap and re-read its gates |
+| ITA co-ownership | Built and replayed, count gate met | **Yes.** Role not assigned | No | No | Its own section in [the evaluation protocol](evaluation-protocol.md). R8.4, if it trains |
+| ITA area mix, 2023 | Built and replayed, count gate met | **Yes.** Role not assigned | No | No | Its own section in [the evaluation protocol](evaluation-protocol.md). R8.4, if it trains |
 | ACS staffing patterns | On hold (three failed full builds) | **Yes** | No | No | Its build and its count gate |
 | ACS workplace area mix | On hold | **Yes** | No | No | Its build and its count gate |
 | ACS and CPS worker profiles | Deferred | **Yes** | No | Possible later wage panel (my inference) | Its build and its count gate |
