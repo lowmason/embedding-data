@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Synthetic basic data files page (test fixture)</title>
+  </head>
+  <body>
+    <main>
+      <h1>Synthetic basic data files page</h1>
+      <p>This page is an invented test fixture. It copies the tags and attributes of the
+      real page that carry the date and the file links, and none of its prose.</p>
+      <div class="box box--highlight u-align-right"><div class="box__title">Update Status</div><div class="box__content"><p>Includes reporting forms processed as of: <strong>November 5, 2025</strong></p></div></div>
+      <p>Invented introduction. Pick a year and a geographic area, then use the button.</p>
+      <p><label class="usa-label" for="select_year">Select year</label> <select class="usa-select" id="select_year" name="Target" title="Select a reporting year"><option value="2024">2024</option><option value="2023">2023</option><option value="2022">2022</option><option value="2021">2021</option></select> <label class="usa-label" for="select_geography">Select geographic area</label> <select class="usa-select" id="select_geography" name="Target" title="Select a file"><option value="US">U.S.</option><option value="FED">Fed</option><option value="AL">AL</option></select></p>
+      <p><a class="ck-anchor usa-button" id="download" href="/void%280%29%3B">Download data file</a></p>
+      <p><em>Invented note about other files.</em></p>
+    </main>
+    <script>
+      function updateDownloadButtonHref() {
+        var year = jQuery("#select_year").find(":selected").val();
+        var geography = jQuery("#select_geography").find(":selected").val();
+        var url = `https://data.epa.gov/efservice/downloads/tri/mv_tri_basic_download/${year}_${geography}/csv`;
+        jQuery("#download").attr("href", url);
+      }
+      updateDownloadButtonHref();
+    </script>
+  </body>
+</html>
