@@ -355,7 +355,7 @@ exactly-one-pair property and lets later work trace a pair to its records.
 `naics_2022_paths.parquet`: the exact Stage 4 `code_paths` rows for every node
 that any pair-code row references, as a candidate or as a scalar node. Schema
 `node_id: String, path: List(String)`, root to node. This carries the full
-2022 path for every supported candidate. Unresolved rows reference no path.
+2022 path for every supported candidate. A pair-code row references no path only when its candidate list is empty. An unresolved row that keeps unknown-vintage candidates references their paths. *(owner, plan 11, 2026-11-18)*
 
 ### Accounting
 
@@ -452,7 +452,7 @@ protocol can use them with `n(a)`.
 | --- | --- | --- |
 | `node_id` | String | Industry `a` |
 | `n_employers` | UInt64 | `n(a)` |
-| `n_multi_industry_employers` | UInt64 | EINs in `n(a)` with two or more industries in one year |
+| `n_multi_industry_employers` | UInt64 | EINs in `n(a)` with `a` and at least one other industry in the same year *(owner, plan 11, 2026-11-18)* |
 | `n_records` | UInt64 | Eligible records in `a` |
 | `n_employers_including_padded` | UInt64 | `n(a)` with padded EINs admitted |
 | `n_employers_partial` | UInt64 | EINs in `n(a)` that, in at least one year with an eligible record in `a`, also filed an ineligible record in that same year |
@@ -534,7 +534,7 @@ precedence:
 A `weaker_same_id` row carries the reasons as separate Boolean columns:
 `reason_later_id_ambiguous`, `reason_ein_unknown`, `reason_ein_reconstructed`,
 `reason_ein_conflict`, `reason_address_incomplete` and
-`reason_address_conflict`. Several reasons can be true. Weaker evidence and
+`reason_address_conflict`. Several reasons can be true. When the later ID is not unique, `reason_later_id_ambiguous` is the only reason set. *(owner, plan 11, 2026-11-18)* Weaker evidence and
 conflicts never count as confirmed. Relocation can break address confirmation
 without proving a different establishment.
 
@@ -548,7 +548,7 @@ record, sorted by `base_year`, `later_year`, `base_row`:
 | `base_year`, `later_year` | Int64 | Year pair |
 | `base_row` | UInt64 | Smallest source row of the base record |
 | `base_rows` | List(UInt64) | All source rows of the base record |
-| `later_row` | UInt64, nullable | Successor's smallest source row, for confirmed links and for unique same-ID candidates |
+| `later_row` | UInt64, nullable | Successor's smallest source row: the confirmed successor for a confirmed status, the unique same-ID candidate for `weaker_same_id`, otherwise null (`conflict` included) *(owner, plan 11, 2026-11-18)* |
 | `base_establishment_id`, `later_establishment_id` | Int64, nullable | Delivered IDs |
 | `status` | String | One status from the table above |
 | `reason_*` | Boolean | Weaker-evidence reasons |

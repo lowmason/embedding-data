@@ -425,8 +425,15 @@ the limits of the stage spec. Under R8.4, no Stage 10 output may feed embedder
 training, curriculum, hard-negative mining or model selection.
 
 The tests and the fixture chain show software readiness only. Fixture results are
-never benchmarks. Full-data acceptance is pending until the finding
-`specs/findings/stage-10-ita-establishment-targets.md` exists.
+never benchmarks. The measured production runs are
+`stage10_ita_establishment_20261116_r1` (the first run) and
+`stage10_ita_establishment_20261116_r1_replay`. Their detached pins, which `verify` needs
+as `--outputs-sha256`, are
+`e19b0d58f61f106c3994aa6fe51f4fb71244188145dd90f8cccaa8dc8a8b09df` and
+`e38e820b6e999f751687918d8f578b0f9d69ce145bbcb672b966a19a78d536a4`. Both pass `verify`
+with the basis `adopted_v1_v3_finding`, and `compare-runs` finds them equal. The
+[Stage 10 finding](specs/findings/stage-10-ita-establishment-targets.md) records the exact
+commands, the counts, the cost and what is not claimed.
 
 ## Data sources
 
