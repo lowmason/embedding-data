@@ -5,7 +5,7 @@
 > placement). That stage then goes to writing-plans against this file. Do not
 > plan this file before the roadmap has its stage.
 
-Status: DRAFT, written 2026-11-18. Awaiting the owner's review.
+Status: APPROVED (2026-11-18, owner: "Approve"). Written 2026-11-18.
 
 ## Design provenance
 
