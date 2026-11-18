@@ -410,6 +410,18 @@ def test_import_file_refuses_a_non_regular_or_empty_original(kind, data_director
     assert not data_directory.exists()
 
 
+def test_import_file_refuses_an_existing_destination_before_copying(data_directory, tmp_path):
+    original = tmp_path / 'download.csv'
+    original.write_bytes(BODIES[2023])
+    destination = tri_raw.raw_path(data_directory, 2023, RECORDED)
+    destination.parent.mkdir(parents=True)
+    destination.write_bytes(b'placed by hand\n')
+    with pytest.raises(ValueError, match='raw destination already exists'):
+        tri_raw.import_file(data_directory, 2023, original, processed_as_of=RECORDED)
+    assert destination.read_bytes() == b'placed by hand\n'
+    assert files_under(data_directory) == [destination.relative_to(data_directory).as_posix()]
+
+
 def test_import_file_refuses_a_recorded_path_whose_file_is_gone(data_directory, tmp_path):
     original = tmp_path / 'download.csv'
     original.write_bytes(BODIES[2023])
