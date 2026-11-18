@@ -174,7 +174,8 @@ never call upstream builders or `sample` to prepare this stage. Occupied run and
 staging names require inspection and a fresh selection, never overwrite. Relevant
 software/dependency changes invalidate preparation/resume. The nonfixture production
 measurement is separate from the 21-row/five-eligible V12 readiness fixture;
-later families and V9 remain planned.
+later families remain planned. The V9 headline minimum for the 2023 area mix is in
+`specs/findings/v9-ita-naics-minimum-counts.md`.
 
 **Delivered IPUMS verification (Stage 7).** `embedding-data ipums` provides explicit
 `acquire-references REFERENCE_ID`, `import-reference REFERENCE_ID KIND FILE`, offline

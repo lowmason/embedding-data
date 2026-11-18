@@ -270,7 +270,8 @@ cell supports. County denominators retain assigned, eligible and excluded-indust
 counts, including counties with zero eligible records. Flag counts record positive
 true/null support for each numerator and denominator; labels such as
 `numerator:flag_assignment_hud:true` indicate some support, not that all records
-carry the flag. Every target has `size_gate_pending`; V9 remains pending.
+carry the flag. Every target keeps `size_gate_pending`. The V9 headline minimum for
+this family is in `specs/findings/v9-ita-naics-minimum-counts.md`.
 
 This is conditional on a program-selected filing universe with unvalidated
 reported employment and preserved duplicate multiplicity. Coverage establishes
