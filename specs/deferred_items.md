@@ -138,6 +138,7 @@
       field/year-specific evidence resolves the 2026 category and Stage 11 has
       regression-tested explicit special/mapping behavior retaining original
       values and provenance, with no silent leaf assignment or headline inclusion.
+      → planned 2026-11-18: specs/naics-evaluation-data-roadmap.md
 
 ## embedding-evaluation-data-spec-roadmap — 2026-11-16
 - [ ] ACS targets (old Stage 9): ACS staffing-pattern, workplace area-mix,
@@ -156,6 +157,7 @@
       ACS target bundle, with its universe, pooling, replicate-SE and
       allocation-flag helpers, is published and verified on real data, or the
       owner retires plan 9.
+      → planned 2026-11-18: specs/naics-evaluation-data-roadmap.md
 - [ ] CPS panel linkage and job-change flows (old Stage 11): CPS codes mapped
       to NAICS and SOC, linked person-month pairs, and occupation→occupation and
       industry→industry job-change flows (spec R4.3, R4.6–R4.9, R4.11, R5.1, the
@@ -166,6 +168,7 @@
       Size: design. Done when: the CPS code mapping, the linked person-month
       pairs and the CPS weight and SE helpers exist, and job-change flows are
       built on real data.
+      → planned 2026-11-18: specs/naics-evaluation-data-roadmap.md
 - [ ] Worker profiles and CPS cross-sections (old Stage 12): worker profiles,
       the CPS staffing check and CPS state-migration targets (spec R4.4,
       R4.10–R4.12 and the worker-profile, staffing and migration rows of R7.2).
