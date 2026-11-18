@@ -19,13 +19,25 @@ directory by rename.
 
 Roadmap: specs/naics-evaluation-data-roadmap.md, Stage 4 — tick Stage 1 when its Exit holds; on plan completion, tick Stage 4 and re-validate later stages against what shipped. (Moved from Stage 10 of the parked `specs/completed/embedding-evaluation-data-spec-roadmap.md` on 2026-11-16.)
 
+Scope: O1, O2, O3 (hardening) — plan 11 Task 11 Steps 5, 6, 9 and 10; leave out nothing.
+
 Process: lighter — first build (Gate 2), verify, the reconciliation script and the preservation checks, plus a one-screen findings file with measured wall time, peak memory and bundle size. The replay build, the long-form finding, the README/CLAUDE.md pins and plan 11's retirement go to Stage 4.
+
+Stage 4 process: inline execution (executing-plans) on branch `stage-4-ita-naics-hardening` in worktree `.claude/worktrees/stage-4-ita-naics-hardening`, cut from `main` at `9161c16`. The controller runs Task 11 Steps 4a, 4b, 5, 6, 6a, 9, 9a, 10, 11 and 12 in that order. Plan 11 carries Stage 4 itself: no other plan claims the stage, so its completion ticks Stage 4 once.
 
 ## Global Constraints
 
 - **Branch.** Execute on a new branch cut from `main` at or after `e1470e7`, the
   merge of lowmason/embedding-data#8. That commit is the first on `main` with the
   spec and this plan.
+- **Stage 4 software identity.** Stage 4 changes no file under `src/`, `scripts/`,
+  `features/`, `pyproject.toml` or `uv.lock`. The only `.py` change is the one-line
+  `SPEC` path in `tests/test_ita_co_ownership.py` (Step 11), which is outside
+  `ita_establishment_bundle.SOFTWARE_FILES`. Run `build`, `verify` and `compare-runs`
+  with plain `uv run --locked` from the Stage 4 worktree's own `.venv`: no `uv sync`
+  with other flags, no `--with` overlay, and no change to the venv between Step 4a and
+  Step 6. `freeze_software()` records the full `sys.version` and all installed
+  distributions, so a drifted venv fails `verify` of both runs.
 - **Stage 9 host rule.** Before every commit, every full `pytest` run and every
   full-data command, run
   `pgrep -fl 'embedding_data\.acs_targets|stage9_independent|reconcile_stage9'`.
@@ -47,7 +59,9 @@ Process: lighter — first build (Gate 2), verify, the reconciliation script and
 - **Merging.** Stage 9's checker hashes every `.py` file under `src`, `scripts`,
   `tests` and `features` of the checkout it runs from. Do not merge Stage 10 into
   `main` or any Stage 9 checkout without the owner. Avoiding a merge between a Stage 9
-  freeze and its preservation check is Stage 9's responsibility.
+  freeze and its preservation check is Stage 9's responsibility. Stage 4's PR merges
+  under the owner's standing PR-lifecycle rule (Step 12), with the `pgrep` check run
+  right before the merge.
 - **Commit protocol.** Each task's commit step is: run the `pgrep` check, then
   `git add <the task's files>`, then `git commit` with the given message and the
   `Co-Authored-By` trailer from the session's attribution rule.
@@ -115,6 +129,10 @@ Process: lighter — first build (Gate 2), verify, the reconciliation script and
    cleanup of a failed run's leftover staging. Each time, the owner confirms that no
    Stage 9 freeze window is open. The controller runs Task 11 itself, because a
    dispatched subagent cannot ask the owner for a go-ahead.
+4. **Stage 4 result checks (Task 11).** Stop and ask the owner, and change no code,
+   if any of these fails: `verify` of the first run at Step 4b, the replay `build` or
+   its `verify`, `compare-runs` (`"equal": false`), or a Step 6a preservation check. A
+   failed Step 4b blocks Gate 3: do not ask for its go-ahead.
 
 ## Review Focus
 
@@ -133,6 +151,16 @@ Process: lighter — first build (Gate 2), verify, the reconciliation script and
 5. **Index whitespace.** Official entries can carry trailing spaces (64 in 2017,
    recon). A description without the space still gets the copied-index flag. Test:
    Task 4 `test_index_whitespace_still_flags_copy`.
+6. **Fresh Stage 4 venv (Stage 4).** A new worktree venv can resolve a different Python
+   patch release or distribution set, and then neither run verifies. The person expects
+   the first run to verify from Stage 4's checkout. Check: Task 11 Step 4a compares the
+   live `freeze_software()` with the first run's recorded `software`, and Step 4b runs
+   `verify` before Gate 3.
+7. **Retired spec path (Stage 4).** Moving `specs/ita-establishment-targets.md` to
+   `specs/completed/` breaks `tests/test_ita_co_ownership.py::test_universe_is_the_spec_statement`,
+   which reads the spec by path. The person expects the suite to pass after retirement.
+   Check: Task 11 Step 11 changes the test's `SPEC` path in the retire commit, and the
+   commit hook's suite passes.
 
 ## Decisions
 
@@ -142,6 +170,10 @@ Process: lighter — first build (Gate 2), verify, the reconciliation script and
 - **D4** (owner, after plan review, 2026-11-14): Merge the spec and this plan into `main` through lowmason/embedding-data#8 (merge commit `e1470e7`), and delete the remote planning branch. Execution starts from `main`. Applied in: Global Constraints (Branch).
 - **D5** (owner, brief, 2026-11-16): Plan 11 finishes in `specs/naics-evaluation-data-roadmap.md` as Stages 1 and 4, with the lighter Stage 1 process. Stage 1 runs Task 11 Step 1 (a new snapshot), Step 3 (the first run's ID only), Step 4 (Gate 2), Step 6 for the first run only (`verify`, no `compare-runs`), Steps 7 and 8, and Step 8a, which writes `specs/naics-evaluation-data-stage-1-findings.md`. Stage 4 runs Steps 5, 6 (the replay's `verify` and `compare-runs`), 9 and 10, then the Plan Completion Protocol. When Stage 1's Exit holds, Stage 1 ticks its roadmap box with the stamp `> Stage 1: COMPLETE (<date>) — implemented by plan 11 (specs/plans/11-ita-establishment-targets.md), Task 11 first build; findings in specs/naics-evaluation-data-stage-1-findings.md.` and changes `Stage 1` to `Stage 4` in this plan's Roadmap line. Stage 1 does not run the Plan Completion Protocol. Applied in: header (Process line), Task 11.
 - **D6** (owner, brief, 2026-11-16): Preservation (Task 11 Step 8) runs in Stage 1, reversing `cbeaf2b`'s move to Stage 4. Applied in: `specs/naics-evaluation-data-roadmap.md` (Choices made, Stage 1 Exit and Leaves out, Stage 4), Task 11 Step 8.
+- **D7** (owner, Stage 4 planning stop-and-ask, 2026-11-18): Keep both CLI output shapes that the ledger marks `Ruling (unclear):`. The `compare-runs` failure line prints `run FIRST,SECOND; path DIR1,DIR2`, and `import-reference` success prints the data-relative path as a JSON string. No code changes. Applied in: Task 11 Steps 9 and 11.
+- **D8** (owner, Stage 4 planning stop-and-ask, 2026-11-18): Keep the `n_multi_industry_employers` reading (the EIN has `a` and at least one other industry in the same year), and clarify the spec to match. Applied in: Task 11 Step 9a (spec amendment).
+- **D9** (owner, Stage 4 planning stop-and-ask, 2026-11-18): Keep both link readings: `later_row` takes the confirmed successor for confirmed rows and is null for `conflict`, and an ambiguous later ID sets only `reason_later_id_ambiguous`. Clarify the spec to match. Applied in: Task 11 Step 9a (spec amendment).
+- **D10** (owner, Stage 4 planning stop-and-ask, 2026-11-18): Keep the path reading: only a pair-code row with an empty candidate list references no path, and an unresolved row that keeps candidates references their paths. Clarify the spec to match. Applied in: Task 11 Step 9a (spec amendment).
 
 ## Settled Defaults (for owner review)
 
@@ -189,6 +221,9 @@ Process: lighter — first build (Gate 2), verify, the reconciliation script and
 | `specs/embedding-evaluation-data-spec.md` | 4 | R2.6 amendment |
 | `README.md`, `CLAUDE.md` | 9, 11 | Stage 10 commands, then selected runs |
 | `specs/findings/stage-10-ita-establishment-targets.md` | 11 | Measured acceptance |
+| `specs/ita-establishment-targets.md` | 11 (Stage 4) | D8–D10 amendments, then retired to `specs/completed/` |
+| `tests/test_ita_co_ownership.py` | 11 (Stage 4) | `SPEC` path follows the retired spec |
+| `specs/embedding-evaluation-data-spec.md`, `specs/naics-evaluation-data-roadmap.md`, `specs/deferred_items.md`, `specs/history.md` | 11 (Stage 4) | Link re-point, Stage 4 tick, completion records |
 
 ---
 
@@ -1400,7 +1435,9 @@ Message: `test: add Stage 10 raw-to-target V12 chain and reconciliation`.
 - Modify (Stage 1): `specs/naics-evaluation-data-roadmap.md` (Stage 1 tick and stamp),
   this plan's Roadmap line
 - Create (Stage 4): `specs/findings/stage-10-ita-establishment-targets.md`
-- Modify (Stage 4): `README.md`, `CLAUDE.md` (selected runs and pins)
+- Modify (Stage 4): `README.md`, `CLAUDE.md` (selected runs and pins),
+  `specs/ita-establishment-targets.md` (D8–D10), then the completion files in the File
+  Map's Stage 4 rows
 
 `ROOT` below is `/Users/lowell/Projects/embedding-data/data`. Run every command from the
 execution checkout. Run the `pgrep` check before each command. Each step names the
@@ -1452,9 +1489,54 @@ Expected: one JSON line with `outputs_sha256`. If the process dies and leaves
 `<RUN>.part`, leave it in place. Ask the owner (gate 4), record the event, and use a
 new ID afterwards.
 
+- [ ] **Step 4a (Stage 4): Checkout, venv, ledger and snapshot (read-only on `ROOT`)**
+
+`W` is `/Users/lowell/Projects/embedding-data/.claude/worktrees/stage-4-ita-naics-hardening`.
+Run every Stage 4 command from `W`.
+- Run `uv sync --locked` once, with no other flag.
+- Ledger: `mkdir -p .sdd && cp -R /Users/lowell/.cache/agent-skills/handoffs/embedding-data/stage10-ledger-backup/workspace .sdd/11-ita-establishment-targets`,
+  then write `.sdd/.gitignore` with the single line `*`. `git status --porcelain
+  --untracked-files=normal` must then print nothing, because `inputs.json` records
+  `dirty`. Append Stage 4 lines to `.sdd/11-ita-establishment-targets/progress.md` only.
+- Identity: in `uv run --locked python`, load
+  `ROOT/derived/osha/establishment-targets/stage10_ita_establishment_20261116_r1/inputs.json`
+  and compare its `software` with `ita_establishment_bundle.freeze_software()`.
+  Expected: equal (`python_full` `3.14.0 (main, Oct 14 2025, 21:10:22) [Clang 20.1.4 ]`,
+  63 distributions). Unequal: stop and ask (checkpoint 4).
+- Snapshot, recorded in the ledger. Expected values are the Stage 1 snapshot:
+  `ROOT/raw/manifest.jsonl` SHA-256 `0c610ce188e6ecc0a987db1726b34280c65bd7d42d3fbcd9448afeebdcddbb71`
+  and 3,010 lines. The Stage 2 summary is `6335cda7…36a8`. The codes `outputs.json` is
+  `15b95846…9c3a`. The Stage 6 pins are `084292b6…2473` and `78fd21e3…be71`. The first
+  run's `outputs.json` is `e19b0d58f61f106c3994aa6fe51f4fb71244188145dd90f8cccaa8dc8a8b09df`.
+  `establishment-targets/` holds only `stage10_ita_establishment_20261116_r1`. Any
+  difference: stop and ask.
+- Replay ID: `stage10_ita_establishment_20261116_r1_replay`. Confirm that neither the
+  final nor `<ID>.part` exists.
+
+- [ ] **Step 4b (Stage 4): Re-verify the first run (no gate, read-only on `ROOT`)**
+
+The Stage 4 Exit needs this, because `compare-runs` does not check software identity.
+Run it before Gate 3: a failure here blocks the replay (checkpoint 4).
+
+```bash
+/usr/bin/time -l uv run --locked python -m embedding_data.ita_establishment_targets verify stage10_ita_establishment_20261116_r1 --data-dir /Users/lowell/Projects/embedding-data/data --outputs-sha256 e19b0d58f61f106c3994aa6fe51f4fb71244188145dd90f8cccaa8dc8a8b09df
+```
+
+Expected: exit 0 and one JSON line whose `reproduction` reports the basis
+`adopted_v1_v3_finding` with source records, V1 and V2 equal. Its `rows` equal the
+Stage 1 findings: pairs 644,265; pair codes 771,971; members 3,206,055; paths 1,007;
+links 3,198,774; co-ownership 39,152; marginals 991; support 39,152. Record wall time
+and maximum RSS.
+
 - [ ] **Step 5 (Stage 4): GATE 3, replay build**
 
-Repeat Step 4 with the replay ID after its own go-ahead.
+Repeat Step 4 with the replay ID after its own go-ahead. Ask the owner for the go-ahead
+and confirmation that no Stage 9 freeze window is open. Before launch, every Stage 4
+plan edit is committed and `git status --porcelain --untracked-files=normal` prints
+nothing. Write the build's stdout, stderr and `time` output to `.sdd/11-ita-establishment-targets/stage-4-build.{out,err,times}`.
+Expected: exit 0 and one JSON line with the replay's `outputs_sha256`. The replay's pin
+differs from the first run's, because `inputs.json` records the run ID and the creation
+time. The tables and `report.json` must not differ.
 
 - [ ] **Step 6 (Stage 1: first run's `verify`; Stage 4: replay's `verify` and `compare-runs`): Verify and compare**
 
@@ -1469,6 +1551,19 @@ distribution.
 
 - `verify` for each run reports the basis `adopted_v1_v3_finding`.
 - `compare-runs <RUN> <REPLAY> --data-dir …` reports `"equal": true` and exits 0.
+
+Stage 4 runs `verify` of `stage10_ita_establishment_20261116_r1_replay` with the pin
+from Step 5. Its `rows` equal Step 4b's. Then it runs the comparison, also under
+`/usr/bin/time -l`:
+
+```bash
+/usr/bin/time -l uv run --locked python -m embedding_data.ita_establishment_targets compare-runs stage10_ita_establishment_20261116_r1 stage10_ita_establishment_20261116_r1_replay --data-dir /Users/lowell/Projects/embedding-data/data
+```
+
+Expected: exit 0, `"equal": true`, `"report_equal": true`, `"trust_established": false`,
+and for each of the eight tables `schema_equal` and `values_equal` true with equal
+row counts. Exit 1 or any unequal table: stop and ask (checkpoint 4). Save both JSON
+lines in the ledger folder.
 
 - [ ] **Step 7 (Stage 1): Independent checks**
 
@@ -1500,6 +1595,18 @@ distribution.
 - Commit. Message: `docs: record Stage 1 first build of the ITA NAICS targets`.
 - Do not run the Plan Completion Protocol or tick any Task 11 box. Stage 4 does both.
 
+- [ ] **Step 6a (Stage 4): Preservation after the replay (read-only)**
+
+- `uv run --locked python .sdd/11-ita-establishment-targets/stage1_checks.py stage10_ita_establishment_20261116_r1_replay`
+  prints `"all_ok": true`. Its `step7` values equal `stage-1-checks.out`, and all three
+  upstream inventories are `ok`.
+- The manifest SHA-256 and line count, the Stage 2 summary, the codes and Stage 6
+  `outputs.json` hashes and the first run's `outputs.json` hash all equal Step 4a's
+  snapshot. `build`, `verify` and `compare-runs` append nothing to the manifest.
+- `establishment-targets/` holds exactly the two runs and no `.part`.
+- `uv run --locked embedding-data audit --data-dir /Users/lowell/Projects/embedding-data/data`
+  exits 0 with zero discrepancies.
+
 - [ ] **Step 9 (Stage 4): Write the finding and update the docs**
 
 `specs/findings/stage-10-ita-establishment-targets.md` records:
@@ -1512,9 +1619,127 @@ distribution.
 - the limits (spec "Methodological limits")
 - what is not claimed: V9 size gate, scoring, null models and Stage 13
 
+Stage 4 sources and detail for these bullets:
+- Index originals: the three `REGISTRY` entries of `ita_index_references` (full
+  SHA-256 and size) and their three manifest lines (`retrieved_at`), from Gate 1
+  (2026-11-16).
+- Runs: `stage10_ita_establishment_20261116_r1` (first, pin `e19b0d58…09df`, its
+  `inputs.json`/`report.json` hashes in the Stage 1 findings) and
+  `stage10_ita_establishment_20261116_r1_replay` (Step 5 pin, and the SHA-256 of its
+  `inputs.json` and `report.json`). Give each pin in full. The two `report.json`
+  hashes are equal.
+- Software: both executing commits (`1f3abf0` and the Step 5 commit, each
+  `dirty: false`), CPython 3.14.0, 63 distributions, 35 software files, the `uv.lock`
+  SHA-256, and Step 4a's equality result.
+- Cost: one table with wall time and maximum RSS for every measured command: Stage 1's
+  `build`, `verify` and both reconcilers, and Stage 4's Step 4b `verify`, Step 5 `build`,
+  Step 6 `verify` and `compare-runs`. Also the bundle size (files and bytes) of each run.
+- Results: `reproduction`, the eight `tables` row counts, Step 6's comparison, both
+  reconcilers (Stage 1) and both preservation checks (Stage 1 Step 8, Stage 4 Step 6a).
+- Distributions, from `report.json`: `pairs.headline_pair_record_distribution`,
+  `pairs.pairs_by_kind_headline_text`, `pairs.records_by_year_status_basis` (the
+  exclusion partition), `co_ownership.N`, `N_including_padded`,
+  `cell_count_distribution`, `marginal_employer_distribution`, `partition_by_year`, and
+  the `links.pairs` status counts. Report counts and shares only, never an EIN, name,
+  address or description.
+- Rulings: the owner kept five unclear readings (D7–D10, 2026-11-18), and the spec now
+  states D8–D10 (Step 9a). The ledger's sixth unclear ruling (LIMITS bullet) was
+  superseded during Task 8: fix `2e756f2` restored the spec bullet word for word.
+- Not claimed: replace "V9 size gate" with this. Every co-ownership row keeps
+  `size_gate_pending`, and the headline minimum counts are in
+  `specs/findings/v9-ita-naics-minimum-counts.md` (Stage 3). No output feeds embedder
+  training, curriculum, hard-negative mining or model selection (R8.4).
+
 Then put the selected runs and pins into the README section and the `CLAUDE.md`
 paragraph. Do not tick the roadmap's Stage 4. The Plan Completion Protocol does that.
+- `CLAUDE.md`: replace the sentence "Measured full-data acceptance is pending until
+  `specs/findings/stage-10-ita-establishment-targets.md` exists." with the selected
+  first/replay runs `stage10_ita_establishment_20261116_r1` / `_replay`, both detached
+  pins in full, the exact replay and both verifiers, and a link to the finding.
+- `README.md` (Stage 10 section, last paragraph): replace "Full-data acceptance is
+  pending until the finding `specs/findings/stage-10-ita-establishment-targets.md`
+  exists." with the same runs and pins and a link to the finding. Write in the
+  section's existing style.
+
+- [ ] **Step 9a (Stage 4): Spec amendments D8–D10**
+
+In `specs/ita-establishment-targets.md`, make exactly these replacements. Leave the
+spec's status line alone: retirement in Step 11 marks the spec complete.
+
+1. D10, paths paragraph. Replace `2022 path for every supported candidate. Unresolved rows reference no path.`
+   with `2022 path for every supported candidate. A pair-code row references no path only when its candidate list is empty. An unresolved row that keeps unknown-vintage candidates references their paths. *(owner, plan 11, 2026-11-18)*`
+2. D9, reasons paragraph. Replace `` `reason_address_conflict`. Several reasons can be true. ``
+   with `` `reason_address_conflict`. Several reasons can be true. When the later ID is not unique, `reason_later_id_ambiguous` is the only reason set. *(owner, plan 11, 2026-11-18)* ``
+3. D9, link table. Replace the `later_row` meaning cell ``Successor's smallest source row, for confirmed links and for unique same-ID candidates``
+   with ``Successor's smallest source row: the confirmed successor for a confirmed status, the unique same-ID candidate for `weaker_same_id`, otherwise null (`conflict` included) *(owner, plan 11, 2026-11-18)*``
+4. D8, marginals table. Replace the `n_multi_industry_employers` meaning cell ``EINs in `n(a)` with two or more industries in one year``
+   with ``EINs in `n(a)` with `a` and at least one other industry in the same year *(owner, plan 11, 2026-11-18)*``
+
+Check: `git diff` shows exactly four changed lines in the spec, and
+`uv run --locked pytest tests/test_ita_co_ownership.py -q` passes (it reads the spec's
+universe statement, which these edits leave alone).
 
 - [ ] **Step 10 (Stage 4): Commit**
 
-Message: `docs: record Stage 10 full-data acceptance`.
+Message: `docs: record Stage 10 full-data acceptance`. The commit holds the finding,
+`README.md`, `CLAUDE.md` and the Step 9a spec edits.
+
+- [ ] **Step 11 (Stage 4): Plan Completion Protocol for plan 11**
+
+Follow writing-plans' Plan Completion Protocol, steps 1–5, with these plan-specific
+inputs:
+- Gate (step 1): no question remains. D7–D10 settled the five live unclear rulings,
+  and ruling 60 superseded the sixth. Every other ledger ruling stays as executed.
+- Markup (step 2): tick every step of Tasks 1–11, Task 11 Step 2 included. Add a
+  `> Deviation:` line under each of these steps, from the ledger:
+  - Task 2's index workbook fixture: `write_index_workbook` rewrites sheet XML with
+    `xml:space="preserve"`.
+  - Task 3: the extra public helper `merge_citations`.
+  - Task 10 Step 5: behave plus the parallel `coverage-check-full` hook replaced the
+    serial `pytest`.
+  - Task 11 Steps 1–8a: run under D5/D6 in Stage 1.
+  - Task 11 Steps 4a–12: added for Stage 4.
+  - The final review's fix commit `5426170`: `acquire-references` stdout narrowed to one
+    JSON line. Put this note under Task 2's acquisition step.
+  Status header: `**Status: COMPLETE (<date>)** — executed via subagent-driven-development (Tasks 1–10) and executing-plans (Task 11); nothing deferred`.
+- Deferred items (step 3): run the ticking pass. Plan 11 defers nothing, so append no
+  section.
+- Step 3a: write `## Handoff to later stages` as
+  `None: shipped as the roadmap's Produces states.` (Stage 5 consumes the codes run, not
+  Stage 10). Tick the roadmap's Stage 4 box and add the stamp
+  `> Stage 4: COMPLETE (<date>) — implemented by plan 11 (specs/plans/completed/11-ita-establishment-targets.md).`
+  and `> Next: resume the roadmap.`
+- Backlog triage (step 4): report `deferred_stats.py`'s summary line.
+- Retire (step 5): run `deferral_scan.py scan specs/plans/11-ita-establishment-targets.md specs/ita-establishment-targets.md`.
+  `git mv` the plan to `specs/plans/completed/` and the spec to `specs/completed/`
+  (marked complete at top). No other live plan implements the spec. In the same commit:
+  - change `SPEC` in `tests/test_ita_co_ownership.py` to
+    `'specs/completed/ita-establishment-targets.md'`
+  - re-point the live links `README.md` (`[stage spec](specs/ita-establishment-targets.md)`)
+    and `specs/embedding-evaluation-data-spec.md` (`[stage spec](ita-establishment-targets.md)`)
+    to the retired path
+  - append the history entry that `history_entry.py` drafts from this plan and the
+    ledger, finished per writing-plans' `references/history.md`
+  - Leave dated records unchanged: the Stage 1 findings, the roadmap's Stage 1 entry
+    and the reset review.
+  The commit hook then runs the suite, which must pass. Message:
+  `chore(specs): retire plan 11`.
+- Report to the owner: the backlog summary line, the Opus 5.5 trailers on the Task 7 and
+  Task 8 commits (ledger rulings, Tasks 7–8), and the skipped Codex review seat (owner,
+  2026-11-16).
+
+- [ ] **Step 12 (Stage 4): PR, merge and cleanup**
+
+- Push the branch and open a PR to `main`. Follow the owner's PR-lifecycle rule:
+  enable Auto-fix and auto-merge. The repo has no CI and no required checks, so when
+  GitHub refuses auto-merge, run the `pgrep` check and merge with
+  `gh pr merge <n> --merge --delete-branch`. Then report `PR merged, remote deleted`.
+- Copy `.sdd/11-ita-establishment-targets/` back over the backup's `workspace/` before
+  any worktree is removed.
+- Clean up: fast-forward `main` in the primary checkout, delete the local branch,
+  remove worktree `W`, and run `git fetch --prune`. Remove the plan 11 worktree
+  `.claude/worktrees/vigilant-mirzakhani-bee453` and its local branch
+  `claude/vigilant-mirzakhani-bee453` only after confirming that its `.sdd/` holds
+  nothing newer than the backup. Otherwise stop and report.
+- Write the roadmap-resume handoff brief (prepare-handoff). It routes to derive-roadmap
+  and to no stage.
