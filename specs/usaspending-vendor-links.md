@@ -6,10 +6,13 @@
 > write.
 
 Status: draft for owner review, 2026-11-18. Stage 14 design session of
-[the roadmap](naics-evaluation-data-roadmap.md). The owner chose the three
+[the roadmap](naics-evaluation-data-roadmap.md). The owner chose the four
 decisions below on 2026-11-18. Calls marked "My call" were made in the session
-or while writing this file. No data file was downloaded, no API was called and
-no key was used for this design.
+or while writing this file. A builder check by a separate reviewer raised two
+questions on 2026-11-18. One became owner decision 4 (malformed codes). The
+other is a process call: the document checks run before any download (see
+[Preflight](#preflight-open-checks-e4e6)). No data file was downloaded, no API
+was called and no key was used for this design.
 
 ## Scope and governing contracts
 
@@ -42,6 +45,7 @@ is the model for the bundle, the commands, the preflight and the host rule.
 | 1 | Population | **Contract subawards only.** These are the subcontracts that prime contractors report under FFATA. Sub-grants are out. | "Contracts only" |
 | 2 | Window | **Fiscal years (FY) 2024–2026 by subaward action date**, October 2023 to September 2026. One SAM.gov snapshot, taken at acquisition. | "FY2024–FY2026" |
 | 3 | Measure | **Firm shares, mirroring Stage 10.** Each firm counts once in each count. | "Firm shares" |
+| 4 | Malformed codes | **Keep R5.3 strict.** A malformed SAM.gov primary NAICS code on a firm that the build reads fails the build. The preflight counts such codes first. No source-spec exception. | "Keep R5.3 strict" |
 
 Two facts from the owner on 2026-11-18:
 
@@ -426,7 +430,7 @@ the owner decides. It is not an acceptance threshold.
 | Check | Measures and records | Stops the stage when |
 |---|---|---|
 | **E4** subawards | Each year's exact header row. The fields for the prime UEI, the subcontractor UEI, both parent UEIs, the action date, the amount, the type, a report identifier and the subaward NAICS. The date field that the download filter used (read). Rows by type. Blank and malformed UEI rates by side. Rows whose action date falls outside the file's fiscal year. Duplicate rows (identical in every column). Rows by month, to show the March 2025 move to SAM.gov. The share of rows whose subaward NAICS equals the prime contract's NAICS, where both exist (diagnostic). | A window year has no prime UEI, subcontractor UEI or action date field. The download filter does not select by subaward action date (owner decides). No parent UEI field exists on either side, because the corporate-group rule depends on it (owner decides). |
-| **E5** SAM.gov extract | The layout version and the column positions of UEI, primary NAICS, NAICS code string, registration status, last update date and EVS source if present (read, from GSA's layout document). Rows per UEI. Rows by registration status. The last-update-date distribution. EVS source values if present. The share of primary codes that are NAICS 2022 national industries. Join coverage: the share of distinct prime UEIs and of distinct subcontractor UEIs in the window that reach an eligible SAM record. How many past monthly files the API keeps, and the rate limits (read). | The extract has no UEI or primary NAICS field. The extract has no last update date, because the D&B rule depends on it. More than 1% of the distinct UEIs on usable reports that have a primary code have one outside the NAICS 2022 national-industry set (trigger). Fewer than half of the distinct prime UEIs, or of the distinct subcontractor UEIs, reach an eligible SAM record (trigger). |
+| **E5** SAM.gov extract | The layout version and the column positions of UEI, primary NAICS, NAICS code string, registration status, last update date and EVS source if present (read, from GSA's layout document). Rows per UEI. Rows by registration status. The last-update-date distribution. EVS source values if present. The share of primary codes that are NAICS 2022 national industries. Join coverage: the share of distinct prime UEIs and of distinct subcontractor UEIs in the window that reach an eligible SAM record. How many past monthly files the API keeps, and the rate limits (read). | The extract has no UEI or primary NAICS field. The extract has no last update date, because the D&B rule depends on it. A firm that the build reads has a malformed primary code (see [Firm table](#firm-table)). The owner decides with the counts in hand. More than 1% of the distinct UEIs on usable reports that have a primary code have one outside the NAICS 2022 national-industry set (trigger). Fewer than half of the distinct prime UEIs, or of the distinct subcontractor UEIs, reach an eligible SAM record (trigger). |
 | **E6** terms | The live SAM.gov terms of use, the D&B terms on the Entity API page and the key-rotation rule (read). USAspending's terms or licensing page, read in a browser (read). Any statement on SAM.gov Data Services or open.gsa.gov about redistribution of public entity data (read). | A statement restricts publishing aggregates or UEI-level rows derived from public subaward data or public entity data. A statement forbids the API access that `acquire-subawards` or `acquire-sam-extract` uses. A statement forbids downloading the public extract, which carries name and address fields, for this use. A failed terms check never becomes "build it but keep the aggregates local" (Stage 2 rule). |
 
 **My call: the two coverage triggers.** Primes must be registered in SAM.gov to
@@ -479,9 +483,20 @@ extract. Statuses are disjoint and checked in this order:
    2022-04-04, or an EVS source of D&B where the field exists.
 3. `naics_missing`: no row gives a primary NAICS code.
 4. `naics_conflict`: the rows give more than one distinct primary code.
-5. `naics_not_2022`: the one code is not a NAICS 2022 national industry in the
-   selected Stage 4 nodes.
+5. `naics_not_2022`: the one code is six digits but is not a NAICS 2022
+   national industry in the selected Stage 4 nodes. This is a known vintage
+   mismatch, not a parse failure (R5.4).
 6. `eligible`.
+
+**Malformed codes fail the build (R5.3, owner decision 4).** A primary code is
+malformed when it does not match `^[0-9]{6}$` after stripping surrounding
+whitespace. If any row of a UEI that reaches steps 3–5 gives a malformed
+primary code, the build fails. Steps 3–5 cover every UEI on a usable report
+that is in the extract and is not a `dnb_era_record`, because those are the
+firms whose codes the build reads. E5 counts these codes first, so the stop
+comes in the preflight, before any build. Codes on other extract rows, the
+firm's other codes and the subaward's NAICS field are diagnostics. They are
+counted and never fail the build.
 
 **My call on several rows for one UEI.** The extract may hold more than one row
 for one UEI, for example one for each EFT indicator *(unverified)*. Rows that
@@ -751,7 +766,8 @@ findings file records its detached checksum.
 - Expected data states are retained diagnostics, not failures: unusable
   reports, ineligible firms, excluded pairs and duplicate rows.
 - Changed raw bytes, a changed header or layout, a wrong field count, a
-  subaward type other than `sub-contract`, row loss or multiplication and
+  subaward type other than `sub-contract`, a malformed primary code on a firm
+  that the build reads, row loss or multiplication and
   invalid estimates are failures.
 
 ## Verification and acceptance
@@ -770,6 +786,9 @@ Write the failing tests first. Small typed frames cover:
   subcontractors where firm shares and pair counts differ.
 - The intra-group sensitivity and its support label.
 - Partial counterparty sets.
+- A malformed primary code on a firm that the build reads fails the build. The
+  same code on an unread extract row, in a firm's other codes or in the
+  subaward's NAICS field is only counted.
 - Header and layout refusal, a sub-grant row, occupied run names, changed pins
   and changed software.
 - `compare-runs` equal and unequal.
@@ -792,7 +811,8 @@ Stage 10 fixture helper, then `build`, `verify`, a second `build` and
 made-up UEIs and no name or address values. The fixture contains at least: a
 self-link, an intra-group pair by each of the three conditions, a subcontractor
 not in SAM.gov, a record last updated before 2022-04-04, a missing code, a code
-conflict, a code outside NAICS 2022, a blank UEI, a malformed UEI, a report
+conflict, a well-formed code outside NAICS 2022, a malformed code on an extract
+row that no usable report reaches, a blank UEI, a malformed UEI, a report
 outside the window, a duplicate row, a diagonal cell, a firm in both roles, a
 prime with several subcontractors in one industry, and a report in each fiscal
 year. Fixture results are software readiness, never benchmarks.
