@@ -117,7 +117,9 @@ not design a scoring method.
 
 The R7.2 family "Text–code pairs", built by Stage 10. A read uses the first
 run (my call: the replay's `ita_text_pairs.parquet` has equal values but
-different bytes, so one run must be named).
+different bytes, so one run must be named). The independent reconcilers of the
+[Stage 10 finding](findings/stage-10-ita-establishment-targets.md) also ran on
+the first run only. *(owner, 2026-11-18)*
 
 | Item | Value |
 | --- | --- |
@@ -125,6 +127,7 @@ different bytes, so one run must be named).
 | Detached pin (SHA-256 of `outputs.json`) | `e19b0d58f61f106c3994aa6fe51f4fb71244188145dd90f8cccaa8dc8a8b09df` |
 | `ita_text_pairs.parquet` | 644,265 rows, SHA-256 `60aad7642961e70b987e9d3222d660147861458e12ac52d71d2739d2d21e1e1c` |
 | `ita_text_pair_codes.parquet` | 771,971 rows, SHA-256 `c8084e4ad297e3f78391e035ebe51119b07982639ae4daf47f1d47caeb1f8916` |
+| Headline pairs | 239,364 pairs with `flag_headline = true`. Of these, 527 have `flag_headline_codes_conflict = true` (Stage 10 finding, "Text–code pairs"). A reader's C2 filter gives these counts *(owner, 2026-11-18)* |
 | Count gate | Minimum 1 on `n_headline_records` of pairs with `flag_headline` (V9 decision). The headline rule needs at least one eligible record, so every headline pair meets it |
 
 ### Assignment
@@ -241,6 +244,8 @@ Findings, retired specs and retired plans are records and are not edited.
 - [ ] `git diff --stat` for the change lists only Markdown files.
 - [ ] The four values in the Evidence table equal the values in the selected
       run's `outputs.json`, and the SHA-256 of that file equals the pin.
+- [ ] The headline-pair and conflict counts in the Evidence table equal the
+      Stage 10 finding's counts and a count on the selected run's table.
 - [ ] A reader can answer from this file alone: who decides the split, who
       decides the scoring, which run and pin to read, and which families are
       still unscored.
