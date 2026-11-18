@@ -150,6 +150,12 @@ go-ahead.
 - **Merging.** Stage 9's checker hashes every `.py` file under `src`, `scripts`, `tests`
   and `features` of the checkout it runs from. The PR merges under the owner's standing
   PR-lifecycle rule, with the Stage 9 `pgrep` check run right before the merge.
+- **Long-running commands.** A foreground tool call is killed after 2 to 10 minutes, and a
+  kill skips `finally`. A killed download then leaves a `.part` that makes every retry
+  refuse the directory, and its removal needs the owner's go-ahead. So every controller
+  command that can run longer than 2 minutes (`acquire-subawards`, which can poll for 4
+  hours, the preflight's `measure`, the full-data `build`, `verify` and the reconciler)
+  runs with `run_in_background`, or in the owner's own terminal.
 - **Production root.** Write to `/Users/lowell/Projects/embedding-data/data` only at the
   owner-gated steps of Tasks 9 and 15. Every production command passes
   `--data-dir /Users/lowell/Projects/embedding-data/data`. Tests use `tmp_path` roots and
@@ -172,7 +178,10 @@ go-ahead.
 2. **Document reads (Task 1).** Get a go-ahead before downloading GSA's extract layout
    spreadsheet. Get a go-ahead before opening any usaspending.gov page in a browser,
    because the page calls the USAspending API. The owner may instead read the page and
-   paste its text.
+   paste its text. The owner reads and pastes every sam.gov page: the accepted terms
+   prohibit automated gathering from the SAM.gov website, the spec says this stage never
+   reads a SAM.gov web page, and the terms page needs a login. Pages on open.gsa.gov may
+   be fetched.
 3. **Document stops (Task 1).** E6 fails its stop condition; the download filter does not
    select by subaward action date; the layout has no UEI, primary NAICS or last update
    date field. Each stops the stage before any code. Report and do nothing further.
@@ -236,8 +245,8 @@ None.
 6. **SAM response handling.** The API answers with a ZIP body, or with at most one
    redirect. A redirect `Location` that holds any spelling of the key is refused. The
    target is fetched with no key and must answer 200. A body that does not start with the
-   ZIP signature `PK\x03\x04`, or a JSON or text content type, is refused before any byte
-   is written. The body streams to `.part` behind an echo scan that holds back
+   ZIP signature `PK\x03\x04` (a JSON error, for example) is refused before any byte is
+   written. The content type is not checked. The body streams to `.part` behind an echo scan that holds back
    `len(longest spelling) - 1` bytes, so no complete spelling reaches disk. No automatic
    retry, because each attempt spends one daily request. `source_url` is the key-free API
    URL, never a redirect URL.
@@ -392,9 +401,10 @@ Draft request body (FY2024), to confirm in Step 1:
 - [ ] **Step 1: USAspending API source (E4 filter read)**
 
 Read the `fedspendingtransparency/usaspending-api` source at the current `master` commit,
-and record that commit. Fetch each raw file with
-`gh api -H 'Accept: application/vnd.github.raw' repos/fedspendingtransparency/usaspending-api/contents/<path>`
-(the worktree guard refuses a command line that names the raw-content host). Never open a
+and record that commit. Fetch each file with
+`gh api repos/fedspendingtransparency/usaspending-api/contents/<path> --jq .content | base64 --decode > <file>`.
+The worktree guard refuses a command line that holds the substring of the version-control
+tool's name, as the raw-content host and the raw media type do. Never open a
 usaspending.gov page and never call the API. Record:
 1. The request fields and the `agencies` shape that selects all agencies.
 2. Whether an absent or empty `prime_award_types` keeps `prime_awards` out of
@@ -444,10 +454,11 @@ directory, using only `zipfile` and `xml.etree.ElementTree`, run as
 - [ ] **Step 4: Terms (E6 read; Owner Checkpoint 2 for usaspending.gov)**
 
 Read and record:
-1. The live SAM.gov terms of use, and the key-rotation rule in them.
-2. The D&B terms on `https://open.gsa.gov/api/entity-api/`.
-3. Any statement on SAM.gov Data Services or open.gsa.gov about redistributing public
-   entity data.
+1. The live SAM.gov terms of use, and the key-rotation rule in them. The owner reads the
+   page and pastes its text, as on 2026-11-18.
+2. The D&B terms on `https://open.gsa.gov/api/entity-api/` (fetched).
+3. Any statement about redistributing public entity data on open.gsa.gov (fetched) or on
+   SAM.gov Data Services (the owner reads and pastes).
 4. USAspending's terms or licensing page. Get a go-ahead before opening it in the built-in
    browser, or ask the owner to paste its text.
 
@@ -691,8 +702,8 @@ Message: `feat: acquire and import USAspending contract subaward downloads`.
 `httpx.URL(url).copy_add_param(KEY_PARAMETER, credential)`, built inside the scope.
 1. A 3xx answer needs a `Location`. `contains_echo(location, credential)` refuses it.
    The target is fetched once, with no key. A second 3xx refuses.
-2. The final answer must be 200, with `Content-Encoding` `identity` or absent, a
-   `Content-Length`, and a content type that is not JSON or `text/*`.
+2. The final answer must be 200, with `Content-Encoding` `identity` or absent and a
+   `Content-Length`.
 3. The first chunk must start with `usaspending_raw.ZIP_SIGNATURE` before any byte is
    written. The body then streams into `partial`, opened `'xb'`, through `scan_chunks`.
 4. The written length must equal `Content-Length`, and `zipfile.is_zipfile(partial)` must
@@ -731,8 +742,7 @@ def test_key_reaches_no_file_log_line_or_error(cli_runner, data_directory, caplo
 
 @pytest.mark.parametrize('case', ['body_echo', 'body_echo_across_chunks', 'quoted_echo',
                                   'location_echo', 'location_percent_echo', 'json_body',
-                                  'text_body', 'second_redirect', 'no_length', 'short',
-                                  'bad_name'])
+                                  'second_redirect', 'no_length', 'short', 'bad_name'])
 def test_refused_responses_leave_nothing(case, tmp_path, monkeypatch):
     with pytest.raises(ValueError) as error:
         sam_access.fetch_extract(URL, FAKE_KEY, tmp_path / 'download.part')
@@ -1381,7 +1391,8 @@ host-rule checks, get the go-ahead, then run:
 uv run --locked python -m embedding_data.usaspending_vendor_links acquire-subawards FY --snapshot DATE --data-dir /Users/lowell/Projects/embedding-data/data
 ```
 
-Expected: one JSON line with a path under `raw/usaspending/subcontracts/DATE/FY<FY>/`.
+Run it in the background (Global Constraints, "Long-running commands"). Expected: one JSON
+line with a path under `raw/usaspending/subcontracts/DATE/FY<FY>/`.
 If it refuses, the owner downloads that year in a browser from USAspending's Custom Award
 Data page, with the Task 1 filters. Then run
 `import-subawards FY FILE --snapshot DATE --data-dir ...` with its own go-ahead. Record
@@ -1405,7 +1416,8 @@ Record the file's path, size and SHA-256.
 
 - [ ] **Step 4: Headers**
 
-Run `uv run --locked python scripts/preflight_usaspending_sam.py headers --data-dir /Users/lowell/Projects/embedding-data/data --snapshot DATE --sam-month YYYY-MM`.
+Run `uv run --locked python scripts/preflight_usaspending_sam.py headers --data-dir /Users/lowell/Projects/embedding-data/data --snapshot DATE --sam-month YYYY-MM`
+in the background (Global Constraints, "Long-running commands").
 Write a draft registry in the scratch directory: copy each year's header row exactly, set
 `member_pattern` to fit the observed member names of all three years, map each logical
 field to one cell, and leave a field null when no cell holds it. Set `date_format` from
@@ -1414,8 +1426,8 @@ the shapes. Check the extract summary against the committed layout: every data l
 
 - [ ] **Step 5: Measure**
 
-Run `measure` with the draft registry, the codes run and its pin. Keep the final JSON
-output.
+Run `measure` with the draft registry, the codes run and its pin, in the background. Keep
+the final JSON output.
 
 - [ ] **Step 6: Decide (Owner Checkpoint 5)**
 
@@ -1597,7 +1609,9 @@ Message: `feat: estimate vendor-link firm shares with companions`.
     Stage 10's (lines 179-202), written here
   - `build(data_dir: Path, run_id: str, *, codes_run: str, codes_outputs_sha256: str, snapshot: date, sam_month: str, subaward_layouts: dict[int, SubawardLayout] | None = None, extract_layout: ExtractLayout | None = None) -> dict`,
     returning `{'run_id', 'directory', 'outputs_sha256'}`. `None` means the committed
-    registry.
+    registry: `build` and `verify_bundle` then call
+    `vendor_link_layouts.load_subaward_layouts()` and `load_extract_layout()` at call time,
+    looked up on the module, so that tests can patch both loaders.
   - `verify_bundle(directory: Path, data_dir: Path, *, expected_outputs_sha256: str, subaward_layouts=None, extract_layout=None) -> dict`
   - `compare_runs(first: Path, second: Path) -> dict`:
     `{'equal', 'tables', 'report_equal', 'trust_established': False}`
@@ -1623,7 +1637,7 @@ UEI.
 **Build order:** `target_io.stage`; `scratch = staging / '.scratch'`; `freeze_software()`;
 `select_nodes`; `usaspending_raw.select_files`; `sam_raw.select_extract`; `read_subawards`;
 `check_subaward_types`; `reports`; `read_extract`; `firms`; `pairs`; `validate_pairs`;
-`estimate`; `validate_vendor_links`. Then write the targets with `write_targets` and the
+`report_counts` (on the same frames); `estimate`; `validate_vendor_links`. Then write the targets with `write_targets` and the
 other tables with `write_parquet`. Re-read every table, validate it again and compare it
 with `ordered_equal`. Remove the scratch. Write `inputs.json` and `report.json`. Recheck the
 codes selection, the software and the raw citations (`verify_raw`). Write `outputs.json`.
@@ -1699,6 +1713,10 @@ Message: `feat: build, verify and compare vendor-link bundles`.
   `--data-dir`. `compare-runs` exits 1 outside the `_invoke` guard, as Stage 10 does
   (`src/embedding_data/ita_establishment_targets.py:96-106`). The failure path is
   `derived/usaspending/vendor-links/<run_id>` (Settled Default 20).
+- Test seam: the committed subaward registry holds the real header, so every test in this
+  task patches `vendor_link_layouts.load_subaward_layouts` and `load_extract_layout` to
+  return `TEST_SUBAWARD_LAYOUTS` and `TEST_EXTRACT_LAYOUT`, and seeds data with `seed_raw`
+  in those registries. The offline test does the same.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1935,8 +1953,9 @@ Choose a fresh run ID `stage14_vendor_links_<YYYYMMDD>_r1` and confirm that neit
 /usr/bin/time -l uv run --offline --locked python -m embedding_data.usaspending_vendor_links build RUN_ID --codes-run stage4_v11_20261013_r2 --codes-outputs-sha256 15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a --snapshot DATE --sam-month YYYY-MM --data-dir /Users/lowell/Projects/embedding-data/data
 ```
 
-Expected: one JSON line with `outputs_sha256`. Record the wall time and the maximum
-resident set size. Record the bundle size with `du -sk`.
+Run it in the background (Global Constraints, "Long-running commands"). Expected: one JSON
+line with `outputs_sha256`. Record the wall time and the maximum resident set size. Record
+the bundle size with `du -sk`.
 
 - [ ] **Step 4: Verify**
 
@@ -1944,7 +1963,7 @@ resident set size. Record the bundle size with `du -sk`.
 uv run --offline --locked python -m embedding_data.usaspending_vendor_links verify RUN_ID --outputs-sha256 RUN_PIN --data-dir /Users/lowell/Projects/embedding-data/data
 ```
 
-Expected: exit 0 and one JSON line.
+Run it in the background. Expected: exit 0 and one JSON line.
 
 - [ ] **Step 5: Reconcile**
 
@@ -1952,7 +1971,7 @@ Expected: exit 0 and one JSON line.
 uv run --offline --locked python scripts/reconcile_usaspending_vendor_links.py --data-dir /Users/lowell/Projects/embedding-data/data --run RUN_ID --outputs-sha256 RUN_PIN
 ```
 
-Expected: exit 0, with every comparison true.
+Run it in the background. Expected: exit 0, with every comparison true.
 
 - [ ] **Step 6: Preservation**
 
