@@ -50,9 +50,9 @@ is the model for the bundle, the commands, the preflight and the host rule.
 Two facts from the owner on 2026-11-18:
 
 - The SAM.gov account exists (roadmap, Stage 14 `Consumes`).
-- The owner asked for the URL to get the personal API key. So the key did not
-  exist yet when this spec was written. It is a precondition of the SAM.gov
-  acquisition, not of the design (see [Key handling](#key-handling)).
+- The owner asked where to get the personal API key. The key is a
+  precondition of `acquire-sam-extract`, not of the design (see
+  [Key handling](#key-handling)).
 
 ### Proposals played back and not corrected (2026-11-18)
 
@@ -168,7 +168,7 @@ name below is *unverified* until E4 or E5 records the real header or layout.
    subawards is *unverified*.
 5. **Subaward reporting moved from FSRS.gov to SAM.gov on 2025-03-08.**
    USAspending now receives the subaward file from SAM.gov
-   ([sam.gov/fsrs](https://sam.gov/fsrs); Treasury TFM Volume 1, Part 2,
+   ([sam.gov/fsrs](https://sam.gov/fsrs) and Treasury TFM Volume 1, Part 2,
    Chapter 6000). The window spans this change.
 6. **Subaward data quality is weak.** The Data Broker runs no field-level or
    cross-file validation on the subaward files (Treasury TFM, paraphrase). GAO
@@ -481,16 +481,18 @@ extract. Statuses are disjoint and checked in this order:
 1. `not_in_sam`: no extract row has this UEI.
 2. `dnb_era_record`: an extract row for this UEI has a last update date before
    2022-04-04, or an EVS source of D&B where the field exists.
-3. `naics_missing`: no row gives a primary NAICS code.
-4. `naics_conflict`: the rows give more than one distinct primary code.
+3. `naics_missing`: no row gives a non-blank primary NAICS code.
+4. `naics_conflict`: the non-blank primary codes of the rows are not all the
+   same.
 5. `naics_not_2022`: the one code is six digits but is not a NAICS 2022
    national industry in the selected Stage 4 nodes. This is a known vintage
    mismatch, not a parse failure (R5.4).
 6. `eligible`.
 
 **Malformed codes fail the build (R5.3, owner decision 4).** A primary code is
-malformed when it does not match `^[0-9]{6}$` after stripping surrounding
-whitespace. If any row of a UEI that reaches steps 3–5 gives a malformed
+malformed when, after stripping surrounding whitespace, it is not blank and does
+not match `^[0-9]{6}$`. A blank code is absence (step 3), not a malformed code.
+If any row of a UEI that reaches steps 3–5 gives a malformed
 primary code, the build fails. Steps 3–5 cover every UEI on a usable report
 that is in the extract and is not a `dnb_era_record`, because those are the
 firms whose codes the build reads. E5 counts these codes first, so the stop
@@ -499,9 +501,11 @@ firm's other codes and the subaward's NAICS field are diagnostics. They are
 counted and never fail the build.
 
 **My call on several rows for one UEI.** The extract may hold more than one row
-for one UEI, for example one for each EFT indicator *(unverified)*. Rows that
-agree on the primary code give one firm. Rows that disagree are kept, flagged
-and excluded. No value is picked. This follows Stage 5.
+for one UEI, for example one for each EFT indicator *(unverified)*. Rows whose
+non-blank primary codes agree give one firm with that code. A blank row is
+absence, not a competing value, as Stage 5's mixed-blank rule says. The report
+counts firms that have both blank and non-blank rows. Rows whose non-blank codes
+disagree are kept, flagged and excluded. No value is picked.
 
 **My call on registration status.** Active and expired rows in the extract are
 used alike, because an expired firm's code is still its last self-report. The
@@ -795,10 +799,10 @@ Write the failing tests first. Small typed frames cover:
 
 **Key tests.** With `httpx.MockTransport`, `acquire-sam-extract` must:
 
-- send the key only in the wire URL;
-- leave it out of the manifest, every log record, every printed line, every
-  error message and every written file;
-- refuse a response or redirect that echoes it.
+- Send the key only in the wire URL.
+- Leave it out of the manifest, every log record, every printed line, every
+  error message and every written file.
+- Refuse a response or redirect that echoes it.
 
 Every offline command must read no key and construct no client, as Stage 9's
 tests check.
