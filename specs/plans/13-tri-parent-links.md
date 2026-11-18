@@ -185,11 +185,12 @@ because a dispatched subagent cannot ask the owner for a go-ahead.
 
 ## Decisions
 
-None.
+- **D1** (owner, plan review, 2026-11-18): Run acquisition and the preflight (Task 4) before the reader, the estimators, the bundle and V12, so that V12 uses the header layout that E7 records. The first build stays after V12. This amends the stage spec's Rollout bullet ("Approve with D1"). Applied in: task order (Tasks 4–12), Task 14 Step 5a (spec amendment).
+- **D2** (owner, plan review, 2026-11-18): Approve plan 13 as committed at `b924f22`, with Settled Defaults 2–21 unchanged. Applied in: Settled Defaults.
 
 ## Settled Defaults (for owner review)
 
-1. **Preflight first (a spec-level change; needs approval as D1).** The spec's Rollout
+1. **Preflight first (a spec-level change; approved as D1).** The spec's Rollout
    says "Software readiness (tests and the V12 fixture) comes before full-data
    acceptance". Its full-data acceptance list starts "Acquire or import the three files"
    and "Run the preflight". Its V12 extension also requires "synthetic TRI CSVs in the
@@ -199,9 +200,8 @@ None.
    also says "Each build stage starts with a preflight". The alternative builds all
    software and V12 on a test-owned layout and acquires after V12. That keeps the
    Rollout bullet but breaks "recorded header layout", and it builds the software before
-   E7–E9 can stop the stage. If the owner approves this order, log it as D1 (plan
-   review) and keep Task 14 Step 5a, which amends the Rollout bullet. If not, move Task 4
-   to after Task 12, and give Tasks 5–11 a test-owned layout.
+   E7–E9 can stop the stage. The owner approved this order as D1. Task 14 Step 5a
+   amends the Rollout bullet.
 2. **Layout record.** The spec's "registry constant" is the committed JSON file
    `src/embedding_data/tri_layouts.json`, loaded by `tri_layout`. The preflight's
    `measure` reads the same file, so nothing is copied by hand into the build.
@@ -1630,7 +1630,7 @@ embeddings from three core sources: OSHA ITA Form 300A summaries, ACS via IPUMS 
 
 Message: `docs(specs): record the Stage 5 TRI findings and source spec amendment`.
 
-- [ ] **Step 5a: Amend the stage spec's Rollout (only if the owner approved D1)**
+- [ ] **Step 5a: Amend the stage spec's Rollout (D1)**
 
 In `specs/tri-parent-links.md`, replace:
 
@@ -1645,7 +1645,7 @@ with:
 - Acquisition and the preflight (full-data acceptance steps 1 and 2) come first,
   because the V12 fixture uses the header layout that E7 records. Software
   readiness (tests and the V12 fixture) then comes before the full-data build
-  *(owner, plan 13, <plan-review date>)*. Do not tick Stage 5 on design or
+  *(owner, plan 13, 2026-11-18)*. Do not tick Stage 5 on design or
   planning completion.
 ```
 
