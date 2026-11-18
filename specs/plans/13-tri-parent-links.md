@@ -26,8 +26,8 @@ long-form finding, README and `CLAUDE.md` run pins), O13 (minimum count) and O17
 
 Process: lighter (Stage 2 spec, "Rules for every new family"): one full-data build,
 `verify`, the independent reconciler and a one-screen findings file. The controller runs
-the two gated tasks (4 and 13) and Task 14 itself, because a dispatched subagent cannot
-ask the owner for a go-ahead.
+Task 1 Step 1 (the page read), the two gated tasks (4 and 13) and Task 14 itself,
+because a dispatched subagent cannot ask the owner for a go-ahead.
 
 ## Global Constraints
 
@@ -71,8 +71,10 @@ ask the owner for a go-ahead.
   `TRI parent links <command> failed: <reason>; run <run_id>; path <path>` to stderr and
   exits 2. `<reason>` is `validation`, `filesystem`, `network` or `unexpected`. It never
   prints exception text or row content. Unequal `compare-runs` exits 1.
-- **No D&B numbers out.** No bundle file, report, success line or failure line holds a
-  Dun & Bradstreet number. D&B numbers exist only in memory during a build.
+- **No D&B numbers out.** No published bundle file, report, success line or failure line
+  holds a Dun & Bradstreet number. During a build they exist in memory and in transcoded
+  scratch copies under `<RUN_ID>.part/.scratch/`, which the build removes before
+  publication.
 - **Frozen code.** Edit no existing file under `src/` or `scripts/`, no existing test file,
   no `tests/conftest.py`, `pyproject.toml` or `uv.lock`. Stage 5 adds files only. Add no
   dependency. If a reused function cannot serve unchanged, stop and ask the owner.
@@ -154,7 +156,10 @@ ask the owner for a go-ahead.
    nothing further. The owner records O7 and O8 as uncovered or promotes a named
    alternate. A blank standardized parent field leaves the owner a choice between the
    D&B key and an uncovered verdict. More than 1% of a year's facility-years outside the
-   NAICS 2022 set is a trigger to ask the owner, not a failure.
+   NAICS 2022 set is a trigger to ask the owner, not a failure. A year with no
+   `reporting_year`, `trifd`, `form_type` or `parent_dnb` column also stops for the
+   owner: the build needs these, but the spec names no stop for them. Never relax the
+   layout parser to fit.
 5. **Full-data run (Task 13).** Get a go-ahead under the host rule before the build and
    before any cleanup of a failed run's staging. If `verify`, the reconciler or a
    preservation check fails, stop, change no code and ask the owner.
@@ -184,10 +189,19 @@ None.
 
 ## Settled Defaults (for owner review)
 
-1. **Preflight first.** Task 4 (acquisition, preflight and layout) comes before the
-   reader, estimators and bundle. The V12 fixture needs "the recorded header layout",
-   and the Stage 2 rule says each build stage starts with its preflight. This puts the
-   first production write in the middle of execution.
+1. **Preflight first (a spec-level change; needs approval as D1).** The spec's Rollout
+   says "Software readiness (tests and the V12 fixture) comes before full-data
+   acceptance". Its full-data acceptance list starts "Acquire or import the three files"
+   and "Run the preflight". Its V12 extension also requires "synthetic TRI CSVs in the
+   recorded header layout", and only E7 records that layout. The two texts cannot both
+   hold. This plan runs acquisition and the preflight as Task 4, before the reader, the
+   estimators, the bundle and V12. The first build stays after V12. The Stage 2 rule
+   also says "Each build stage starts with a preflight". The alternative builds all
+   software and V12 on a test-owned layout and acquires after V12. That keeps the
+   Rollout bullet but breaks "recorded header layout", and it builds the software before
+   E7–E9 can stop the stage. If the owner approves this order, log it as D1 (plan
+   review) and keep Task 14 Step 5a, which amends the Rollout bullet. If not, move Task 4
+   to after Task 12, and give Tasks 5–11 a test-owned layout.
 2. **Layout record.** The spec's "registry constant" is the committed JSON file
    `src/embedding_data/tri_layouts.json`, loaded by `tri_layout`. The preflight's
    `measure` reads the same file, so nothing is copied by hand into the build.
@@ -272,6 +286,7 @@ None.
 | `README.md` | 10 | Command contract section |
 | `specs/naics-evaluation-data-stage-5-findings.md` | 4, 13, 14 | Preflight, run and handoff |
 | `specs/embedding-evaluation-data-spec.md`, `CLAUDE.md` | 14 | Source spec amendment |
+| `specs/tri-parent-links.md` | 14 | Rollout amendment (if D1 is approved), then retired |
 | `specs/naics-evaluation-data-roadmap.md`, `specs/deferred_items.md`, `specs/history.md` | 14 | Completion records |
 
 ---
@@ -299,8 +314,8 @@ None.
   - `raw_path(data_dir: Path, year: int, processed_as_of: date) -> Path`:
     `snapshot_dir(...) / file_name(year)`
   - `make_client(transport: httpx.BaseTransport | None = None) -> httpx.Client`, a module
-    global looked up at call time (test seam): `follow_redirects=True`, `USER_AGENT`,
-    `TIMEOUT`
+    global looked up at call time (test seam): `follow_redirects=True`, headers
+    `User-Agent: USER_AGENT` and `Accept-Encoding: identity`, `TIMEOUT`
   - `acquire(data_dir: Path) -> list[Path]`, in window order
   - `import_file(data_dir: Path, year: int, original: Path, *, processed_as_of: date) -> Path`
   - `select_files(data_dir: Path, processed_as_of: date) -> dict[int, Path]`
@@ -319,8 +334,12 @@ None.
 - `acquire` reads the page, then checks every destination before any download (Settled
   Default 5). A symlink anywhere in a destination path fails. Then for each missing year
   it streams the body into `<destination>.part`, opened `'xb'`. A missing
-  `Content-Length` raises `ValueError('download has no Content-Length')`. A byte count
-  that differs raises `httpx.RemoteProtocolError`. It then builds the entry from the
+  `Content-Length` raises `ValueError('download has no Content-Length')`. When
+  `response.num_bytes_downloaded` (bytes on the wire, as
+  `osha_benchmark_download.download` compares them) differs from `Content-Length`, it
+  raises `httpx.RemoteProtocolError`. A response with a `Content-Encoding` other than
+  `identity` raises `ValueError('encoded download')`, so the saved bytes are the bytes
+  EPA sent. It then builds the entry from the
   `.part` bytes, calls `manifest.check_appendable`, publishes with
   `os.link(partial, destination)` and appends the entry. `finally` unlinks the `.part`.
   Entries: `client='httpx'`, `client_version=version('httpx')`, `source_url=<year URL>`,
@@ -348,8 +367,9 @@ If the status is 403, retry once with the browser string in
    `<option value>` or a script literal. Write the rule that `parse_page` applies.
 3. The resolved URL for 2022, 2023 and 2024.
 
-Send one `curl -sSI` (`HEAD`) per window URL. Record the status, `Content-Length`,
-`Content-Disposition` and `Content-Type`. The EPA file name is the
+Send one `curl -sSI -H 'Accept-Encoding: identity'` (`HEAD`) per window URL. Record the
+status, `Content-Length`, `Content-Encoding`, `Content-Disposition` and `Content-Type`.
+The EPA file name is the
 `Content-Disposition` file name, or else the URL's last path segment. Record the naming
 rule that `file_name` applies. Fetch no body.
 
@@ -359,10 +379,12 @@ to the findings file.
 
 - [ ] **Step 2: Write the fixture page**
 
-Copy `page.html` to `tests/fixtures/epa_tri/basic_data_files.html`. Keep only the element
-that holds the "processed as of" sentence and the elements that carry the U.S. links for
-2021–2024, plus one non-U.S. link of 2024 if the page lists state files. Do not change
-anything inside the kept elements. Delete the scratch directory.
+E9 has not run yet, so the fixture is synthetic (Stage 2 spec, Licensing). Hand-write
+`tests/fixtures/epa_tri/basic_data_files.html` in the markup shape that Step 1 observed:
+the same tags and attributes that carry the date and the links, with invented
+surrounding text. Give it a "processed as of" sentence, U.S. links for 2021–2024 whose
+URLs follow the discovered rule, and one non-U.S. link of 2024 if the page lists state
+files. Copy no EPA prose. Delete the scratch directory.
 
 - [ ] **Step 3: Write the failing tests**
 
@@ -390,8 +412,8 @@ def test_acquire_downloads_and_records_each_window_file(data_directory, monkeypa
     assert [(e.client, e.source_url, e.through_date, e.proxies) for e in entries] == [
         ('httpx', URLS[y], RECORDED.isoformat(), ()) for y in tri_raw.WINDOW]
 
-@pytest.mark.parametrize('length', ['short', 'absent'])
-def test_acquire_refuses_a_short_or_unsized_body(length, data_directory, monkeypatch): ...
+@pytest.mark.parametrize('length', ['short', 'absent', 'gzip_encoded'])
+def test_acquire_refuses_a_short_unsized_or_encoded_body(length, data_directory, monkeypatch): ...
     # raises; no final file, no .part, no manifest line
 
 def test_acquire_keeps_a_recorded_file_and_refuses_unrecorded_or_missing(...): ...
@@ -573,10 +595,14 @@ header row), `columns` and `values`:
 - Produces in `tri_layout`:
   - `LAYOUT_VERSION = 'tri-headers-v1'`,
     `PRODUCTION_FILE = Path(__file__).with_name('tri_layouts.json')`
-  - `FIELDS = ('reporting_year', 'trifd', 'document_control_number', 'form_type', 'state', 'federal', 'primary_naics', 'parent_name', 'parent_dnb', 'standardized_parent')`
-  - `FOREIGN_FIELDS = ('foreign_parent_name', 'foreign_parent_dnb', 'standardized_foreign_parent')`
+  - `REQUIRED_FIELDS = ('reporting_year', 'trifd', 'form_type', 'federal', 'primary_naics', 'parent_dnb', 'standardized_parent')`:
+    the build needs each of them
+  - `DIAGNOSTIC_FIELDS = ('document_control_number', 'state', 'parent_name')`: nullable
+  - `FOREIGN_FIELDS = ('foreign_parent_name', 'foreign_parent_dnb', 'standardized_foreign_parent')`:
+    null for 2022, nullable for 2023 and 2024
   - `VALUE_SETS = ('form_r', 'form_a', 'federal_yes', 'federal_no', 'no_parent', 'no_dnb')`
-  - `@dataclass(frozen=True) class HeaderLayout: year: int; header: tuple[str, ...]; columns: dict[str, str | None]; other_naics: tuple[str, ...]; values: dict[str, frozenset[str]]`
+  - `@dataclass(frozen=True) class HeaderLayout: year: int; header: tuple[str, ...]; columns: dict[str, str | None]; other_naics: tuple[str, ...]; values: dict[str, frozenset[str]]`,
+    with the property `missing -> tuple[str, ...]`
   - `parse_layouts(value: dict) -> dict[int, HeaderLayout]`
   - `layouts_json(layouts: dict[int, HeaderLayout]) -> dict`, with sorted value lists, so
     that `parse_layouts(layouts_json(x)) == x`
@@ -599,21 +625,25 @@ header row), `columns` and `values`:
     `asks` (the 1% trigger) and `ok`.
 
 **`parse_layouts` checks:** `version == LAYOUT_VERSION`; years exactly `WINDOW`; header
-cells nonblank and unique; every mapped column is a header cell; `FIELDS` all mapped;
-`other_naics` holds 5 distinct cells; `FOREIGN_FIELDS` null for 2022 and mapped for
-2023 and 2024; every value set present; `form_r` and `form_a` disjoint and nonempty;
-`federal_yes` and `federal_no` disjoint, with `federal_yes` nonempty; `no_parent` and
-`no_dnb` entries equal their own strip. Each failure raises `ValueError`.
+cells nonblank and unique; every mapped column is a header cell; every
+`REQUIRED_FIELDS` entry mapped; `other_naics` holds 0 to 5 distinct cells; every
+`FOREIGN_FIELDS` entry null for 2022; every value set present; `form_r` and `form_a`
+disjoint and nonempty; `federal_yes` and `federal_no` disjoint, with `federal_yes`
+nonempty; `no_parent` and `no_dnb` entries equal their own strip. Each failure raises
+`ValueError`. `HeaderLayout.missing` lists the unmapped diagnostic and foreign fields,
+and a short `other_naics`.
 
 **Stop conditions in `measure`:** a year with no `primary_naics`, `federal` or
 `standardized_parent` column; a year in which the standardized parent is blank or a
-"no parent" string for every facility-year that reports a parent name. The 1% trigger
-uses Settled Default 8. Document checks are not in the script.
+"no parent" string for every facility-year that reports a parent name. `asks` holds the
+1% trigger (Settled Default 8) and a year with no `reporting_year`, `trifd`,
+`form_type` or `parent_dnb` column. Document checks are not in the script.
 
 - [ ] **Step 1: Write the failing tests**
 
 `tests/test_tri_layout.py`: `test_layout_json_round_trip`,
-`test_parse_layouts_refuses` (parametrized over every check above) and
+`test_parse_layouts_refuses` (parametrized over every check above),
+`test_unmapped_diagnostic_fields_are_listed_as_missing` and
 `test_load_layouts_refuses_a_missing_file`.
 
 `tests/test_preflight_tri.py` writes synthetic CSVs with an invented numbered header and
@@ -718,8 +748,11 @@ URL, the read date and a quote of fewer than 15 words:
 - [ ] **Step 6: Decide (Owner Checkpoint 4)**
 
 If `measure` lists any stop, or a document check fails its stop condition, stop the
-stage. Report to the owner and do no further task. If `asks` is not empty, ask the owner
-before going on. A "current owner" time basis is recorded as a limit and does not stop.
+stage. Report to the owner and do no further task. If `asks` is not empty, or a year has
+no cell for a `REQUIRED_FIELDS` entry that is not a spec stop (`reporting_year`,
+`trifd`, `form_type`, `parent_dnb`), ask the owner before going on. A "current owner"
+time basis is recorded as a limit and does not stop. A missing diagnostic field is
+recorded and does not stop.
 
 - [ ] **Step 7: Write the failing test**
 
@@ -781,7 +814,8 @@ Commit the layout, the test and the findings file with the message
 exactly, else `ValueError('changed header')`. A transcoded copy goes to
 `scratch / f'{year}.utf8.csv'`, line by line through `decode_line`, with a leading BOM
 removed. Scan with `pl.scan_csv(source, infer_schema=False, missing_utf8_is_empty_string=True)`.
-Select the mapped cells and rename them to `READ_SCHEMA` names. The Polars row count must
+Select the mapped cells and rename them to `READ_SCHEMA` names. An unmapped diagnostic or
+foreign field, or a missing `naics_<k>` cell, reads as `''`. The Polars row count must
 equal the `csv.reader` record count, else `ValueError('row count differs')`. Each
 `reporting_year`, stripped, must equal `str(year)`, else
 `ValueError('reporting year mismatch')`.
@@ -887,9 +921,11 @@ eligible rows and the `parent_conflict` and `federal` rows.
 sum to `facility_years`), `with_parent`, `with_usable_dnb`,
 `names_with_several_dnb`, `dnb_with_several_names` (counted over rows that carry both),
 `mixed_blank`, `with_foreign_parent`, `with_secondary_codes`, `in_territories`,
-`case_a`, `case_b`, `case_c`. Case (a): `_reported_names` is empty and `parent_names` is
-not. Case (b): `_reported_names` is not empty and `parent_names` is. Case (c):
-exactly one usable D&B number and `parent_names` empty.
+`case_a`, `case_b`, `case_c`, `missing_fields` (`HeaderLayout.missing`). Case (a):
+`_reported_names` is empty and `parent_names` is not. Case (b): `_reported_names` is not
+empty and `parent_names` is. Case (c): exactly one usable D&B number and `parent_names`
+empty. When `parent_name` is unmapped for the year, `case_a` and `case_b` are null, not
+zero, and when `state` is unmapped, `in_territories` is null.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1463,18 +1499,21 @@ Expected: exit 0, with every comparison true.
 - [ ] **Step 6: Preservation**
 
 1. The current `data/raw/manifest.jsonl` starts with the bytes of the Task 4 baseline
-   copy. The only lines after them are the three TRI entries.
+   copy, and the lines after them include the three TRI entries. Other stages run in
+   parallel, so show the owner any other appended line for the owner to account for.
 2. `uv run --locked embedding-data audit --data-dir /Users/lowell/Projects/embedding-data/data`
    exits 0.
 3. `derived/osha/ita_300a_summary.parquet` has SHA-256
    `6335cda7adb40a41c4a11d57d22048999449ac8d078a2ec0291f0198cd9136a8` and 139,930,636
    bytes.
-4. Each bundle below passes `target_io.verify_inventory` against its own `outputs.json`,
-   and that file's SHA-256 equals the pin:
+4. Each bundle below passes `target_io.verify_inventory(directory, outputs, set(outputs))`
+   against its own `outputs.json`, and that file's SHA-256 equals the pin. The Stage 6
+   pins are from `specs/findings/stage-6-ita-area-mix-build.md:26-33`:
 
 | Bundle | Detached pin |
 | --- | --- |
 | `derived/codes/stage4_v11_20261013_r2` | `15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a` |
+| `derived/osha/assignment-inputs/stage6_ita_assignment_20261014_1000_csv` | `84b29be17bae26e4cd7bb372108f95641936be4b73b794667957ed39de990d48` |
 | `derived/targets/stage6_ita_area_mix_20261014_1000_csv` | `084292b6835eb09ce27ecc4a3aef03a6f43bfe7b39b815665c29190a431e2473` |
 | `derived/targets/stage6_ita_area_mix_20261014_1000_csv_replay` | `78fd21e37ba0c5b1cd396ff0961b557650788fdccd3c84a911e8c6c3b7fabe71` |
 | `derived/osha/establishment-targets/stage10_ita_establishment_20261116_r1` | `e19b0d58f61f106c3994aa6fe51f4fb71244188145dd90f8cccaa8dc8a8b09df` |
@@ -1590,6 +1629,28 @@ embeddings from three core sources: OSHA ITA Form 300A summaries, ACS via IPUMS 
 - [ ] **Step 5: Commit**
 
 Message: `docs(specs): record the Stage 5 TRI findings and source spec amendment`.
+
+- [ ] **Step 5a: Amend the stage spec's Rollout (only if the owner approved D1)**
+
+In `specs/tri-parent-links.md`, replace:
+
+```
+- Software readiness (tests and the V12 fixture) comes before full-data
+  acceptance. Do not tick Stage 5 on design or planning completion.
+```
+
+with:
+
+```
+- Acquisition and the preflight (full-data acceptance steps 1 and 2) come first,
+  because the V12 fixture uses the header layout that E7 records. Software
+  readiness (tests and the V12 fixture) then comes before the full-data build
+  *(owner, plan 13, <plan-review date>)*. Do not tick Stage 5 on design or
+  planning completion.
+```
+
+Leave the spec's Status line unchanged. Commit with
+`docs(specs): record the preflight-first order in the TRI spec`.
 
 - [ ] **Step 6: Plan Completion Protocol**
 
