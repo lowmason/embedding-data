@@ -227,7 +227,7 @@ placeholder keys `n/a`, `na`, `none`, `unknown`, `not applicable`,
 or 2022 NAICS index entry, is flagged as copied text. Titles and index
 entries are flagged separately. Native-vintage identity is also reported,
 with unknown vintage kept unknown. *(owner, Stage 10 design, 2026-11-13;
-[stage spec](ita-establishment-targets.md))* Suspected mojibake is flagged
+[stage spec](completed/ita-establishment-targets.md))* Suspected mojibake is flagged
 rather than automatically repaired.
 Employer grouping uses a usable EIN, else a non-empty normalized company
 name, with name fallback and reconstructed EIN marked separately; blank

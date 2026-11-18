@@ -1,7 +1,6 @@
 # ITA establishment targets
 
-> Required next skill: writing-plans in a fresh session. The owner approved
-> this committed specification. Do not implement during brainstorming.
+**Status: COMPLETE (2026-11-18)** — implemented by [plan 11](../plans/completed/11-ita-establishment-targets.md); measured runs in the [Stage 10 finding](../findings/stage-10-ita-establishment-targets.md).
 
 The owner approved the headline window, the index-entry flag, the co-ownership
 measure, the build approach and the Stage 9 write coordination on 2026-11-13.
@@ -11,12 +10,12 @@ acceptance remain planned.
 
 ## Scope and governing contracts
 
-Stage 10 of [the roadmap](completed/embedding-evaluation-data-spec-roadmap.md)
+Stage 10 of [the roadmap](embedding-evaluation-data-spec-roadmap.md)
 implements R2.6, R2.7 and the text–code pair and co-ownership rows of R7.2 in
-[the source spec](embedding-evaluation-data-spec.md). R7.1, R7.4, R8 and R9
+[the source spec](../embedding-evaluation-data-spec.md). R7.1, R7.4, R8 and R9
 govern outputs, provenance, disclosure, leakage and offline operation. The
 adopted V1–V3 rules in
-[the V1–V3 finding](findings/v1-v3-ita-verification.md) govern text keys,
+[the V1–V3 finding](../findings/v1-v3-ita-verification.md) govern text keys,
 employer keys and linkage.
 
 Stage 10 produces three products from data that is already on disk:
@@ -569,7 +568,7 @@ difference. A mismatch fails the build.
 A gate that compares the build with a recomputation from the same code proves
 little. **My call:** the expected values are integer constants transcribed
 from the adopted V1 and V2 tables in
-[the V1–V3 finding](findings/v1-v3-ita-verification.md), committed in a
+[the V1–V3 finding](../findings/v1-v3-ita-verification.md), committed in a
 Stage 10 module. A unit test checks the constants against the finding's
 Markdown tables, so a transcription error fails the suite. The build compares
 its own counts, computed by the new Stage 10 code, with those constants.

@@ -1,5 +1,7 @@
 # ITA Establishment Targets Implementation Plan
 
+**Status: COMPLETE (2026-11-18)** — executed via subagent-driven-development (Tasks 1–10) and executing-plans (Task 11); nothing deferred
+
 > **For agentic workers:** REQUIRED SUB-SKILL: implement this plan task-by-task via subagent-driven-development (the default) — or executing-plans when your human partner chose inline execution at the handoff. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build one immutable, offline Stage 10 bundle with ITA establishment links,
@@ -255,7 +257,7 @@ Stage 4 process: inline execution (executing-plans) on branch `stage-4-ita-naics
     `'V1 reproduction differs'` or `'V2 reproduction differs'`. Returns
     `{'basis': ..., 'source_records': 'equal', 'v1': 'equal', 'v2': 'equal'}`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 FINDING = Path(__file__).parents[1] / 'specs/findings/v1-v3-ita-verification.md'
@@ -292,22 +294,22 @@ def test_check_reproduction(): ...
 `finding_table` must match the heading line exactly. The finding also holds a
 `### V1 after exact duplicate collapse (diagnostic)` table, which must never be read.
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_ita_establishment_expected.py -q`
 Expected: FAIL, `ModuleNotFoundError: embedding_data.ita_establishment_expected`.
 
-- [ ] **Step 3: Implement the module**
+- [x] **Step 3: Implement the module**
 
 Transcribe `V1` and `V2` as integer literals from the finding's `## V1` and `## V2`
 tables. Do not parse the finding at import time. The test is the independent check.
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_ita_establishment_expected.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Files: the module and its test. Message: `feat: record adopted Stage 10 V1/V2 reproduction values`.
 
@@ -407,11 +409,11 @@ evidence and may be gone. These facts are the record.
 - On import, already-recorded identical bytes return the path. Different bytes fail.
 - `read_index` calls `manifest.entry_for`, the pin check and `parse_index` for each kind.
 
-- [ ] **Step 1: Add the `sheet` keyword to `tests/code_fixtures.py::write_xlsx`**
+- [x] **Step 1: Add the `sheet` keyword to `tests/code_fixtures.py::write_xlsx`**
 
 The default `'Fixture'` keeps every existing caller's output byte-identical.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 - `test_parse_keeps_cross_references_and_delivered_entries`: three leaf rows (one entry
   with a trailing space) and two `******` rows give five rows in `INDEX_SCHEMA`. Code
@@ -437,19 +439,23 @@ The default `'Fixture'` keeps every existing caller's output byte-identical.
 - `test_read_index_verifies_manifest_and_pin`: a published file changed by one byte
   fails `read_index`.
 
-- [ ] **Step 3: Run the tests and see them fail**
+- [x] **Step 3: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_ita_index_references.py -q`
 Expected: FAIL, module not found.
 
-- [ ] **Step 4: Implement `ita_index_references.py` and the fixture helpers**
+- [x] **Step 4: Implement `ita_index_references.py` and the fixture helpers**
 
-- [ ] **Step 5: Run the tests and see them pass**
+> Deviation: the index workbook fixture helper `write_index_workbook` rewrites the sheet XML with `xml:space="preserve"`.
+
+> Deviation: the final review's fix commit `5426170` narrowed `acquire-references` stdout to one JSON line.
+
+- [x] **Step 5: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_ita_index_references.py tests/test_code_build.py tests/test_codes_cli.py -q`
 Expected: all pass, and existing `write_xlsx` callers are unchanged.
 
-- [ ] **Step 6: Apply the D2 amendment to `specs/ita-establishment-targets.md`**
+- [x] **Step 6: Apply the D2 amendment to `specs/ita-establishment-targets.md`**
 
 Leave the status line untouched. In "Parsing", replace:
 
@@ -487,7 +493,7 @@ entries, so they take part in the copied-index flags. Every other row is a
 six-digit leaf of its own vintage. *(owner, plan 11, 2026-11-14)*
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 Files: the module, `tests/ita_establishment_fixtures.py`, `tests/code_fixtures.py`,
 the test file and the spec. Message: `feat: register and parse official NAICS index originals`.
@@ -539,7 +545,7 @@ the test file and the spec. Message: `feat: register and parse official NAICS in
 10. Run steps 1–9 twice. Unequal snapshots raise
     `'selected codes inputs changed during validation'`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Use `target_fixtures.seed_inputs(tmp_path)`. It builds a toy Stage 4 bundle named
 `fixture_codes`, which suffices because the selector reads no titles.
@@ -558,19 +564,21 @@ Use `target_fixtures.seed_inputs(tmp_path)`. It builds a toy Stage 4 bundle name
 - `test_verify_detects_change`: after selection, change `report.json` and repin, then
   `verify()` raises.
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_ita_establishment_inputs.py -q`
 Expected: FAIL, module not found.
 
-- [ ] **Step 3: Implement `ita_establishment_inputs.py`**
+- [x] **Step 3: Implement `ita_establishment_inputs.py`**
 
-- [ ] **Step 4: Run the tests and see them pass**
+> Deviation: the module adds one public helper, `merge_citations`, beyond the plan.
+
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_ita_establishment_inputs.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Message: `feat: select pinned Stage 4 codes for Stage 10 without geography`.
 
@@ -635,7 +643,7 @@ Message: `feat: select pinned Stage 4 codes for Stage 10 without geography`.
 | `n_repeat_rows` | sum of group sizes above 1 for groups `(year, employer_key, description_key)` with known employer and nonempty key |
 | `n_repeat_excess` | sum of `size − 1` over the same groups, 0 when there is none |
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 - `test_keys_match_stage3_semantics`: every `with_keys` column equals the one computed
   on `frame.select(SOURCE_COLUMNS)`. `source_row` is `0..n-1` as UInt64.
@@ -657,19 +665,19 @@ Message: `feat: select pinned Stage 4 codes for Stage 10 without geography`.
 - `test_index_counts_partition_overlap`: title only, index only, and both.
 - `test_text_keys_refuse_empty_key`.
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_ita_establishment_records.py -q`
 Expected: FAIL, module not found.
 
-- [ ] **Step 3: Implement the module and the frame builders**
+- [x] **Step 3: Implement the module and the frame builders**
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_ita_establishment_records.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Apply the R2.6 amendment to `specs/embedding-evaluation-data-spec.md`**
+- [x] **Step 5: Apply the R2.6 amendment to `specs/embedding-evaluation-data-spec.md`**
 
 Replace:
 
@@ -692,7 +700,7 @@ with unknown vintage kept unknown. *(owner, Stage 10 design, 2026-11-13;
 rather than automatically repaired.
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Message: `feat: key ITA records and flag copied title and index text`.
 
@@ -785,7 +793,7 @@ Message: `feat: key ITA records and flag copied title and index text`.
   `flag_employer_unknown`.
 - Path rows equal the Stage 4 rows, and the referenced node set equals the path set.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 - `test_pair_id_encoding`:
   - `pair_id('employer', ('ein:123456789', 'steel mill')) == '7a0f1cef9cf5bc5d79af3a2993a46c15767dd0f3d208a8233fca9a07aac0d6f1'`
@@ -811,19 +819,19 @@ Message: `feat: key ITA records and flag copied title and index text`.
   candidates yields both paths. An unresolved row with empty candidates yields none.
 - `test_validator_rejects_row_loss`: a dropped member row raises `ValueError`.
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_ita_text_pairs.py -q`
 Expected: FAIL, module not found.
 
-- [ ] **Step 3: Implement `ita_text_pairs.py`**
+- [x] **Step 3: Implement `ita_text_pairs.py`**
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_ita_text_pairs.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Message: `feat: build deduplicated ITA text-code pair tables`.
 
@@ -895,7 +903,7 @@ leaves open:
   `n_multi_industry_employers ≥ max_b J(a,b)`, and it is 0 exactly when `a` has no
   target row.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 - `test_same_year_rule`: an EIN with 238220 in 2023 and 722511 in 2024 forms no cell.
   The same pair within 2025 forms one.
@@ -916,22 +924,22 @@ leaves open:
 - `test_targets_pass_shared_writer`: `target_contract.write_targets` into `tmp_path`
   succeeds.
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_ita_co_ownership.py -q`
 Expected: FAIL, module not found.
 
-- [ ] **Step 3: Implement `ita_co_ownership.py`**
+- [x] **Step 3: Implement `ita_co_ownership.py`**
 
 Deduplicate `(ein_key, year, node)` before the self-join on `(ein_key, year)`, so record
 multiplicity never enters J.
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_ita_co_ownership.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Message: `feat: estimate directional ITA co-ownership shares`.
 
@@ -1033,7 +1041,7 @@ Message: `feat: estimate directional ITA co-ownership shares`.
 - The reason, `later_row` and flag rules above hold. A null base ID holds exactly when
   the status is `missing_id`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 - `test_v2_counts_equal_stage3_link_report`: base 2023 and later 2024 hold exact
   duplicates, null IDs in both years, a competing ID in each year, a padded EIN, an
@@ -1054,19 +1062,19 @@ Message: `feat: estimate directional ITA co-ownership shares`.
   gives `weaker_same_id` with `reason_address_conflict`.
 - `test_validator_rejects_missing_base_record`.
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_ita_establishment_links.py -q`
 Expected: FAIL, module not found.
 
-- [ ] **Step 3: Implement `ita_establishment_links.py`**
+- [x] **Step 3: Implement `ita_establishment_links.py`**
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_ita_establishment_links.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Message: `feat: link ITA establishments across filing years`.
 
@@ -1203,7 +1211,7 @@ them. Never use an all-same-digit EIN, which `ein_key` treats as unusable.
    `ita_index_references.import_reference`.
 4. `stage3_expectations(data_dir)`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Use a module-scoped seeded root with one built run `first`.
 - `test_build_publishes_complete_bundle`: the file set is `FILES` plus `outputs.json`.
@@ -1237,19 +1245,19 @@ Use a module-scoped seeded root with one built run `first`.
   That set plus `pyproject.toml` and `uv.lock` equals `set(SOFTWARE_FILES)`. `dotenv`
   and `ipumspy` are not loaded.
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_ita_establishment_bundle.py -q`
 Expected: FAIL, module not found.
 
-- [ ] **Step 3: Implement the bundle module and the fixture chain**
+- [x] **Step 3: Implement the bundle module and the fixture chain**
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_ita_establishment_bundle.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Message: `feat: publish and verify immutable Stage 10 bundles`.
 
@@ -1295,7 +1303,7 @@ Message: `feat: publish and verify immutable Stage 10 bundles`.
   `acs_targets.py` does. A catch-all inside the guard would turn it into the fixed
   failure line with exit 2.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 - `test_help_lists_exactly_five_commands`.
 - `test_data_dir_is_required`: exit 2 with a usage error.
@@ -1308,19 +1316,19 @@ Message: `feat: publish and verify immutable Stage 10 bundles`.
 - Update `test_software_files_cover_loaded_modules` so it imports
   `embedding_data.ita_establishment_targets`.
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_ita_establishment_cli.py tests/test_ita_establishment_bundle.py::test_software_files_cover_loaded_modules -q`
 Expected: FAIL, module not found.
 
-- [ ] **Step 3: Implement the command module and add it to `SOFTWARE_FILES`**
+- [x] **Step 3: Implement the command module and add it to `SOFTWARE_FILES`**
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: the Step 2 command.
 Expected: all pass.
 
-- [ ] **Step 5: Document the commands**
+- [x] **Step 5: Document the commands**
 
 - **`README.md`.** Add a section `## ITA establishment targets (Stage 10)` after
   "ITA assignment and 2023 area-mix targets". Include:
@@ -1340,7 +1348,7 @@ Expected: all pass.
   - the frozen-module rule and the Stage 9 `pgrep` check
   - the statement that measured acceptance is pending
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Message: `feat: expose offline Stage 10 ITA establishment commands`.
 
@@ -1384,7 +1392,7 @@ Message: `feat: expose offline Stage 10 ITA establishment commands`.
 - **Eligibility.** Year in 2023–2025, status `native_2022`, a non-null node, the three
   NAICS flags false (null is ineligible), and a usable unpadded EIN.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 - `test_ita_establishment_raw_to_target_offline`: run the chain.
   - Both verifies pass, `compare_runs` is equal and the basis is the fixture basis.
@@ -1402,19 +1410,21 @@ Message: `feat: expose offline Stage 10 ITA establishment commands`.
 - `test_reconciler_is_independent`: an AST import scan finds none of the forbidden
   modules.
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_ita_establishment_v12.py tests/test_reconcile_stage10.py -q`
 Expected: FAIL, missing helper and script.
 
-- [ ] **Step 3: Implement the chain helper and the script**
+- [x] **Step 3: Implement the chain helper and the script**
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: the Step 2 command.
 Expected: all pass.
 
-- [ ] **Step 5: Run the software checkpoint**
+- [x] **Step 5: Run the software checkpoint**
+
+> Deviation: behave plus the parallel `coverage-check-full` hook replaced the serial `pytest`.
 
 Run the `pgrep` check, then:
 - `uv run --locked pytest`: every test passes, with the `network` canary deselected.
@@ -1423,7 +1433,7 @@ Run the `pgrep` check, then:
 - `git diff --name-status main...HEAD -- src scripts tests`: only `A` lines, plus
   `M tests/code_fixtures.py`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Message: `test: add Stage 10 raw-to-target V12 chain and reconciliation`.
 
@@ -1444,7 +1454,9 @@ Message: `test: add Stage 10 raw-to-target V12 chain and reconciliation`.
 execution checkout. Run the `pgrep` check before each command. Each step names the
 roadmap stage that runs it (D5).
 
-- [ ] **Step 1 (Stage 1): Snapshot (read-only)**
+- [x] **Step 1 (Stage 1): Snapshot (read-only)**
+
+> Deviation: run in Stage 1 under D5 and D6.
 
 Stage 1 takes this snapshot again before Gate 2 and keeps the first one (2026-11-15,
 before Gate 1). Record these for the finding:
@@ -1457,7 +1469,9 @@ Expected Stage 6 pins: `stage6_ita_area_mix_20261014_1000_csv` is
 `084292b6835eb09ce27ecc4a3aef03a6f43bfe7b39b815665c29190a431e2473`, and `_replay` is
 `78fd21e37ba0c5b1cd396ff0961b557650788fdccd3c84a911e8c6c3b7fabe71`.
 
-- [ ] **Step 2 (done 2026-11-16, before Stage 1): GATE 1, index acquisition**
+- [x] **Step 2 (done 2026-11-16, before Stage 1): GATE 1, index acquisition**
+
+> Deviation: done on 2026-11-16, before Stage 1, as Gate 1.
 
 Ask the owner for a go-ahead and confirm that no Stage 9 freeze window is open. Then:
 
@@ -1470,12 +1484,16 @@ the registered SHA-256. If Census refuses, the owner downloads the files by hand
 the same go-ahead, run `import-reference naics_index_<year> <file> --data-dir …` per
 kind. If bytes or counts differ from the registry, stop and ask (checkpoint 2).
 
-- [ ] **Step 3 (Stage 1): Choose a fresh run ID**
+- [x] **Step 3 (Stage 1): Choose a fresh run ID**
+
+> Deviation: run in Stage 1 under D5 and D6.
 
 Use `stage10_ita_establishment_<YYYYMMDD>_r1`. Confirm that neither a final nor a
 `.part` exists for it. Stage 4 picks the replay ID and checks it the same way.
 
-- [ ] **Step 4 (Stage 1): GATE 2, first build**
+- [x] **Step 4 (Stage 1): GATE 2, first build**
+
+> Deviation: run in Stage 1 under D5 and D6.
 
 Build from a committed checkout: `git status --porcelain --untracked-files=normal` prints
 nothing at launch, and nothing in the checkout outside `.sdd/` changes until the JSON
@@ -1490,7 +1508,9 @@ Expected: one JSON line with `outputs_sha256`. If the process dies and leaves
 `<RUN>.part`, leave it in place. Ask the owner (gate 4), record the event, and use a
 new ID afterwards.
 
-- [ ] **Step 4a (Stage 4): Checkout, venv, ledger and snapshot (read-only on `ROOT`)**
+- [x] **Step 4a (Stage 4): Checkout, venv, ledger and snapshot (read-only on `ROOT`)**
+
+> Deviation: added for Stage 4.
 
 `W` is `/Users/lowell/Projects/embedding-data/.claude/worktrees/stage-4-ita-naics-hardening`.
 Run every Stage 4 command from `W`.
@@ -1514,7 +1534,9 @@ Run every Stage 4 command from `W`.
 - Replay ID: `stage10_ita_establishment_20261116_r1_replay`. Confirm that neither the
   final nor `<ID>.part` exists.
 
-- [ ] **Step 4b (Stage 4): Re-verify the first run (no gate, read-only on `ROOT`)**
+- [x] **Step 4b (Stage 4): Re-verify the first run (no gate, read-only on `ROOT`)**
+
+> Deviation: added for Stage 4.
 
 The Stage 4 Exit needs this, because `compare-runs` does not check software identity.
 Run it before Gate 3: a failure here blocks the replay (checkpoint 4).
@@ -1529,7 +1551,7 @@ Stage 1 findings: pairs 644,265; pair codes 771,971; members 3,206,055; paths 1,
 links 3,198,774; co-ownership 39,152; marginals 991; support 39,152. Record wall time
 and maximum RSS.
 
-- [ ] **Step 5 (Stage 4): GATE 3, replay build**
+- [x] **Step 5 (Stage 4): GATE 3, replay build**
 
 Repeat Step 4 with the replay ID after its own go-ahead. Ask the owner for the go-ahead
 and confirmation that no Stage 9 freeze window is open. Before launch, every Stage 4
@@ -1539,7 +1561,9 @@ Expected: exit 0 and one JSON line with the replay's `outputs_sha256`. The repla
 differs from the first run's, because `inputs.json` records the run ID and the creation
 time. The tables and `report.json` must not differ.
 
-- [ ] **Step 6 (Stage 1: first run's `verify`; Stage 4: replay's `verify` and `compare-runs`): Verify and compare**
+- [x] **Step 6 (Stage 1: first run's `verify`; Stage 4: replay's `verify` and `compare-runs`): Verify and compare**
+
+> Deviation: Stage 1 ran the first run's `verify` under D5 and D6, and Stage 4 ran the replay's `verify` and `compare-runs`.
 
 `verify` reruns every product, so record its wall time and maximum resident set size as
 Step 4 does. Run it from the checkout and venv that built the run, with no `uv sync` or
@@ -1566,7 +1590,9 @@ and for each of the eight tables `schema_equal` and `values_equal` true with equ
 row counts. Exit 1 or any unequal table: stop and ask (checkpoint 4). Save both JSON
 lines in the ledger folder.
 
-- [ ] **Step 7 (Stage 1): Independent checks**
+- [x] **Step 7 (Stage 1): Independent checks**
+
+> Deviation: run in Stage 1 under D5 and D6.
 
 - `uv run --locked python scripts/reconcile_stage10.py co-ownership --data-dir … --run <RUN> --outputs-sha256 <pin>`
   reports equal.
@@ -1575,7 +1601,9 @@ lines in the ledger folder.
 - From `report.json`, pair records sum to 3,206,055 in total, and to each year's V1
   `n_rows`.
 
-- [ ] **Step 8 (Stage 1): Preservation**
+- [x] **Step 8 (Stage 1): Preservation**
+
+> Deviation: run in Stage 1 under D5 and D6.
 
 - The summary, codes and both Stage 6 `outputs.json` SHA-256 values equal the snapshot,
   and `target_io.verify_inventory` passes on each bundle.
@@ -1585,7 +1613,9 @@ lines in the ledger folder.
 - `uv run --locked embedding-data audit --data-dir /Users/lowell/Projects/embedding-data/data`
   reports zero discrepancies.
 
-- [ ] **Step 8a (Stage 1): Findings file, tick and commit**
+- [x] **Step 8a (Stage 1): Findings file, tick and commit**
+
+> Deviation: run in Stage 1 under D5 and D6.
 
 - Write `specs/naics-evaluation-data-stage-1-findings.md`, one screen: the run ID, the
   `outputs.json` pin, the `inputs.json` and `report.json` SHA-256, the Stage 1 snapshot
@@ -1596,7 +1626,9 @@ lines in the ledger folder.
 - Commit. Message: `docs: record Stage 1 first build of the ITA NAICS targets`.
 - Do not run the Plan Completion Protocol or tick any Task 11 box. Stage 4 does both.
 
-- [ ] **Step 6a (Stage 4): Preservation after the replay (read-only)**
+- [x] **Step 6a (Stage 4): Preservation after the replay (read-only)**
+
+> Deviation: added for Stage 4.
 
 - `uv run --locked python .sdd/11-ita-establishment-targets/stage1_checks.py stage10_ita_establishment_20261116_r1_replay`
   prints `"all_ok": true`. Its `step7` values equal `stage-1-checks.out`, and all three
@@ -1608,7 +1640,7 @@ lines in the ledger folder.
 - `uv run --locked embedding-data audit --data-dir /Users/lowell/Projects/embedding-data/data`
   exits 0 with zero discrepancies.
 
-- [ ] **Step 9 (Stage 4): Write the finding and update the docs**
+- [x] **Step 9 (Stage 4): Write the finding and update the docs**
 
 `specs/findings/stage-10-ita-establishment-targets.md` records:
 - the index originals (path, size, SHA-256, retrieval)
@@ -1664,7 +1696,9 @@ paragraph. Do not tick the roadmap's Stage 4. The Plan Completion Protocol does 
   exists." with the same runs and pins and a link to the finding. Write in the
   section's existing style.
 
-- [ ] **Step 9a (Stage 4): Spec amendments D8–D10**
+- [x] **Step 9a (Stage 4): Spec amendments D8–D10**
+
+> Deviation: added for Stage 4.
 
 In `specs/ita-establishment-targets.md`, make exactly these replacements. Leave the
 spec's status line alone: retirement in Step 11 marks the spec complete.
@@ -1682,12 +1716,14 @@ Check: `git diff` shows exactly four changed lines in the spec, and
 `uv run --locked pytest tests/test_ita_co_ownership.py -q` passes (it reads the spec's
 universe statement, which these edits leave alone).
 
-- [ ] **Step 10 (Stage 4): Commit**
+- [x] **Step 10 (Stage 4): Commit**
 
 Message: `docs: record Stage 10 full-data acceptance`. The commit holds the finding,
 `README.md`, `CLAUDE.md` and the Step 9a spec edits.
 
-- [ ] **Step 11 (Stage 4): Plan Completion Protocol for plan 11**
+- [x] **Step 11 (Stage 4): Plan Completion Protocol for plan 11**
+
+> Deviation: added for Stage 4.
 
 Follow writing-plans' Plan Completion Protocol, steps 1–5, with these plan-specific
 inputs:
@@ -1733,7 +1769,9 @@ inputs:
   Task 8 commits (ledger rulings, Tasks 7–8), and the skipped Codex review seat (owner,
   2026-11-16).
 
-- [ ] **Step 12 (Stage 4): PR, merge and cleanup**
+- [x] **Step 12 (Stage 4): PR, merge and cleanup**
+
+> Deviation: added for Stage 4.
 
 - Push with `git push -u origin stage-4-ita-naics-hardening` (the branch has no
   upstream on purpose) and open a PR to `main`. Follow the owner's PR-lifecycle rule:
@@ -1749,3 +1787,7 @@ inputs:
   nothing newer than the backup. Otherwise stop and report.
 - Write the roadmap-resume handoff brief (prepare-handoff). It routes to derive-roadmap
   and to no stage.
+
+## Handoff to later stages
+
+None: shipped as the roadmap's Produces states.

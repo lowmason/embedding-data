@@ -37,7 +37,7 @@ from embedding_data.ita_establishment_records import keyed_records, text_keys
 from embedding_data.ita_index_references import INDEX_SCHEMA
 from embedding_data.target_contract import TARGET_KEY_COLUMNS, TARGET_SCHEMA
 
-SPEC = Path(__file__).parents[1] / 'specs/ita-establishment-targets.md'
+SPEC = Path(__file__).parents[1] / 'specs/completed/ita-establishment-targets.md'
 TITLES = pl.DataFrame(
     [(2022, '332312', 'Fabricated Structural Metal Manufacturing')],
     schema={'vintage': pl.Int64, 'code': pl.String, 'title': pl.String},

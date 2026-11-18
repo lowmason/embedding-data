@@ -289,7 +289,7 @@ establishment-link table links establishment records across filing years. The
 text–code pair tables pair each employer's own industry text with every candidate
 NAICS 2022 code path. The co-ownership target measures how often one EIN operates
 establishments in two NAICS 2022 industries in the same year. It is the only
-`targets-v1` family in this stage. The [stage spec](specs/ita-establishment-targets.md)
+`targets-v1` family in this stage. The [stage spec](specs/completed/ita-establishment-targets.md)
 defines all three.
 
 The standalone module `embedding_data.ita_establishment_targets` has five commands.

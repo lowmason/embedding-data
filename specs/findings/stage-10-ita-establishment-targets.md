@@ -4,7 +4,7 @@ The full-data build of the Stage 10 bundle exists, and a second build of it matc
 `stage10_ita_establishment_20261116_r1` (the first run) and run
 `stage10_ita_establishment_20261116_r1_replay` (the replay) both pass `verify`.
 `compare-runs` finds the two bundles equal. Plan 11
-(`specs/plans/11-ita-establishment-targets.md`) ran Task 11 in two roadmap stages. Stage 1
+(`specs/plans/completed/11-ita-establishment-targets.md`) ran Task 11 in two roadmap stages. Stage 1
 built and checked the first run on 2026-11-16, and its record is
 `specs/naics-evaluation-data-stage-1-findings.md`. Stage 4 built the replay on 2026-11-18
 and wrote this file.
@@ -268,7 +268,7 @@ label "unclear". On 2026-11-18 the owner settled them.
 - D10 settles a separate Task 5 note that the ledger flagged for the owner. Only a
   pair-code row with an empty candidate list references no path. An unresolved row that
   keeps candidates references their paths.
-- The spec now states D8, D9 and D10 (`specs/ita-establishment-targets.md`).
+- The spec now states D8, D9 and D10 (`specs/completed/ita-establishment-targets.md`).
 - The ledger's sixth unclear ruling (line 55, the `LIMITS` bullet) was superseded during
   Task 8. Fix `2e756f2` restored the spec bullet word for word. Every other ledger ruling
   stays as executed.
