@@ -5,7 +5,9 @@
 > not build, before the plan exists and the owner gives the go-ahead for each
 > write.
 
-Status: draft for owner review, 2026-11-18. Stage 14 design session of
+Status: the owner approved this committed spec on 2026-11-18 ("Approve the
+spec"), including every call marked "My call" and the proposals played back
+below. Stage 14 design session of
 [the roadmap](naics-evaluation-data-roadmap.md). The owner chose the four
 decisions below on 2026-11-18. Calls marked "My call" were made in the session
 or while writing this file. A builder check by a separate reviewer raised two
@@ -57,7 +59,7 @@ Two facts from the owner on 2026-11-18:
 ### Proposals played back and not corrected (2026-11-18)
 
 The session played these back to the owner before decisions 2 and 3. The owner
-did not correct them. Approval of this spec confirms them.
+did not correct them, and approved them with this spec.
 
 - A link is one distinct pair of a prime UEI and a subcontractor UEI with at
   least one usable report in the window. Each pair counts once, however many
