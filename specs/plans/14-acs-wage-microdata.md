@@ -51,12 +51,11 @@ task.
   skip a hook.
 - **Owner gates (roadmap Stage 17 `Consumes`).** Get the owner's go-ahead before each
   production write: (1) the preservation freeze and the first build, (2) the replay build,
-  (3) any cleanup of a failed run's leftover staging. *Default, flagged at plan review:*
-  each go-ahead also confirms that no Stage 9 freeze window is open and that no other
+  (3) any cleanup of a failed run's leftover staging. Each go-ahead also confirms (D1) that no Stage 9 freeze window is open and that no other
   stage's acquisition or full-data build is running. Show the owner the output of `pgrep
   -fl 'embedding_data|embedding-data'` at each go-ahead. The controller runs Task 9
   itself, because a subagent cannot ask the owner.
-- **Stage 17's own preservation window.** *Default, flagged at plan review.* The window
+- **Stage 17's own preservation window (D2).** The window
   opens at the freeze (Task 9 Step 4) and closes at the preservation check (Step 10).
   Spec item 7 is strict: the manifest stays byte-identical, and no file appears outside
   the two runs and the control directory. During the window the owner holds every other
@@ -117,7 +116,20 @@ task.
 
 ## Decisions
 
-None.
+The spec's owner decisions are D1–D6 of `specs/acs-wage-microdata.md`. The D-numbers
+below are this plan's own.
+
+- **D1** (owner, plan review, 2026-11-18): each production go-ahead also confirms that no Stage 9 freeze window is open and that no other stage's acquisition or full-data build is running. Applied in: Global Constraints, Task 9 Steps 2 and 9.
+- **D2** (owner, plan review, 2026-11-18): Stage 17's own preservation window runs from the freeze to the preservation check, and the owner holds other stages' writes under `data/` meanwhile. Applied in: Global Constraints, Task 9 Step 2.
+- **D3** (owner, plan review, 2026-11-18): build and `verify` check Stage 8 by its detached pin and full inventory hash, not by `acs_mapping_bundle.verify_bundle`. Task 9 runs Stage 8's public `verify` once as a read-only preflight. Applied in: Task 3, Task 9 Step 3.
+- **D4** (owner, plan review, 2026-11-18): `--codes-run` and `--codes-outputs-sha256` are explicit and must equal the codes selection recorded in the Stage 8 bundle. Applied in: Tasks 3 and 5.
+- **D5** (owner, plan review, 2026-11-18): every build and verify checks the delivered `WKSWORK2` and `CLASSWKRD` labels and refuses a mismatch. Applied in: Tasks 1 and 3.
+- **D6** (owner, plan review, 2026-11-18): an earner with `INCWAGE` 999998 or 999999, or with `INCWAGE_CPIU_2010` zero or below, stops the build. Applied in: Task 1.
+- **D7** (owner, plan review, 2026-11-18): a new committed preservation script, with its control directory under `derived/acs/wage-microdata-controls/<first run ID>`, written under gate 1. Applied in: Tasks 8 and 9.
+- **D8** (owner, plan review, 2026-11-18): Stage 17 carries its own streaming ordered comparison, because importing `ipums_parity` loads `ipumspy`. Applied in: Task 4.
+- **D9** (owner, plan review, 2026-11-18): the exact wording of amendments 2 to 4 in Task 10, plus a README section and a Stage 17 paragraph in `CLAUDE.md`. Applied in: Task 10 (spec amendment).
+- **D10** (owner, plan review, 2026-11-18): this plan is numbered 14, because PR 32 merged plan 13 (Stage 5 TRI) during planning. Applied in: the plan file name and Task 10's tags.
+- **D11** (owner, plan review, 2026-11-18): the source spec's out-of-scope line "Microdata release (R8.1)" and `specs/evaluation-targets-methodology.md:35` stay unchanged. Applied in: Task 10.
 
 ## File Structure
 
@@ -490,8 +502,7 @@ git commit -m "feat(acs-wage): check headline rules and NAICS 2022 nodes"
     `mapping_outputs_sha256`, `codes_run`, `codes_outputs_sha256`, and
     `copy_template(template: dict, tmp_path: Path) -> dict`.
 
-**Default, flagged at plan review: how the build checks Stage 8** (spec, "Left to the
-builder"). The build and `verify` check the detached pin first and then hash the whole
+**How the build checks Stage 8 (D3)** (spec, "Left to the builder"). The build and `verify` check the detached pin first and then hash the whole
 Stage 8 inventory (`target_io.verify_inventory`). They do not call
 `acs_mapping_bundle.verify_bundle`, which re-derives every Stage 8 table (about 6 minutes
 each in Stage 9). Stage 9 ran it twice in-process before its build was killed (exit 137),
@@ -1002,7 +1013,7 @@ python scripts/reconcile_stage17.py freeze --data-dir ROOT --control-dir DIR
 python scripts/reconcile_stage17.py preservation --data-dir ROOT --control-dir DIR --freeze-sha256 PIN --runs FIRST,REPLAY
 ```
 
-**Default, flagged at plan review.** No committed tool proves preservation for a stage
+**D7.** No committed tool proves preservation for a stage
 that adds only a derived directory. Stage 10 used an uncommitted script, and the Stage 8
 and Stage 9 tools are bound to their own stages. This task adds one. Its control
 directory is `ROOT/derived/acs/wage-microdata-controls/<FIRST_RUN_ID>`, after the Stage 8
@@ -1214,9 +1225,10 @@ Line numbers are those of `main` at `2c2de1d`. Plan 13 (Stage 5) also edits `REA
 branch before this task, and place each edit by its quoted anchor text, not by line
 number.
 
-The spec gives amendment 1 verbatim and paraphrases items 2 to 4. The exact wording below
-is shown to the owner at plan review. `<date>` is the execution date. Leave the spec's
-status line alone.
+The spec gives amendment 1 verbatim and paraphrases items 2 to 4. The owner approved the
+exact wording below at plan review (D9). `<date>` is the execution date. Leave the spec's
+status line alone. Leave the source spec's out-of-scope line `**Microdata release**
+(R8.1)` and `specs/evaluation-targets-methodology.md:35` unchanged (D11).
 
 - [ ] **Step 1: Amend the source spec (spec amendments 1 to 3).**
 
