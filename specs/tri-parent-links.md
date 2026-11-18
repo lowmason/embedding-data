@@ -4,11 +4,12 @@
 > any TRI file, and do not build, before the plan exists and the owner gives
 > the go-ahead for each write.
 
-Status: draft for owner review, 2026-11-18. Stage 5 design session of
+Status: the owner approved this committed spec on 2026-11-18 ("Approve the
+spec"), including every call marked "My call". Stage 5 design session of
 [the roadmap](naics-evaluation-data-roadmap.md). On 2026-11-18 the owner chose
 all five decisions below ("Accept all picks"), with the calls listed under
 Accepted proposals. Calls marked "My call" elsewhere in this file were made
-while writing it. They stand unless the owner corrects them at review. A
+while writing it. A
 builder check by a separate reviewer raised four questions on 2026-11-18. Two
 follow from the owner's decisions (the "no parent" basis and partial owners).
 Two are process calls (document checks and the Stage 9 freeze window). All four
