@@ -1642,9 +1642,11 @@ Stage 4 sources and detail for these bullets:
   `cell_count_distribution`, `marginal_employer_distribution`, `partition_by_year`, and
   the `links.pairs` status counts. Report counts and shares only, never an EIN, name,
   address or description.
-- Rulings: the owner kept five unclear readings (D7–D10, 2026-11-18), and the spec now
-  states D8–D10 (Step 9a). The ledger's sixth unclear ruling (LIMITS bullet) was
-  superseded during Task 8: fix `2e756f2` restored the spec bullet word for word.
+- Rulings: the owner kept the five live unclear readings (ledger lines 36, 45, 46, 66
+  and 68: D7–D9, 2026-11-18) and the Task 5 path reading that the ledger flagged for the
+  owner (D10). The spec now states D8–D10 (Step 9a). The ledger's sixth unclear ruling
+  (LIMITS bullet, line 55) was superseded during Task 8: fix `2e756f2` restored the spec
+  bullet word for word.
 - Not claimed: replace "V9 size gate" with this. Every co-ownership row keeps
   `size_gate_pending`, and the headline minimum counts are in
   `specs/findings/v9-ita-naics-minimum-counts.md` (Stage 3). No output feeds embedder
@@ -1688,8 +1690,10 @@ Message: `docs: record Stage 10 full-data acceptance`. The commit holds the find
 
 Follow writing-plans' Plan Completion Protocol, steps 1–5, with these plan-specific
 inputs:
-- Gate (step 1): no question remains. D7–D10 settled the five live unclear rulings,
-  and ruling 60 superseded the sixth. Every other ledger ruling stays as executed.
+- Gate (step 1): no question remains. D7–D9 settled the five live unclear rulings
+  (ledger lines 36, 45, 46, 66 and 68), D10 settled the Task 5 note for the owner, and
+  ruling 60 superseded the sixth unclear ruling. Every other ledger ruling stays as
+  executed.
 - Markup (step 2): tick every step of Tasks 1–11, Task 11 Step 2 included. Add a
   `> Deviation:` line under each of these steps, from the ledger:
   - Task 2's index workbook fixture: `write_index_workbook` rewrites sheet XML with
@@ -1730,7 +1734,8 @@ inputs:
 
 - [ ] **Step 12 (Stage 4): PR, merge and cleanup**
 
-- Push the branch and open a PR to `main`. Follow the owner's PR-lifecycle rule:
+- Push with `git push -u origin stage-4-ita-naics-hardening` (the branch has no
+  upstream on purpose) and open a PR to `main`. Follow the owner's PR-lifecycle rule:
   enable Auto-fix and auto-merge. The repo has no CI and no required checks, so when
   GitHub refuses auto-merge, run the `pgrep` check and merge with
   `gh pr merge <n> --merge --delete-branch`. Then report `PR merged, remote deleted`.
