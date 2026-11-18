@@ -19,6 +19,10 @@ reinstates the ACS and CPS work. That widens the Source beyond NAICS evaluation 
 also covers commuting and migration targets, and old Stage 11 covers occupation flows. Geography
 and SOC work therefore returns for those two tracks.
 
+Amended again 2026-11-18 (owner: "Approve as drafted"): Track H adds the ACS wage microdata of the
+approved spec `specs/acs-wage-microdata.md`. It is a person-level input for naics-embedder's
+wage panel, not a target family (that spec, "Amendments to the source spec", item 2).
+
 Choices made:
 - First answer: the ITA NAICS targets O1–O3. The 2023 ITA area mix and the NAICS 2022 graph are already built and delivered with it (owner, 2026-11-16).
 - Smallest usable standard: plan 11 as specified. That is the pooled 2023–2025 native-2022 window, SE `none`, every target `size_gate_pending` and `verify` passing, with no minimum-count gate in the first answer.
@@ -35,7 +39,8 @@ Choices made:
 - Shared amendments (owner, 2026-11-18): whichever of Stages 5, 14 and 15 merges first applies items 1, 2 and 7 of the Stage 2 spec's amendment and the wording change in item 3. Each of the three adds its own rows under items 3 and 6. Stage 14 adds item 4 and Stage 15 adds item 5.
 - Shared resources (owner, 2026-11-18): run one acquisition at a time, because `manifest.append_entries` checks and then appends with no lock. Run one full-data build at a time, because the Stage 9 build was killed with exit 137 (`specs/findings/stage-9-acs-targets.md`). Every session passes the production `--data-dir`.
 - Frozen code (owner, 2026-11-18): frozen modules stay frozen, and new families add modules only. A family that needs a new dependency builds as a nested project with its own `pyproject.toml` and `uv.lock`. The selected runs record the root `pyproject.toml`, the root `uv.lock` and every installed distribution. A throwaway project showed that `uv` keeps a nested project out of the root lock. That test has not run in this repository.
-- Protocol sections (owner, 2026-11-18): each new family needs its own section in `specs/evaluation-protocol.md` before it is scored. It is the last Ranked-list item of its track (O17 to O21) and is written after that track's first real build. Stage 16 frames its section like Section 1 of the protocol: evidence, assignment and the conditions this repository keeps. The scores may stay with naics-embedder, because the protocol lists them under "What this repository does not decide".
+- Protocol sections (owner, 2026-11-18): each new family needs its own section in `specs/evaluation-protocol.md` before it is scored. It is the last Ranked-list item of its track (O17 to O21, and O24) and is written after that track's first real build. Stage 16 frames its section like Section 1 of the protocol: evidence, assignment and the conditions this repository keeps. The scores may stay with naics-embedder, because the protocol lists them under "What this repository does not decide".
+- Track H (owner, 2026-11-18): the "Roadmap placement" section of `specs/acs-wage-microdata.md`, approved on 2026-11-18, proposed the track. Track H reads Stage 8 in place and does not wait for Stage 9. Stage 17 goes to writing-plans against that spec, as its header says. Stage 17 keeps the replay check of the spec's Verification item 1, which the owner approved with the spec. Stages 1, 5, 14 and 15 left replay to a later stage or item.
 
 | # | Outcome | Track | Rank | Cost (estimate; basis) |
 |---|---|---|---|---|
@@ -60,19 +65,24 @@ Choices made:
 | O19 | A protocol section for the BEA family (owner, 2026-11-18) | D | 3 | Design sessions only, after Stage 15's real build |
 | O20 | A protocol section for the ACS targets (owner, 2026-11-18) | F | 2 | Design sessions only, after Stage 9's real build |
 | O21 | A protocol section for the CPS job-change flows (owner, 2026-11-18) | G | 2 | Design sessions only, after Stage 11's real build |
+| O22 | A person-level file of ACS 2023–2024 wage earners for naics-embedder's wage panel: the wage outcome, person covariates, survey weights, each person's NAICS node, flags and a headline column (owner, 2026-11-18) | H | 1 | Moderate (estimate): a lazy scan of 3,035,086 rows and about 120 of the 261 columns of the 910 MB Stage 8 core table, run twice for the replay. Stage 8's `verify_bundle` took about 6 minutes for each run in Stage 9. Peak memory measured by Stage 17 |
+| O23 | A minimum number of headline earners for each category, set from the built counts, as O4 did for the ITA targets (owner, 2026-11-18) | H | 2 | Small: one pass over Stage 17's counts, like O4 |
+| O24 | A protocol section for the ACS wage microdata (owner, 2026-11-18) | H | 3 | Design sessions only, after Stage 17's real build and O23 |
 
 Tracks: A — ITA NAICS targets (known progression, complete). B — EPA TRI parent
 links (research). C — USAspending subawards with SAM.gov (research). D — BEA
 input–output tables (research). E — ITA evaluation-protocol section (research: the
 choice of scores is open). F — ACS targets (research: the cause of the failed builds
-is open). G — CPS job-change flows (research: the meaning of `9890` is open).
+is open). G — CPS job-change flows (research: the meaning of `9890` is open). H — ACS
+wage microdata (research: O23 and O24 depend on the counts of the first build).
 
 B, C and D were one track until 2026-11-18. They split because each answer stands
 without the other, and the Stage 2 spec says the six uses give at most three
 independent new families. E answers how to score a family, not what the data hold,
 so it is split from A and from B to D. F and G split from each other and from A to
 E. The ACS targets need no CPS helper, and the old Stage 12 that needs both stays
-deferred.
+deferred. H splits from F because it reads Stage 8 in place and needs no Stage 9 output.
+The person-level file stands without the ACS targets, and the targets stand without it.
 Track order: none (owner, 2026-11-18). The owner's ranking of 2026-11-16 within the
 old Track B (O7 and O8 first, then O6, then O9 and O10, then O12 and O13) holds
 inside each track and sets the numbers of Stages 14 and 15. Ranks restart within each
@@ -172,7 +182,7 @@ do not set an order.
       Objective: USAspending subawards with SAM.gov entity NAICS are built once on real data as a new evidence family and verified.
       Outcomes: O6
       Track: C
-      Consumes: the Stage 2 spec `specs/uncovered-uses-evidence-sources.md` (Source 2, Rules for every new family, Source spec amendment) and `specs/naics-evaluation-data-stage-2-findings.md`. The SAM.gov account that the owner creates, and its key, handled as Source 2, Owner gates, says. Not met on 2026-11-18. The official NAICS concordances of codes run `stage4_v11_20261013_r2`. The owner's go-ahead for each file fetch
+      Consumes: the Stage 2 spec `specs/uncovered-uses-evidence-sources.md` (Source 2, Rules for every new family, Source spec amendment) and `specs/naics-evaluation-data-stage-2-findings.md`. The SAM.gov account that the owner creates, and its key, handled as Source 2, Owner gates, says. The account exists (Resolved at resume, 2026-11-18: owner). The official NAICS concordances of codes run `stage4_v11_20261013_r2`. The owner's go-ahead for each file fetch
       Produces: one verified USAspending bundle under `data/derived/` with its detached pin. `specs/naics-evaluation-data-stage-14-findings.md`
       Exit: Preflight: open checks E4–E6 are settled before any data is trusted. A failed check stops the stage for an owner decision (Stage 2 spec, Rules for every new family). O6: the bundle holds the evidence that Source 2 of the Stage 2 spec names, and `verify` with the detached pin passes. The stage adds amendment item 4 (R1.2 free account) and its rows under items 3 and 6. The findings file records the run ID, the pin, and the wall time, maximum RSS and bundle size of the real run
       Leaves out: replay check, long-form acceptance finding and headline minimum count → not staged. The owner decides at the resume after this stage reports, as for O12 and O13 in Track B. The USAspending protocol section → O18. The R8.4 training-role amendment → a separate owner decision after naics-embedder's spec (reset prompt, Leave alone)
@@ -195,8 +205,18 @@ do not set an order.
       Consumes: `specs/evaluation-protocol.md`, approved 2026-11-18 (Section 1 as the model, "Families with no section", "What this repository does not decide"). The Stage 10 acceptance finding `specs/findings/stage-10-ita-establishment-targets.md` and the Stage 6 finding `specs/findings/stage-6-ita-area-mix-build.md`, with the runs and pins they record. The V9 decision `specs/findings/v9-ita-naics-minimum-counts.md`. Methodology K5 and K6 in `specs/evaluation-targets-methodology.md`. The Stage 10 spec `specs/completed/ita-establishment-targets.md` (Out of scope)
       Produces: an owner-approved, committed section in `specs/evaluation-protocol.md` for each of the two families. `specs/naics-evaluation-data-stage-16-findings.md`
       Exit: O14: the committed protocol has a section for each family that states the evidence (which run and pin to read), the assignment (who decides the split) and the conditions this repository keeps, as Section 1 does. It names who decides the scores. The findings file records the stage's measured cost in sessions. No source file, test or data file changed
-      Leaves out: the scores, their intervals, the margin and the adoption decision, if they stay with naics-embedder (protocol, "What this repository does not decide"). Sections for the ACS and CPS families and each new evidence family → O17 to O21
+      Leaves out: the scores, their intervals, the margin and the adoption decision, if they stay with naics-embedder (protocol, "What this repository does not decide"). Sections for the ACS and CPS families and each new evidence family → O17 to O21. The section for the ACS wage microdata → O24
       ROUTING: brainstorming
+
+- [ ] Stage 17: ACS wage microdata, first build
+      Objective: One person-level file of ACS 2023–2024 wage earners is built from Stage 8 on real data, verified and replayed.
+      Outcomes: O22
+      Track: H
+      Consumes: the approved spec `specs/acs-wage-microdata.md` (Owner decisions, Design, Amendments to the source spec, Constraints, Verification). The selected Stage 8 run `stage8_acs_mapping_20261018_r7` with its detached pin `1ec9701092f576b122b01464cdb6fa3fbee49db030e4ad3df7b64e621b8e75f4` (`CLAUDE.md`, Stage 8). The NAICS 2022 node table of codes run `stage4_v11_20261013_r2`, with detached pin `15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a`. The owner's go-ahead for each production write
+      Produces: one verified bundle in `data/derived/acs/wage-microdata/<RUN_ID>/` with its detached pin. A replay bundle and its `compare-runs` result. `specs/naics-evaluation-data-stage-17-findings.md`
+      Exit: O22: items 1 to 9 of the spec's "Verification: observable outcomes" hold. The stage applies items 1 to 4 of the spec's "Amendments to the source spec". The findings file records the run ID, the pin, and the wall time, maximum RSS and bundle size of the real run
+      Leaves out: the minimum number of headline earners for each category → O23. The protocol section for the file → O24. The wage panel itself → naics-embedder's panel spec (spec, Non-goals and "Handoff to naics-embedder"). New IPUMS variables, CPS and ACS 2025 → not staged (spec, Non-goals)
+      ROUTING: writing-plans
 
 ## Ranked list — Track B
 
@@ -223,6 +243,14 @@ left the list as Stage 5. O11 is uncovered and parked in `specs/deferred_items.m
 
 1. O21 — CPS protocol section. Design sessions only, after Stage 11's real build
 
+## Ranked list — Track H
+
+The order that `specs/acs-wage-microdata.md` ("Roadmap placement") proposed, ranked by the
+owner on 2026-11-18.
+
+1. O23 — Minimum headline earners for each category. Small: one pass over Stage 17's counts
+2. O24 — ACS wage microdata protocol section. Design sessions only, after Stage 17's real build and O23
+
 Track E has no Ranked list. Its one outcome is Stage 16.
 
 ## Stage-spec stamp
@@ -240,7 +268,7 @@ completion ticks Stage 4.
 ## Completion
 
 Retire this roadmap only after a conformance audit of the accumulated system: re-run
-the gap rubric over every outcome O1–O21, with evidence for each verdict (implementing
+the gap rubric over every outcome O1–O24, with evidence for each verdict (implementing
 stage and plan, `> Deviation:` notes, `specs/deferred_items.md` entries). Ranked-list
 items that the owner never promoted park as deferred items. Each unmet outcome either
 becomes a new stage, keeping this roadmap live, or is deferred consciously with a
