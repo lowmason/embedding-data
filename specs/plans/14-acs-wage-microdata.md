@@ -130,6 +130,7 @@ below are this plan's own.
 - **D9** (owner, plan review, 2026-11-18): the exact wording of amendments 2 to 4 in Task 10, plus a README section and a Stage 17 paragraph in `CLAUDE.md`. Applied in: Task 10 (spec amendment).
 - **D10** (owner, plan review, 2026-11-18): this plan is numbered 14, because PR 32 merged plan 13 (Stage 5 TRI) during planning. Applied in: the plan file name and Task 10's tags.
 - **D11** (owner, plan review, 2026-11-18): the source spec's out-of-scope line "Microdata release (R8.1)" and `specs/evaluation-targets-methodology.md:35` stay unchanged. Applied in: Task 10.
+- **D12** (owner, plan handoff, 2026-11-18): the final whole-branch review (code-reviewer and its Codex second opinion) runs after Task 8 and before Task 9, and its findings are resolved first. From Task 9 Step 5 on, no file in `acs_wage_inputs.SOFTWARE_FILES`, `pyproject.toml` or `uv.lock` changes. A later change to one of them invalidates both runs and needs a fresh run ID and new owner gates. Applied in: Task 9 Step 1.
 
 ## File Structure
 
@@ -1093,7 +1094,9 @@ each command's stdout, stderr and `time` output to the ledger
   --git-common-dir)/info/exclude`, a local file that is never committed. It applies to
   every worktree of this clone, including the primary checkout. Ledger files then cannot
   make the tree dirty. Tasks 1–8 are committed, and the full suite passed at this
-  HEAD. `git status --porcelain --untracked-files=normal` prints nothing. Record
+  HEAD. The final whole-branch review of Tasks 1–8 has run, and every finding is
+  resolved (D12). From Step 5 on, change no file in `acs_wage_inputs.SOFTWARE_FILES`,
+  `pyproject.toml` or `uv.lock`. `git status --porcelain --untracked-files=normal` prints nothing. Record
   `git rev-parse HEAD`. Choose `FIRST=stage17_acs_wage_microdata_<YYYYMMDD>_r1`,
   `REPLAY=${FIRST}_replay`, `CONTROL=$ROOT/derived/acs/wage-microdata-controls/$FIRST`.
   Confirm with `ls` that none of the three paths exists, and no `.part` beside them.
@@ -1303,4 +1306,6 @@ Expected: `git diff --stat` shows only the four files, and the source spec diff 
 exactly four paragraphs.
 
 After Task 10, run the Plan Completion Protocol of writing-plans, including step 3a for
-roadmap Stage 17 (O23 and O24 consume the counts in `report.json` and the finding).
+roadmap Stage 17 (O23 and O24 consume the counts in `report.json` and the finding). The
+final whole-branch review already ran before Task 9 (D12). Any later review covers only
+Tasks 9 and 10, which change docs, and changes no software file.
