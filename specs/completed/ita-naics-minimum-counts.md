@@ -1,5 +1,7 @@
 # Headline minimum counts for the ITA NAICS targets
 
+**Status: COMPLETE (2026-11-17)** — implemented by plan 12 (`specs/plans/completed/12-ita-naics-minimum-counts.md`); decision in `specs/findings/v9-ita-naics-minimum-counts.md`.
+
 Design spec for Stage 3 of `specs/naics-evaluation-data-roadmap.md`. It discharges spec
 R7.3 and V9 (`specs/embedding-evaluation-data-spec.md`) for three families only: ITA
 co-ownership, the 2023 ITA area mix and ITA text–code pairs. Owner decisions are dated

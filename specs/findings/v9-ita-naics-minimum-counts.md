@@ -3,7 +3,7 @@
 Measured on 2026-11-17 with `scripts/measure_ita_minimum_counts.py` (plan 12, Task 8)
 at the rule commit in section 2. This record discharges spec R7.3 and V9 for three families
 only: ITA co-ownership, the 2023 ITA area mix and ITA text–code pairs. The design is in
-`specs/ita-naics-minimum-counts.md`. The record holds counts, rates, run IDs and pins only.
+`specs/completed/ita-naics-minimum-counts.md`. The record holds counts, rates, run IDs and pins only.
 
 ## 1. Decision
 

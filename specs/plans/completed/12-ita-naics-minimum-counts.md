@@ -1,5 +1,7 @@
 # ITA NAICS Minimum Counts Implementation Plan
 
+**Status: COMPLETE (2026-11-17)** — executed via subagent-driven-development; nothing deferred
+
 > **For agentic workers:** REQUIRED SUB-SKILL: implement this plan task-by-task via subagent-driven-development (the default) — or executing-plans when your human partner chose inline execution at the handoff. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Measure next-year recurrence curves for the three ITA NAICS families and set
@@ -15,7 +17,7 @@ data, and the decision record transcribes the output.
 
 **Tech Stack:** Python 3.14, Polars, argparse, pytest, uv. No new dependency.
 
-**Spec:** `specs/ita-naics-minimum-counts.md` (owner-approved, merged in lowmason/embedding-data#17 and #18, `ace8559`; amended by D1 in Task 6).
+**Spec:** `specs/completed/ita-naics-minimum-counts.md` (owner-approved, merged in lowmason/embedding-data#17 and #18, `ace8559`; amended by D1 in Task 6).
 
 > Roadmap: specs/naics-evaluation-data-roadmap.md, Stage 3 — on plan
 > completion, tick the stage and re-validate later stages against what shipped.
@@ -141,7 +143,7 @@ data, and the decision record transcribes the output.
   - `family_minimum(minimums: list[int | None]) -> int | None`: the largest, or None when
     any is None.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add `load_script()` (copy the pattern from `tests/test_reconcile_stage10.py`, script path
 `scripts/measure_ita_minimum_counts.py`, assertion message
@@ -192,12 +194,12 @@ Add a helper `band(low, high, rate)` that returns a band dict, and:
 - `test_family_minimum_is_largest_over_year_pairs`: `[1, 3]` gives `3`, `[2, None]` gives
   `None`.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_measure_ita_minimum_counts.py -v`
 Expected: FAIL with "measurement script is missing" (the `load_script` assertion).
 
-- [ ] **Step 3: Implement the constants and the four functions**
+- [x] **Step 3: Implement the constants and the four functions**
 
 The module docstring states the rule in two sentences and cites the spec. Banding uses
 `min(base_count, TOP_BAND)`. Merging is the one algorithm the signature leaves open:
@@ -215,12 +217,12 @@ for index in range(1, TOP_BAND + 1):           # raw bands 1..9 and TOP_BAND (= 
 `rate >= LEVEL`, and returns the `low` of the last band it passed, or None if it passed
 none. Compute `rate` and Wilson in Python from integers, never from Polars floats.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_measure_ita_minimum_counts.py -v`
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/measure_ita_minimum_counts.py tests/test_measure_ita_minimum_counts.py
@@ -293,7 +295,7 @@ Authentication order, each step with its fixed reason:
    codes inventory's record. The Stage 1 `codes.run_id` and `codes.outputs_sha256` equal
    the codes selection. Otherwise: `'inputs name another canonical table or codes run'`.
 
-- [ ] **Step 1: Write the fixture module and the failing tests**
+- [x] **Step 1: Write the fixture module and the failing tests**
 
 Add a `published` fixture: `publish(tmp_path, build_frames(golden_rows()))`. In every
 later task, build a test's rows as `golden_rows()` plus changes, so that each family
@@ -319,22 +321,22 @@ eligible, and the other frozen builders can refuse an empty family.
 - `test_unsafe_run_id_refused`: run ID `'../fixture_codes'`. Reason
   `'unsafe run id or pin'`.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_measure_ita_minimum_counts.py -v -k "fixture or authenticate or refused or pins"`
 Expected: `test_fixture_builds_frozen_tables` PASS. The others FAIL with
 `AttributeError: ... has no attribute 'authenticate'`.
 
-- [ ] **Step 3: Implement `Refused`, `Inputs` and `authenticate`**
+- [x] **Step 3: Implement `Refused`, `Inputs` and `authenticate`**
 
 Hash with `hashlib.file_digest`, as `scripts/reconcile_stage10.py` does.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_measure_ita_minimum_counts.py -v`
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/measure_ita_minimum_counts.py tests/minimum_count_fixtures.py tests/test_measure_ita_minimum_counts.py
@@ -371,7 +373,7 @@ git commit -m "feat(scripts): authenticate the pinned minimum-count inputs"
   - `visible(links: pl.DataFrame, eligible_rows: pl.Series) -> pl.DataFrame` with columns
     `base_year` and `source_row`: the links whose `later_row` is in `eligible_rows`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Build frames with `build_frames` and derive records and links through the new functions.
 
@@ -395,19 +397,19 @@ Build frames with `build_frames` and derive records and links through the new fu
 - `test_link_year_disagreement_refused`: point one `later_row` at a 2023 row. Raises
   `Refused('link rows disagree with canonical rows')`.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_measure_ita_minimum_counts.py -v -k "record_frame or link or successor"`
 Expected: FAIL with `AttributeError` on `record_frame`.
 
-- [ ] **Step 3: Implement `record_frame`, `confirmed_links` and `visible`**
+- [x] **Step 3: Implement `record_frame`, `confirmed_links` and `visible`**
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_measure_ita_minimum_counts.py -v`
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/measure_ita_minimum_counts.py tests/test_measure_ita_minimum_counts.py
@@ -437,7 +439,7 @@ git commit -m "feat(scripts): find visible links for the minimum-count test"
     `employer_eligible` records at both nodes that are in
     `visible(links, employer-eligible source rows)`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Nodes are `naics:2022:national_industry:<code>`.
 
@@ -459,22 +461,22 @@ Nodes are `naics:2022:national_industry:<code>`.
 - `test_co_ownership_directed_cells_agree`: both directions of each pair have equal
   `base_count`, `testable` and `recurs`.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_measure_ita_minimum_counts.py -v -k co_ownership`
 Expected: FAIL with `AttributeError` on `co_ownership_counts`.
 
-- [ ] **Step 3: Implement the three functions**
+- [x] **Step 3: Implement the three functions**
 
 Count `j_t` by deduplicating to `(ein_key, year, node)` and self-joining on
 `(ein_key, year)` with `unit_a != unit_b`, as `ita_co_ownership` does.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_measure_ita_minimum_counts.py -v`
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/measure_ita_minimum_counts.py tests/test_measure_ita_minimum_counts.py
@@ -510,7 +512,7 @@ git commit -m "feat(scripts): measure co-ownership recurrence"
     cell has an `area_eligible` record in t+1. `testable` holds when one of its year-t
     records is in `visible(links, area-eligible source rows)`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 - `test_area_mix_counts_equal_frozen_estimate`: `check_area_mix` passes on golden frames
   with two counties.
@@ -526,22 +528,22 @@ git commit -m "feat(scripts): measure co-ownership recurrence"
   and refiles as `238210`. Another EIN files `238220` in the same county in 2024 only.
   The 2023 cell (county, `238220`) is testable and recurs.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_measure_ita_minimum_counts.py -v -k "area_mix or assignment"`
 Expected: FAIL with `AttributeError` on `assignment_frame`.
 
-- [ ] **Step 3: Implement the four functions**
+- [x] **Step 3: Implement the four functions**
 
 `ita_area_mix.estimate` refuses other years, so count with its filters: year, county
 assigned and `eligible_industry()`.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_measure_ita_minimum_counts.py -v`
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/measure_ita_minimum_counts.py tests/test_measure_ita_minimum_counts.py
@@ -581,7 +583,7 @@ git commit -m "feat(scripts): measure area-mix recurrence"
     `later_row` is `industry_eligible` **and has the same `pair_id`** (D1). Join `links`
     to `paired` on `source_row` and again on `later_row` to compare the two pair IDs.
 
-- [ ] **Step 1: Amend the stage spec (D1)**
+- [x] **Step 1: Amend the stage spec (D1)**
 
 Leave the spec's status line unchanged. In "Testable cells", replace the table row:
 
@@ -614,7 +616,7 @@ link.", insert:
   *(owner, plan 12, 2026-11-17)*
 ```
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 - `test_text_pair_counts_equal_frozen_pairs`: `check_text_pairs` passes on the golden
   frames.
@@ -637,19 +639,19 @@ link.", insert:
   "Plumbing contractor" at `238220`. In 2024 establishment 1 rewords its description and
   establishment 2 keeps it. The 2023 cell is testable and recurs.
 
-- [ ] **Step 3: Run the tests to verify they fail**
+- [x] **Step 3: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_measure_ita_minimum_counts.py -v -k "text_pair or member or pair_recurs or reworded or same_pair"`
 Expected: FAIL with `AttributeError` on `pair_frame`.
 
-- [ ] **Step 4: Implement the four functions**
+- [x] **Step 4: Implement the four functions**
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_measure_ita_minimum_counts.py -v`
 Expected: all PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add specs/ita-naics-minimum-counts.md scripts/measure_ita_minimum_counts.py tests/test_measure_ita_minimum_counts.py
@@ -701,7 +703,7 @@ Output shape (key names fixed):
 Exit 1 when it is not, with every curve printed (OC2). On `Refused`, print only
 `{"complete": false, "reason": <fixed reason>}` and exit 2.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 - `test_kept_counts_cells_support_and_lenient`: counts `[2, 3, 1]`, largest `[1, 3, 1]`,
   minimum 2 give `{'cells': 3, 'support': 6, 'kept_cells': 2, 'kept_cell_share': 2/3,
@@ -728,24 +730,24 @@ Exit 1 when it is not, with every curve printed (OC2). On `Refused`, print only
   No `embedding_data` import names `ita_establishment_bundle`, `ita_target_build`,
   `ita_establishment_targets`, `targets_cli` or `cli`.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_measure_ita_minimum_counts.py -v -k "kept or cli or runs or output or imports"`
 Expected: FAIL with `AttributeError` on `kept` and `main`.
 
-- [ ] **Step 3: Implement `kept`, `measure` and `main`**
+- [x] **Step 3: Implement `kept`, `measure` and `main`**
 
 `measure` scans each authenticated Parquet with only the columns it needs. The
 `if __name__ == '__main__': sys.exit(main())` guard closes the file.
 
-- [ ] **Step 4: Run the tests and lint**
+- [x] **Step 4: Run the tests and lint**
 
 Run: `uv run --locked pytest tests/test_measure_ita_minimum_counts.py -v`
 Expected: all PASS.
 Run: `uv run --locked ruff check scripts/measure_ita_minimum_counts.py tests/minimum_count_fixtures.py tests/test_measure_ita_minimum_counts.py`
 Expected: `All checks passed!`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/measure_ita_minimum_counts.py tests/test_measure_ita_minimum_counts.py
@@ -761,25 +763,28 @@ be committed first.
 `OUT=$HOME/.cache/embedding-data/stage3-minimum-counts` (outside the repository and
 `data/`).
 
-- [ ] **Step 1: Full checks**
+- [x] **Step 1: Full checks**
 
 Run the `pgrep` check (no output), then `uv run --locked pytest`, `uv run --locked behave`
 and `uv run --locked ruff check .`.
 Expected: all pass, the `network` canary deselected.
 
-- [ ] **Step 2: Review before data**
+
+> Deviation: the full pytest run at `d15384f` had one Hypothesis `DeadlineExceeded` failure (252.81 ms > 200 ms) in `tests/test_ita_naics_mapping.py`, which this plan does not touch. The file passed alone, 19 of 19. The owner saw it at the gate.
+
+- [x] **Step 2: Review before data**
 
 Dispatch requesting-code-review over the branch (`main...HEAD`). Review against the
 spec's "The rule" and "What gets built" item 1 and this plan's Review Focus. Resolve every
 finding and rerun Step 1. This review guards Anti-goal "a rule picked after seeing its
 result": after the first real run, only fixes toward the written rule are allowed.
 
-- [ ] **Step 3: Record the rule commit**
+- [x] **Step 3: Record the rule commit**
 
 Run: `git status --porcelain` (expected: no output), then `git rev-parse HEAD`. Keep the
 SHA as the rule commit. Every real run runs at this commit, on a clean tree.
 
-- [ ] **Step 4: First real run**
+- [x] **Step 4: First real run**
 
 ```bash
 mkdir -p "$OUT" && touch "$OUT/start"
@@ -794,7 +799,7 @@ In a restricted workspace, prefix `UV_CACHE_DIR=/private/tmp/embedding-data-uv-c
 - Exit 2: stop (OC3). Read the reason. A fix toward the written rule restarts at Step 1
   with a new rule commit, and the decision record discloses it.
 
-- [ ] **Step 5: Second real run and identity**
+- [x] **Step 5: Second real run and identity**
 
 Repeat Step 4's commands with `run2.json` and `run2.time`. Then:
 
@@ -813,7 +818,7 @@ Expected: two equal digests, `identical`, and no output from `find`.
 - Modify: `specs/embedding-evaluation-data-spec.md:528-530`, `:609-612`, `:672-673`
 - Modify: `CLAUDE.md` (end of the "ITA establishment targets (Stage 10)" paragraph)
 
-- [ ] **Step 1: Write the decision record**
+- [x] **Step 1: Write the decision record**
 
 Plain technical English. All values come from `$OUT/run1.json` and `$OUT/run1.time`.
 Sections in order:
@@ -835,7 +840,7 @@ Sections in order:
 10. Not claimed: no bundle is relabeled, `size_gate_pending` stays, no minimum for other
     families, no scoring.
 
-- [ ] **Step 2: Amend the spec**
+- [x] **Step 2: Amend the spec**
 
 Use the execution date for `<date>`. Replace R7.3:
 
@@ -891,7 +896,7 @@ V9 sets each family's cell-count gate after that family's first full build and
 before any embedder is scored on that family. *(owner, plan 12, <date>)*
 ```
 
-- [ ] **Step 3: Add the CLAUDE.md sentence**
+- [x] **Step 3: Add the CLAUDE.md sentence**
 
 Append to the "ITA establishment targets (Stage 10)" paragraph:
 
@@ -901,7 +906,7 @@ The published Stage 6 and Stage 10 bundles keep `size_gate_pending`, and
 co-ownership, the 2023 ITA area mix and ITA text–code pairs.
 ```
 
-- [ ] **Step 4: Check that no frozen file changed**
+- [x] **Step 4: Check that no frozen file changed**
 
 ```bash
 uv run --locked python -c "import subprocess; from embedding_data.ita_establishment_bundle import SOFTWARE_FILES; changed = set(subprocess.run(['git', 'diff', '--name-only', 'main...HEAD'], capture_output=True, text=True, check=True).stdout.split()); print(sorted(changed & set(SOFTWARE_FILES)) or 'none frozen'); print(sorted(changed))"
@@ -909,9 +914,16 @@ uv run --locked python -c "import subprocess; from embedding_data.ita_establishm
 
 Expected: `none frozen`, then only the seven files of this plan's File Structure.
 
-- [ ] **Step 5: Commit**
+
+> Deviation: after the final review, the owner approved two more docs fixes, so the branch also changes `README.md`. `CLAUDE.md:177` and `README.md:273` no longer call V9 pending for the 2023 area mix (`e684bc5`).
+
+- [x] **Step 5: Commit**
 
 ```bash
 git add specs/findings/v9-ita-naics-minimum-counts.md specs/embedding-evaluation-data-spec.md CLAUDE.md
 git commit -m "docs(specs): record the V9 ITA NAICS minimum counts"
 ```
+
+## Handoff to later stages
+
+None: shipped as the roadmap's Produces states.
