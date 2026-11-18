@@ -1,5 +1,7 @@
 # Headline minimum counts for the ITA NAICS targets
 
+**Status: COMPLETE (2026-11-17)** — implemented by plan 12 (`specs/plans/completed/12-ita-naics-minimum-counts.md`); decision in `specs/findings/v9-ita-naics-minimum-counts.md`.
+
 Design spec for Stage 3 of `specs/naics-evaluation-data-roadmap.md`. It discharges spec
 R7.3 and V9 (`specs/embedding-evaluation-data-spec.md`) for three families only: ITA
 co-ownership, the 2023 ITA area mix and ITA text–code pairs. Owner decisions are dated
@@ -141,7 +143,12 @@ link when all of these hold:
 | --- | --- | --- |
 | Co-ownership | is eligible under plan 11's co-ownership classification | at least one of its year-t EINs has a year-t record in `a` and a year-t record in `b` that both have visible links |
 | Area mix | has an assigned county and passes `eligible_industry()` | at least one of its year-t records has a visible link |
-| Text pairs | passes `eligible_industry()` | at least one of the pair's eligible year-t records has a visible link |
+| Text pairs | passes `eligible_industry()` and belongs to the same pair | at least one of the pair's eligible year-t records has a visible link |
+
+**Owner decision (plan 12 review, 2026-11-17): same pair.** A text pair's linked
+successor must belong to the same pair, so the establishment kept its description. A
+successor with a reworded description makes no pair testable. Description churn is not
+a coding accident. *(owner, plan 12, 2026-11-17)*
 
 Recurrence still counts any employer or establishment. A testable cell recurs when the
 condition in the previous table holds, through the linked record or through any other.
@@ -287,6 +294,9 @@ of kept cells whose largest single-year count is below the minimum.
   wrong code every year recurs.
 - Testability keeps only cells with a visible link. Establishments that relocate or file
   in older NAICS editions are under-represented in the curves.
+- A text pair is testable only when a linked successor kept its description. Pairs whose
+  establishments reword their descriptions are under-represented in the text-pair curves.
+  *(owner, plan 12, 2026-11-17)*
 - Co-ownership and text-pair gates apply to three-year pooled counts, which makes them a
   little lenient (measured, above).
 - ITA is a program-selected filing population. Filing-rule changes between years can move

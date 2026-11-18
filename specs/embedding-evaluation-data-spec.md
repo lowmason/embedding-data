@@ -526,8 +526,11 @@ counts, and its source, sample set, code vintage, and universe. *(chosen; D)*
 The co-ownership family is *(added at synthesis)*; the others are *(chosen; D)*.
 
 **R7.3** Every target reports its unweighted count. The minimum count for
-headline use is *(open — resolved by measurement, not argument, discharged by
-V9)*; it is set from observed distributions, not picked here.
+headline use is set for each family from its observed distributions, not picked
+here. The [V9 ITA NAICS decision](findings/v9-ita-naics-minimum-counts.md) sets
+it for ITA co-ownership, the 2023 ITA area mix and ITA text–code pairs. For every
+other family it stays *(open — resolved by measurement, not argument, discharged
+by V9)*. *(owner, plan 12, 2026-11-17)*
 
 **R7.4** Outputs are Parquet. Pairwise families share one long schema —
 `source`, `family`, `unit_a_type`, `unit_a`, `unit_b_type`, `unit_b`, `measure`,
@@ -606,10 +609,13 @@ bullet here.
   check found zero of 3,222 counties assigned to multiple composition groups
   and zero of 4,689 accepted PUMA–county group mismatches; see the
   [measured Stage 8 finding](findings/stage-8-acs-codes-area-allocation.md).
-- **V9 — minimum cell counts** *(discharges R7.3)*. After the first full build,
-  report unweighted-count distributions for every family and set the headline
-  minimum in a recorded decision. Until then, no target is described as passing
-  or failing a size gate.
+- **V9 — minimum cell counts** *(discharges R7.3 family by family)*. After each
+  family's first full build, report its unweighted-count distribution and set its
+  headline minimum in a recorded decision. Until a family's decision exists, none
+  of its targets is described as passing or failing a size gate. The
+  [V9 ITA NAICS decision](findings/v9-ita-naics-minimum-counts.md) covers ITA
+  co-ownership, the 2023 ITA area mix and ITA text–code pairs. *(owner, plan 12,
+  2026-11-17)*
 - **V10 — totals reproduction**. Compare ITA rows per year with OSHA's published
   submission counts, ACS pooled employment by state with published ACS
   estimates, and CPS monthly employment with BLS levels. CPS totals use
@@ -669,8 +675,8 @@ with V4 and V5 run before any download is trusted, and then CPS. CPS metro-level
 targets need August 2026 and later months (R4.4); the rest of R4 runs on the
 current window.
 
-V9 sets the cell-count gate after the first full build and before any embedder
-is scored.
+V9 sets each family's cell-count gate after that family's first full build and
+before any embedder is scored on that family. *(owner, plan 12, 2026-11-17)*
 
 XA and XC were tested offline (dry runs, a mocked sample catalog, and synthetic
 conversions) before their first live submissions on 2026-10-12. Those

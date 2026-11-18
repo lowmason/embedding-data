@@ -198,3 +198,14 @@
       Size: design. Revisit if: the owner names a free source that records visit
       order and either codes visited places by NAICS or has an official
       published mapping to NAICS.
+
+## 12-ita-naics-minimum-counts Step 4b review — 2026-11-17
+- [ ] Stale spec path in the V9 measurement script: the docstring of
+      `scripts/measure_ita_minimum_counts.py` (line 7) names
+      `specs/ita-naics-minimum-counts.md`, which moved to
+      `specs/completed/ita-naics-minimum-counts.md` when plan 12 retired (Codex
+      P3, Step 4b review). Carried because the script is frozen at rule commit
+      `d15384f`: any edit breaks that tie, and under OC3 forces both real runs
+      again. The fix is a one-line docstring edit. Size: trivial. Done when: the
+      docstring names the retired path, in the same commit as the next change
+      that already requires a new rule commit and both real runs.

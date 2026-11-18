@@ -1,0 +1,1558 @@
+'''The V9 minimum-count script, on small synthetic cells frames and fixture bundles.'''
+
+import ast
+import hashlib
+import importlib.util
+import json
+from pathlib import Path
+
+import polars as pl
+import pytest
+from ita_establishment_fixtures import canonical_frame, crosswalked, unresolved
+from minimum_count_fixtures import (
+    COUNTY,
+    build_frames,
+    golden_rows,
+    publish,
+    republish,
+    row,
+)
+
+SCRIPT = Path(__file__).resolve().parents[1] / 'scripts' / 'measure_ita_minimum_counts.py'
+
+
+def load_script():
+    assert SCRIPT.is_file(), 'measurement script is missing'
+    spec = importlib.util.spec_from_file_location('measure_ita_minimum_counts', SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.fixture
+def script():
+    return load_script()
+
+
+def cells(*groups):
+    '''A cells frame from (base_count, n_testable, n_recurring, n_untestable) tuples.
+
+    The first n_recurring testable cells of a group recur. Untestable cells never recur.
+    '''
+    base_count, testable, recurs = [], [], []
+    for count, n_testable, n_recurring, n_untestable in groups:
+        base_count += [count] * (n_testable + n_untestable)
+        testable += [True] * n_testable + [False] * n_untestable
+        recurs += ([True] * n_recurring + [False] * (n_testable - n_recurring)
+                   + [False] * n_untestable)
+    return pl.DataFrame(
+        {'cell': list(range(len(base_count))), 'base_count': base_count, 'testable': testable,
+         'recurs': recurs},
+        schema={'cell': pl.UInt64, 'base_count': pl.UInt64, 'testable': pl.Boolean,
+                'recurs': pl.Boolean})
+
+
+def band(low, high, rate):
+    return {'low': low, 'high': high, 'rate': rate}
+
+
+def test_rule_constants_are_the_committed_values(script):
+    assert (script.LEVEL, script.TOP_BAND, script.MIN_BAND_CELLS) == (0.90, 10, 50)
+    assert script.YEAR_PAIRS == ((2023, 2024), (2024, 2025))
+
+
+def test_bands_merge_short_bands_upward(script):
+    found = script.bands(cells((1, 200, 0, 7), (2, 30, 0, 0), (3, 30, 0, 0), (4, 60, 0, 0),
+                               (5, 10, 0, 0), (9, 45, 0, 0), (10, 2, 0, 0), (12, 2, 0, 0),
+                               (40, 1, 0, 0)))
+    assert [(b['low'], b['high'], b['testable_cells']) for b in found] == [
+        (1, 1, 200), (2, 3, 60), (4, 4, 60), (5, 9, 55), (10, None, 5)]
+    assert found[0]['base_cells'] == 207
+
+
+def test_short_bands_chain_into_the_top_band(script):
+    found = script.bands(cells(*[(k, 50, 0, 0) for k in range(1, 8)],
+                               (8, 20, 0, 0), (9, 10, 0, 0), (11, 500, 0, 0)))
+    assert [(b['low'], b['high'], b['testable_cells']) for b in found] == [
+        *[(k, k, 50) for k in range(1, 8)], (8, None, 530)]
+
+
+def test_band_rate_and_wilson(script):
+    (band,) = script.bands(cells((10, 50, 45, 3)))
+    assert (band['low'], band['high'], band['recurring_cells']) == (1, None, 45)
+    assert band['rate'] == 0.9
+    assert (band['wilson_low'], band['wilson_high']) == pytest.approx(
+        (0.7863976856252035, 0.9565242350681096))
+
+
+def test_wilson_reference_values(script):
+    assert script.wilson(9, 10) == pytest.approx((0.5958499732047615, 0.9821237869049271))
+    assert script.wilson(50, 50) == pytest.approx((0.9286524008666414, 1.0))
+    assert script.wilson(0, 0) is None
+
+
+def test_pair_minimum_is_start_of_trailing_passing_run(script):
+    found = [band(1, 1, 0.5), band(2, 3, 0.95), band(4, 4, 0.85), band(5, 9, 0.92),
+             band(10, None, 0.99)]
+    assert script.pair_minimum(found) == 5
+
+
+def test_pair_minimum_of_one_is_valid(script):
+    found = [band(1, 1, 0.9), band(2, 3, 0.95), band(4, 9, 0.97), band(10, None, 1.0)]
+    assert script.pair_minimum(found) == 1
+
+
+def test_rate_equal_to_level_passes(script):
+    assert script.pair_minimum([band(1, 9, 0.9), band(10, None, 0.9)]) == 1
+
+
+def test_no_minimum_when_top_band_misses_level(script):
+    assert script.pair_minimum([band(1, 9, 0.95), band(10, None, 0.89)]) is None
+    assert script.pair_minimum([band(1, 9, 0.95), band(10, None, None)]) is None
+
+
+def test_family_minimum_is_largest_over_year_pairs(script):
+    assert script.family_minimum([1, 3]) == 3
+    assert script.family_minimum([2, None]) is None
+
+
+def test_wilson_z_and_family_names_are_the_committed_values(script):
+    assert script.WILSON_Z == 1.959963984540054
+    assert script.FAMILIES == ('co_ownership', 'area_mix', 'text_pairs')
+
+
+def test_wilson_interval_stays_inside_zero_and_one(script):
+    assert script.wilson(16, 16)[1] == 1.0
+    assert script.wilson(0, 21)[0] == 0.0
+
+
+def test_empty_cells_give_one_band_without_a_rate(script):
+    (only,) = script.bands(cells())
+    assert (only['low'], only['high'], only['base_cells'], only['testable_cells']) == (
+        1, None, 0, 0)
+    assert (only['rate'], only['wilson_low'], only['wilson_high']) == (None, None, None)
+
+
+def test_base_count_below_one_is_refused(script):
+    with pytest.raises(ValueError, match='base count'):
+        script.bands(cells((0, 3, 0, 0)))
+
+
+def test_band_with_one_cell_fewer_than_the_minimum_merges(script):
+    found = script.bands(cells((1, 49, 0, 0), (2, 50, 0, 0), (3, 49, 0, 0), (4, 1, 0, 0)))
+    assert [(b['low'], b['high'], b['testable_cells']) for b in found] == [
+        (1, 2, 99), (3, 4, 50), (5, None, 0)]
+
+
+def test_untestable_cells_do_not_fill_a_band(script):
+    found = script.bands(cells((1, 10, 0, 100), (2, 50, 0, 0)))
+    assert [(b['low'], b['high'], b['base_cells'], b['testable_cells']) for b in found] == [
+        (1, 2, 160, 60), (3, None, 0, 0)]
+
+
+def test_untestable_cells_never_count_as_recurring(script):
+    frame = pl.DataFrame(
+        {'base_count': [3, 3, 3], 'testable': [True, False, False],
+         'recurs': [True, True, False]},
+        schema={'base_count': pl.UInt64, 'testable': pl.Boolean, 'recurs': pl.Boolean})
+    (only,) = script.bands(frame)
+    assert (only['base_cells'], only['testable_cells'], only['recurring_cells']) == (3, 1, 1)
+
+
+def test_minimum_from_cells_uses_the_rate_not_the_interval(script):
+    found = script.bands(cells((1, 100, 50, 0), (2, 60, 58, 0), (3, 60, 50, 0),
+                               (10, 100, 95, 0)))
+    assert [(b['low'], b['high']) for b in found] == [(1, 1), (2, 2), (3, 3), (4, None)]
+    assert found[-1]['wilson_low'] < script.LEVEL <= found[-1]['rate']
+    assert script.pair_minimum(found) == 4
+
+
+def test_minimum_from_cells_accepts_a_rate_of_exactly_the_level(script):
+    assert script.pair_minimum(script.bands(cells((10, 50, 45, 3)))) == 1
+
+
+def test_top_band_without_testable_cells_gives_no_minimum(script):
+    assert script.pair_minimum(script.bands(cells((1, 60, 60, 0)))) is None
+
+
+def test_pair_minimum_is_the_top_band_when_only_the_top_passes(script):
+    assert script.pair_minimum([band(1, 4, 0.5), band(5, None, 0.95)]) == 5
+
+
+def test_pair_minimum_rejects_a_rate_just_below_the_level(script):
+    assert script.pair_minimum([band(1, 9, 0.95), band(10, None, 0.899)]) is None
+
+
+def test_pair_minimum_stops_at_a_band_without_a_rate(script):
+    found = [band(1, 1, 0.95), band(2, 3, None), band(4, None, 0.95)]
+    assert script.pair_minimum(found) == 4
+
+
+def test_pair_minimum_of_no_bands_is_none(script):
+    assert script.pair_minimum([]) is None
+
+
+def test_family_minimum_ignores_year_pair_order_and_needs_every_pair(script):
+    assert script.family_minimum([3, 1]) == 3
+    assert script.family_minimum([None, 2]) is None
+    assert script.family_minimum([4]) == 4
+    assert script.family_minimum([]) is None
+
+
+@pytest.fixture
+def published(tmp_path):
+    return publish(tmp_path, build_frames(golden_rows()))
+
+
+def selections(published, **changes):
+    '''The `authenticate` arguments of the published bundles, with role tuples replaced.'''
+    selected = {
+        'establishment': (published.establishment.name, published.establishment_pin),
+        'area_mix': (published.area_mix.name, published.area_mix_pin),
+        'codes': (published.codes.name, published.codes_pin),
+    }
+    return {'data_dir': published.data_dir, **selected, **changes}
+
+
+def refusal(script, arguments):
+    with pytest.raises(script.Refused) as raised:
+        script.authenticate(**arguments)
+    return str(raised.value)
+
+
+def edit_inputs(directory, change):
+    file = directory / 'inputs.json'
+    inputs = json.loads(file.read_text())
+    change(inputs)
+    file.write_text(json.dumps(inputs))
+    return republish(directory)
+
+
+def test_fixture_builds_frozen_tables():
+    frames = build_frames(golden_rows())
+    assert frames.support.height == 2
+    assert frames.support.select('j_2023', 'j_2024', 'j_2025').to_dicts() == [
+        {'j_2023': 1, 'j_2024': 1, 'j_2025': 1}] * 2
+    confirmed = frames.links.filter(pl.col('status') == 'confirmed_same_id')
+    assert {(2023, 2024), (2024, 2025)} <= set(
+        confirmed.select('base_year', 'later_year').iter_rows())
+
+
+def test_authenticate_returns_pinned_files(script, published):
+    inputs = script.authenticate(**selections(published))
+    assert inputs.canonical == published.codes / 'ita_300a_canonical.parquet'
+    assert inputs.assignments == published.area_mix / 'ita_county_assignments.parquet'
+
+
+def test_authenticate_names_every_file(script, published):
+    inputs = script.authenticate(**selections(published))
+    establishment, area_mix = published.establishment, published.area_mix
+    assert inputs == script.Inputs(
+        canonical=published.codes / 'ita_300a_canonical.parquet',
+        links=establishment / 'ita_establishment_links.parquet',
+        pairs=establishment / 'ita_text_pairs.parquet',
+        members=establishment / 'ita_text_pair_members.parquet',
+        co_ownership=establishment / 'ita_co_ownership.parquet',
+        support=establishment / 'co_ownership_support.parquet',
+        establishment_report=establishment / 'report.json',
+        assignments=area_mix / 'ita_county_assignments.parquet',
+        area_mix=area_mix / 'ita_area_mix.parquet',
+        area_mix_report=area_mix / 'report.json',
+    )
+
+
+@pytest.mark.parametrize('role, reason', [
+    ('establishment', 'establishment-target pin differs'),
+    ('area_mix', 'area-mix pin differs'),
+    ('codes', 'codes pin differs'),
+])
+def test_wrong_pin_refused(script, published, role, reason):
+    run_id = selections(published)[role][0]
+    assert refusal(script, selections(published, **{role: (run_id, '0' * 64)})) == reason
+
+
+def test_changed_file_refused(script, published):
+    file = published.establishment / 'ita_co_ownership.parquet'
+    pl.read_parquet(file).slice(1).write_parquet(file)
+    assert refusal(script, selections(published)) == 'file differs from its inventory'
+
+
+@pytest.mark.parametrize('bundle, name', [
+    ('codes', 'ita_300a_canonical.parquet'),
+    ('establishment', 'ita_establishment_links.parquet'),
+    ('establishment', 'ita_text_pairs.parquet'),
+    ('establishment', 'ita_text_pair_members.parquet'),
+    ('establishment', 'ita_co_ownership.parquet'),
+    ('establishment', 'co_ownership_support.parquet'),
+    ('establishment', 'inputs.json'),
+    ('establishment', 'report.json'),
+    ('area_mix', 'ita_county_assignments.parquet'),
+    ('area_mix', 'ita_area_mix.parquet'),
+    ('area_mix', 'inputs.json'),
+    ('area_mix', 'report.json'),
+])
+def test_every_read_file_is_checked(script, published, bundle, name):
+    file = getattr(published, bundle) / name
+    file.write_bytes(file.read_bytes() + b' ')
+    assert refusal(script, selections(published)) == 'file differs from its inventory'
+
+
+def test_file_missing_from_inventory_refused(script, published):
+    outputs = published.area_mix / 'outputs.json'
+    inventory = json.loads(outputs.read_text())
+    del inventory['ita_area_mix.parquet']
+    outputs.write_text(json.dumps(inventory))
+    pin = hashlib.sha256(outputs.read_bytes()).hexdigest()
+    arguments = selections(published, area_mix=(published.area_mix.name, pin))
+    assert refusal(script, arguments) == 'file differs from its inventory'
+
+
+def test_pins_are_checked_before_files(script, published):
+    file = published.area_mix / 'ita_area_mix.parquet'
+    pl.read_parquet(file).slice(1).write_parquet(file)
+    arguments = selections(published, codes=(published.codes.name, '0' * 64))
+    assert refusal(script, arguments) == 'codes pin differs'
+
+
+def test_pins_are_checked_in_table_order(script, published):
+    arguments = selections(published, establishment=(published.establishment.name, '0' * 64),
+                           codes=(published.codes.name, '0' * 64))
+    assert refusal(script, arguments) == 'establishment-target pin differs'
+    arguments = selections(published, area_mix=(published.area_mix.name, '0' * 64),
+                           codes=(published.codes.name, '0' * 64))
+    assert refusal(script, arguments) == 'area-mix pin differs'
+
+
+def test_establishment_inputs_naming_other_canonical_refused(script, published):
+    pin = edit_inputs(published.establishment,
+                      lambda inputs: inputs['canonical'].update(sha256='1' * 64))
+    arguments = selections(published, establishment=(published.establishment.name, pin))
+    assert refusal(script, arguments) == 'inputs name another canonical table or codes run'
+
+
+def test_area_mix_inputs_naming_other_canonical_refused(script, published):
+    pin = edit_inputs(published.area_mix,
+                      lambda inputs: inputs['canonical'].update(sha256='1' * 64))
+    arguments = selections(published, area_mix=(published.area_mix.name, pin))
+    assert refusal(script, arguments) == 'inputs name another canonical table or codes run'
+
+
+OTHER_PATH = 'derived/codes/other_codes/ita_300a_canonical.parquet'
+
+
+@pytest.mark.parametrize('role, change', [
+    ('establishment', lambda inputs: inputs['canonical'].update(path=OTHER_PATH)),
+    ('area_mix', lambda inputs: inputs['canonical'].update(path=OTHER_PATH)),
+    ('establishment', lambda inputs: inputs['codes'].update(run_id='other_codes')),
+    ('establishment', lambda inputs: inputs['codes'].update(outputs_sha256='1' * 64)),
+    ('establishment', lambda inputs: inputs.pop('codes')),
+    ('area_mix', lambda inputs: inputs.pop('canonical')),
+    ('establishment', lambda inputs: inputs.update(canonical='derived/codes')),
+])
+def test_cross_bundle_identity_refused(script, published, role, change):
+    directory = getattr(published, role)
+    pin = edit_inputs(directory, change)
+    arguments = selections(published, **{role: (directory.name, pin)})
+    assert refusal(script, arguments) == 'inputs name another canonical table or codes run'
+
+
+def test_unsafe_run_id_refused(script, published):
+    arguments = selections(published, codes=('../fixture_codes', published.codes_pin))
+    assert refusal(script, arguments) == 'unsafe run id or pin'
+
+
+@pytest.mark.parametrize('role', ['establishment', 'area_mix', 'codes'])
+@pytest.mark.parametrize('form', ['trailing slash', 'trailing newline', 'leading dash',
+                                  'upper pin', 'pin newline', 'short pin'])
+def test_unsafe_forms_refused(script, published, role, form):
+    run_id, pin = selections(published)[role]
+    run_id, pin = {
+        'trailing slash': (run_id + '/', pin),
+        'trailing newline': (run_id + '\n', pin),
+        'leading dash': ('-' + run_id, pin),
+        'upper pin': (run_id, pin.upper()),
+        'pin newline': (run_id, pin + '\n'),
+        'short pin': (run_id, pin[:-1]),
+    }[form]
+    arguments = selections(published, **{role: (run_id, pin)})
+    assert refusal(script, arguments) == 'unsafe run id or pin'
+
+
+def derive(script, rows):
+    '''The frames, record frame and confirmed links of canonical override rows.'''
+    frames = build_frames(rows)
+    records = script.record_frame(frames.canonical.lazy())
+    return frames, records, script.confirmed_links(frames.links.lazy(), records)
+
+
+def rows_of(records, year, establishment, canonical):
+    '''The source rows of one establishment's records in one year.'''
+    wanted = canonical.with_row_index('source_row').filter(
+        (pl.col('year_filing_for') == year)
+        & (pl.col('establishment_name') == f'Plant {establishment}'))
+    return sorted(wanted['source_row'].cast(pl.UInt64).to_list())
+
+
+def linked(links, year):
+    return set(links.filter(pl.col('base_year') == year)['source_row'].to_list())
+
+
+def test_record_frame_keeps_2023_to_2025(script):
+    golden = golden_rows()
+    frames = build_frames(
+        [*golden, row(2022, 1, '238220', 'Plumbing contractor',
+                      mapping=crosswalked('238220', 2017, ['238220']))])
+    records = script.record_frame(frames.canonical.lazy())
+    assert records.height == 6
+    assert records['industry_eligible'].all()
+    assert records['employer_eligible'].all()
+
+
+def test_record_frame_columns(script):
+    frames = build_frames(golden_rows())
+    records = script.record_frame(frames.canonical.lazy())
+    assert records.columns == ['source_row', 'year_filing_for', 'naics_code',
+                               'naics_2022_node_id', 'ein_key', 'industry_eligible',
+                               'employer_eligible']
+    assert records.schema['source_row'] == pl.UInt64
+    assert records['source_row'].to_list() == list(range(6))
+    assert sorted(set(records['year_filing_for'].to_list())) == [2023, 2024, 2025]
+    assert records['ein_key'].to_list() == ['123456789'] * 6
+    assert records['naics_code'].to_list() == ['238220', '722511'] * 3
+
+
+def test_record_frame_drops_the_years_outside_the_window(script):
+    frames = build_frames([
+        row(2022, 1, '238220', 'Plumbing contractor',
+            mapping=crosswalked('238220', 2017, ['238220'])),
+        *golden_rows(),
+        row(2026, 1, '238220', 'Plumbing contractor',
+            mapping=crosswalked('238220', 2017, ['238220'])),
+    ])
+    records = script.record_frame(frames.canonical.lazy())
+    assert records['source_row'].to_list() == list(range(1, 7))
+
+
+def test_employer_eligibility_follows_the_co_ownership_classification(script):
+    frames = build_frames([
+        row(2023, 1, '238220', 'Plumbing contractor'),
+        row(2023, 2, '238220', 'Plumbing contractor',
+            mapping=crosswalked('238220', 2017, ['238220'])),
+        row(2023, 3, '238220', 'Plumbing contractor', ein=''),
+        row(2023, 4, '238220', 'Plumbing contractor', ein='23456789'),
+    ])
+    records = script.record_frame(frames.canonical.lazy())
+    assert records['industry_eligible'].to_list() == [True, False, True, True]
+    assert records['employer_eligible'].to_list() == [True, False, False, False]
+    assert records['ein_key'].to_list() == ['123456789', '123456789', None, '023456789']
+
+
+@pytest.mark.parametrize('change', [
+    {'flag_naics_crosswalked': True},
+    {'flag_naics_ambiguous': True},
+    {'flag_naics_unresolved': True},
+    {'naics_2022_node_id': None},
+    {'flag_naics_unresolved': None},
+], ids=['crosswalked flag', 'ambiguous flag', 'unresolved flag', 'no node', 'null flag'])
+def test_industry_eligibility_is_the_frozen_rule(script, change):
+    canonical = canonical_frame([
+        row(2023, 1, '238220', 'Plumbing contractor'),
+        row(2023, 2, '238220', 'Plumbing contractor', **change),
+    ])
+    records = script.record_frame(canonical)
+    assert records['industry_eligible'].to_list() == [True, False]
+    assert records['employer_eligible'].to_list() == [True, False]
+
+
+def test_two_year_link_is_not_visible(script):
+    rows = [r for r in golden_rows()
+            if not (r['year_filing_for'] == 2024 and r['establishment_name'] == 'Plant 1')]
+    frames, _records, links = derive(script, rows)
+    base = rows_of(_records, 2023, 1, frames.canonical)
+    guard = frames.links.filter(
+        (pl.col('base_year') == 2023) & (pl.col('later_year') == 2025)
+        & (pl.col('status') == 'confirmed_same_id'))
+    assert any(base[0] in rows for rows in guard['base_rows'].to_list())
+    assert base[0] not in linked(links, 2023)
+
+
+def test_duplicate_rows_link_through_base_rows(script):
+    rows = [
+        row(2023, 1, '238220', 'Plumbing contractor', id=7),
+        row(2023, 1, '238220', 'Plumbing contractor', id=7),
+        row(2024, 1, '238220', 'Plumbing contractor'),
+    ]
+    _frames, _records, links = derive(script, rows)
+    found = links.filter(pl.col('base_year') == 2023)
+    assert sorted(found['source_row'].to_list()) == [0, 1]
+    assert found['later_row'].to_list() == [2, 2]
+
+
+def test_unconfirmed_links_are_not_visible(script):
+    rows = golden_rows()
+    rows[2] = {**rows[2], 'street_address': '1 Other St'}
+    frames, records, links = derive(script, rows)
+    status = frames.links.filter(
+        (pl.col('base_year') == 2023) & (pl.col('later_year') == 2024)
+        & (pl.col('base_row') == 0))['status'].to_list()
+    assert status == ['weaker_same_id']
+    assert 0 not in linked(links, 2023)
+    assert 1 in linked(links, 2023)
+
+
+def test_changed_id_link_is_visible(script):
+    rows = golden_rows()
+    rows[2] = {**rows[2], 'establishment_id': 999}
+    frames, _records, links = derive(script, rows)
+    status = frames.links.filter(
+        (pl.col('base_year') == 2023) & (pl.col('later_year') == 2024)
+        & (pl.col('base_row') == 0))['status'].to_list()
+    assert status == ['confirmed_changed_id']
+    assert links.filter(pl.col('base_year') == 2023).sort('source_row').rows() == [
+        (2023, 0, 2), (2023, 1, 3)]
+
+
+def test_confirmed_links_cover_both_year_pairs(script):
+    _frames, _records, links = derive(script, golden_rows())
+    assert links.columns == ['base_year', 'source_row', 'later_row']
+    assert links.sort('base_year', 'source_row').rows() == [
+        (2023, 0, 2), (2023, 1, 3), (2024, 2, 4), (2024, 3, 5)]
+
+
+def test_ineligible_successor_is_not_visible(script):
+    rows = golden_rows()
+    rows[2] = row(2024, 1, '238220', 'Plumbing contractor',
+                  mapping=crosswalked('238220', 2017, ['238220']))
+    _frames, records, links = derive(script, rows)
+    found = script.visible(links, records.filter('industry_eligible')['source_row'])
+    assert 0 not in linked(found, 2023)
+    assert 1 in linked(found, 2023)
+
+
+def test_visible_keeps_base_year_and_source_row(script):
+    _frames, records, links = derive(script, golden_rows())
+    found = script.visible(links, records.filter('industry_eligible')['source_row'])
+    assert found.columns == ['base_year', 'source_row']
+    assert found.sort('base_year', 'source_row').rows() == [
+        (2023, 0), (2023, 1), (2024, 2), (2024, 3)]
+
+
+def refused_links(script, change):
+    frames = build_frames(golden_rows())
+    records = script.record_frame(frames.canonical.lazy())
+    links = change(frames.links)
+    with pytest.raises(script.Refused) as raised:
+        script.confirmed_links(links.lazy(), records)
+    return str(raised.value)
+
+
+def point(column, value):
+    '''Set one column of the 2023 -> 2024 link of source row 0.'''
+    target = ((pl.col('base_year') == 2023) & (pl.col('later_year') == 2024)
+              & (pl.col('base_row') == 0))
+    return lambda links: links.with_columns(
+        pl.when(target).then(value).otherwise(pl.col(column)).alias(column))
+
+
+def test_link_year_disagreement_refused(script):
+    reason = refused_links(script, point('later_row', pl.lit(1, pl.UInt64)))
+    assert reason == 'link rows disagree with canonical rows'
+
+
+@pytest.mark.parametrize('change', [
+    point('later_row', pl.lit(4, pl.UInt64)),
+    point('later_row', pl.lit(99, pl.UInt64)),
+    point('base_rows', pl.lit([2], pl.List(pl.UInt64))),
+    point('base_rows', pl.lit([99], pl.List(pl.UInt64))),
+    point('base_rows', pl.lit([0, 1], pl.List(pl.UInt64))),
+    lambda links: pl.concat([links, links.filter(
+        (pl.col('base_year') == 2023) & (pl.col('later_year') == 2024)
+        & (pl.col('base_row') == 0))]),
+], ids=['later two years on', 'later absent', 'source in later year', 'source absent',
+        'source twice', 'link twice'])
+def test_link_row_disagreements_refused(script, change):
+    assert refused_links(script, change) == 'link rows disagree with canonical rows'
+
+
+OTHER_EIN = '987654321'
+PLUMBING, RESTAURANT = '238220', '722511'
+
+
+def node(code):
+    return f'naics:2022:national_industry:{code}'
+
+
+def co_cells(script, rows, base_year=2023):
+    '''The co-ownership cells of canonical override rows for one base year.'''
+    _frames, records, links = derive(script, rows)
+    return script.co_ownership_cells(records, links, base_year)
+
+
+def cell(found, a=PLUMBING, b=RESTAURANT):
+    '''The one cell of the industry pair (a, b) as a dict.'''
+    match = found.filter((pl.col('unit_a') == node(a)) & (pl.col('unit_b') == node(b)))
+    assert match.height == 1
+    return match.row(0, named=True)
+
+
+def pair(year, first, second, *, ein='123456789', codes=(PLUMBING, RESTAURANT)):
+    '''Two establishments of one EIN in one year, with the plumbing and restaurant codes.'''
+    return [row(year, first, codes[0], 'Plumbing contractor', ein=ein),
+            row(year, second, codes[1], 'Restaurant', ein=ein)]
+
+
+def golden_with_second_ein():
+    return [*golden_rows(), *pair(2024, 3, 4, ein=OTHER_EIN)]
+
+
+def recount(script, rows):
+    frames = build_frames(rows)
+    records = script.record_frame(frames.canonical.lazy())
+    return frames, script.co_ownership_counts(records)
+
+
+def test_co_ownership_counts_equal_frozen_support(script):
+    frames, counts = recount(script, golden_with_second_ein())
+    assert script.check_co_ownership(counts, frames.support, frames.co_ownership) is None
+
+
+def test_co_ownership_recount_difference_refused(script):
+    frames, counts = recount(script, golden_with_second_ein())
+    support = frames.support.with_columns(
+        pl.when(pl.int_range(pl.len()) == 0).then(pl.col('j_2024') + 1)
+        .otherwise(pl.col('j_2024')).alias('j_2024'))
+    with pytest.raises(script.Refused, match='^co-ownership recount differs$'):
+        script.check_co_ownership(counts, support, frames.co_ownership)
+    with pytest.raises(script.Refused, match='^co-ownership recount differs$'):
+        script.check_co_ownership(counts, frames.support, frames.co_ownership.slice(1))
+
+
+def test_co_ownership_testable_needs_both_industries_linked(script):
+    first = [
+        row(2023, 1, PLUMBING, 'Plumbing contractor'),
+        row(2024, 1, PLUMBING, 'Plumbing contractor'),
+        row(2023, 2, RESTAURANT, 'Restaurant'),
+    ]
+    second = [*pair(2023, 3, 4, ein=OTHER_EIN), *pair(2024, 3, 4, ein=OTHER_EIN)]
+    both = cell(co_cells(script, [*first, *second]))
+    assert (both['base_count'], both['testable']) == (2, True)
+    alone = cell(co_cells(script, first))
+    assert (alone['base_count'], alone['testable']) == (1, False)
+
+
+def test_co_ownership_recurs_through_any_employer(script):
+    rows = [
+        *pair(2023, 1, 2),
+        *pair(2024, 1, 2, codes=('238210', '722513')),
+        *pair(2024, 3, 4, ein=OTHER_EIN),
+    ]
+    found = cell(co_cells(script, rows))
+    assert (found['testable'], found['recurs']) == (True, True)
+
+
+def test_co_ownership_crosswalked_successor_is_not_testable(script):
+    rows = golden_rows()
+    rows[3] = row(2024, 2, RESTAURANT, 'Restaurant',
+                  mapping=crosswalked(RESTAURANT, 2017, [RESTAURANT]))
+    found = cell(co_cells(script, rows))
+    assert found['testable'] is False
+
+
+def test_co_ownership_directed_cells_agree(script):
+    rows = [
+        *pair(2023, 1, 2),
+        row(2023, 5, '238210', 'Electrical contractor'),
+        *pair(2024, 1, 2),
+        *pair(2023, 3, 4, ein=OTHER_EIN),
+        *pair(2024, 3, 4, ein=OTHER_EIN, codes=('238210', RESTAURANT)),
+        *pair(2025, 3, 4, ein=OTHER_EIN, codes=('238210', RESTAURANT)),
+    ]
+    for base_year in (2023, 2024):
+        found = co_cells(script, rows, base_year)
+        mirror = found.select(
+            unit_a='unit_b', unit_b='unit_a', base_count='base_count', testable='testable',
+            recurs='recurs').sort('unit_a', 'unit_b')
+        assert found.height >= 2
+        assert found.equals(mirror)
+
+
+def mixed_rows():
+    '''Golden rows plus duplicates, ineligible records and a second EIN in 2024 only.'''
+    return [
+        *golden_with_second_ein(),
+        row(2023, 1, PLUMBING, 'Plumbing contractor'),
+        row(2023, 6, PLUMBING, 'Plumbing contractor'),
+        row(2023, 7, '238210', 'Electrical contractor',
+            mapping=crosswalked('238210', 2017, ['238210'])),
+        row(2024, 8, '238210', 'Electrical contractor', ein='23456789'),
+        row(2024, 9, RESTAURANT, 'Restaurant', ein='23456789'),
+        row(2025, 10, '238210', 'Electrical contractor', ein=''),
+        row(2025, 11, RESTAURANT, 'Restaurant', ein=''),
+    ]
+
+
+def test_co_ownership_recount_counts_eligible_employers_once(script):
+    frames, counts = recount(script, mixed_rows())
+    assert script.check_co_ownership(counts, frames.support, frames.co_ownership) is None
+    assert counts.schema == pl.Schema({
+        'unit_a': pl.String, 'unit_b': pl.String, 'j_2023': pl.UInt64, 'j_2024': pl.UInt64,
+        'j_2025': pl.UInt64})
+    assert counts.rows() == [
+        (node(PLUMBING), node(RESTAURANT), 1, 2, 1),
+        (node(RESTAURANT), node(PLUMBING), 1, 2, 1),
+    ]
+
+
+def test_co_ownership_counts_are_sorted_by_cell(script):
+    rows = [*golden_rows(), *pair(2023, 3, 4, codes=('238210', '722513'))]
+    _frames, counts = recount(script, rows)
+    keys = counts.select('unit_a', 'unit_b')
+    assert keys.height == 12
+    assert keys.rows() == sorted(keys.rows())
+    assert keys.rows() != sorted(keys.rows(), key=lambda key: (key[1], key[0]))
+
+
+def perturb(column, change):
+    '''Change one column of the first row of a frame.'''
+    first = pl.int_range(pl.len()) == 0
+    return lambda frame: frame.with_columns(
+        pl.when(first).then(change).otherwise(pl.col(column)).alias(column))
+
+
+@pytest.mark.parametrize('side, change', [
+    ('support', perturb('j_2023', pl.col('j_2023') + 1)),
+    ('support', perturb('j_2025', pl.col('j_2025') + 1)),
+    ('support', perturb('unit_b', pl.lit(node('238210')))),
+    ('support', lambda frame: frame.slice(1)),
+    ('counts', perturb('j_2024', pl.col('j_2024') + 1)),
+    ('counts', lambda frame: frame.slice(1)),
+    ('targets', perturb('unit_b', pl.lit(node('238210')))),
+    ('targets', lambda frame: pl.concat([frame, frame.slice(0, 1)])),
+], ids=['support j_2023', 'support j_2025', 'support unit', 'support row missing',
+        'counts j_2024', 'counts row missing', 'targets other cell', 'targets row twice'])
+def test_co_ownership_recount_differences_refused(script, side, change):
+    frames, counts = recount(script, golden_with_second_ein())
+    tables = {'counts': counts, 'support': frames.support, 'targets': frames.co_ownership}
+    tables[side] = change(tables[side])
+    with pytest.raises(script.Refused, match='^co-ownership recount differs$'):
+        script.check_co_ownership(tables['counts'], tables['support'], tables['targets'])
+
+
+def test_co_ownership_testable_needs_both_links_through_one_ein(script):
+    rows = [
+        *pair(2023, 1, 2),
+        row(2024, 1, PLUMBING, 'Plumbing contractor'),
+        *pair(2023, 3, 4, ein=OTHER_EIN),
+        row(2024, 4, RESTAURANT, 'Restaurant', ein=OTHER_EIN),
+    ]
+    found = cell(co_cells(script, rows))
+    assert (found['base_count'], found['testable']) == (2, False)
+
+
+def test_co_ownership_one_linked_record_at_a_node_suffices(script):
+    rows = [
+        *pair(2023, 1, 2),
+        row(2023, 5, PLUMBING, 'Plumbing contractor'),
+        *pair(2024, 1, 2),
+    ]
+    found = cell(co_cells(script, rows))
+    assert (found['base_count'], found['testable']) == (1, True)
+
+
+def test_co_ownership_cell_without_next_year_pair_does_not_recur(script):
+    rows = golden_rows()
+    rows[3] = row(2024, 2, RESTAURANT, 'Restaurant',
+                  mapping=crosswalked(RESTAURANT, 2017, [RESTAURANT]))
+    found = cell(co_cells(script, rows))
+    assert (found['base_count'], found['testable'], found['recurs']) == (1, False, False)
+
+
+def test_co_ownership_cells_of_the_second_year_pair(script):
+    rows = [
+        *pair(2023, 1, 2),
+        row(2023, 5, '238210', 'Electrical contractor'),
+        *pair(2024, 1, 2),
+        *pair(2024, 3, 4, ein=OTHER_EIN, codes=('238210', RESTAURANT)),
+        *pair(2025, 3, 4, ein=OTHER_EIN, codes=('238210', RESTAURANT)),
+    ]
+    found = co_cells(script, rows, 2024)
+    assert found.columns == ['unit_a', 'unit_b', 'base_count', 'testable', 'recurs']
+    assert found.schema['base_count'] == pl.UInt64
+    assert found.select('unit_a', 'unit_b').rows() == [
+        (node('238210'), node(RESTAURANT)), (node(PLUMBING), node(RESTAURANT)),
+        (node(RESTAURANT), node('238210')), (node(RESTAURANT), node(PLUMBING))]
+    assert cell(found)['base_count'] == 1
+    assert (cell(found)['testable'], cell(found)['recurs']) == (False, False)
+    other = cell(found, '238210', RESTAURANT)
+    assert (other['base_count'], other['testable'], other['recurs']) == (1, True, True)
+    earlier = cell(co_cells(script, rows, 2023))
+    assert (earlier['base_count'], earlier['testable'], earlier['recurs']) == (1, True, True)
+
+
+def test_co_ownership_untestable_cell_recurs_through_another_employer(script):
+    rows = [*pair(2023, 1, 2), *pair(2024, 3, 4, ein=OTHER_EIN)]
+    found = cell(co_cells(script, rows))
+    assert (found['base_count'], found['testable'], found['recurs']) == (1, False, True)
+
+
+def test_co_ownership_ineligible_linked_base_record_is_not_testable(script):
+    rows = [
+        row(2023, 1, PLUMBING, 'Plumbing contractor'),
+        row(2023, 2, RESTAURANT, 'Restaurant',
+            mapping=crosswalked(RESTAURANT, 2017, [RESTAURANT])),
+        row(2023, 3, RESTAURANT, 'Restaurant'),
+        *pair(2024, 1, 2),
+    ]
+    _frames, records, links = derive(script, rows)
+    crosswalk = records.filter(pl.col('source_row') == 1)
+    assert crosswalk['naics_2022_node_id'].to_list() == [node(RESTAURANT)]
+    assert crosswalk['employer_eligible'].to_list() == [False]
+    assert 1 in linked(links, 2023)
+    found = cell(script.co_ownership_cells(records, links, 2023))
+    assert (found['base_count'], found['testable']) == (1, False)
+
+
+OTHER_COUNTY = 'county:2025:39093'
+ELECTRICAL = '238210'
+
+
+def assign(script, rows, counties=None):
+    '''The frames, record frame, assignment frame and confirmed links of override rows.'''
+    frames = build_frames(rows, counties)
+    records = script.record_frame(frames.canonical.lazy())
+    assigned = script.assignment_frame(frames.assignments.lazy(), records)
+    return frames, records, assigned, script.confirmed_links(frames.links.lazy(), records)
+
+
+def area_cells(script, rows, counties=None, base_year=2023):
+    _frames, _records, assigned, links = assign(script, rows, counties)
+    return script.area_mix_cells(assigned, links, base_year)
+
+
+def area_cell(found, code, county=COUNTY):
+    '''The one area-mix cell of a county and a code as a dict.'''
+    match = found.filter((pl.col('county_id') == county)
+                         & (pl.col('naics_2022_node_id') == node(code)))
+    assert match.height == 1
+    return match.row(0, named=True)
+
+
+def two_counties():
+    '''Golden rows: establishment 1 in COUNTY, establishment 2 in OTHER_COUNTY.'''
+    return golden_rows(), [COUNTY, OTHER_COUNTY] * 3
+
+
+def disagree(script, records, assignments):
+    with pytest.raises(script.Refused,
+                       match='^assignment rows disagree with canonical rows$'):
+        script.assignment_frame(assignments.lazy(), records)
+
+
+def test_area_mix_counts_equal_frozen_estimate(script):
+    frames, _records, assigned, _links = assign(script, *two_counties())
+    assert script.check_area_mix(assigned, frames.area_mix, frames.area_mix_report) is None
+
+
+@pytest.mark.parametrize('change', ['n_unweighted', 'row dropped', 'eligible 2024'])
+def test_area_mix_recount_difference_refused(script, change):
+    frames, _records, assigned, _links = assign(script, *two_counties())
+    area_mix, report = frames.area_mix, frames.area_mix_report
+    if change == 'n_unweighted':
+        area_mix = perturb('n_unweighted', pl.col('n_unweighted') + 1)(area_mix)
+    elif change == 'row dropped':
+        area_mix = area_mix.slice(1)
+    else:
+        report = {'partition_by_year': [
+            entry | {'eligible': entry['eligible'] + (entry['year_filing_for'] == 2024)}
+            for entry in report['partition_by_year']]}
+    with pytest.raises(script.Refused, match='^area-mix recount differs$'):
+        script.check_area_mix(assigned, area_mix, report)
+
+
+def test_assignment_disagreement_refused(script):
+    frames = build_frames(golden_rows())
+    records = script.record_frame(frames.canonical.lazy())
+    other_code = perturb('naics_code', pl.lit(ELECTRICAL))(frames.assignments)
+    disagree(script, records, other_code)
+    disagree(script, records, frames.assignments.slice(1))
+
+
+def test_area_mix_successor_without_county_is_not_testable(script):
+    counties = [COUNTY] * 6
+    counties[2] = None
+    found = area_cells(script, golden_rows(), counties)
+    assert area_cell(found, PLUMBING)['testable'] is False
+
+
+def test_area_mix_recurs_through_another_record(script):
+    rows = [
+        row(2023, 1, PLUMBING, 'Plumbing contractor'),
+        row(2024, 1, ELECTRICAL, 'Electrical contractor'),
+        row(2024, 3, PLUMBING, 'Plumbing contractor', ein=OTHER_EIN),
+    ]
+    _frames, _records, _assigned, links = assign(script, rows)
+    assert linked(links, 2023) == {0}
+    found = area_cell(area_cells(script, rows), PLUMBING)
+    assert (found['testable'], found['recurs']) == (True, True)
+
+
+def windowed_rows():
+    '''Golden rows between a 2022 and a 2026 row, with ineligible and repeated records.'''
+    return [
+        row(2022, 1, PLUMBING, 'Plumbing contractor',
+            mapping=crosswalked(PLUMBING, 2017, [PLUMBING])),
+        *golden_rows(),
+        row(2023, 1, PLUMBING, 'Plumbing contractor'),
+        row(2023, 6, PLUMBING, 'Plumbing contractor'),
+        row(2023, 7, RESTAURANT, 'Restaurant',
+            mapping=crosswalked(RESTAURANT, 2017, [RESTAURANT])),
+        row(2024, 8, ELECTRICAL, 'Electrical contractor', ein=OTHER_EIN),
+        row(2026, 1, PLUMBING, 'Plumbing contractor',
+            mapping=crosswalked(PLUMBING, 2017, [PLUMBING])),
+    ]
+
+
+WINDOWED_COUNTIES = [COUNTY, COUNTY, OTHER_COUNTY, COUNTY, OTHER_COUNTY, None, COUNTY,
+                     COUNTY, COUNTY, COUNTY, COUNTY, None]
+
+
+def test_assignment_frame_keeps_the_window_and_eligibility(script):
+    _frames, records, assigned, _links = assign(script, windowed_rows(), WINDOWED_COUNTIES)
+    assert assigned.columns == ['source_row', 'year_filing_for', 'county_id',
+                                'naics_2022_node_id', 'area_eligible']
+    assert assigned['source_row'].to_list() == list(range(1, 11))
+    assert assigned['source_row'].to_list() == records['source_row'].to_list()
+    assert assigned['county_id'].to_list() == WINDOWED_COUNTIES[1:11]
+    assert assigned['area_eligible'].to_list() == [
+        True, True, True, True, False, True, True, True, False, True]
+
+
+def test_area_mix_counts_count_eligible_records_of_the_year(script):
+    frames, _records, assigned, _links = assign(script, windowed_rows(), WINDOWED_COUNTIES)
+    counts = script.area_mix_counts(assigned, 2023)
+    assert counts.schema == pl.Schema({'county_id': pl.String,
+                                       'naics_2022_node_id': pl.String,
+                                       'n_unweighted': pl.UInt64})
+    assert counts.rows() == [(COUNTY, node(PLUMBING), 3), (OTHER_COUNTY, node(RESTAURANT), 1)]
+    assert script.area_mix_counts(assigned, 2024).rows() == [
+        (COUNTY, node(ELECTRICAL), 1), (COUNTY, node(PLUMBING), 1),
+        (OTHER_COUNTY, node(RESTAURANT), 1)]
+    years = [entry['year_filing_for'] for entry in frames.area_mix_report['partition_by_year']]
+    assert years == [2022, 2023, 2024, 2025, 2026]
+    assert script.check_area_mix(assigned, frames.area_mix, frames.area_mix_report) is None
+
+
+def swapped_records(script, rows):
+    '''The record frame of `rows` with the first two rows in the other order.'''
+    rows = [rows[1], rows[0], *rows[2:]]
+    return script.record_frame(build_frames(rows).canonical.lazy())
+
+
+@pytest.mark.parametrize('change', [
+    'row twice', 'other year', 'year outside the window', 'extra row', 'null code',
+    'record missing', 'records of another canonical table'])
+def test_assignment_disagreements_refused(script, change):
+    frames = build_frames(golden_rows())
+    records = script.record_frame(frames.canonical.lazy())
+    assignments = frames.assignments
+    if change == 'row twice':
+        assignments = pl.concat([assignments, assignments.slice(0, 1)])
+    elif change == 'other year':
+        assignments = perturb('year_filing_for', pl.lit(2024))(assignments)
+    elif change == 'year outside the window':
+        assignments = perturb('year_filing_for', pl.lit(2022))(assignments)
+    elif change == 'extra row':
+        assignments = pl.concat([
+            assignments,
+            perturb('source_row', pl.lit(6, dtype=pl.UInt64))(assignments.slice(0, 1))])
+    elif change == 'null code':
+        assignments = perturb('naics_code', pl.lit(None, dtype=pl.String))(assignments)
+    elif change == 'record missing':
+        records = records.slice(1)
+    else:
+        records = swapped_records(script, golden_rows())
+        assert sorted(records['source_row'].to_list()) == list(range(6))
+    disagree(script, records, assignments)
+
+
+def test_assignment_codes_missing_on_both_sides_agree(script):
+    rows = golden_rows()
+    rows[0] = row(2023, 1, PLUMBING, 'Plumbing contractor', mapping=unresolved(None, None))
+    frames = build_frames(rows)
+    records = script.record_frame(frames.canonical.lazy())
+    assert records['naics_code'][0] is None
+    assigned = script.assignment_frame(frames.assignments.lazy(), records)
+    assert assigned.height == 6
+
+
+@pytest.mark.parametrize('change', [
+    'eligible 2023', 'eligible 2025', 'no 2025 entry', 'other unit_b', 'row twice',
+    'report without partition'])
+def test_area_mix_recount_differences_refused(script, change):
+    frames, _records, assigned, _links = assign(script, *two_counties())
+    area_mix, report = frames.area_mix, frames.area_mix_report
+    entries = report['partition_by_year']
+    if change in ('eligible 2023', 'eligible 2025'):
+        year = int(change[-4:])
+        report = {'partition_by_year': [
+            entry | {'eligible': entry['eligible'] + (entry['year_filing_for'] == year)}
+            for entry in entries]}
+    elif change == 'no 2025 entry':
+        report = {'partition_by_year': [e for e in entries if e['year_filing_for'] != 2025]}
+    elif change == 'other unit_b':
+        area_mix = perturb('unit_b', pl.lit(node(ELECTRICAL)))(area_mix)
+    elif change == 'row twice':
+        area_mix = pl.concat([area_mix, area_mix.slice(0, 1)])
+    else:
+        report = {}
+    with pytest.raises(script.Refused, match='^area-mix recount differs$'):
+        script.check_area_mix(assigned, area_mix, report)
+
+
+def test_area_mix_ineligible_linked_base_record_is_not_testable(script):
+    rows = [
+        row(2023, 2, RESTAURANT, 'Restaurant',
+            mapping=crosswalked(RESTAURANT, 2017, [RESTAURANT])),
+        row(2023, 3, RESTAURANT, 'Restaurant'),
+        row(2024, 2, RESTAURANT, 'Restaurant'),
+    ]
+    _frames, records, assigned, links = assign(script, rows)
+    assert records['naics_2022_node_id'][0] == node(RESTAURANT)
+    assert assigned['area_eligible'].to_list() == [False, True, True]
+    assert linked(links, 2023) == {0}
+    found = script.area_mix_cells(assigned, links, 2023)
+    assert found.rows() == [(COUNTY, node(RESTAURANT), 1, False, True)]
+
+
+def test_area_mix_linked_base_record_without_county_is_not_testable(script):
+    rows = [
+        row(2023, 1, PLUMBING, 'Plumbing contractor'),
+        row(2023, 3, PLUMBING, 'Plumbing contractor'),
+        row(2024, 1, PLUMBING, 'Plumbing contractor'),
+    ]
+    _frames, _records, assigned, links = assign(script, rows, [None, COUNTY, COUNTY])
+    assert linked(links, 2023) == {0}
+    found = script.area_mix_cells(assigned, links, 2023)
+    assert found.rows() == [(COUNTY, node(PLUMBING), 1, False, True)]
+
+
+def test_area_mix_recurrence_needs_an_eligible_record_in_the_cell(script):
+    rows = [
+        row(2023, 1, PLUMBING, 'Plumbing contractor'),
+        row(2023, 2, RESTAURANT, 'Restaurant'),
+        row(2024, 1, PLUMBING, 'Plumbing contractor'),
+        row(2024, 2, RESTAURANT, 'Restaurant',
+            mapping=crosswalked(RESTAURANT, 2017, [RESTAURANT])),
+        row(2024, 3, RESTAURANT, 'Restaurant', ein=OTHER_EIN),
+    ]
+    found = area_cells(script, rows, [COUNTY, COUNTY, OTHER_COUNTY, COUNTY, OTHER_COUNTY])
+    assert found.rows() == [
+        (COUNTY, node(PLUMBING), 1, True, False),
+        (COUNTY, node(RESTAURANT), 1, False, False),
+    ]
+
+
+def test_area_mix_cells_of_the_second_year_pair(script):
+    rows = [
+        *golden_rows(),
+        row(2024, 3, ELECTRICAL, 'Electrical contractor', ein=OTHER_EIN),
+        row(2024, 4, ELECTRICAL, 'Electrical contractor', ein=OTHER_EIN),
+        row(2025, 3, ELECTRICAL, 'Electrical contractor', ein=OTHER_EIN),
+    ]
+    counties = [COUNTY, COUNTY, COUNTY, OTHER_COUNTY, COUNTY, None, OTHER_COUNTY,
+                OTHER_COUNTY, COUNTY]
+    found = area_cells(script, rows, counties, base_year=2024)
+    assert found.columns == ['county_id', 'naics_2022_node_id', 'base_count', 'testable',
+                             'recurs']
+    assert found.schema['base_count'] == pl.UInt64
+    assert found.rows() == [
+        (COUNTY, node(PLUMBING), 1, True, True),
+        (OTHER_COUNTY, node(ELECTRICAL), 2, True, False),
+        (OTHER_COUNTY, node(RESTAURANT), 1, False, False),
+    ]
+    earlier = area_cells(script, rows, counties)
+    assert earlier.rows() == [
+        (COUNTY, node(PLUMBING), 1, True, True),
+        (COUNTY, node(RESTAURANT), 1, True, False),
+    ]
+
+
+def test_area_mix_recount_sorts_cells_by_county_first(script):
+    rows = [row(2023, 1, RESTAURANT, 'Restaurant'),
+            row(2023, 2, PLUMBING, 'Plumbing contractor')]
+    frames, _records, assigned, _links = assign(script, rows, [COUNTY, OTHER_COUNTY])
+    assert script.area_mix_counts(assigned, 2023).rows() == [
+        (COUNTY, node(RESTAURANT), 1), (OTHER_COUNTY, node(PLUMBING), 1)]
+    assert script.check_area_mix(assigned, frames.area_mix, frames.area_mix_report) is None
+
+
+def text_frames(script, rows):
+    '''The frames, pair frame and confirmed links of canonical override rows.'''
+    frames = build_frames(rows)
+    records = script.record_frame(frames.canonical.lazy())
+    paired = script.pair_frame(frames.members.lazy(), frames.pairs.lazy(), records)
+    return frames, paired, script.confirmed_links(frames.links.lazy(), records)
+
+
+def pair_cells(script, rows, base_year=2023):
+    '''The text-pair cells of one base year, with the pair ID of each cell's first row.'''
+    _frames, paired, links = text_frames(script, rows)
+    return paired, script.text_pair_cells(paired, links, base_year)
+
+
+def pair_of(paired, source_row):
+    return paired.filter(pl.col('source_row') == source_row)['pair_id'].item()
+
+
+def text_check(script, rows):
+    frames, paired, _links = text_frames(script, rows)
+    counts = script.text_pair_counts(paired)
+    return frames, paired, counts
+
+
+def recount_refused(script, paired, counts, pairs, report):
+    with pytest.raises(script.Refused, match='^text-pair recount differs$'):
+        script.check_text_pairs(paired, counts, pairs, report)
+
+
+def test_text_pair_counts_equal_frozen_pairs(script):
+    frames, paired, counts = text_check(script, golden_rows())
+    script.check_text_pairs(paired, counts, frames.pairs, frames.establishment_report)
+
+
+@pytest.mark.parametrize('change', ['n_headline_records', 'report 2024'])
+def test_text_pair_recount_difference_refused(script, change):
+    frames, paired, counts = text_check(script, golden_rows())
+    pairs, report = frames.pairs, frames.establishment_report
+    if change == 'n_headline_records':
+        first = pl.int_range(pl.len()) == 0
+        pairs = pairs.with_columns(
+            pl.when(first).then(pl.col('n_headline_records') + 1)
+            .otherwise(pl.col('n_headline_records')).alias('n_headline_records'))
+    else:
+        entries = [dict(entry) for entry in report['pairs']['records_by_year_status_basis']]
+        for entry in entries:
+            if entry['year_filing_for'] == 2024 and entry['flag_headline_basis']:
+                entry['n'] += 1
+        report = {'pairs': {'records_by_year_status_basis': entries}}
+    recount_refused(script, paired, counts, pairs, report)
+
+
+def test_member_disagreement_refused(script):
+    frames = build_frames(golden_rows())
+    records = script.record_frame(frames.canonical.lazy())
+    members = frames.members.filter(pl.col('source_row') != 0)
+    with pytest.raises(script.Refused, match='^pair members disagree with canonical rows$'):
+        script.pair_frame(members.lazy(), frames.pairs.lazy(), records)
+
+
+def test_text_pair_recurs_only_on_a_year_t_node(script):
+    rows = [row(2023, 1, PLUMBING, 'Plumbing contractor'),
+            row(2024, 1, ELECTRICAL, 'Plumbing contractor')]
+    paired, found = pair_cells(script, rows)
+    assert found.rows() == [(pair_of(paired, 0), 1, True, False)]
+
+
+@pytest.mark.parametrize('code, recurs', [(ELECTRICAL, True), ('238290', False)])
+def test_conflicting_pair_recurs_on_either_node(script, code, recurs):
+    rows = [row(2023, 1, PLUMBING, 'Plumbing contractor'),
+            row(2023, 2, ELECTRICAL, 'Plumbing contractor'),
+            row(2024, 1, code, 'Plumbing contractor')]
+    paired, found = pair_cells(script, rows)
+    assert found.rows() == [(pair_of(paired, 0), 2, True, recurs)]
+
+
+def test_non_headline_pairs_are_not_cells(script):
+    rows = [row(2023, 1, PLUMBING, 'N/A'), row(2024, 1, PLUMBING, 'N/A'),
+            row(2023, 2, RESTAURANT, 'Restaurant'), row(2024, 2, RESTAURANT, 'Restaurant')]
+    paired, found = pair_cells(script, rows)
+    assert paired['flag_headline'].to_list() == [False, False, True, True]
+    assert found.rows() == [(pair_of(paired, 2), 1, True, True)]
+
+
+def test_reworded_successor_is_not_testable(script):
+    rows = [row(2023, 1, PLUMBING, 'Plumbing contractor'),
+            row(2024, 1, PLUMBING, 'Plumbing and heating')]
+    _frames, paired, links = text_frames(script, rows)
+    assert linked(links, 2023) == {0}
+    found = script.text_pair_cells(paired, links, 2023)
+    assert found.rows() == [(pair_of(paired, 0), 1, False, False)]
+
+
+def test_same_pair_successor_makes_pair_testable(script):
+    rows = [row(2023, 1, PLUMBING, 'Plumbing contractor'),
+            row(2023, 2, PLUMBING, 'Plumbing contractor'),
+            row(2024, 1, PLUMBING, 'Plumbing and heating'),
+            row(2024, 2, PLUMBING, 'Plumbing contractor')]
+    paired, found = pair_cells(script, rows)
+    assert found.rows() == [(pair_of(paired, 0), 2, True, True)]
+
+
+def crosswalked_row(year, establishment, code, description):
+    return row(year, establishment, code, description,
+               mapping=crosswalked(code, 2017, [code]))
+
+
+def test_pair_frame_reads_the_published_pairs(script):
+    rows = [*golden_rows(), crosswalked_row(2024, 3, PLUMBING, 'Plumbing contractor'),
+            row(2023, 4, RESTAURANT, 'N/A')]
+    frames, paired, _links = text_frames(script, rows)
+    assert paired.columns == ['source_row', 'pair_id', 'year_filing_for',
+                              'naics_2022_node_id', 'industry_eligible', 'flag_headline']
+    published = frames.members.join(frames.pairs.select('pair_id', 'flag_headline'),
+                                    on='pair_id').sort('source_row')
+    assert paired.select('source_row', 'pair_id', 'flag_headline').equals(published)
+    assert paired['industry_eligible'].to_list() == [True] * 6 + [False, True]
+    assert paired['flag_headline'].to_list() == [True] * 7 + [False]
+    assert paired['year_filing_for'].to_list() == [2023, 2023, 2024, 2024, 2025, 2025,
+                                                    2024, 2023]
+
+
+@pytest.mark.parametrize('change', ['duplicate member', 'unknown pair'])
+def test_member_disagreements_refused(script, change):
+    frames = build_frames(golden_rows())
+    records = script.record_frame(frames.canonical.lazy())
+    members, pairs = frames.members, frames.pairs
+    if change == 'duplicate member':
+        members = pl.concat([members, members.head(1)])
+    else:
+        pairs = pairs.filter(pl.col('pair_id') != members['pair_id'][1])
+    with pytest.raises(script.Refused, match='^pair members disagree with canonical rows$'):
+        script.pair_frame(members.lazy(), pairs.lazy(), records)
+
+
+def mixed_text_rows():
+    '''A plumbing pair absent in 2024 but for a crosswalked record, and an 'N/A' pair.'''
+    return [row(2023, 1, PLUMBING, 'Plumbing contractor'),
+            crosswalked_row(2024, 1, PLUMBING, 'Plumbing contractor'),
+            row(2025, 1, PLUMBING, 'Plumbing contractor'),
+            row(2023, 2, RESTAURANT, 'N/A'),
+            row(2024, 2, RESTAURANT, 'N/A')]
+
+
+def test_text_pair_counts_zero_fill_eligible_headline_records(script):
+    _frames, paired, counts = text_check(script, mixed_text_rows())
+    assert counts.columns == ['pair_id', 'n_2023', 'n_2024', 'n_2025']
+    assert all(counts.schema[f'n_{t}'] == pl.UInt64 for t in (2023, 2024, 2025))
+    assert counts.rows() == [(pair_of(paired, 0), 1, 0, 1)]
+
+
+def test_text_pair_check_counts_every_eligible_record(script):
+    frames, paired, counts = text_check(script, mixed_text_rows())
+    entries = frames.establishment_report['pairs']['records_by_year_status_basis']
+    assert {(e['year_filing_for'], e['flag_headline_basis']) for e in entries} == {
+        (2023, True), (2024, True), (2024, False), (2025, True)}
+    script.check_text_pairs(paired, counts, frames.pairs, frames.establishment_report)
+
+
+@pytest.mark.parametrize('change', ['counts row dropped', 'report not a dict',
+                                    'entries not a list', 'entry not a dict'])
+def test_text_pair_recount_differences_refused(script, change):
+    frames, paired, counts = text_check(script, golden_rows())
+    report = frames.establishment_report
+    if change == 'counts row dropped':
+        counts = counts.head(1)
+    elif change == 'report not a dict':
+        report = []
+    elif change == 'entries not a list':
+        entries = report['pairs']['records_by_year_status_basis']
+        report = {'pairs': {'records_by_year_status_basis': tuple(entries)}}
+    else:
+        report = {'pairs': {'records_by_year_status_basis': [1]}}
+    recount_refused(script, paired, counts, frames.pairs, report)
+
+
+def test_text_pair_ineligible_linked_base_record_is_not_testable(script):
+    rows = [crosswalked_row(2023, 1, PLUMBING, 'Plumbing contractor'),
+            row(2023, 2, PLUMBING, 'Plumbing contractor'),
+            row(2024, 1, PLUMBING, 'Plumbing contractor')]
+    _frames, paired, links = text_frames(script, rows)
+    assert paired['naics_2022_node_id'][0] == node(PLUMBING)
+    assert linked(links, 2023) == {0}
+    found = script.text_pair_cells(paired, links, 2023)
+    assert found.rows() == [(pair_of(paired, 0), 1, False, True)]
+
+
+def test_text_pair_ineligible_successor_is_not_testable(script):
+    rows = [row(2023, 1, PLUMBING, 'Plumbing contractor'),
+            crosswalked_row(2024, 1, PLUMBING, 'Plumbing contractor')]
+    _frames, paired, links = text_frames(script, rows)
+    assert linked(links, 2023) == {0}
+    found = script.text_pair_cells(paired, links, 2023)
+    assert found.rows() == [(pair_of(paired, 0), 1, False, False)]
+
+
+def test_text_pair_recurrence_ignores_ineligible_year_t_nodes(script):
+    rows = [crosswalked_row(2023, 1, ELECTRICAL, 'Plumbing contractor'),
+            row(2023, 2, PLUMBING, 'Plumbing contractor'),
+            row(2024, 3, ELECTRICAL, 'Plumbing contractor')]
+    paired, found = pair_cells(script, rows)
+    assert paired['naics_2022_node_id'][0] == node(ELECTRICAL)
+    assert found.rows() == [(pair_of(paired, 0), 1, False, False)]
+
+
+def test_text_pair_cells_of_the_second_year_pair(script):
+    rows = [row(2023, 1, PLUMBING, 'Plumbing contractor'),
+            row(2024, 1, PLUMBING, 'Plumbing contractor'),
+            row(2025, 1, ELECTRICAL, 'Plumbing contractor'),
+            row(2023, 2, RESTAURANT, 'Restaurant'),
+            row(2024, 3, ELECTRICAL, 'Electrical contractor'),
+            row(2024, 4, ELECTRICAL, 'Electrical contractor'),
+            row(2025, 3, ELECTRICAL, 'Electrical contractor')]
+    _frames, paired, links = text_frames(script, rows)
+    found = script.text_pair_cells(paired, links, 2024)
+    assert found.columns == ['pair_id', 'base_count', 'testable', 'recurs']
+    assert found.schema['base_count'] == pl.UInt64
+    expected = sorted([(pair_of(paired, 1), 1, True, False),
+                       (pair_of(paired, 4), 2, True, True)])
+    assert found.rows() == expected
+    earlier = script.text_pair_cells(paired, links, 2023)
+    assert earlier.rows() == sorted([(pair_of(paired, 0), 1, True, True),
+                                     (pair_of(paired, 3), 1, False, False)])
+
+
+def test_kept_counts_cells_support_and_lenient(script):
+    published = pl.DataFrame({'count': [2, 3, 1], 'largest_year_count': [1, 3, 1]},
+                             schema={'count': pl.UInt64, 'largest_year_count': pl.UInt64})
+    assert script.kept(published, 2) == {
+        'cells': 3, 'support': 6, 'kept_cells': 2, 'kept_cell_share': 2 / 3,
+        'kept_support': 5, 'kept_support_share': 5 / 6, 'lenient_kept_cells': 1}
+    assert script.kept(published, None) == {
+        'cells': 3, 'support': 6, 'kept_cells': None, 'kept_cell_share': None,
+        'kept_support': None, 'kept_support_share': None, 'lenient_kept_cells': None}
+
+
+def run_main(script, capsys, argv):
+    '''The exit code and the one printed line of `main`, parsed.'''
+    code = script.main(argv)
+    out = capsys.readouterr().out
+    lines = out.splitlines()
+    assert len(lines) == 1 and out == lines[0] + '\n'
+    return code, lines[0], json.loads(lines[0])
+
+
+def test_cli_golden_run_exits_zero(script, published, capsys):
+    code, line, result = run_main(script, capsys, published.argv())
+    assert code == 0
+    assert line == json.dumps(json.loads(line), sort_keys=True)
+    assert result['complete'] is True
+    assert {family: result['families'][family]['minimum']
+            for family in script.FAMILIES} == dict.fromkeys(script.FAMILIES, 1)
+    assert result['inputs'] == {
+        'establishment_targets': {'run': published.establishment.name,
+                                  'outputs_sha256': published.establishment_pin},
+        'area_mix': {'run': published.area_mix.name, 'outputs_sha256': published.area_mix_pin},
+        'codes': {'run': published.codes.name, 'outputs_sha256': published.codes_pin},
+    }
+    assert result['constants'] == {'level': 0.9, 'top_band': 10, 'min_band_cells': 50,
+                                   'wilson_z': 1.959963984540054}
+
+
+def refiled_rows(years):
+    '''The golden rows with establishments 1 and 2 refiling under other codes in `years`.'''
+    other = {1: '238210', 2: '722513'}
+    return [
+        {**found, **row(found['year_filing_for'], found['establishment_id'],
+                        other[found['establishment_id']], found['industry_description'])}
+        if found['year_filing_for'] in years else found
+        for found in golden_rows()
+    ]
+
+
+def test_cli_without_recurrence_exits_one(script, tmp_path, capsys):
+    published = publish(tmp_path, build_frames(refiled_rows({2024, 2025})))
+    code, _line, result = run_main(script, capsys, published.argv())
+    assert code == 1
+    assert result['complete'] is False
+    assert all(result['families'][family]['minimum'] is None for family in script.FAMILIES)
+    assert result['families']['co_ownership']['year_pairs']['2023-2024']['bands']
+
+
+def test_cli_refusal_exits_two(script, published, capsys):
+    argv = published.argv()
+    argv[argv.index('--establishment-outputs-sha256') + 1] = '0' * 64
+    code, _line, result = run_main(script, capsys, argv)
+    assert code == 2
+    assert result == {'complete': False, 'reason': 'establishment-target pin differs'}
+
+
+def tamper_support(published):
+    '''Add 1 to the first support row's `j_2023` and return the new argv.'''
+    file = published.establishment / 'co_ownership_support.parquet'
+    support = pl.read_parquet(file)
+    support.with_columns(
+        pl.when(pl.int_range(pl.len()) == 0).then(pl.col('j_2023') + 1)
+        .otherwise(pl.col('j_2023')).alias('j_2023')).write_parquet(file)
+    argv = published.argv()
+    argv[argv.index('--establishment-outputs-sha256') + 1] = republish(published.establishment)
+    return argv
+
+
+def test_self_check_refusal_prints_no_curves(script, published, capsys):
+    code, _line, result = run_main(script, capsys, tamper_support(published))
+    assert code == 2
+    assert result == {'complete': False, 'reason': 'co-ownership recount differs'}
+
+
+def test_two_runs_are_byte_identical(script, published, capsys):
+    first = run_main(script, capsys, published.argv())
+    second = run_main(script, capsys, published.argv())
+    assert first[1] == second[1]
+
+
+def test_output_holds_no_identifiers(script, published, capsys):
+    _code, line, _result = run_main(script, capsys, published.argv())
+    canonical = build_frames(golden_rows()).canonical
+    strings = set()
+    for column in ('ein', 'company_name', 'establishment_name', 'industry_description',
+                   'street_address'):
+        strings.update(canonical[column].drop_nulls().to_list())
+    assert strings
+    assert [found for found in sorted(strings) if found in line] == []
+
+
+def tree(directory):
+    return sorted((path.relative_to(directory).as_posix(),
+                   hashlib.sha256(path.read_bytes()).hexdigest())
+                  for path in directory.rglob('*') if path.is_file())
+
+
+def test_cli_writes_nothing_under_data_dir(script, published, capsys):
+    before = tree(published.data_dir)
+    run_main(script, capsys, published.argv())
+    assert tree(published.data_dir) == before
+
+
+FORBIDDEN_IMPORTS = {'httpx', 'dotenv', 'ipumspy', 'requests', 'urllib', 'socket',
+                     'subprocess', 'typer'}
+FORBIDDEN_MODULES = {'ita_establishment_bundle', 'ita_target_build',
+                     'ita_establishment_targets', 'targets_cli', 'cli'}
+
+
+def test_script_imports_are_offline():
+    imported = []
+    for node_ in ast.walk(ast.parse(SCRIPT.read_text())):
+        if isinstance(node_, ast.Import):
+            imported += [alias.name.split('.') for alias in node_.names]
+        elif isinstance(node_, ast.ImportFrom):
+            module = (node_.module or '').split('.')
+            imported += [module + [alias.name] for alias in node_.names]
+    assert imported
+    assert [parts for parts in imported if parts[0] in FORBIDDEN_IMPORTS] == []
+    assert [parts for parts in imported
+            if parts[0] == 'embedding_data' and FORBIDDEN_MODULES & set(parts[1:])] == []
+
+
+def test_cli_one_family_without_minimum_exits_one(script, tmp_path, capsys):
+    counties = [COUNTY] * 6
+    counties[3] = OTHER_COUNTY
+    published = publish(tmp_path, build_frames(golden_rows(), counties))
+    code, _line, result = run_main(script, capsys, published.argv())
+    assert (code, result['complete']) == (1, False)
+    assert {family: result['families'][family]['minimum'] for family in script.FAMILIES} == {
+        'co_ownership': 1, 'area_mix': None, 'text_pairs': 1}
+    assert result['families']['area_mix']['published']['kept_cells'] is None
+
+
+@pytest.mark.parametrize('years, minimums', [({2024, 2025}, (None, 1)), ({2025}, (1, None))])
+def test_family_minimum_needs_every_year_pair(script, tmp_path, capsys, years, minimums):
+    published = publish(tmp_path, build_frames(refiled_rows(years)))
+    code, _line, result = run_main(script, capsys, published.argv())
+    assert code == 1
+    for family in script.FAMILIES:
+        found = result['families'][family]
+        assert (found['year_pairs']['2023-2024']['minimum'],
+                found['year_pairs']['2024-2025']['minimum']) == minimums
+        assert found['minimum'] is None
+
+
+def test_year_pair_counts_and_bands(script, published, capsys):
+    _code, _line, result = run_main(script, capsys, published.argv())
+    found = result['families']['co_ownership']['year_pairs']
+    assert set(found) == {'2023-2024', '2024-2025'}
+    expected_band = {'low': 1, 'high': None, 'base_cells': 2, 'testable_cells': 2,
+                     'recurring_cells': 2, 'rate': 1.0}
+    for pair in found.values():
+        assert {key: pair[key] for key in ('base_cells', 'testable_cells',
+                                           'recurring_cells', 'minimum')} == {
+            'base_cells': 2, 'testable_cells': 2, 'recurring_cells': 2, 'minimum': 1}
+        (band,) = pair['bands']
+        assert {key: band[key] for key in expected_band} == expected_band
+        assert 0 < band['wilson_low'] < band['wilson_high'] == 1.0
+
+
+def test_year_pair_totals_count_cells_and_recurring_testable_cells(script):
+    frame = cells((1, 60, 30, 5), (10, 3, 3, 2))
+    frame = frame.with_columns(
+        pl.when(pl.col('testable').not_()).then(True).otherwise(pl.col('recurs'))
+        .alias('recurs'))
+    found = script.curve(frame)
+    assert {key: found[key] for key in ('base_cells', 'testable_cells',
+                                        'recurring_cells', 'minimum')} == {
+        'base_cells': 70, 'testable_cells': 63, 'recurring_cells': 33, 'minimum': 2}
+    assert found['bands'] == script.bands(frame)
+
+
+def published_rows():
+    '''Pooled counts above every single-year count, a count-2 area cell, a non-headline pair.
+
+    EIN A files a plumbing contractor and a restaurant in 2023 and the plumbing contractor
+    again in 2025. EIN B files both in 2025. EIN A also files an 'N/A' plumbing record in
+    2023.
+    '''
+    return [
+        row(2023, 1, PLUMBING, 'Plumbing contractor'),
+        row(2023, 2, RESTAURANT, 'Restaurant'),
+        row(2023, 5, PLUMBING, 'N/A'),
+        row(2025, 1, PLUMBING, 'Plumbing contractor'),
+        row(2025, 3, PLUMBING, 'Plumbing contractor', ein=OTHER_EIN),
+        row(2025, 4, RESTAURANT, 'Restaurant', ein=OTHER_EIN),
+    ]
+
+
+def test_published_counts_per_family(script, tmp_path, capsys, monkeypatch):
+    published = publish(tmp_path, build_frames(published_rows()))
+    monkeypatch.setattr(script, 'pair_minimum', lambda bands: 2)
+    code, _line, result = run_main(script, capsys, published.argv())
+    assert code == 0
+    found = {family: result['families'][family]['published'] for family in script.FAMILIES}
+    assert found == {
+        'co_ownership': {'cells': 2, 'support': 4, 'kept_cells': 2, 'kept_cell_share': 1.0,
+                         'kept_support': 4, 'kept_support_share': 1.0,
+                         'lenient_kept_cells': 2},
+        'area_mix': {'cells': 2, 'support': 3, 'kept_cells': 1, 'kept_cell_share': 0.5,
+                     'kept_support': 2, 'kept_support_share': 2 / 3,
+                     'lenient_kept_cells': 0},
+        'text_pairs': {'cells': 4, 'support': 5, 'kept_cells': 1, 'kept_cell_share': 0.25,
+                       'kept_support': 2, 'kept_support_share': 0.4,
+                       'lenient_kept_cells': 1},
+    }
+
+
+def test_self_checks_run_before_any_cells(script, published, capsys, monkeypatch):
+    def fail(*_args):
+        pytest.fail('a cells frame was built before every self-check passed')
+
+    def refuse(*_args):
+        raise script.Refused('text-pair recount differs')
+
+    for name in ('co_ownership_cells', 'area_mix_cells', 'text_pair_cells'):
+        monkeypatch.setattr(script, name, fail)
+    monkeypatch.setattr(script, 'check_text_pairs', refuse)
+    code, _line, result = run_main(script, capsys, published.argv())
+    assert code == 2
+    assert result == {'complete': False, 'reason': 'text-pair recount differs'}
+
+
+def test_unexpected_error_exits_two_with_a_fixed_reason(script, published, capsys,
+                                                        monkeypatch):
+    def broken(_inputs):
+        raise ValueError('a polars error')
+
+    monkeypatch.setattr(script, 'measure', broken)
+    code = script.main(published.argv())
+    captured = capsys.readouterr()
+    assert code == 2
+    assert captured.out == json.dumps(
+        {'complete': False, 'reason': 'unexpected error'}, sort_keys=True) + '\n'
+    assert 'ValueError: a polars error' in captured.err

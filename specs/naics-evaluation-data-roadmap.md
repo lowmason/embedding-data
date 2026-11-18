@@ -79,7 +79,7 @@ promoted Track B item, follows Track A's Stages 3 and 4 (owner, 2026-11-16).
       ROUTING: brainstorming
 > Stage 2: COMPLETE (2026-11-16) — implemented by spec specs/uncovered-uses-evidence-sources.md, approved by the owner (no plan). Findings in specs/naics-evaluation-data-stage-2-findings.md.
 
-- [ ] Stage 3: Headline minimum count for NAICS targets
+- [x] Stage 3: Headline minimum count for NAICS targets
       Objective: A minimum cell count for headline use of the NAICS targets is set from their observed counts.
       Outcomes: O4
       Track: A
@@ -88,6 +88,9 @@ promoted Track B item, follows Track A's Stages 3 and 4 (owner, 2026-11-16).
       Exit: O4: a committed decision sets the minimum count from the observed `n_unweighted` distributions of the Stage 1 co-ownership target and the 2023 ITA area mix, and from the observed `n_records` distribution of Stage 1's headline text–code pairs (Resolved at resume, 2026-11-16: owner; spec R7.2, plan 11). It reports for each family how many cells, or headline pairs, meet it. Cross-year links are a support table, not an R7.2 family, and get no minimum count
       Leaves out: the minimum count for SOC, geography, ACS and CPS families → the deferred item for old Stage 13. The minimum count for each new Track B family → that family's own stages, O13 for TRI (Resolved at resume, 2026-11-16: Stage 2 spec, "Rules for every new family")
       ROUTING: brainstorming
+
+> Stage 3: COMPLETE (2026-11-17) — implemented by plan 12 (specs/plans/completed/12-ita-naics-minimum-counts.md); decision in specs/findings/v9-ita-naics-minimum-counts.md. The text-pair gate counts `n_headline_records`, not the Exit's `n_records`, per that plan's Deviation note.
+> Next: resume the roadmap.
 
 - [ ] Stage 4: ITA NAICS targets, hardening
       Objective: Stage 1's bundle gets its exact replay check, long-form acceptance finding and README and CLAUDE.md run pins, and plan 11 retires.
