@@ -80,9 +80,8 @@ did not correct them. Approval of this spec confirms them.
 - Sub-grants, prime awards without subawards, the NAICS code of a contract as a
   firm's industry, and fiscal years before 2024 or after 2026.
 - Firm names, addresses and any other Dun & Bradstreet (D&B) Open Data field.
-- Any SAM.gov API other than the Entity Extracts API, the Entity Management API
-  and the subaward reporting APIs. Any FOUO or sensitive data, or a role that
-  grants it.
+- Any SAM.gov API other than the Entity Extracts API. Any FOUO or sensitive
+  data, or a role that grants it.
 - Any change to a frozen module, an earlier stage's artifact or a raw file.
 
 ## Intent
@@ -119,8 +118,10 @@ The design fails, even if it runs, when it:
   A contract code classifies the thing bought, not the vendor
   ([FAR 19.102](https://www.acquisition.gov/far/19.102)).
 - Matches firms by name, or joins anything other than an exact UEI.
-- Reads, stores or publishes a D&B Open Data field, or uses a SAM.gov record
-  last updated before 2022-04-04.
+- Reads a D&B Open Data field into any derived table, or publishes one, or uses
+  a SAM.gov record last updated before 2022-04-04. The raw extract is kept as
+  delivered (R1.4). It stays on this machine, and no step reads its name or
+  address fields.
 - Writes the SAM.gov key anywhere, or prints it.
 - Lets links inside one corporate group into the headline cells.
 - Lets a code that is not a native NAICS 2022 national industry enter a
@@ -377,6 +378,9 @@ other window.
 - A registry constant records the exact header row of the subaward CSV for each
   window year, taken from the preflight. The build maps the columns it needs by
   exact header text. A changed header fails the build.
+- **My call:** a download ZIP may hold more than one CSV file. The build reads
+  every CSV member of the ZIP, each with the recorded header, and the registry
+  records the member-name pattern. Any other member fails the build.
 - A second registry constant records the extract layout: the column positions
   of the fields the build reads, taken from GSA's layout document during E5. A
   changed layout version or a row with the wrong field count fails the build.
@@ -393,17 +397,25 @@ present, and the subaward's NAICS field (diagnostic).
 
 ## Preflight: open checks E4–E6
 
-The preflight runs after the four raw files are recorded and before any build.
-It has two parts, as in Stage 5. **My calls:**
+The preflight has two parts, as in Stage 5. **My calls:**
 
-- **Data checks.** A script, `scripts/preflight_usaspending_sam.py`, reads only
-  the manifested files and the pinned Stage 4 nodes, offline, and prints a JSON
+- **Document checks**, marked "(read)" below. They run first, before any
+  acquisition or import, because they need no data. The operator reads the
+  named pages and records the URL, the read date and a short quote in the
+  findings file. Reading GSA's extract layout document (a PDF or spreadsheet)
+  needs the owner's go-ahead. These documents are not manifest-registered and
+  are not stored under the data root, because no build step reads them.
+- **Data checks.** They run after the four raw files are recorded and before
+  any build. A script, `scripts/preflight_usaspending_sam.py`, reads only the
+  manifested files and the pinned Stage 4 nodes, offline, and prints a JSON
   report.
-- **Document checks**, marked "(read)" below. The operator reads the named
-  pages and records the URL, the read date and a short quote in the findings
-  file. Reading GSA's extract layout document (a PDF or spreadsheet) needs the
-  owner's go-ahead. These documents are not manifest-registered and are not
-  stored under the data root, because no build step reads them.
+
+**My call: why the document checks come first.** The public extract carries
+name and address columns on every row, and the D&B terms forbid bulk access to
+D&B Open Data. Whether downloading the public extract is allowed is an E6
+question. If E6 fails, the stage stops before any raw file exists, so no
+recorded raw file ever needs removal. Removing a recorded raw file is outside
+this design and would need its own owner decision.
 
 The results of both parts go into the Stage 14 findings file. The covered
 verdict holds only while these checks pass. A failed check stops the stage.
@@ -414,8 +426,8 @@ the owner decides. It is not an acceptance threshold.
 | Check | Measures and records | Stops the stage when |
 |---|---|---|
 | **E4** subawards | Each year's exact header row. The fields for the prime UEI, the subcontractor UEI, both parent UEIs, the action date, the amount, the type, a report identifier and the subaward NAICS. The date field that the download filter used (read). Rows by type. Blank and malformed UEI rates by side. Rows whose action date falls outside the file's fiscal year. Duplicate rows (identical in every column). Rows by month, to show the March 2025 move to SAM.gov. The share of rows whose subaward NAICS equals the prime contract's NAICS, where both exist (diagnostic). | A window year has no prime UEI, subcontractor UEI or action date field. The download filter does not select by subaward action date (owner decides). No parent UEI field exists on either side, because the corporate-group rule depends on it (owner decides). |
-| **E5** SAM.gov extract | The layout version and the column positions of UEI, primary NAICS, NAICS code string, registration status, last update date and EVS source if present (read, from GSA's layout document). Rows per UEI. Rows by registration status. The last-update-date distribution. EVS source values if present. The share of primary codes that are NAICS 2022 national industries. Join coverage: the share of distinct prime UEIs and of distinct subcontractor UEIs in the window that reach an eligible SAM record. How many past monthly files the API keeps, and the rate limits (read). | The extract has no UEI or primary NAICS field. The extract has no last update date, because the D&B rule depends on it. More than 1% of primary codes are outside the NAICS 2022 national-industry set (trigger). Fewer than half of the distinct prime UEIs, or of the distinct subcontractor UEIs, reach an eligible SAM record (trigger). |
-| **E6** terms | The live SAM.gov terms of use, the D&B terms on the Entity API page and the key-rotation rule (read). USAspending's terms or licensing page, read in a browser (read). Any statement on SAM.gov Data Services or open.gsa.gov about redistribution of public entity data (read). | A statement restricts publishing aggregates or UEI-level rows derived from public subaward data or public entity data. Or a statement forbids the API access that `acquire-subawards` or `acquire-sam-extract` uses. A failed terms check never becomes "build it but keep the aggregates local" (Stage 2 rule). |
+| **E5** SAM.gov extract | The layout version and the column positions of UEI, primary NAICS, NAICS code string, registration status, last update date and EVS source if present (read, from GSA's layout document). Rows per UEI. Rows by registration status. The last-update-date distribution. EVS source values if present. The share of primary codes that are NAICS 2022 national industries. Join coverage: the share of distinct prime UEIs and of distinct subcontractor UEIs in the window that reach an eligible SAM record. How many past monthly files the API keeps, and the rate limits (read). | The extract has no UEI or primary NAICS field. The extract has no last update date, because the D&B rule depends on it. More than 1% of the distinct UEIs on usable reports that have a primary code have one outside the NAICS 2022 national-industry set (trigger). Fewer than half of the distinct prime UEIs, or of the distinct subcontractor UEIs, reach an eligible SAM record (trigger). |
+| **E6** terms | The live SAM.gov terms of use, the D&B terms on the Entity API page and the key-rotation rule (read). USAspending's terms or licensing page, read in a browser (read). Any statement on SAM.gov Data Services or open.gsa.gov about redistribution of public entity data (read). | A statement restricts publishing aggregates or UEI-level rows derived from public subaward data or public entity data. A statement forbids the API access that `acquire-subawards` or `acquire-sam-extract` uses. A statement forbids downloading the public extract, which carries name and address fields, for this use. A failed terms check never becomes "build it but keep the aggregates local" (Stage 2 rule). |
 
 **My call: the two coverage triggers.** Primes must be registered in SAM.gov to
 hold a contract, so low prime coverage points to a wrong join or layout.
@@ -813,20 +825,22 @@ reports equal or unequal.
 
 ### Full-data acceptance
 
-1. Acquire or import the three subaward files and the extract. Record their
+1. Run the preflight's document checks (E4's filter read, E5's layout and API
+   reads, and E6). Record them in the findings file. Stop on a failed check.
+2. Acquire or import the three subaward files and the extract. Record their
    hashes.
-2. Run the preflight. Record E4–E6 in the findings file. Stop on a failed check
-   or a trigger.
-3. Build the first run with a fresh ID under `/usr/bin/time -l`, to measure wall
+3. Run the preflight's data checks. Record E4 and E5 in the findings file. Stop
+   on a failed check or a trigger.
+4. Build the first run with a fresh ID under `/usr/bin/time -l`, to measure wall
    time and maximum RSS.
-4. Verify it with its detached pin.
-5. Run the independent reconciler. It must report equal.
-6. Confirm preservation. Every earlier raw file is byte-identical. The manifest
+5. Verify it with its detached pin.
+6. Run the independent reconciler. It must report equal.
+7. Confirm preservation. Every earlier raw file is byte-identical. The manifest
    keeps its earlier bytes as a prefix. The raw audit
    (`uv run embedding-data audit --data-dir ...`) reports zero discrepancies.
    The Stage 2 summary and the Stage 4, Stage 6 and Stage 10 bundles, and any
    Stage 5 bundle, are byte-identical.
-7. Write `specs/naics-evaluation-data-stage-14-findings.md`: the run ID, the
+8. Write `specs/naics-evaluation-data-stage-14-findings.md`: the run ID, the
    pin, the snapshot label, the extract month, the wall time, maximum RSS and
    bundle size of the real run, the preflight outcomes, join coverage and the
    main counts.
