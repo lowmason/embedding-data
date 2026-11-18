@@ -100,7 +100,9 @@ Process: lighter — first build (Gate 2), verify, the reconciliation script and
   `uv run --locked ruff check .` clean. Polars lazy with method-style expressions.
   No pandas.
 - **R8.4.** No output feeds embedder training, curriculum, hard-negative mining or
-  model selection. The README section and the finding say so.
+  model selection. The README section and the finding say so. One exception (owner,
+  2026-11-18, the stage spec's amendment): selection may read the validation part of
+  the text–code pairs. The finding states the exclusion with this exception.
 - **Fixtures.** Fixture results show software readiness. They are never benchmarks.
 
 ## Owner Checkpoints

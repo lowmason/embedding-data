@@ -9,6 +9,24 @@ The owner then approved this written specification, including every call
 marked "My call", on 2026-11-13. Stage 10 implementation and measured
 acceptance remain planned.
 
+**Amendment: selection on the validation part (owner, 2026-11-18).** The
+anti-goal against model selection now has one exception. Checkpoint and
+candidate selection for the text→code artifact of `naics-embedder` may read the
+validation part of the headline text–code pairs. Its basis is the second
+sentence of R8.4: "A family used for tuning is split first, and only its
+held-out part is reported as evaluation." R8.4 itself is unchanged. The limits:
+
+- The split comes first. It groups pairs by `description_key`, so no normalized
+  description is in both parts. `naics-embedder` defines it in its
+  `specs/text-to-code-ita-panel.md`.
+- Only the sealed part is reported as evaluation. It is read once, to judge.
+- No pair and no ITA description enters training, curriculum construction or
+  hard-negative mining.
+- The exception covers the text–code pair tables only. Co-ownership and the
+  link table keep the full exclusion.
+- A real read still waits for the successor evaluation-protocol specification
+  (source spec, Out of scope).
+
 ## Scope and governing contracts
 
 Stage 10 of [the roadmap](completed/embedding-evaluation-data-spec-roadmap.md)
@@ -90,7 +108,8 @@ Stage 10 produces three products from data that is already on disk:
 - V9 minimum cell counts and complete eight-family V12: Stage 13.
 - Any change to Stage 2–9 code, bundles, findings or raw files.
 - Any embedder training, curriculum, hard-negative mining or model-selection
-  use (R8.4).
+  use (R8.4). The one exception is selection on the validation part of the
+  text–code pairs. *(owner, amendment, 2026-11-18)*
 
 ## Intent
 
@@ -121,7 +140,9 @@ Anti-goals. The design fails, even if it runs, when it:
 - Picks one code when a pair or record has several possibilities.
 - Confirms a link that the adopted R2.7 rule does not confirm.
 - Edits a frozen module or an earlier stage's artifact.
-- Lets any table feed embedder training or model selection.
+- Lets any table feed embedder training, or lets any table feed model
+  selection outside the validation part of the text–code pairs. *(owner,
+  amendment, 2026-11-18)*
 
 ## Approaches
 
@@ -789,7 +810,8 @@ The shipped Handoff must give exact schemas, APIs, pins and limits for:
   the `size_gate_pending` state.
 - The successor evaluation protocol: copied-text flags, headline flags, the
   co-ownership counts and marginals for any null-model normalization, and the
-  R8.4 exclusion from training and model selection.
+  R8.4 exclusion from training and model selection, with the amendment's one
+  exception for the text–code pairs. *(owner, amendment, 2026-11-18)*
 
 After the owner approves this committed spec, use a fresh session with
 writing-plans against `specs/ita-establishment-targets.md`. The brainstorming
