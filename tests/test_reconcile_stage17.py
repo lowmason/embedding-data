@@ -518,6 +518,9 @@ FLAG_CASES = {
        for name in HEADLINE_Q},
     'QDEGFIELD_allocated': ({'QDEGFIELD': 4}, {'flag_any_allocated': True,
                                                'flag_headline': True}),
+    # Any value other than 0 is allocated, not only 4.
+    'QUHRSWOR_code_3': ({'QUHRSWOR': 3}, {'flag_any_allocated': True, 'flag_headline': False}),
+    'QDEGFIELD_code_1': ({'QDEGFIELD': 1}, {'flag_any_allocated': True, 'flag_headline': True}),
 }
 
 
@@ -548,6 +551,13 @@ def test_a_node_is_shared_when_another_earner_category_has_it(script):
     frame = derived(script, rows)
     assert frame['flag_industry_shared_node'].to_list() == [True, True, False, False, False]
     assert frame['flag_headline'].to_list() == [False, False, True, True, True]
+
+
+def test_a_node_is_shared_across_the_years_of_the_file(script):
+    # The file's rows pool both years. Only the top code reads state and year.
+    node = {'industry_canonical_common_node_id': 'naics:2022:x:n1'}
+    rows = [core_row(INDNAICS='A', **node), core_row(INDNAICS='B', YEAR=2024, **node)]
+    assert derived(script, rows)['flag_industry_shared_node'].to_list() == [True, True]
 
 
 def test_node_codes_and_level_are_the_parts_of_the_ids(script):
