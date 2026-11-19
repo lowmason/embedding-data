@@ -45,7 +45,11 @@ from embedding_data.vendor_link_pairs import (
     subaward_types,
     validate_pairs,
 )
-from embedding_data.vendor_link_readers import EXTRACT_SCHEMA, SUBAWARD_SCHEMA
+from embedding_data.vendor_link_readers import (
+    EXTRACT_SCHEMA,
+    SUBAWARD_SCHEMA,
+    UNREADABLE_SCHEMA,
+)
 
 LAYOUTS = TEST_SUBAWARD_LAYOUTS
 EXTRACT = TEST_EXTRACT_LAYOUT
@@ -120,13 +124,14 @@ def pair_table_of(records, rows, *, layouts=LAYOUTS):
     return pairs(usable, firms(usable, extract_of(rows), EXTRACT, NODE_IDS))
 
 
-def counts_of(records, rows, *, layouts=LAYOUTS, layout=EXTRACT):
+def counts_of(records, rows, *, layouts=LAYOUTS, layout=EXTRACT, unreadable=None):
     reported = reported_of(*records, layouts=layouts)
     usable = reported.filter(pl.col('report_status') == 'usable')
     extract = extract_of(rows)
     firm_table = firms(usable, extract, layout, NODE_IDS)
     pair_table = pairs(usable, firm_table)
-    return report_counts(reported, firm_table, pair_table, extract, layouts, layout, NODE_IDS)
+    return report_counts(reported, firm_table, pair_table, extract, layouts, layout, NODE_IDS,
+                         unreadable)
 
 
 def with_columns(layouts, **columns):
@@ -953,6 +958,7 @@ KNOWN_ROWS = [
 
 
 NO_TRIGGER = {'naics_not_2022': 0, 'with_code': 0, 'share': None}
+NO_FIRMS = {'prime': 0, 'subcontractor': 0, 'all': 0}
 
 
 def tally(statuses, **counts):
@@ -1025,7 +1031,8 @@ def test_report_counts_on_a_known_window():
         'rows_per_uei': {'1': 7, '2': 2, '3+': 0},
         'last_update_by_year': {'2024': 10, 'invalid': 1}, 'evs_source': {'': 11},
         'primary_codes': {'blank': 2, 'well_formed': 6, 'in_2022': 5, 'malformed': 3},
-        'malformed_unread_rows': 3}
+        'malformed_unread_rows': 3, 'unreadable_lines': 0, 'unreadable_firms': NO_FIRMS,
+        'unreadable_firms_not_in_sam': NO_FIRMS}
     assert counts['missing_fields'] == {
         'subawards': {'2024': [], '2025': [], '2026': ['subaward_naics']}, 'extract': []}
 
@@ -1184,7 +1191,8 @@ def test_extract_counts_strip_and_tally_every_row():
         'last_update_by_year': {'2021': 1, '2022': 1, '2023': 1, '2024': 3, 'invalid': 2},
         'evs_source': {'': 5, 'D&B': 2, 'SAM': 1},
         'primary_codes': {'blank': 2, 'well_formed': 4, 'in_2022': 3, 'malformed': 2},
-        'malformed_unread_rows': 2}
+        'malformed_unread_rows': 2, 'unreadable_lines': 0, 'unreadable_firms': NO_FIRMS,
+        'unreadable_firms_not_in_sam': NO_FIRMS}
 
 
 def test_join_coverage_counts_distinct_ueis_in_each_role_and_fiscal_year():
@@ -1291,3 +1299,94 @@ def test_report_counts_hold_no_uei_and_dump_as_strict_json():
     for uei in KNOWN.values():
         assert uei not in text
     assert 'R1' not in text
+
+
+# ---- skipped extract lines (owner decision 2026-11-19: skip and count them)
+
+A1, A2, A3 = 'AAAAAAAAAAA1', 'AAAAAAAAAAA2', 'AAAAAAAAAAA3'
+B1, B2, B3, B4, B5 = (f'BBBBBBBBBBB{n}' for n in range(1, 6))
+# A1 is the prime of two usable reports and the subcontractor of one. A3 and B4 are only on
+# a report outside the window, and B5 only on a report whose prime UEI is unusable.
+SKIPPING_RECORDS = [report(prime_uei=A1, sub_uei=B1), report(prime_uei=A1, sub_uei=B2),
+                    report(prime_uei=A2, sub_uei=B2), report(prime_uei=B3, sub_uei=A1),
+                    report(prime_uei=A3, sub_uei=B4, action_date='2023-01-01'),
+                    report(prime_uei='', sub_uei=B5)]
+# A2 and B1 have a readable row, and B1's is padded.
+SKIPPING_ROWS = [extract_row(A2), extract_row(f' {B1} ')]
+# Eleven skipped lines: A1 three times (once padded), B2 only padded with a vertical tab, B3
+# only padded with a no-break space, which `WHITESPACE` does not strip, and one UEI that is
+# on no report.
+SKIPPED_UEIS = [A1, A1, f' {A1}\t', A2, B1, f'\x0b{B2} ', B4, A3, B5, 'XXXXXXXXXXX9',
+                NBSP + B3]
+
+
+def unreadable_of(ueis):
+    '''Skipped extract lines in `UNREADABLE_SCHEMA`, one for each delivered UEI.'''
+    return pl.DataFrame({'line': list(range(2, 2 + len(ueis))), 'uei': ueis,
+                         'fields': [41] * len(ueis)}, schema=UNREADABLE_SCHEMA)
+
+
+def test_skipped_lines_and_their_report_firms_are_counted_by_role_and_pooled():
+    extract = counts_of(SKIPPING_RECORDS, SKIPPING_ROWS,
+                        unreadable=unreadable_of(SKIPPED_UEIS))['extract']
+    assert extract['unreadable_lines'] == 11
+    assert extract['unreadable_firms'] == {'prime': 2, 'subcontractor': 3, 'all': 4}
+    assert extract['unreadable_firms_not_in_sam'] == {'prime': 1, 'subcontractor': 2,
+                                                      'all': 2}
+
+
+def test_a_firm_with_a_readable_row_is_not_in_the_not_in_sam_subset():
+    # A1 has a padded readable row and a skipped line, and B1 only a skipped line.
+    extract = counts_of([report(prime_uei=A1, sub_uei=B1)], [extract_row(f' {A1}\t')],
+                        unreadable=unreadable_of([A1, B1]))['extract']
+    assert extract['unreadable_firms'] == {'prime': 1, 'subcontractor': 1, 'all': 2}
+    assert extract['unreadable_firms_not_in_sam'] == {'prime': 0, 'subcontractor': 1,
+                                                      'all': 1}
+
+
+def test_no_unreadable_frame_counts_as_an_empty_one():
+    default = counts_of(SKIPPING_RECORDS, SKIPPING_ROWS)
+    empty = counts_of(SKIPPING_RECORDS, SKIPPING_ROWS,
+                      unreadable=pl.DataFrame(schema=UNREADABLE_SCHEMA))
+    assert default == empty
+    extract = default['extract']
+    assert (extract['unreadable_lines'], extract['unreadable_firms'],
+            extract['unreadable_firms_not_in_sam']) == (0, NO_FIRMS, NO_FIRMS)
+
+
+def test_skipped_lines_change_no_other_count():
+    plain = counts_of(SKIPPING_RECORDS, SKIPPING_ROWS)
+    counted = counts_of(SKIPPING_RECORDS, SKIPPING_ROWS, unreadable=unreadable_of(SKIPPED_UEIS))
+    for counts in (plain, counted):
+        for key in ('unreadable_lines', 'unreadable_firms', 'unreadable_firms_not_in_sam'):
+            del counts['extract'][key]
+    assert counted == plain
+    # A1, B2 and B3 have no readable row, so they stay not_in_sam.
+    assert counted['firms']['all']['not_in_sam'] == 3
+
+
+def test_the_skipped_line_counts_do_not_need_the_firm_and_pair_tables():
+    unreadable = unreadable_of(SKIPPED_UEIS)
+    partial = report_counts(reported_of(*SKIPPING_RECORDS), pl.DataFrame(schema=FIRM_SCHEMA),
+                            pl.DataFrame(schema=PAIR_SCHEMA), extract_of(SKIPPING_ROWS),
+                            LAYOUTS, EXTRACT, NODE_IDS, unreadable)
+    full = counts_of(SKIPPING_RECORDS, SKIPPING_ROWS, unreadable=unreadable)
+    assert partial['extract'] == full['extract']
+
+
+OTHER_UNREADABLE_SCHEMAS = {
+    'line_unsigned': {'line': pl.UInt64, 'uei': pl.String, 'fields': pl.Int64},
+    'fields_int32': {'line': pl.Int64, 'uei': pl.String, 'fields': pl.Int32},
+    'no_fields': {'line': pl.Int64, 'uei': pl.String},
+    'extra_column': {'line': pl.Int64, 'uei': pl.String, 'fields': pl.Int64,
+                     'extra': pl.String},
+    'reordered': {'uei': pl.String, 'line': pl.Int64, 'fields': pl.Int64},
+    'renamed': {'line': pl.Int64, 'key': pl.String, 'fields': pl.Int64},
+}
+
+
+@pytest.mark.parametrize('name', list(OTHER_UNREADABLE_SCHEMAS))
+def test_an_unreadable_frame_of_another_schema_fails(name):
+    with exactly('unreadable frame schema is wrong'):
+        counts_of([report()], [],
+                  unreadable=pl.DataFrame(schema=OTHER_UNREADABLE_SCHEMAS[name]))

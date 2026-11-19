@@ -5,8 +5,10 @@ report gets one firm status from the SAM.gov extract rows that share its strippe
 distinct (prime, subcontractor) pair of usable reports gets one pair status. Every chain is
 checked in its spec order, and the first status that applies wins. Every strip uses the
 ASCII set `WHITESPACE`. The work stays in lazy Polars until a small table or a count is
-collected. A malformed primary code on a firm whose codes the build reads raises a
-`ValueError`, and so does each failed pair-table check. Every message is fixed.
+collected. The extract lines that the reader skips for their field count are counted with
+the report firms whose UEIs they hold, and change no status. A malformed primary code on a
+firm whose codes the build reads raises a `ValueError`, and so does each failed pair-table
+check and a frame of skipped lines in another schema. Every message is fixed.
 '''
 
 from datetime import date
@@ -21,7 +23,7 @@ from embedding_data.vendor_link_layouts import (
     ExtractLayout,
     SubawardLayout,
 )
-from embedding_data.vendor_link_readers import SUBAWARD_SCHEMA
+from embedding_data.vendor_link_readers import SUBAWARD_SCHEMA, UNREADABLE_SCHEMA
 
 CONTRACT = 'vendor-link-pairs-v1'
 UEI_PATTERN = r'^[A-Z0-9]{12}$'
@@ -411,9 +413,20 @@ def _trigger(usable: pl.LazyFrame, firm_table: pl.DataFrame) -> dict:
     return _trigger_counts(firm_table['firm_status']) | {'by_fiscal_year': by_year}
 
 
+def _firms_in(usable: pl.LazyFrame, ueis: pl.LazyFrame) -> dict[str, int]:
+    '''For each role, and pooled over both, the distinct UEIs on `usable` that `ueis` holds.'''
+    by_role = {role: usable.select(uei=column) for role, column in _ROLES}
+    frames = by_role | {'all': pl.concat(list(by_role.values()))}
+    return {name: int(frame.unique().join(ueis, on='uei', how='semi').select(pl.len())
+                      .collect().item())
+            for name, frame in frames.items()}
+
+
 def _extract_counts(extract: pl.DataFrame, layout: ExtractLayout, node_ids: frozenset[str],
-                    usable: pl.LazyFrame) -> dict:
+                    usable: pl.LazyFrame, unreadable: pl.DataFrame) -> dict:
     rows = _extract_rows(extract, layout)
+    skipped = unreadable.lazy().select(uei=_strip('uei'))
+    without_rows = skipped.join(rows.select(uei='key'), on='uei', how='anti')
     well_formed = _matches(pl.col('code'), CODE_PATTERN)
     codes = rows.select(
         blank=_count(pl.col('blank')), well_formed=_count(well_formed),
@@ -434,14 +447,30 @@ def _extract_counts(extract: pl.DataFrame, layout: ExtractLayout, node_ids: froz
         'evs_source': None if layout.positions['evs_source'] is None else _tally(evs, 'evs'),
         'primary_codes': {name: int(value) for name, value in codes.items()},
         'malformed_unread_rows': _malformed(usable, rows)['unread_rows'],
+        'unreadable_lines': unreadable.height,
+        'unreadable_firms': _firms_in(usable, skipped),
+        'unreadable_firms_not_in_sam': _firms_in(usable, without_rows),
     }
 
 
 def report_counts(reported: pl.LazyFrame, firm_table: pl.DataFrame, pair_table: pl.DataFrame,
                   extract: pl.DataFrame, layouts: dict[int, SubawardLayout],
-                  layout: ExtractLayout, node_ids: frozenset[str]) -> dict:
+                  layout: ExtractLayout, node_ids: frozenset[str],
+                  unreadable: pl.DataFrame | None = None) -> dict:
     '''The counts that the preflight prints and `report.json` stores. Every key is text and
-    every value is an integer, a share, None, a list or a dict of these.'''
+    every value is an integer, a share, None, a list or a dict of these.
+
+    `unreadable` holds the extract lines that the reader skipped for their field count, in
+    `UNREADABLE_SCHEMA`, and None stands for none. The `extract` section counts them
+    (`unreadable_lines`). It also counts the distinct UEIs of usable reports that equal a
+    skipped line's stripped UEI, by role and pooled (`unreadable_firms`), and those of them
+    with no readable extract row, whose firm status is `not_in_sam`
+    (`unreadable_firms_not_in_sam`). These counts read the extract, never the firm table.
+    '''
+    if unreadable is None:
+        unreadable = pl.DataFrame(schema=UNREADABLE_SCHEMA)
+    elif list(unreadable.schema.items()) != list(UNREADABLE_SCHEMA.items()):
+        raise ValueError('unreadable frame schema is wrong')
     usable = reported.filter(pl.col('report_status') == 'usable')
     fiscal_years = _tally(usable.select(year=pl.col('fiscal_year').cast(pl.String)), 'year',
                           tuple(str(year) for year in WINDOW))
@@ -456,7 +485,7 @@ def report_counts(reported: pl.LazyFrame, firm_table: pl.DataFrame, pair_table: 
                 str(year): _coverage(usable.filter(pl.col('fiscal_year') == year), firm_table)
                 for year in WINDOW}},
         'trigger': _trigger(usable, firm_table),
-        'extract': _extract_counts(extract, layout, node_ids, usable),
+        'extract': _extract_counts(extract, layout, node_ids, usable, unreadable),
         'missing_fields': {
             'subawards': {str(year): list(layouts[year].missing) for year in WINDOW},
             'extract': [field for field in EXTRACT_OPTIONAL if layout.positions[field] is None]},
