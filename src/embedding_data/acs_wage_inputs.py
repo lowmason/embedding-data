@@ -56,13 +56,14 @@ CODES_FILES = frozenset({
     'report.json',
 })
 SOFTWARE_ROOT = paths.PROJECT_ROOT
-# The command group's modules and every module that importing them loads. Later modules of the
-# command group add their own files.
+# The command group's modules and every module that importing the command group loads.
+# `test_software_files_cover_loaded_modules` pins this list.
 SOFTWARE_FILES = (
     'src/embedding_data/__init__.py',
     'src/embedding_data/acs_wage_bundle.py',
     'src/embedding_data/acs_wage_checks.py',
     'src/embedding_data/acs_wage_inputs.py',
+    'src/embedding_data/acs_wage_microdata.py',
     'src/embedding_data/acs_wage_rules.py',
     'src/embedding_data/geography_parsers.py',
     'src/embedding_data/geography_references.py',
