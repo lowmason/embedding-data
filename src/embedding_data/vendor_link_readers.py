@@ -8,7 +8,7 @@ mapped columns and a row digest to Parquet parts in scratch, never a full copy.
 The extract has one member, read line by line with no quote rules. The reader checks the BOF
 and EOF framing lines, the field count and the record end of every data line, and keeps only
 the registered positions. It writes nothing. No name, address or other D&B Open Data field
-enters a frame or a file. Every refusal is a `ValueError` with a fixed message.
+enters a frame or a file. Each failed check raises a `ValueError` with a fixed message.
 '''
 
 import codecs
