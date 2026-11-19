@@ -724,6 +724,8 @@ REFUSED_MEMBERS = {
     'unsuffixed_utf8_form': f'{HEAD}{DATE}.dat',
     'ascii_form': f'SAM_PUBLIC_MONTHLY_V2_{DATE}_{HEX}.dat',
     'ascii_unsuffixed_form': 'SAM_PUBLIC_MONTHLY_V2_20200414.dat',
+    'unsuffixed_upper_case_extension': f'{HEAD}{DATE}.DAT',
+    'ascii_unsuffixed_upper_case_extension': 'SAM_PUBLIC_MONTHLY_V2_20200414.DAT',
     'upper_case_extension': f'{STEM}.DAT',
     'mixed_case_extension': f'{STEM}.Dat',
     'underscore_for_the_dot': f'{STEM}_dat',
