@@ -164,14 +164,16 @@ def test_wrong_codes_pin_is_refused(fixture):
         select(fixture)
 
 
-@pytest.mark.parametrize('edit', ['append_byte_to_nodes', 'add_extra_file'])
+@pytest.mark.parametrize('edit', ['append_byte_to_nodes', 'add_extra_file', 'remove_report'])
 def test_changed_codes_inventory_is_refused(fixture, edit):
     directory = codes_dir(fixture)
     if edit == 'append_byte_to_nodes':
         nodes = directory / 'naics_nodes.parquet'
         nodes.write_bytes(nodes.read_bytes() + b'\0')
-    else:
+    elif edit == 'add_extra_file':
         (directory / 'extra.json').write_text('{}\n')
+    else:
+        (directory / 'report.json').unlink()
     with pytest.raises(ValueError, match='inventory'):
         select(fixture)
 
@@ -192,6 +194,28 @@ def test_the_mapping_run_must_cite_exactly_one_core_ddi(fixture, count):
         source['raw_citations'] = others + [ddi] * count
     pin = repin(mapping_dir(fixture), mutate)
     with pytest.raises(ValueError, match='does not cite one core DDI'):
+        select(fixture, mapping_outputs_sha256=pin)
+
+
+def test_a_ddi_citation_missing_from_the_manifest_is_refused(fixture):
+    def mutate(recorded):
+        for citation in recorded['sources']['acs/core']['raw_citations']:
+            if citation['path'].endswith('.xml'):
+                citation['path'] = citation['path'].removesuffix('.xml') + '_other.xml'
+    pin = repin(mapping_dir(fixture), mutate)
+    with pytest.raises(ValueError, match='cited raw file is not recorded'):
+        select(fixture, mapping_outputs_sha256=pin)
+
+
+@pytest.mark.parametrize('field', ['request', 'raw_citations'])
+def test_mapping_inputs_without_a_selected_field_are_refused(fixture, field):
+    def mutate(recorded):
+        if field == 'request':
+            del recorded['selected_upstreams']['request']
+        else:
+            del recorded['sources']['acs/core']['raw_citations']
+    pin = repin(mapping_dir(fixture), mutate)
+    with pytest.raises(ValueError, match='mapping inputs lack a selected field'):
         select(fixture, mapping_outputs_sha256=pin)
 
 
@@ -260,6 +284,8 @@ def test_unsafe_run_ids_are_refused(fixture, run_id):
     ('codes_run', '../fixture_codes', 'unsafe selected run ID'),
     ('codes_run', '.hidden', 'unsafe selected run ID'),
     ('mapping_outputs_sha256', 'uppercase', 'invalid detached checksum'),
+    ('mapping_outputs_sha256', '0' * 65, 'invalid detached checksum'),
+    ('mapping_outputs_sha256', 'g' * 64, 'invalid detached checksum'),
     ('codes_outputs_sha256', 'uppercase', 'invalid detached checksum'),
     ('codes_outputs_sha256', '0' * 63, 'invalid detached checksum'),
 ])
@@ -291,6 +317,13 @@ def test_symlinked_run_parent_is_refused(fixture, tmp_path, parent):
 def test_verify_detects_a_change_after_selection(fixture):
     selected = select(fixture)
     selected.core.write_bytes(selected.core.read_bytes() + b'\0')
+    with pytest.raises(ValueError, match='selected inputs changed'):
+        selected.verify()
+
+
+def test_verify_refuses_a_removed_mapping_run(fixture):
+    selected = select(fixture)
+    shutil.rmtree(mapping_dir(fixture))
     with pytest.raises(ValueError, match='selected inputs changed'):
         selected.verify()
 
