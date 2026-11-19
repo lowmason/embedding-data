@@ -1245,6 +1245,31 @@ def test_the_trigger_is_split_by_the_reports_own_fiscal_year():
         '2026': {'naics_not_2022': 1, 'with_code': 3, 'share': 1 / 3}}
 
 
+def test_the_three_firm_flag_counts_are_kept_apart():
+    f1, f2, f3, f4 = 'FFFFFFFFFFF1', 'FFFFFFFFFFF2', 'FFFFFFFFFFF3', 'FFFFFFFFFFF4'
+    records = [report(prime_uei=f1, sub_uei=f2), report(prime_uei=f3, sub_uei=f4)]
+    rows = [extract_row(f1, code=''), extract_row(f1),
+            extract_row(f2, code=''), extract_row(f2, string='236220Y'),
+            extract_row(f3, code='', update=''), extract_row(f3),
+            extract_row(f4, string='236220Y')]
+    flags = counts_of(records, rows)['firms']
+    assert {key: flags[key] for key in ('mixed_blank', 'last_update_invalid',
+                                        'code_not_in_string')} == {
+        'mixed_blank': 3, 'last_update_invalid': 1, 'code_not_in_string': 2}
+
+
+def test_unread_malformed_rows_leave_out_the_rows_of_read_firms():
+    records = [report(prime_uei=FIRM, sub_uei=OTHER)]
+    extract = extract_of([extract_row(FIRM, code='54151A'), extract_row(PARENT, code='5415')])
+    assert count_malformed(usable_of(*records), extract, EXTRACT) == {'read_rows': 1,
+                                                                      'unread_rows': 1}
+    counts = report_counts(reported_of(*records), pl.DataFrame(schema=FIRM_SCHEMA),
+                           pl.DataFrame(schema=PAIR_SCHEMA), extract, LAYOUTS, EXTRACT,
+                           NODE_IDS)
+    assert counts['extract']['primary_codes']['malformed'] == 2
+    assert counts['extract']['malformed_unread_rows'] == 1
+
+
 def test_report_and_extract_counts_do_not_need_the_firm_and_pair_tables():
     reported = reported_of(*KNOWN_RECORDS)
     extract = extract_of(KNOWN_ROWS)
