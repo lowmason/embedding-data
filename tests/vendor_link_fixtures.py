@@ -5,15 +5,18 @@ the fake USAspending and SAM.gov servers answer from memory. Fixture results sho
 readiness only.
 '''
 
+import codecs
+import csv
 import io
 import json
 import logging
 import zipfile
+from pathlib import Path
 
 import httpx
 import pytest
 
-from embedding_data import sam_access, usaspending_raw
+from embedding_data import sam_access, usaspending_raw, vendor_link_layouts
 
 FAKE_KEY = 'FAKEKEYfake0123456789ABCDEFghij'
 # FAKE_KEY plus punctuation, not a second key. Its five spellings (plain, quote, quote_plus,
@@ -206,3 +209,119 @@ def seed_codes_bundle(data_dir, directory):
     bundle = code_build.build(data_dir, ita_establishment_fixtures.CODES_RUN)
     return (ita_establishment_fixtures.CODES_RUN,
             manifest.sha256_file(bundle / 'outputs.json'))
+
+
+# The invented test registries. The 30 header cells imitate USAspending's column names. The
+# free-text `description` cell comes before the subcontractor columns, so a value that splits
+# wrongly shifts them. FY2026 has no subaward NAICS column, so its `subaward_naics` is unmapped.
+_SUBAWARD_HEADER = (
+    'prime_award_unique_key', 'prime_award_piid', 'prime_award_amount', 'prime_awardee_uei',
+    'prime_awardee_name', 'prime_awardee_parent_uei', 'prime_awardee_parent_name',
+    'prime_award_naics_code', 'prime_award_naics_description', 'subaward_type',
+    'subaward_report_id', 'subaward_number', 'description', 'subawardee_uei',
+    'subawardee_name', 'subawardee_parent_uei', 'subawardee_parent_name', 'subaward_amount',
+    'subaward_action_date', 'subaward_action_date_fiscal_year', 'subaward_naics',
+    'subawardee_business_types', 'subaward_last_modified_date', 'prime_award_base_action_date',
+    'prime_award_awarding_agency_name', 'prime_award_funding_agency_name',
+    'prime_award_project_title', 'usaspending_permalink', 'subaward_fsrs_report_id',
+    'subaward_fsrs_report_year')
+_SUBAWARD_COLUMNS = {
+    'prime_uei': 'prime_awardee_uei', 'sub_uei': 'subawardee_uei',
+    'action_date': 'subaward_action_date', 'amount': 'subaward_amount',
+    'subaward_type': 'subaward_type', 'prime_parent_uei': 'prime_awardee_parent_uei',
+    'sub_parent_uei': 'subawardee_parent_uei', 'report_id': 'subaward_report_id',
+    'subaward_naics': 'subaward_naics', 'prime_naics': 'prime_award_naics_code'}
+
+
+def _subaward_year(year: int) -> dict:
+    header = list(_SUBAWARD_HEADER)
+    columns = dict(_SUBAWARD_COLUMNS)
+    if year == 2026:
+        header[header.index('subaward_naics')] = 'subaward_fsrs_report_month'
+        columns['subaward_naics'] = None
+    return {'member_pattern': r'Contracts_Subawards_[0-9]+\.csv', 'header': header,
+            'date_format': '%Y-%m-%d', 'columns': columns}
+
+
+TEST_SUBAWARD_LAYOUTS = vendor_link_layouts.parse_subaward_layouts({
+    'version': vendor_link_layouts.SUBAWARD_VERSION,
+    'years': {str(year): _subaward_year(year) for year in usaspending_raw.WINDOW}})
+# Restricted positions 10 to 16 sit right after `last_update_date` (9) and right before
+# `primary_naics` (17), so a read one position off reaches a restricted field.
+TEST_EXTRACT_LAYOUT = vendor_link_layouts.parse_extract_layout({
+    'version': vendor_link_layouts.EXTRACT_VERSION,
+    'layout': 'Fixture extract layout v1',
+    'member_pattern': r'SAM_PUBLIC_UTF-8_MONTHLY_V2_[0-9]{8}\.dat',
+    'encoding': 'utf-8',
+    'delimiter': '|',
+    'field_count': 40,
+    'bof_prefix': 'BOF FIXTURE V2 00000000 ',
+    'eof_prefix': 'EOF FIXTURE V2 00000000 ',
+    'record_end': '!end',
+    'date_format': '%Y%m%d',
+    'positions': {'uei': 2, 'registration_status': 5, 'last_update_date': 9,
+                  'primary_naics': 17, 'naics_code_string': 27, 'evs_source': 33},
+    'evs_dnb': ['D&B'],
+    'restricted_positions': [10, 11, 12, 13, 14, 15, 16],
+})
+# Stands in for a D&B Open Data value (a name or an address). It must reach no output.
+DNB_SENTINEL = 'DNB-SENTINEL-NAME'
+
+
+def subaward_record(layout: vendor_link_layouts.SubawardLayout, **fields: str) -> list[str]:
+    '''A full record in header order, every other cell empty.
+
+    A keyword names a logical field or, after the prefix `cell_`, a raw header cell.
+    '''
+    record = dict.fromkeys(layout.header, '')
+    for name, value in fields.items():
+        cell = name.removeprefix('cell_') if name.startswith('cell_') else layout.columns[name]
+        if cell not in record:
+            raise ValueError(f'{name} names no header cell')
+        record[cell] = value
+    return list(record.values())
+
+
+def write_subaward_zip(file: Path, layout: vendor_link_layouts.SubawardLayout,
+                       members: dict[str, list[list[str]]], *, bom: bool = False,
+                       extra: dict[str, bytes] | None = None) -> None:
+    '''Write a subaward ZIP. Each CSV member holds the layout's header, then its records.
+
+    `csv.writer` quotes a value that holds a comma, a quote or a line break, and ends each
+    line with CRLF. `bom` starts every CSV member with a UTF-8 BOM. `extra` adds members with
+    exact bytes after the CSV members.
+    '''
+    contents = {}
+    for name, records in members.items():
+        text = io.StringIO()
+        writer = csv.writer(text, lineterminator='\r\n')
+        writer.writerow(layout.header)
+        writer.writerows(records)
+        contents[name] = (codecs.BOM_UTF8 if bom else b'') + text.getvalue().encode('utf-8')
+    file.write_bytes(zip_bytes(contents | (extra or {})))
+
+
+def extract_line(layout: vendor_link_layouts.ExtractLayout, **fields: str) -> str:
+    '''A data line: each keyword at its field's position, `DNB_SENTINEL` at each restricted
+    position, the record end last, and every other position empty.'''
+    values = [''] * layout.field_count
+    for position in layout.restricted_positions:
+        values[position - 1] = DNB_SENTINEL
+    if layout.record_end is not None:
+        values[-1] = layout.record_end
+    for name, value in fields.items():
+        values[layout.positions[name] - 1] = value
+    return layout.delimiter.join(values)
+
+
+def write_extract_zip(file: Path, layout: vendor_link_layouts.ExtractLayout, lines: list[str],
+                      *, member: str, bof: str | None = None, eof: str | None = None) -> None:
+    '''Write an extract ZIP with one member: the BOF line, `lines` and the EOF line.
+
+    Lines end with CRLF and the EOF line has no line end, as in the SAM.gov sample file. The
+    default framing lines are the layout's prefixes followed by a date and two counts.
+    '''
+    bof = f'{layout.bof_prefix}20261102 0000000 0000000' if bof is None else bof
+    eof = f'{layout.eof_prefix}20261102 0000000 0000000' if eof is None else eof
+    text = '\r\n'.join([bof, *lines, eof])
+    file.write_bytes(zip_bytes({member: text.encode(layout.encoding)}))
