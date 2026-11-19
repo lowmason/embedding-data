@@ -348,6 +348,12 @@ def extract_cases():
                       extract_with(lambda v, f=field: v['positions'].update({f: None})),
                       f'{label} field {field} is not mapped'))
     cases += [
+        ('required_two_null', extract_with(lambda v: v['positions'].update(
+            uei=None, registration_status=None)),
+         f'{label} field uei is not mapped'),
+        ('required_and_evs_source_null', extract_with(lambda v: v['positions'].update(
+            uei=None, evs_source=None)),
+         f'{label} field uei is not mapped'),
         ('restricted_number', extract_with(lambda v: v.update(restricted_positions=12)),
          f'{label} restricted positions are not a list of integers'),
         ('restricted_text', extract_with(lambda v: v.update(restricted_positions=['12'])),
