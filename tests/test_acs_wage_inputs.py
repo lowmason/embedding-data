@@ -357,6 +357,15 @@ def test_read_json_is_strict(tmp_path):
             inputs.read_json(file)
 
 
+@pytest.mark.parametrize('text', ['{"a": {"b": 1, "b": 2}}', '{"a": [{"b": 1, "b": 2}]}'],
+                         ids=['in_an_object', 'in_an_object_in_a_list'])
+def test_read_json_refuses_a_nested_duplicate_key(tmp_path, text):
+    file = tmp_path / 'value.json'
+    file.write_text(text)
+    with pytest.raises(ValueError, match='duplicate JSON key'):
+        inputs.read_json(file)
+
+
 @pytest.mark.parametrize('number', ['Infinity', '-Infinity', '1e999', '-1e999'])
 def test_read_json_refuses_every_non_finite_number(tmp_path, number):
     file = tmp_path / 'value.json'
