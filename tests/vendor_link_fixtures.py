@@ -11,12 +11,13 @@ import io
 import json
 import logging
 import zipfile
+from datetime import date
 from pathlib import Path
 
 import httpx
 import pytest
 
-from embedding_data import sam_access, usaspending_raw, vendor_link_layouts
+from embedding_data import sam_access, sam_raw, usaspending_raw, vendor_link_layouts
 
 FAKE_KEY = 'FAKEKEYfake0123456789ABCDEFghij'
 # FAKE_KEY plus punctuation, not a second key. Its five spellings (plain, quote, quote_plus,
@@ -325,3 +326,22 @@ def write_extract_zip(file: Path, layout: vendor_link_layouts.ExtractLayout, lin
     eof = f'{layout.eof_prefix}20261102 0000000 0000000' if eof is None else eof
     text = '\r\n'.join([bof, *lines, eof])
     file.write_bytes(zip_bytes({member: text.encode(layout.encoding)}))
+
+
+def seed_raw(data_dir: Path, directory: Path, subawards: dict[int, dict[str, list[list[str]]]],
+             extract_lines: list[str], *, snapshot: date, month: str, subaward_layouts,
+             extract_layout, extract_member: str) -> None:
+    '''Write a subaward ZIP for each year of `subawards` and one extract ZIP in `directory`,
+    and import them into `data_dir` under `snapshot` and `month`.
+
+    Each year's ZIP is `FY<year>_Contracts_Subawards_fixture.zip` and holds its members, each
+    with that year's layout header. The extract is `extract_name(month)` with one member.
+    '''
+    directory.mkdir(parents=True, exist_ok=True)
+    for year, members in subawards.items():
+        file = directory / f'FY{year}_Contracts_Subawards_fixture.zip'
+        write_subaward_zip(file, subaward_layouts[year], members)
+        usaspending_raw.import_file(data_dir, year, file, snapshot=snapshot)
+    extract = directory / extract_name(month)
+    write_extract_zip(extract, extract_layout, extract_lines, member=extract_member)
+    sam_raw.import_file(data_dir, extract, month=month)
