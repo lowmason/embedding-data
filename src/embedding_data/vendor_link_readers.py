@@ -113,7 +113,7 @@ def _read_member(archive: zipfile.ZipFile, info: zipfile.ZipInfo, layout: Subawa
     records = 0
     try:
         with _text(archive, info) as text:
-            reader = csv.reader(text)
+            reader = csv.reader(text, strict=True)
             if next(reader, None) != list(layout.header):
                 raise ValueError('changed header')
             for record in reader:
@@ -171,7 +171,7 @@ def read_subawards(files: dict[int, Path], layouts: dict[int, SubawardLayout],
 def _member_shape(archive: zipfile.ZipFile, info: zipfile.ZipInfo,
                   errors: str) -> tuple[list[str] | None, int, int]:
     with _text(archive, info, errors) as text:
-        reader = csv.reader(text)
+        reader = csv.reader(text, strict=True)
         header = next(reader, None)
         records = ragged = 0
         for record in reader:
@@ -197,11 +197,16 @@ def subaward_headers(file: Path) -> dict:
     For each member: its name, its first record as the header (None when it has none),
     whether it starts with a BOM, whether all of its bytes are UTF-8, its records after the
     header, and how many of them have a field count other than the header's. A member that
-    is not UTF-8 is read with replacement characters for the counts.
+    is not UTF-8 is read with replacement characters for the counts. A member that breaks
+    the CSV quote rules or the field size limit raises `malformed subaward CSV`, so that no
+    run of row text can pass for a header cell.
     '''
     with _field_size_limit(), zipfile.ZipFile(file) as archive:
         infos = sorted(archive.infolist(), key=lambda info: info.filename)
-        return {'members': [_describe_member(archive, info) for info in infos]}
+        try:
+            return {'members': [_describe_member(archive, info) for info in infos]}
+        except csv.Error as error:
+            raise ValueError('malformed subaward CSV') from error
 
 
 def _extract_member(archive: zipfile.ZipFile, layout: ExtractLayout) -> zipfile.ZipInfo:

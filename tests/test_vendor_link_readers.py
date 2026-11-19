@@ -67,6 +67,19 @@ def member_bytes(records, *, header=LAYOUT.header, bom=False):
     return (codecs.BOM_UTF8 if bom else b'') + text.getvalue().encode('utf-8')
 
 
+def csv_lines(records):
+    '''Records as CSV lines with no header.'''
+    text = io.StringIO()
+    csv.writer(text, lineterminator='\r\n').writerows(records)
+    return text.getvalue().encode('utf-8')
+
+
+def broken_quote_line(n, last_cell):
+    '''A record line whose unquoted cells come from `record_of(n)` and whose last cell is
+    raw text, so that it can break the CSV quote rules.'''
+    return (','.join(record_of(n)[:-1]) + ',' + last_cell + '\r\n').encode('utf-8')
+
+
 def subaward_files(directory, members_by_year, *, layouts=TEST_SUBAWARD_LAYOUTS, **options):
     directory.mkdir(parents=True, exist_ok=True)
     files = {}
@@ -511,6 +524,18 @@ def test_a_field_over_the_limit_is_malformed_and_the_limit_is_restored(
     assert parts(tmp_path) == []
 
 
+@pytest.mark.parametrize('last_cell', ['"open', '"x"y'],
+                         ids=['unclosed_quote_in_the_last_cell', 'text_after_a_closing_quote'])
+def test_a_quote_that_breaks_the_csv_rules_is_malformed(last_cell, tmp_path):
+    content = (member_bytes([record_of(1)]) + broken_quote_line(2, last_cell)
+               + csv_lines([record_of(3), record_of(4)]))
+    file = tmp_path / 'FY2024.zip'
+    file.write_bytes(zip_bytes({MEMBER_1: content}))
+    with exactly('malformed subaward CSV'):
+        read_file(tmp_path, file)
+    assert parts(tmp_path) == []
+
+
 def test_the_limit_is_restored_after_a_refusal(tmp_path, field_size_limit):
     file = tmp_path / 'FY2024.zip'
     write_subaward_zip(file, LAYOUT, {MEMBER_1: [record_of(1), []]})
@@ -550,6 +575,37 @@ def test_subaward_headers_reads_long_fields_and_restores_the_limit(tmp_path, fie
     write_subaward_zip(file, LAYOUT, {MEMBER_1: [record_of(1, cell_description='x' * 200_000)]})
     members = vendor_link_readers.subaward_headers(file)['members']
     assert [(member['records'], member['ragged']) for member in members] == [(1, 0)]
+    assert csv.field_size_limit() == field_size_limit
+
+
+def malformed_member(case):
+    '''Member bytes that break the CSV rules at one place.'''
+    if case == 'unclosed_quote_in_the_header':
+        return b'prime_award_unique_key,"open\r\n' + csv_lines([record_of(1), record_of(2)])
+    if case == 'unclosed_quote_in_a_later_record':
+        return (member_bytes([record_of(1)]) + broken_quote_line(2, '"open')
+                + csv_lines([record_of(3)]))
+    if case == 'text_after_a_closing_quote':
+        return member_bytes([record_of(1)]) + broken_quote_line(2, '"x"y')
+    if case == 'after_a_byte_that_is_not_utf8':
+        return (member_bytes([record_of(1)]).replace(b'description', b'descr\xe9ption', 1)
+                + broken_quote_line(2, '"open'))
+    return member_bytes([record_of(1, cell_description='x' * 65)])
+
+
+@pytest.mark.parametrize('case', ['unclosed_quote_in_the_header',
+                                  'unclosed_quote_in_a_later_record',
+                                  'text_after_a_closing_quote', 'after_a_byte_that_is_not_utf8',
+                                  'field_over_the_limit'])
+def test_subaward_headers_refuses_a_member_that_breaks_the_csv_rules(
+        case, tmp_path, monkeypatch, field_size_limit):
+    if case == 'field_over_the_limit':
+        monkeypatch.setattr(vendor_link_readers, 'FIELD_SIZE_LIMIT', 64)
+    file = tmp_path / 'FY2024.zip'
+    file.write_bytes(zip_bytes({'readme.txt': b'About these files\r\n',
+                                MEMBER_1: malformed_member(case)}))
+    with exactly('malformed subaward CSV'):
+        vendor_link_readers.subaward_headers(file)
     assert csv.field_size_limit() == field_size_limit
 
 
