@@ -42,7 +42,7 @@ def production_layout(year: int) -> tri_layout.HeaderLayout:
 
 def _cell(layout: tri_layout.HeaderLayout, field: str) -> str:
     '''The header cell that a field of `READ_SCHEMA` reads, in the layout of one year.'''
-    if field == 'year' or field not in tri_reader.READ_SCHEMA:
+    if field not in tri_reader.READ_SCHEMA:
         raise ValueError(f'{field} is not a field of a TRI row')
     if field.startswith('naics_'):
         position = int(field.removeprefix('naics_')) - 2

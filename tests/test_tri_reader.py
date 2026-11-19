@@ -230,6 +230,21 @@ def test_each_oddity_reads_like_plain_utf8(name, tmp_path):
     assert transcoded == ([2023] if transcodes else [])
 
 
+@pytest.mark.parametrize('name', ODDITIES)
+def test_each_oddity_file_holds_the_bytes_it_names(name, tmp_path):
+    # Without this, a writer that ignored an option would make the oddity tests read plain files.
+    options, _ = ODDITIES[name]
+    (plain, _), (odd, _) = read_plain_and_odd(tmp_path, **options)
+    data = (tmp_path / 'odd' / '2023_us.csv').read_bytes()
+    windows_1252 = options.get('encoding') == 'cp1252'
+    assert data.startswith(BYTE_ORDER_MARK) is options.get('bom', False)
+    assert data.count(b'\n') == 3  # The header and two records.
+    assert data.count(b'\r\n') == (3 if options.get('newline') == '\r\n' else 0)
+    assert (b'Caf\xe9' in data) is windows_1252
+    assert ('Café'.encode() in data) is not windows_1252
+    assert odd.collect().equals(plain.collect())
+
+
 def test_utf8_and_windows_1252_lines_in_one_file_read_by_line(tmp_path):
     rows = [tri_row(2023, 'T1', parent_name='Zoë Holdings, UTF-8'),
             tri_row(2023, 'T2', parent_name='Café Holdings, Windows-1252'),
@@ -283,6 +298,7 @@ def test_quoted_newline_keeps_one_record(newline, tmp_path):
     file = write(tmp_path, 2023, rows, newline=newline)
     # One header line, three record ends and three quoted newlines.
     assert file.read_bytes().count(b'\n') == 7
+    assert file.read_bytes().count(b'\r\n') == (4 if newline == '\r\n' else 0)
     frame = read(tmp_path, file, 2023).collect()
     assert frame['trifd'].to_list() == ['T1', 'T2', 'T3']
     assert frame['parent_name'].to_list() == [
