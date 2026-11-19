@@ -1,5 +1,5 @@
-'''The Stage 14 command group so far: subaward acquisition and import, their JSON line, exit
-codes and fixed failure line.'''
+'''The Stage 14 command group so far: subaward and SAM.gov extract acquisition and import,
+their JSON line, exit codes and fixed failure line.'''
 
 import json
 import subprocess
@@ -9,14 +9,29 @@ import httpx
 import pytest
 import typer
 from vendor_link_fixtures import (  # noqa: F401
+    EXTRACT_NAME,
+    FAKE_KEY,
+    MONTH,
     NAME,
+    FakeSam,
     FakeUsaspending,
+    extract_answer,
+    extract_name,
+    install_sam,
     install_usaspending,
     no_live_sam,
+    sample_extract,
     sample_zip,
 )
 
-from embedding_data import manifest, paths, usaspending_raw, usaspending_vendor_links
+from embedding_data import (
+    manifest,
+    paths,
+    sam_access,
+    sam_raw,
+    usaspending_raw,
+    usaspending_vendor_links,
+)
 
 SECRET = 'EIN 123456789 at 1 Main St, key FAKEKEYfake0123456789ABCDEFghij'
 
@@ -189,3 +204,191 @@ def test_importing_the_command_module_loads_no_credential_or_ipums_library(tmp_p
         capture_output=True, text=True, cwd=tmp_path, check=False)
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == 'False False'
+
+
+# --- SAM.gov extract commands
+
+
+EXTRACT_DIRECTORY = 'raw/sam/entity-extract/public-monthly-v2'
+
+
+def sam_failure_line(command, reason):
+    return (f'USAspending vendor links {command} failed: {reason}; run -; '
+            f'path {EXTRACT_DIRECTORY}')
+
+
+def sam_acquire_arguments(data_directory, month=MONTH, *options):
+    return ['acquire-sam-extract', '--month', month, '--data-dir', str(data_directory),
+            *options]
+
+
+def sam_import_arguments(data_directory, file, month=MONTH):
+    return ['import-sam-extract', str(file), '--month', month, '--data-dir', str(data_directory)]
+
+
+def extract_original(tmp_path, month='2026-10'):
+    file = tmp_path / 'downloads' / extract_name(month)
+    file.parent.mkdir(parents=True, exist_ok=True)
+    file.write_bytes(sample_extract(month))
+    return file
+
+
+def test_sam_acquire_and_import_print_one_json_line(cli_runner, data_directory, tmp_path,
+                                                    monkeypatch):
+    install_sam(monkeypatch, FakeSam(extract_answer()))
+    monkeypatch.setenv('SAM_API_KEY', FAKE_KEY)
+    acquired = cli_runner.invoke(usaspending_vendor_links.app,
+                                 sam_acquire_arguments(data_directory))
+    assert acquired.exit_code == 0, acquired.output
+    expected = {'path': f'{EXTRACT_DIRECTORY}/2026-11/{EXTRACT_NAME}'}
+    assert acquired.stdout == json.dumps(expected, sort_keys=True) + '\n'
+    assert acquired.stderr == ''
+    imported = cli_runner.invoke(usaspending_vendor_links.app, sam_import_arguments(
+        data_directory, extract_original(tmp_path), '2026-10'))
+    assert imported.exit_code == 0, imported.output
+    expected = {'path': f'{EXTRACT_DIRECTORY}/2026-10/{extract_name("2026-10")}'}
+    assert imported.stdout == json.dumps(expected, sort_keys=True) + '\n'
+    assert imported.stderr == ''
+    entries = manifest.read_manifest(paths.manifest_path(data_directory))
+    assert [(entry.path, entry.client) for entry in entries] == [
+        (f'sam/entity-extract/public-monthly-v2/2026-11/{EXTRACT_NAME}', 'httpx'),
+        (f'sam/entity-extract/public-monthly-v2/2026-10/{extract_name("2026-10")}',
+         'manual-import')]
+
+
+SAM_FAILURES = [
+    (ValueError(SECRET), 'validation'),
+    (FileNotFoundError(2, SECRET, SECRET), 'filesystem'),
+    (httpx.ConnectError(SECRET), 'network'),
+    (RuntimeError(SECRET), 'unexpected'),
+]
+
+
+@pytest.mark.parametrize('error, reason', SAM_FAILURES,
+                         ids=['value', 'missing_file', 'connect', 'runtime'])
+@pytest.mark.parametrize('command, operation', [('acquire-sam-extract', 'acquire'),
+                                                ('import-sam-extract', 'import_file')])
+def test_sam_failure_reason_follows_the_exception_type_and_hides_its_text(
+        cli_runner, data_directory, tmp_path, monkeypatch, command, operation, error, reason):
+    def fail(*args, **kwargs):
+        raise error
+
+    monkeypatch.setattr(sam_raw, operation, fail)
+    monkeypatch.setenv('SAM_API_KEY', FAKE_KEY)
+    arguments = (sam_acquire_arguments(data_directory) if command == 'acquire-sam-extract'
+                 else sam_import_arguments(data_directory, extract_original(tmp_path)))
+    result = cli_runner.invoke(usaspending_vendor_links.app, arguments)
+    assert result.exit_code == 2
+    assert result.stdout == ''
+    assert result.stderr == sam_failure_line(command, reason) + '\n'
+    assert SECRET not in result.output
+
+
+def test_acquire_sam_extract_passes_the_key_options_and_the_key(cli_runner, data_directory,
+                                                                tmp_path, monkeypatch):
+    seen = []
+
+    def read(**options):
+        seen.append(options)
+        return FAKE_KEY
+
+    def acquire(data_dir, month, *, credential):
+        seen.append((data_dir, month, credential))
+        return sam_raw.month_dir(data_dir, month) / EXTRACT_NAME
+
+    monkeypatch.setattr(sam_access, 'read_credential', read)
+    monkeypatch.setattr(sam_raw, 'acquire', acquire)
+    env_file = tmp_path / 'sam.env'
+    result = cli_runner.invoke(usaspending_vendor_links.app, sam_acquire_arguments(
+        data_directory, MONTH, '--env-file', str(env_file), '--prompt'))
+    assert result.exit_code == 0, result.output
+    result = cli_runner.invoke(usaspending_vendor_links.app,
+                               sam_acquire_arguments(data_directory))
+    assert result.exit_code == 0, result.output
+    assert seen == [{'env_file': env_file, 'prompt': True}, (data_directory, MONTH, FAKE_KEY),
+                    {'env_file': None, 'prompt': False}, (data_directory, MONTH, FAKE_KEY)]
+
+
+def test_import_sam_extract_reads_no_key_and_makes_no_client(cli_runner, data_directory,
+                                                             tmp_path, monkeypatch):
+    def forbidden(**options):
+        raise AssertionError('read the key')
+
+    monkeypatch.setattr(sam_access, 'read_credential', forbidden)
+    monkeypatch.setenv('SAM_API_KEY', FAKE_KEY)
+    result = cli_runner.invoke(usaspending_vendor_links.app, sam_import_arguments(
+        data_directory, extract_original(tmp_path), '2026-10'))
+    assert result.exit_code == 0, result.output
+
+
+@pytest.mark.parametrize('month', ['2026-13', '11/2026', ''])
+def test_a_bad_month_fails_as_validation_before_the_key_is_read(
+        cli_runner, data_directory, tmp_path, monkeypatch, month):
+    asked = []
+
+    def read(**options):
+        asked.append(options)
+        return FAKE_KEY
+
+    monkeypatch.setattr(sam_access, 'read_credential', read)
+    for arguments in (sam_acquire_arguments(data_directory, month),
+                      sam_import_arguments(data_directory, extract_original(tmp_path), month)):
+        result = cli_runner.invoke(usaspending_vendor_links.app, arguments)
+        assert result.exit_code == 2
+        assert result.stderr == sam_failure_line(arguments[0], 'validation') + '\n'
+    assert asked == []
+    assert not data_directory.exists()
+
+
+def test_prompt_without_a_terminal_fails_as_validation_before_any_request(
+        cli_runner, data_directory, monkeypatch):
+    server = install_sam(monkeypatch, FakeSam(extract_answer()))
+    result = cli_runner.invoke(usaspending_vendor_links.app,
+                               sam_acquire_arguments(data_directory, MONTH, '--prompt'))
+    assert result.exit_code == 2
+    assert result.stderr == sam_failure_line('acquire-sam-extract', 'validation') + '\n'
+    assert server.requests == []
+    assert not data_directory.exists()
+
+
+def test_a_missing_sam_patch_fails_closed_instead_of_reaching_the_network(
+        cli_runner, data_directory, monkeypatch):
+    # The guard's AssertionError is inside the protected scope, so it becomes the fixed error.
+    monkeypatch.setenv('SAM_API_KEY', FAKE_KEY)
+    result = cli_runner.invoke(usaspending_vendor_links.app,
+                               sam_acquire_arguments(data_directory))
+    assert result.exit_code == 2
+    assert result.stderr == sam_failure_line('acquire-sam-extract', 'validation') + '\n'
+    assert not paths.manifest_path(data_directory).exists()
+
+
+@pytest.mark.parametrize('drop', ['--data-dir', '--month'])
+def test_sam_commands_require_an_explicit_data_root_and_month(cli_runner, data_directory,
+                                                              tmp_path, drop):
+    for arguments in (sam_acquire_arguments(data_directory),
+                      sam_import_arguments(data_directory, tmp_path / 'absent.ZIP')):
+        index = arguments.index(drop)
+        result = cli_runner.invoke(usaspending_vendor_links.app,
+                                   arguments[:index] + arguments[index + 2:])
+        assert result.exit_code == 2
+        assert drop in result.output
+
+
+def test_module_lists_the_sam_commands(tmp_path):
+    result = subprocess.run(
+        [sys.executable, '-m', 'embedding_data.usaspending_vendor_links', '--help'],
+        capture_output=True, text=True, cwd=tmp_path, check=False)
+    assert result.returncode == 0, result.stderr
+    for command in ('acquire-sam-extract', 'import-sam-extract'):
+        assert command in result.stdout
+
+
+def test_importing_the_command_module_loads_no_census_access_module(tmp_path):
+    result = subprocess.run(
+        [sys.executable, '-c',
+         'import sys; import embedding_data.usaspending_vendor_links; '
+         "print('embedding_data.sam_access' in sys.modules, "
+         "'embedding_data.ipums_census_access' in sys.modules, 'dotenv' in sys.modules)"],
+        capture_output=True, text=True, cwd=tmp_path, check=False)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == 'True False False'
