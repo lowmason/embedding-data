@@ -1,7 +1,7 @@
 # NAICS evaluation data — Stage 14 findings: USAspending vendor links
 
 Status: Stage 14 in progress. Task 1 (document checks) is recorded below, read on
-2026-11-18. E6 is open: two reads are outstanding (see "E6 status").
+2026-11-18. The owner closed E6 on 2026-11-19 (see "E6 status").
 
 Stage 14 of `specs/naics-evaluation-data-roadmap.md` builds O6 from
 `specs/usaspending-vendor-links.md` under `specs/plans/15-usaspending-vendor-links.md`.
@@ -203,6 +203,19 @@ Quotes are short. Nothing here is legal advice.
    non-commercial or commercial purposes, "subject to the Limitation on Permissible Use of
    Dun & Bradstreet". The page also says the site code is CC0. This is repository text, not
    the live page.
+5. **SAM.gov Terms of Use, full page.** The owner pasted the whole page on 2026-11-19, and
+   the Restricted Data Use section a second time. It has seven sets of terms, and "all of
+   the terms apply". Data Access: software may connect to "some SAM.gov data" with
+   permission, and the page names the APIs and extracts at `open.gsa.gov/api/` and
+   `sam.gov/data-services` as the routes. It bars bots and data-gathering tools that use
+   the SAM.gov login, and bars web scraping. Public sharing is allowed only for data from
+   public versions of APIs. Restricted Data Use: the plain explanation says D&B Open Data
+   may not be *shared* in bulk. The legal language says a user shall not *access, use or
+   disseminate* it in bulk, meaning amounts usable as an original source or a substitute
+   for the D&B product. Users agree to both texts. D&B data other than D&B Open Data may
+   not be used for commercial, resale or marketing purposes. Records that carry D&B data
+   are those last updated before 2022-04-04 and they show EVS source `D&B`. The page holds
+   no statement on UEI-level rows or aggregates beyond the public-version rule.
 
 ### E6 status
 
@@ -212,11 +225,26 @@ E6 asks three things. The table says what the reads so far show.
 |---|---|
 | Does a statement restrict publishing aggregates or UEI-level rows derived from public subaward or public entity data? | None found in the reads above. The D&B limit covers D&B Open Data fields. UEI is not in that list, and the stage keeps none of those fields. |
 | Does a statement forbid the API access the two acquisition commands use? | None found. The terms name the extracts API as a permitted route. USAspending's live terms are unread. |
-| Does a statement forbid downloading the public extract, which carries name and address fields, for this use? | None found. **Interpretive point for the owner:** the D&B terms bar access to D&B Open Data "in bulk". The public extract carries those fields for records last updated before 2022-04-04. The stage never keeps, uses or publishes them. Whether downloading the extract at all is "access" is a reading, not a finding. |
+| Does a statement forbid downloading the public extract, which carries name and address fields, for this use? | None found. **Interpretive point for the owner:** the D&B terms bar access to D&B Open Data "in bulk". The public extract carries those fields for records last updated before 2022-04-04. The stage never keeps, uses or publishes them. Whether downloading the extract at all is "access" is a reading, not a finding. The owner decided it on 2026-11-19 (below). |
 
-Outstanding: the `sam.gov/data-services` statement and the live USAspending page. The
-design never marks E6 passed. Task 9 does not start until the owner closes both reads or
-waives them, and decides the interpretive point.
+**Owner close-out (2026-11-19).** The owner pasted the full SAM.gov Terms of Use (Step 4,
+item 5) and answered "Yes, close E6" to this question: close E6 with the Terms page as the
+controlling statement and accept the D&B reading? A yes records three things:
+
+1. The Terms page is the controlling statement on redistribution. It shows no restriction
+   on publishing UEI-level rows or aggregates, beyond sharing only data from public
+   versions of APIs. The stage uses the public extract only.
+2. The owner waives the separate `sam.gov/data-services` page and the live USAspending
+   terms page. The owner had already said not to open the USAspending page.
+3. The owner accepts downloading and holding the raw public extract under `data/`
+   (git-ignored, never shared) as consistent with the D&B terms. The reader keeps only the
+   registered positions, no D&B Open Data field enters any frame, table, report or printed
+   line, and no record last updated before 2022-04-04 gives an industry. The words of the
+   two texts differ (the explanation says "share", the legal language says "access, use or
+   disseminate"), and the owner's yes is the reading, not a finding.
+
+E6 is closed by the owner's decision. Tests, the reads and this record do not mark it
+passed. A later statement that meets an E6 stop condition reopens it.
 
 ### Step 5: Decision
 
