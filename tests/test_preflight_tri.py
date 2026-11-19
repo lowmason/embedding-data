@@ -302,7 +302,7 @@ def test_headers_prints_the_path_hash_and_record_count(script, capsys, home):
     report = run_headers(script, capsys, home)
     raw = home.data_dir / 'raw'
     for year, records in (('2022', 3), ('2023', 2), ('2024', 4)):
-        file = raw / f'epa_tri/basic/{year}/2025-11-05/tri_basic_{year}_US.csv'
+        file = raw / f'epa_tri/basic/{year}/2025-11-05/{year}_us.csv'
         assert report[year]['path'] == file.relative_to(home.data_dir).as_posix()
         assert report[year]['sha256'] == manifest.sha256_file(file)
         assert report[year]['records'] == records

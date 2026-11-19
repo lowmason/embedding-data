@@ -125,13 +125,25 @@ def test_parse_page_accepts_a_template_on_the_bare_epa_gov_host():
 def test_raw_layout_names_each_window_year_under_its_snapshot_date(tmp_path):
     assert (tri_raw.SOURCE, tri_raw.WINDOW) == ('epa_tri', (2022, 2023, 2024))
     assert [tri_raw.file_name(y) for y in (2022, 2023, 2024)] == [
-        'tri_basic_2022_US.csv', 'tri_basic_2023_US.csv', 'tri_basic_2024_US.csv']
+        '2022_us.csv', '2023_us.csv', '2024_us.csv']
     snapshot = tmp_path / 'raw' / 'epa_tri' / 'basic' / '2023' / '2025-11-05'
     assert tri_raw.snapshot_dir(tmp_path, 2023, RECORDED) == snapshot
-    assert tri_raw.raw_path(tmp_path, 2023, RECORDED) == snapshot / 'tri_basic_2023_US.csv'
+    assert tri_raw.raw_path(tmp_path, 2023, RECORDED) == snapshot / '2023_us.csv'
     for year in (2021, 2025):
         with pytest.raises(ValueError):
             tri_raw.file_name(year)
+
+
+def test_registered_names_are_the_file_names_that_epa_sends():
+    # EPA answers each download with `Content-Disposition: attachment; filename="<year>_us.csv"`.
+    assert [tri_raw.file_name(year) for year in tri_raw.WINDOW] == [
+        '2022_us.csv', '2023_us.csv', '2024_us.csv']
+
+
+@pytest.mark.parametrize('year', [0, 2021, 2025, 2026, -2023])
+def test_a_year_outside_the_window_has_no_registered_name(year):
+    with pytest.raises(ValueError):
+        tri_raw.file_name(year)
 
 
 def test_client_sends_the_recorded_user_agent_and_asks_for_identity():
@@ -376,12 +388,12 @@ def test_import_file_publishes_the_exact_bytes_under_the_snapshot_date(data_dire
     assert path == tri_raw.raw_path(data_directory, 2023, RECORDED)
     assert path.read_bytes() == original.read_bytes() == BODIES[2023]
     entry = manifest.entry_for(paths.manifest_path(data_directory), path)
-    assert entry.path == 'epa_tri/basic/2023/2025-11-05/tri_basic_2023_US.csv'
+    assert entry.path == 'epa_tri/basic/2023/2025-11-05/2023_us.csv'
     assert (entry.sha256, entry.size) == (manifest.sha256_file(original), len(BODIES[2023]))
     assert entry.client_version == version('embedding-data')
     assert_retrieved_now(entry)
     assert files_under(data_directory) == [
-        'raw/epa_tri/basic/2023/2025-11-05/tri_basic_2023_US.csv', 'raw/manifest.jsonl']
+        'raw/epa_tri/basic/2023/2025-11-05/2023_us.csv', 'raw/manifest.jsonl']
 
 
 def test_import_file_refuses_other_years_existing_paths_and_symlinks(data_directory, tmp_path):

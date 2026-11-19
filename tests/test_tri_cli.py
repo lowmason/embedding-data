@@ -47,7 +47,7 @@ def test_acquire_and_import_print_one_json_line(cli_runner, data_directory, monk
     assert acquired.exit_code == 0, acquired.output
     assert acquired.stderr == ''
     assert acquired.stdout == json.dumps([
-        f'raw/epa_tri/basic/{y}/2025-11-05/tri_basic_{y}_US.csv' for y in (2022, 2023, 2024)
+        f'raw/epa_tri/basic/{y}/2025-11-05/{y}_us.csv' for y in (2022, 2023, 2024)
     ]) + '\n'
 
     original = tmp_path / 'download (1).csv'
@@ -57,7 +57,7 @@ def test_acquire_and_import_print_one_json_line(cli_runner, data_directory, monk
     assert imported.exit_code == 0, imported.output
     assert imported.stderr == ''
     assert imported.stdout == (
-        json.dumps('raw/epa_tri/basic/2023/2026-06-01/tri_basic_2023_US.csv') + '\n')
+        json.dumps('raw/epa_tri/basic/2023/2026-06-01/2023_us.csv') + '\n')
 
 
 def test_import_failure_prints_only_the_fixed_line(cli_runner, data_directory, tmp_path):
@@ -167,4 +167,4 @@ def test_import_file_opens_no_connection(cli_runner, data_directory, monkeypatch
     result = cli_runner.invoke(app, import_arguments(original, data_directory))
     assert result.exit_code == 0, result.output
     assert result.stdout == (
-        json.dumps('raw/epa_tri/basic/2023/2025-11-05/tri_basic_2023_US.csv') + '\n')
+        json.dumps('raw/epa_tri/basic/2023/2025-11-05/2023_us.csv') + '\n')

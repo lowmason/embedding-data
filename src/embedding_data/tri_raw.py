@@ -149,12 +149,14 @@ def parse_page(html: str, page_url: str) -> Catalog:
 def file_name(year: int) -> str:
     '''The registered raw file name of a window year's U.S. file.
 
-    The owner chose this name (2026-11-18). EPA's download endpoint answers HEAD with an
-    error, so no file name that EPA sends was known when the name was registered.
+    This is the name that EPA gives the file: the download answers with
+    `Content-Disposition: attachment; filename="<year>_us.csv"`, and a browser saves it
+    under that name. It is not a name that this project invents. The registered name, not
+    the local name of an imported file, decides where a file is published.
     '''
     if year not in WINDOW:
         raise ValueError('reporting year outside the window')
-    return f'tri_basic_{year}_US.csv'
+    return f'{year}_us.csv'
 
 
 def snapshot_dir(data_dir: Path, year: int, processed_as_of: date) -> Path:
