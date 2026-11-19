@@ -31,7 +31,11 @@ from vendor_link_fixtures import (  # noqa: F401
 )
 
 from embedding_data import vendor_link_readers
-from embedding_data.vendor_link_readers import EXTRACT_SCHEMA, SUBAWARD_SCHEMA
+from embedding_data.vendor_link_readers import (
+    EXTRACT_SCHEMA,
+    SUBAWARD_SCHEMA,
+    UNREADABLE_SCHEMA,
+)
 
 LAYOUT = TEST_SUBAWARD_LAYOUTS[2024]
 MEMBER_1 = 'Contracts_Subawards_1.csv'
@@ -670,8 +674,12 @@ def test_extract_framing_and_field_count_failures(defect, tmp_path):
             content = archive.read(EXTRACT_MEMBER)
         file.write_bytes(zip_bytes({EXTRACT_MEMBER: content,
                                     'SAM_PUBLIC_UTF-8_MONTHLY_V2_20261103.dat': content}))
+    if defect in ('short_line', 'long_line'):
+        # Owner decision 2026-11-19: a line of the wrong field count is skipped, not refused.
+        frame = vendor_link_readers.read_extract(file, TEST_EXTRACT_LAYOUT)
+        assert frame['line'].to_list() == [2, 3]
+        return
     message = {'no_bof': 'missing extract framing', 'no_eof': 'missing extract framing',
-               'short_line': 'wrong field count', 'long_line': 'wrong field count',
                'no_record_end': 'missing record end',
                'second_member': 'unexpected extract member'}[defect]
     with exactly(message):
@@ -750,8 +758,9 @@ def test_the_framing_lines_start_with_their_prefixes(framing, tmp_path):
 
 
 def test_the_eof_line_must_be_the_last_line(tmp_path):
+    # The EOF line inside the data has one field, so it is skipped, and the last line fails.
     file = extract_file(tmp_path, [firm(1), EOF], eof=firm(2))
-    with exactly('wrong field count'):
+    with exactly('missing extract framing'):
         vendor_link_readers.read_extract(file, EXTRACT)
 
 
@@ -809,8 +818,9 @@ def test_extract_summary_counts_the_lines_and_shows_matching_framing(tmp_path):
              '|'.join(fields[:-1] + ['', fields[-1]]), '|'.join(fields[:-1] + [''])]
     summary = vendor_link_readers.extract_summary(extract_file(tmp_path, lines), EXTRACT)
     assert summary == {'member': EXTRACT_MEMBER, 'data_lines': 5,
-                       'field_counts': {40: 3, 39: 1, 41: 1}, 'bof_matches': True,
-                       'eof_matches': True, 'record_end_matches': 4, 'bof': BOF, 'eof': EOF}
+                       'field_counts': {40: 3, 39: 1, 41: 1}, 'unreadable_lines': 2,
+                       'bof_matches': True, 'eof_matches': True, 'record_end_matches': 4,
+                       'bof': BOF, 'eof': EOF}
 
 
 @pytest.mark.parametrize('framing', [
@@ -872,13 +882,14 @@ def test_the_extract_streams_line_by_line(tmp_path):
 
 
 @pytest.mark.parametrize('text, expected', [
-    ('', {'data_lines': 0, 'field_counts': {}, 'bof_matches': False, 'eof_matches': False,
-          'record_end_matches': 0}),
-    (BOF + '\r\n', {'data_lines': 0, 'field_counts': {}, 'bof_matches': True,
-                    'eof_matches': False, 'record_end_matches': 0, 'bof': BOF}),
-    (f'{BOF}\r\n{EOF}', {'data_lines': 0, 'field_counts': {}, 'bof_matches': True,
-                         'eof_matches': True, 'record_end_matches': 0, 'bof': BOF,
-                         'eof': EOF}),
+    ('', {'data_lines': 0, 'field_counts': {}, 'unreadable_lines': 0, 'bof_matches': False,
+          'eof_matches': False, 'record_end_matches': 0}),
+    (BOF + '\r\n', {'data_lines': 0, 'field_counts': {}, 'unreadable_lines': 0,
+                    'bof_matches': True, 'eof_matches': False, 'record_end_matches': 0,
+                    'bof': BOF}),
+    (f'{BOF}\r\n{EOF}', {'data_lines': 0, 'field_counts': {}, 'unreadable_lines': 0,
+                         'bof_matches': True, 'eof_matches': True, 'record_end_matches': 0,
+                         'bof': BOF, 'eof': EOF}),
 ], ids=['empty', 'bof_only', 'framing_only'])
 def test_extract_summary_of_a_short_member(text, expected, tmp_path):
     summary = vendor_link_readers.extract_summary(
@@ -893,3 +904,121 @@ def test_extract_summary_without_a_record_end(tmp_path):
         extract_file(tmp_path, lines, layout=layout), layout)
     assert summary['record_end_matches'] is None
     assert summary['field_counts'] == {40: 1}
+
+
+# ---- lines of the wrong field count (owner decision 2026-11-19: skip and count them)
+
+def widened(line, change):
+    '''`line` with `change` empty fields added before its last field, or `-change` fields
+    removed before it. The last field, the record end, stays last.'''
+    fields = line.split('|')
+    if change > 0:
+        fields[-1:-1] = [''] * change
+    else:
+        del fields[change - 1:-1]
+    return '|'.join(fields)
+
+
+@pytest.mark.parametrize('change', [-1, 1], ids=['short', 'long'])
+def test_a_line_of_the_wrong_field_count_is_skipped(change, tmp_path):
+    lines = [firm(1), widened(firm(9), change), firm(2)]
+    frame = vendor_link_readers.read_extract(extract_file(tmp_path, lines), EXTRACT)
+    assert frame.select('line', 'uei').rows() == [(2, 'FIRMA0000001'), (4, 'FIRMA0000002')]
+
+
+def test_short_and_long_lines_are_skipped_together(tmp_path):
+    lines = [firm(1), widened(firm(7), 2), firm(2), widened(firm(8), -1), widened(firm(9), 1),
+             firm(3)]
+    frame = vendor_link_readers.read_extract(extract_file(tmp_path, lines), EXTRACT)
+    assert frame.select('line', 'uei').rows() == [
+        (2, 'FIRMA0000001'), (4, 'FIRMA0000002'), (7, 'FIRMA0000003')]
+    assert DNB_SENTINEL not in frame.write_csv()
+
+
+@pytest.mark.parametrize('line', ['|'.join(firm(9).split('|')[:-1]), firm(9) + '|x'],
+                         ids=['short', 'long'])
+def test_a_line_of_the_wrong_field_count_is_skipped_without_a_record_end(line, tmp_path):
+    frame = vendor_link_readers.read_extract(extract_file(tmp_path, [firm(1), line, firm(2)]),
+                                             EXTRACT)
+    assert frame['line'].to_list() == [2, 4]
+
+
+def test_unreadable_extract_lines_lists_each_skipped_line(tmp_path):
+    lines = [firm(1), widened(firm(7, uei=' FIRMA0000007\t'), 2), firm(2),
+             widened(firm(8), -1), widened(firm(9), 1), firm(3)]
+    frame = vendor_link_readers.unreadable_extract_lines(extract_file(tmp_path, lines), EXTRACT)
+    assert list(UNREADABLE_SCHEMA.items()) == [('line', pl.Int64), ('uei', pl.String),
+                                               ('fields', pl.Int64)]
+    assert list(frame.schema.items()) == list(UNREADABLE_SCHEMA.items())
+    assert frame.rows() == [(3, ' FIRMA0000007\t', 42), (5, 'FIRMA0000008', 39),
+                            (6, 'FIRMA0000009', 41)]
+    assert DNB_SENTINEL not in frame.write_csv()
+
+
+def test_extract_summary_counts_each_unreadable_line(tmp_path):
+    lines = [firm(1), widened(firm(7), 1), widened(firm(8), 1), widened(firm(9), -1), firm(2)]
+    summary = vendor_link_readers.extract_summary(extract_file(tmp_path, lines), EXTRACT)
+    assert (summary['data_lines'], summary['field_counts'], summary['unreadable_lines']) == (
+        5, {40: 2, 41: 2, 39: 1}, 3)
+
+
+@pytest.mark.parametrize('lines', [[], [firm(1), firm(2)]], ids=['no_data_line', 'readable'])
+def test_unreadable_extract_lines_is_empty_when_every_line_is_readable(lines, tmp_path):
+    frame = vendor_link_readers.unreadable_extract_lines(extract_file(tmp_path, lines), EXTRACT)
+    assert frame.height == 0
+    assert list(frame.schema.items()) == list(UNREADABLE_SCHEMA.items())
+
+
+@pytest.mark.parametrize('position', [1, 3])
+def test_the_unreadable_uei_comes_from_the_registered_position(position, tmp_path):
+    layout = dataclasses.replace(EXTRACT, positions=EXTRACT.positions | {'uei': position})
+    line = widened(extract_line(layout, uei='FIRMA0000005', registration_status='A'), 1)
+    frame = vendor_link_readers.unreadable_extract_lines(
+        extract_file(tmp_path, [line], layout=layout), layout)
+    assert frame.rows() == [(2, 'FIRMA0000005', 41)]
+
+
+def test_a_line_shorter_than_the_uei_position_has_an_empty_uei(tmp_path):
+    lines = [firm(1), 'FIRMA0000004', 'FIRMA|FIRMA0000005', '', firm(2)]
+    file = extract_file(tmp_path, lines)
+    assert vendor_link_readers.unreadable_extract_lines(file, EXTRACT).rows() == [
+        (3, '', 1), (4, 'FIRMA0000005', 2), (5, '', 1)]
+    assert vendor_link_readers.read_extract(file, EXTRACT)['line'].to_list() == [2, 6]
+
+
+def test_unreadable_extract_lines_does_not_check_the_record_end(tmp_path):
+    lines = ['|'.join(firm(1).split('|')[:-1] + ['']), widened(firm(2), 1)]
+    frame = vendor_link_readers.unreadable_extract_lines(extract_file(tmp_path, lines), EXTRACT)
+    assert frame.rows() == [(3, 'FIRMA0000002', 41)]
+
+
+@pytest.mark.parametrize('case', list(EXTRACT_MEMBER_CASES))
+def test_unreadable_extract_lines_needs_exactly_one_fully_matching_member(case, tmp_path):
+    good = f'{BOF}\r\n{widened(firm(1), 1)}\r\n{EOF}'.encode()
+    members = {name: b'' if name.endswith('/') else good for name in EXTRACT_MEMBER_CASES[case]}
+    with exactly('unexpected extract member'):
+        vendor_link_readers.unreadable_extract_lines(raw_extract(tmp_path, members), EXTRACT)
+
+
+LONG_LINE = widened(firm(1), 1)
+
+
+@pytest.mark.parametrize('text', [
+    '', BOF, f'{BOF}\r\n{LONG_LINE}', f'{LONG_LINE}\r\n{EOF}',
+    f'X{BOF}\r\n{LONG_LINE}\r\n{EOF}', f'{BOF}\r\n{LONG_LINE}\r\nX{EOF}',
+    f'{EOF}\r\n{LONG_LINE}\r\n{BOF}',
+], ids=['empty', 'bof', 'no_eof', 'no_bof', 'bof_inside', 'eof_inside', 'swapped'])
+def test_unreadable_extract_lines_needs_the_framing_lines(text, tmp_path):
+    with exactly('missing extract framing'):
+        vendor_link_readers.unreadable_extract_lines(
+            raw_extract(tmp_path, {EXTRACT_MEMBER: text.encode()}), EXTRACT)
+
+
+def test_unreadable_extract_lines_streams_line_by_line(tmp_path):
+    fields = firm(1).split('|')
+    fields[19] = 'z' * 8_000
+    file = extract_file(tmp_path, [widened('|'.join(fields), 1)] * 1000)
+    peak, frame = peak_memory(lambda: vendor_link_readers.unreadable_extract_lines(file, EXTRACT))
+    assert frame.height == 1000
+    # The text is 8 MB.
+    assert peak < 2_000_000

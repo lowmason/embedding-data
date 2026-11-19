@@ -407,8 +407,8 @@ def test_headers_prints_each_year_and_the_extract_exactly(run, seeded, tmp_path)
         'path': f'raw/sam/entity-extract/public-monthly-v2/2026-11/{EXTRACT_ZIP}',
         'sha256': manifest.sha256_file(tmp_path / 'originals' / EXTRACT_ZIP),
         'member': EXTRACT_MEMBER, 'data_lines': 4, 'field_counts': {'40': 4},
-        'bof_matches': True, 'eof_matches': True, 'record_end_matches': 4, 'bof': BOF,
-        'eof': EOF,
+        'unreadable_lines': 0, 'bof_matches': True, 'eof_matches': True,
+        'record_end_matches': 4, 'bof': BOF, 'eof': EOF,
         'shapes': {
             'uei': [{'count': 4, 'shape': 'AAAAA9999999'}],
             'registration_status': [{'count': 4, 'shape': 'A'}],
@@ -745,17 +745,18 @@ def test_headers_stops_are_listed_by_rule_then_year(run, data_dir, tmp_path):
     assert_values_withheld(report_)
 
 
+# A line of the wrong field count is skipped (owner decision 2026-11-19), so it refuses
+# nothing. The missing record end, on a line of the field count, still refuses after one.
 FRAMING_CASES = {
-    'wrong field count': ([firm(P1, '541511'), firm(P2, '541512') + '|extra'], BOF,
-                          {'field_counts': {'40': 1, '41': 1}, 'record_end_matches': 1,
-                           'bof_matches': True, 'bof': BOF}),
-    'missing record end': ([firm(P1, '541511'), firm(P2, '541512').removesuffix('!end')],
-                           BOF,
-                           {'field_counts': {'40': 2}, 'record_end_matches': 1,
+    'missing record end': ([firm(P1, '541511'), firm(OTHER_2, '541511') + '|!end',
+                            firm(P2, '541512').removesuffix('!end')], BOF,
+                           {'data_lines': 3, 'field_counts': {'40': 2, '41': 1},
+                            'unreadable_lines': 1, 'record_end_matches': 2,
                             'bof_matches': True, 'bof': BOF}),
     'missing extract framing': ([firm(P1, '541511'), firm(P2, '541512')],
                                 'XOF FIXTURE V2 00000000 20261002',
-                                {'field_counts': {'40': 2}, 'record_end_matches': 2,
+                                {'data_lines': 2, 'field_counts': {'40': 2},
+                                 'unreadable_lines': 0, 'record_end_matches': 2,
                                  'bof_matches': False}),
 }
 
@@ -771,8 +772,8 @@ def test_headers_prints_the_summary_of_an_extract_that_the_build_refuses(
     assert extract == {
         'path': f'raw/sam/entity-extract/public-monthly-v2/2026-10/{OTHER_ZIP}',
         'sha256': manifest.sha256_file(tmp_path / 'custom' / OTHER_ZIP),
-        'member': OTHER_MEMBER, 'data_lines': 2, 'eof_matches': True, 'eof': EOF,
-        'shapes': None, 'tallies': None} | summary
+        'member': OTHER_MEMBER, 'eof_matches': True, 'eof': EOF, 'shapes': None,
+        'tallies': None} | summary
     status, out, err = invoke(['measure', *measure_args(raw, write_registry(tmp_path), codes)])
     assert (status, err, json.loads(out)) == (2, '', {'reason': message, 'refused': True})
 
@@ -1194,11 +1195,6 @@ def readme_member(data_dir, tmp_path, monkeypatch, script):
     return raw, None, None
 
 
-def extra_extract_field(data_dir, tmp_path, monkeypatch, script):
-    firms = window_firms() + [firm(OTHER_2, '541511') + '|' + DNB_SENTINEL]
-    return seed(data_dir, tmp_path, firms=firms), None, None
-
-
 def no_record_end(data_dir, tmp_path, monkeypatch, script):
     firms = window_firms() + [firm(OTHER_2, '541511').removesuffix('!end') + DNB_SENTINEL]
     return seed(data_dir, tmp_path, firms=firms), None, None
@@ -1270,7 +1266,6 @@ REFUSALS = [
     (subaward_not_utf8, MEASURE, 'subaward file is not UTF-8'),
     (unclosed_quote, BOTH, 'malformed subaward CSV'),
     (readme_member, MEASURE, 'unexpected ZIP member'),
-    (extra_extract_field, MEASURE, 'wrong field count'),
     (no_record_end, MEASURE, 'missing record end'),
     (no_bof, MEASURE, 'missing extract framing'),
     (other_extract_member, BOTH, 'unexpected extract member'),

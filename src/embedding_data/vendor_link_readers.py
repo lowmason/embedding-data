@@ -6,9 +6,13 @@ The reader checks the exact header and the width of every record, and writes onl
 mapped columns and a row digest to Parquet parts in scratch, never a full copy.
 
 The extract has one member, read line by line with no quote rules. The reader checks the BOF
-and EOF framing lines, the field count and the record end of every data line, and keeps only
-the registered positions. It writes nothing. No name, address or other D&B Open Data field
-enters a frame or a file. Each failed check raises a `ValueError` with a fixed message.
+and EOF framing lines and keeps only the registered positions of each data line of the
+layout's field count, whose last field must be the record end. A data line with another
+field count is skipped, not refused, because a `|` inside an unquoted text field splits it
+(owner decision, 2026-11-19). `unreadable_extract_lines` lists those lines with their UEI
+and field count only, so that the build counts them. The extract readers write nothing. No
+name, address or other D&B Open Data field enters a frame or a file. Each failed check
+raises a `ValueError` with a fixed message.
 '''
 
 import codecs
@@ -42,6 +46,7 @@ SUBAWARD_SCHEMA = {'file_year': pl.Int64, 'member': pl.String, 'record': pl.UInt
 EXTRACT_SCHEMA = {'line': pl.UInt64, 'uei': pl.String, 'registration_status': pl.String,
                   'last_update_date': pl.String, 'primary_naics': pl.String,
                   'naics_code_string': pl.String, 'evs_source': pl.String}
+UNREADABLE_SCHEMA = {'line': pl.Int64, 'uei': pl.String, 'fields': pl.Int64}
 BATCH_ROWS = 200_000
 FIELD_SIZE_LIMIT = 1 << 30
 
@@ -247,13 +252,13 @@ def _extract_text(file: Path, layout: ExtractLayout) -> Iterator[tuple[str, io.T
             yield info.filename, text
 
 
-def read_extract(file: Path, layout: ExtractLayout) -> pl.DataFrame:
-    '''The registered positions of every data line, as delivered, in `EXTRACT_SCHEMA`.
+def _data_lines(file: Path, layout: ExtractLayout) -> Iterator[tuple[int, list[str]]]:
+    '''Yield each data line's number and its fields, split at the delimiter.
 
-    `line` is the line number in the member, so the first data line is line 2. An unmapped
-    `evs_source` reads as empty text.
+    The first line must start with the BOF prefix, checked before the first data line, and
+    the last line with the EOF prefix, checked after the last data line. Either failure
+    raises `missing extract framing`.
     '''
-    columns = {name: [] for name in EXTRACT_SCHEMA}
     framed = False
     with _extract_text(file, layout) as (_, text):
         for kind, number, line in _framed(text):
@@ -265,26 +270,61 @@ def read_extract(file: Path, layout: ExtractLayout) -> pl.DataFrame:
                     raise ValueError('missing extract framing')
                 framed = True
             else:
-                fields = line.split(layout.delimiter)
-                if len(fields) != layout.field_count:
-                    raise ValueError('wrong field count')
-                if layout.record_end is not None and fields[-1] != layout.record_end:
-                    raise ValueError('missing record end')
-                columns['line'].append(number)
-                for field in EXTRACT_FIELDS:
-                    position = layout.positions[field]
-                    columns[field].append('' if position is None else fields[position - 1])
+                yield number, line.split(layout.delimiter)
     if not framed:
         raise ValueError('missing extract framing')
+
+
+def read_extract(file: Path, layout: ExtractLayout) -> pl.DataFrame:
+    '''The registered positions of every data line of the layout's field count, as
+    delivered, in `EXTRACT_SCHEMA`.
+
+    A data line with another field count is skipped: it gives no row and no error, and
+    `unreadable_extract_lines` lists it. A data line of the field count whose last field is
+    not the record end raises `missing record end`. `line` is the line number in the member,
+    so the first data line is line 2. An unmapped `evs_source` reads as empty text.
+    '''
+    columns = {name: [] for name in EXTRACT_SCHEMA}
+    for number, fields in _data_lines(file, layout):
+        if len(fields) != layout.field_count:
+            continue
+        if layout.record_end is not None and fields[-1] != layout.record_end:
+            raise ValueError('missing record end')
+        columns['line'].append(number)
+        for field in EXTRACT_FIELDS:
+            position = layout.positions[field]
+            columns[field].append('' if position is None else fields[position - 1])
     return pl.DataFrame(columns, schema=EXTRACT_SCHEMA)
+
+
+def unreadable_extract_lines(file: Path, layout: ExtractLayout) -> pl.DataFrame:
+    '''Each data line whose field count differs from the layout's, in `UNREADABLE_SCHEMA`
+    and in line order: its line number, its value at the registered UEI position as
+    delivered, and its field count.
+
+    The UEI position comes before every restricted position, so a line that a `|` inside a
+    later text field split still holds the UEI there. A line with fewer fields than that
+    position has an empty UEI. No other field is read, and the record end is not checked.
+    The member and framing checks are those of `read_extract`.
+    '''
+    position = layout.positions['uei']
+    columns = {name: [] for name in UNREADABLE_SCHEMA}
+    for number, fields in _data_lines(file, layout):
+        if len(fields) == layout.field_count:
+            continue
+        columns['line'].append(number)
+        columns['uei'].append(fields[position - 1] if len(fields) >= position else '')
+        columns['fields'].append(len(fields))
+    return pl.DataFrame(columns, schema=UNREADABLE_SCHEMA)
 
 
 def extract_summary(file: Path, layout: ExtractLayout) -> dict:
     '''Describe the extract's framing and field counts for the preflight, without values.
 
-    `record_end_matches` counts the data lines whose last field is the record end (None when
-    the layout names none). The BOF and EOF lines appear only when they match their prefix,
-    because a line that does not may be an entity record.
+    `unreadable_lines` counts the data lines whose field count differs from the layout's,
+    which the build skips. `record_end_matches` counts the data lines whose last field is
+    the record end (None when the layout names none). The BOF and EOF lines appear only when
+    they match their prefix, because a line that does not may be an entity record.
     '''
     counts = Counter()
     ends = 0
@@ -301,8 +341,10 @@ def extract_summary(file: Path, layout: ExtractLayout) -> dict:
                 ends += fields[-1] == layout.record_end
     bof_matches = first is not None and first.startswith(layout.bof_prefix)
     eof_matches = last is not None and last.startswith(layout.eof_prefix)
+    unreadable = sum(count for width, count in counts.items() if width != layout.field_count)
     summary = {'member': member, 'data_lines': sum(counts.values()),
-               'field_counts': dict(counts), 'bof_matches': bof_matches,
+               'field_counts': dict(counts), 'unreadable_lines': unreadable,
+               'bof_matches': bof_matches,
                'eof_matches': eof_matches,
                'record_end_matches': None if layout.record_end is None else ends}
     if bof_matches:
