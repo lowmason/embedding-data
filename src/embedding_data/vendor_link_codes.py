@@ -54,10 +54,10 @@ class SelectedNodes:
                 'outputs': self.outputs}
 
 
-def _read_object(directory: Path, name: str) -> dict:
-    value = json.loads(target_io.relative_file(directory, name).read_text())
+def _read_object(file: Path) -> dict:
+    value = json.loads(file.read_text())
     if not isinstance(value, dict):
-        raise ValueError(f'{name}: not a JSON object')
+        raise ValueError(f'{file.name}: not a JSON object')
     return value
 
 
@@ -71,7 +71,7 @@ def _check_versions(inputs: dict, report: dict, codes_run: str) -> None:
 
 
 def _node_ids(directory: Path, report: dict) -> frozenset[str]:
-    nodes = pl.scan_parquet(target_io.relative_file(directory, NODE_FILE))
+    nodes = pl.scan_parquet(directory / NODE_FILE)
     schema = nodes.collect_schema()
     if list(schema.items()) != list(NODE_SCHEMA.items()):
         raise ValueError(f'{NODE_FILE}: ordered schema differs')
@@ -99,13 +99,12 @@ def select_nodes(data_dir: Path, codes_run: str, *, codes_outputs_sha256: str) -
     if not PIN.fullmatch(codes_outputs_sha256):
         raise ValueError('invalid detached checksum')
     directory = target_io.relative_file(data_dir, f'derived/codes/{codes_run}')
-    if manifest.sha256_file(target_io.relative_file(directory, 'outputs.json')) != (
-            codes_outputs_sha256):
+    if manifest.sha256_file(directory / 'outputs.json') != codes_outputs_sha256:
         raise ValueError('detached inventory checksum differs')
-    outputs = _read_object(directory, 'outputs.json')
+    outputs = _read_object(directory / 'outputs.json')
     target_io.verify_inventory(directory, outputs, INVENTORY_NAMES)
-    inputs = _read_object(directory, 'inputs.json')
-    report = _read_object(directory, 'report.json')
+    inputs = _read_object(directory / 'inputs.json')
+    report = _read_object(directory / 'report.json')
     _check_versions(inputs, report, codes_run)
     return SelectedNodes(data_dir, codes_run, codes_outputs_sha256, outputs,
                          _node_ids(directory, report))

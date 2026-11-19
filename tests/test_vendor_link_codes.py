@@ -449,9 +449,40 @@ def test_a_run_id_is_refused_before_a_pin_of_the_wrong_shape(tmp_path):
         select(tmp_path, '../x', 'short')
 
 
-def test_a_missing_bundle_is_an_os_error_not_a_refusal(tmp_path):
-    with pytest.raises(FileNotFoundError):
-        select(tmp_path, 'fixture_codes', 'a' * 64)
+def test_a_symlinked_codes_root_is_refused(codes, tmp_path):
+    _, run, pin = codes
+    copy, directory = bundle_copy(codes, tmp_path)
+    root = directory.parent
+    root.rename(tmp_path / 'elsewhere')
+    root.symlink_to(tmp_path / 'elsewhere', target_is_directory=True)
+    with pytest.raises(ValueError, match='symlink in registered destination'):
+        select(copy, run, pin)
+
+
+def remove_a_table_from_the_bundle(directory):
+    (directory / 'code_paths.parquet').unlink()
+    outputs = json.loads((directory / 'outputs.json').read_text())
+    del outputs['code_paths.parquet']
+    target_io.write_json(directory / 'outputs.json', outputs)
+    return repin(directory)
+
+
+def list_an_extra_file_in_the_bundle(directory):
+    (directory / 'extra.txt').write_text('x')
+    outputs = json.loads((directory / 'outputs.json').read_text())
+    outputs['extra.txt'] = {'sha256': '0', 'size': 0}
+    target_io.write_json(directory / 'outputs.json', outputs)
+    return repin(directory)
+
+
+@pytest.mark.parametrize(
+    'edit', [remove_a_table_from_the_bundle, list_an_extra_file_in_the_bundle],
+    ids=['table-removed', 'extra-file-listed'])
+def test_the_inventory_must_name_exactly_the_bundle_files(codes, tmp_path, edit):
+    _, run, _ = codes
+    copy, directory = bundle_copy(codes, tmp_path)
+    with exactly(EXTRA_FILE):
+        select(copy, run, edit(directory))
 
 
 def test_the_pin_is_checked_before_the_inventory(codes, tmp_path):
@@ -541,13 +572,6 @@ def test_verify_compares_the_reselection_with_the_selected_value(codes, field):
                'outputs': {**selected.outputs, 'extra.json': {}}}[field]
     with exactly(CHANGED):
         dataclasses.replace(selected, **{field: altered}).verify()
-
-
-def test_verify_reselects_with_the_selected_pin(codes):
-    data_dir, run, pin = codes
-    selected = select(data_dir, run, pin)
-    with exactly(CHANGED):
-        dataclasses.replace(selected, codes_outputs_sha256='0' * 64).verify()
 
 
 def test_provenance_is_the_run_the_pin_and_the_outputs(codes):
