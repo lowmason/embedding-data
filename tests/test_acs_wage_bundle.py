@@ -554,11 +554,11 @@ def test_verify_refuses_a_rehashed_edit(chain):
     ('inputs.json', lambda inputs: inputs.update(note='extra'), 'recorded inputs are malformed'),
     ('inputs.json', lambda inputs: inputs.update(contract='acs-wage-microdata-v0'),
      'recorded contract differs'),
-    ('inputs.json', lambda inputs: inputs.pop('codes'), 'recorded inputs are malformed'),
+    ('inputs.json', lambda inputs: inputs.update(codes='stage4'), 'recorded inputs are malformed'),
     ('inputs.json', lambda inputs: inputs['mapping'].pop('outputs_sha256'),
      'recorded inputs are malformed'),
-], ids=['report_count', 'rules', 'ddi', 'no_labels', 'extra_field', 'contract', 'no_codes',
-        'no_mapping_pin'])
+], ids=['report_count', 'rules', 'ddi', 'no_labels', 'extra_field', 'contract',
+        'codes_not_an_object', 'no_mapping_pin'])
 def test_verify_refuses_a_rehashed_json_forgery(chain, file, mutate, message):
     directory = built(chain)
     edit_json(directory, file, mutate)
