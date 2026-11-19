@@ -13,6 +13,7 @@ import hashlib
 import io
 import json
 import re
+import tracemalloc
 import zipfile
 
 import polars as pl
@@ -328,6 +329,7 @@ def test_each_year_is_read_with_its_own_layout(tmp_path):
     assert rows['subaward_naics'].to_list() == ['541511', '541512', '']
     assert result.records == {2024: 1, 2025: 1, 2026: 1}
     assert result.members == {2024: (MEMBER_1,), 2025: (MEMBER_1,), 2026: (MEMBER_1,)}
+    assert list(result.records) == list(result.members) == list(result.bom) == [2024, 2025, 2026]
     other = tmp_path / 'other'
     other.mkdir()
     file = other / 'FY2026.zip'
@@ -750,10 +752,14 @@ def test_extract_summary_counts_the_lines_and_shows_matching_framing(tmp_path):
                        'eof_matches': True, 'record_end_matches': 4, 'bof': BOF, 'eof': EOF}
 
 
-@pytest.mark.parametrize('framing', [{'bof': 'bof'}, {'eof': 'eof'}, {'bof': 'bof', 'eof': 'eof'}],
-                         ids=['bof', 'eof', 'both'])
+@pytest.mark.parametrize('framing', [
+    {'bof': firm(8)},
+    {'eof': firm(9)},
+    {'bof': firm(8), 'eof': firm(9)},
+    {'bof': 'X' + BOF},
+    {'eof': 'X' + EOF},
+], ids=['bof', 'eof', 'both', 'bof_inside', 'eof_inside'])
 def test_extract_summary_hides_framing_lines_that_do_not_match(framing, tmp_path):
-    framing = {key: firm(8 if key == 'bof' else 9) for key in framing}
     summary = vendor_link_readers.extract_summary(
         extract_file(tmp_path, [firm(1)], **framing), EXTRACT)
     assert summary['bof_matches'] is ('bof' not in framing)
@@ -761,9 +767,42 @@ def test_extract_summary_hides_framing_lines_that_do_not_match(framing, tmp_path
     assert ('bof' in summary) is ('bof' not in framing)
     assert ('eof' in summary) is ('eof' not in framing)
     text = json.dumps(summary)
-    assert DNB_SENTINEL not in text and 'FIRMA0000008' not in text
-    assert 'FIRMA0000009' not in text
+    assert DNB_SENTINEL not in text
+    assert not any(value in text for value in framing.values())
     assert summary['data_lines'] == 1 and summary['field_counts'] == {40: 1}
+
+
+def peak_memory(read):
+    '''The peak traced Python memory, in bytes, while `read()` runs, and its result.'''
+    tracemalloc.start()
+    try:
+        result = read()
+        return tracemalloc.get_traced_memory()[1], result
+    finally:
+        tracemalloc.stop()
+
+
+def test_subaward_members_stream_without_holding_their_text(tmp_path):
+    filler = 'z' * 16_000
+    records = [record_of(n, cell_description=filler) for n in range(1, 1001)]
+    files = subaward_files(tmp_path, {2024: {MEMBER_1: records}})
+    peak, result = peak_memory(lambda: vendor_link_readers.read_subawards(
+        files, TEST_SUBAWARD_LAYOUTS, tmp_path / 'scratch'))
+    assert result.records == {2024: 1000}
+    # The text is 16 MB. Streaming measured 0.8 MB.
+    assert peak < 4_000_000
+
+
+def test_the_extract_streams_line_by_line(tmp_path):
+    fields = firm(1).split('|')
+    fields[19] = 'z' * 8_000
+    file = extract_file(tmp_path, ['|'.join(fields)] * 1000)
+    peak, frame = peak_memory(lambda: vendor_link_readers.read_extract(file, EXTRACT))
+    assert frame.height == 1000
+    summary_peak, summary = peak_memory(lambda: vendor_link_readers.extract_summary(file, EXTRACT))
+    assert summary['data_lines'] == 1000
+    # The text is 8 MB. Streaming measured 0.4 MB and 0.25 MB.
+    assert peak < 2_000_000 and summary_peak < 2_000_000
 
 
 @pytest.mark.parametrize('text, expected', [
