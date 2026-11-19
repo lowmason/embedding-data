@@ -486,6 +486,39 @@ def test_a_transport_error_is_replaced_by_the_fixed_error(tmp_path, monkeypatch)
     assert list(tmp_path.iterdir()) == []
 
 
+class InterruptedStream(httpx.SyncByteStream):
+    '''A body that delivers `first`, then stops as a Ctrl-C would.'''
+
+    def __init__(self, first):
+        self.first = first
+
+    def __iter__(self):
+        yield self.first
+        raise KeyboardInterrupt
+
+
+def test_an_interrupted_download_removes_its_part_and_raises_the_fixed_error(tmp_path,
+                                                                             monkeypatch):
+    before = logging.root.manager.disable
+    body = sample_extract()
+    headers = {'Content-Length': str(len(body)),
+               'Content-Disposition': f'attachment; filename="{EXTRACT_NAME}"'}
+    install_sam(monkeypatch, lambda request: httpx.Response(
+        200, headers=headers, stream=InterruptedStream(body[:64])))
+    # Small chunks, so the .part exists and holds bytes before the interrupt.
+    monkeypatch.setattr(sam_access, 'CHUNK_SIZE', 16)
+    partial = tmp_path / 'download.part'
+    # BaseException: under a wrong version the interrupt escapes, and this must still fail
+    # the test rather than stop the session.
+    with pytest.raises(BaseException) as error:
+        sam_access.fetch_extract(URL, FAKE_KEY, partial)
+    assert error.type is ValueError
+    assert str(error.value) == FAILED
+    assert error.value.__cause__ is None and error.value.__context__ is None
+    assert list(tmp_path.iterdir()) == []
+    assert logging.root.manager.disable == before
+
+
 def test_transport_error_line_holds_no_key(cli_runner, data_directory, monkeypatch, caplog):
     caplog.set_level(logging.DEBUG)
 

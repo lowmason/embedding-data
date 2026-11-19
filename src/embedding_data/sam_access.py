@@ -188,8 +188,8 @@ def fetch_extract(url: str, credential: str, partial: Path) -> str:
     and return the delivered file name.
 
     The key is added only to the first wire URL. A redirect is fetched once, with no key,
-    by a new client. Any failure removes `partial` if this call created it and raises one
-    fixed error with no chained exception.
+    by a new client. Any failure, an interrupt included, removes `partial` if this call
+    created it and raises one fixed error with no chained exception.
     '''
     failed = False
     created = False
@@ -219,7 +219,8 @@ def fetch_extract(url: str, credential: str, partial: Path) -> str:
                 raise ValueError('extract length differs from Content-Length')
             if not zipfile.is_zipfile(partial):
                 raise ValueError('extract is not a ZIP file')
-        except Exception:
+        except BaseException:
+            # BaseException too: a Ctrl-C mid-download must not leave the `.part` behind.
             failed = True
     # Raised after the handler, so no chained exception keeps the wire URL or a body.
     if failed:
