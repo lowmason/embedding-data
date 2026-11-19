@@ -9,9 +9,10 @@ counts are the ones the build will see, and prints E4, E5 and the spec's stops a
 
 Both commands print one sorted JSON object. They exit 0 when no stop holds, 1 when one
 does and 2 on a refusal. Output holds counts, shares, header cells, value shapes and tallies
-of coded values, never a UEI, a name, an address, an amount or any other row value. A guard
-holds this structurally: `headers` prints a year's header cells only when they are
-lower-case names, and withholding them is a stop. A refusal prints a fixed reason and never
+of coded values, never a UEI, a name, an address, an amount or any other row value. Two
+guards hold this structurally: `headers` prints a year's header cells only when they are
+lower-case names, and a tally whose values do not look coded is replaced by its number of
+distinct values. Either withholding is a stop. A refusal prints a fixed reason and never
 exception text. The script loads no `.env`, reads no key, opens no HTTP client and runs no
 upstream builder. `measure` reads in a temporary directory outside the data root, and
 neither command writes under the data root.
@@ -22,7 +23,7 @@ import json
 import re
 import sys
 import tempfile
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from datetime import date
 from pathlib import Path
@@ -55,8 +56,14 @@ STOP_FIELDS = ('prime_uei', 'sub_uei', 'action_date')
 ASK_FIELDS = ('subaward_type', 'amount')
 SHAPED_FIELDS = ('action_date', 'amount')
 TALLIED_FIELDS = ('registration_status', 'evs_source')
+# The tallies of delivered extract values in the E5 extract counts. Its other tallies count
+# fixed statuses or the years and months of parsed dates.
+EXTRACT_TALLIES = ('by_registration_status', 'evs_source')
 # A delivered header cell is a lower-case snake_case name. A UEI, an amount or a date is not.
 HEADER_NAME = re.compile(r'[a-z][a-z0-9_]*')
+# A tally of a coded field has few distinct values, and each is short.
+TALLY_VALUES = 25
+TALLY_LENGTH = 40
 # The fixed messages of the raw-file selectors and the readers. A refusal prints one of
 # these or the fixed reason of the step that failed, never other exception text.
 MESSAGES = frozenset({
@@ -101,6 +108,24 @@ def tally(frame: pl.DataFrame, column: str) -> dict[str, int]:
     '''The count of each delivered value of `column`.'''
     counts = frame.group_by(column).agg(pl.len())
     return {value: int(count) for value, count in counts.iter_rows()}
+
+
+def coded(counts: dict[str, int]) -> bool:
+    '''Whether a tally looks like one of a coded field: at most `TALLY_VALUES` distinct
+    values, each at most `TALLY_LENGTH` characters long.'''
+    return len(counts) <= TALLY_VALUES and all(len(value) <= TALLY_LENGTH for value in counts)
+
+
+def guard(tallies: dict | None, keys: Iterable[str], name: str) -> list[str]:
+    '''Replace each tally of `tallies` under `keys` that does not look coded by its number of
+    distinct values, and return the stop `<name>_not_coded` when one was replaced.'''
+    replaced = False
+    for key in keys if tallies is not None else ():
+        counts = tallies[key]
+        if counts is not None and not coded(counts):
+            tallies[key] = {'too_many_values': len(counts)}
+            replaced = True
+    return [f'{name}_not_coded'] if replaced else []
 
 
 def hints(header: list[str]) -> dict[str, list[str]]:
@@ -176,6 +201,8 @@ def headers(options: argparse.Namespace) -> dict:
              if described['header_mismatch']]
     stops += [f'headers_not_names_{year}' for year, described in subawards.items()
               if described['header_not_names']]
+    for field in TALLIED_FIELDS:
+        stops += guard(extract['tallies'], [field], field)
     return {'subawards': subawards, 'extract': extract, 'stops': stops}
 
 
@@ -259,6 +286,10 @@ def evaluate(read: vendor_link_readers.SubawardRead, extract: pl.DataFrame,
     except ValueError:
         other_types = True
     stops = measure_stops(layouts, malformed)
+    # One stop for the types of all years: each year's tally shows where it holds.
+    stops += guard(e4['subaward_types'], [str(year) for year in WINDOW], 'subaward_types')
+    for key in EXTRACT_TALLIES:
+        stops += guard(e5['extract'], [key], key)
     return {'e4': e4, 'e5': e5, 'stops': stops,
             'asks': measure_asks(layouts, e5, other_types), 'ok': not stops}
 

@@ -674,6 +674,77 @@ def test_an_unmapped_evs_source_has_no_shapes_and_no_tally(run, data_dir, tmp_pa
     assert extract['tallies'] == {'registration_status': {'A': 1}, 'evs_source': None}
 
 
+# The sides of the tally guard: the number of distinct values (with the delivered one) and
+# the length of each made-up value.
+TALLY_SIDES = {'25 values': (25, 12), '26 values': (26, 12), '40 characters': (2, 40),
+               '41 characters': (2, 41)}
+PRINTED_SIDES = ['25 values', '40 characters']
+REPLACED_SIDES = ['26 values', '41 characters']
+# The delivered value of each extract tally on the four window firms.
+EXTRACT_TALLIES = {'registration_status': 'A', 'evs_source': 'SAM'}
+
+
+def made_up(side):
+    '''The made-up values beside the one delivered value. Each holds a non-ASCII letter, so
+    that its length in characters is one less than its length in UTF-8 bytes.'''
+    distinct, length = TALLY_SIDES[side]
+    return [f'TALLYVALUÉ{index:02d}'.ljust(length, 'X') for index in range(1, distinct)]
+
+
+def tally_firms(field, values):
+    '''The window firms and one made-up firm for each value of the extract `field`.'''
+    argument = {'registration_status': 'status', 'evs_source': 'evs'}[field]
+    return window_firms() + [firm(f'TALLY{index:07d}', '541511', **{argument: value})
+                             for index, value in enumerate(values, 1)]
+
+
+def assert_values_withheld(report_):
+    assert 'TALLYVALU' not in json.dumps(report_)
+
+
+@pytest.mark.parametrize('side', PRINTED_SIDES)
+@pytest.mark.parametrize('field', list(EXTRACT_TALLIES))
+def test_headers_prints_an_extract_tally_of_few_short_values(field, side, run, data_dir,
+                                                             tmp_path):
+    values = made_up(side)
+    raw = seed(data_dir, tmp_path, firms=tally_firms(field, values))
+    report_ = run(['headers', *raw])
+    assert report_['extract']['tallies'][field] == (
+        {EXTRACT_TALLIES[field]: 4} | dict.fromkeys(values, 1))
+    assert report_['stops'] == []
+
+
+@pytest.mark.parametrize('side', REPLACED_SIDES)
+@pytest.mark.parametrize('field', list(EXTRACT_TALLIES))
+def test_headers_replaces_an_extract_tally_of_many_or_long_values(field, side, run, data_dir,
+                                                                  tmp_path):
+    values = made_up(side)
+    raw = seed(data_dir, tmp_path, firms=tally_firms(field, values))
+    report_ = run(['headers', *raw], code=1)
+    other = next(name for name in EXTRACT_TALLIES if name != field)
+    assert report_['extract']['tallies'] == {
+        field: {'too_many_values': len(values) + 1},
+        other: {EXTRACT_TALLIES[other]: 4 + len(values)}}
+    assert report_['stops'] == [f'{field}_not_coded']
+    assert_values_withheld(report_)
+
+
+def test_headers_stops_are_listed_by_rule_then_year(run, data_dir, tmp_path):
+    # 2026: members whose names differ; 2024: a data row as the only header; and both
+    # extract tallies hold a long value
+    long = made_up('41 characters')[0]
+    firms = window_firms() + [firm('TALLY0000001', '541511', status=long, evs=long)]
+    raw = seed(data_dir, tmp_path, years={2024: None, 2026: None}, firms=firms)
+    import_subawards(data_dir, tmp_path, 2026, {
+        MEMBER: csv_bytes([zq_header('zqcell_alpha')]),
+        MEMBER_2: csv_bytes([zq_header('zqcell_beta')])})
+    import_subawards(data_dir, tmp_path, 2024, {MEMBER: csv_bytes([[S2, '5511.42']])})
+    report_ = run(['headers', *raw], code=1)
+    assert report_['stops'] == ['headers_differ_2026', 'headers_not_names_2024',
+                                'registration_status_not_coded', 'evs_source_not_coded']
+    assert_values_withheld(report_)
+
+
 FRAMING_CASES = {
     'wrong field count': ([firm(P1, '541511'), firm(P2, '541512') + '|extra'], BOF,
                           {'field_counts': {'40': 1, '41': 1}, 'record_end_matches': 1,
@@ -802,6 +873,101 @@ def test_measure_asks_about_an_unmapped_amount_column(run, seeded, tmp_path, cod
     registry = write_registry(tmp_path, draft((2025, 'amount')))
     report_ = run(['measure', *measure_args(seeded, registry, codes)])
     assert (report_['stops'], report_['asks']) == ([], ['no_amount_2025'])
+
+
+# The delivered value of each `measure` tally and its count in the seeded window: FY2024
+# types in E4, and the extract tallies in E5.
+MEASURED_TALLIES = {'subaward_types': ('sub-contract', 5), 'by_registration_status': ('A', 4),
+                    'evs_source': ('SAM', 4)}
+
+
+def measured_tally(report_, name):
+    if name == 'subaward_types':
+        return report_['e4']['subaward_types']['2024']
+    return report_['e5']['extract'][name]
+
+
+def seed_tally(data_dir, tmp_path, name, values):
+    '''Seed the window with one more FY2024 report or one more firm for each made-up value.'''
+    if name == 'subaward_types':
+        return seed(data_dir, tmp_path, reports=window_reports() + [
+            report(P1, S1, '2024-06-01', subaward_type=value) for value in values])
+    return seed(data_dir, tmp_path, firms=tally_firms(name.removeprefix('by_'), values))
+
+
+@pytest.mark.parametrize('side', PRINTED_SIDES)
+@pytest.mark.parametrize('name', list(MEASURED_TALLIES))
+def test_measure_prints_a_tally_of_few_short_values(name, side, run, data_dir, tmp_path,
+                                                    codes):
+    values = made_up(side)
+    raw = seed_tally(data_dir, tmp_path, name, values)
+    report_ = run(['measure', *measure_args(raw, write_registry(tmp_path), codes)])
+    delivered, count = MEASURED_TALLIES[name]
+    assert measured_tally(report_, name) == {delivered: count} | dict.fromkeys(values, 1)
+    assert (report_['stops'], report_['ok']) == ([], True)
+
+
+@pytest.mark.parametrize('side', REPLACED_SIDES)
+@pytest.mark.parametrize('name', list(MEASURED_TALLIES))
+def test_measure_replaces_a_tally_of_many_or_long_values(name, side, run, data_dir, tmp_path,
+                                                         codes):
+    values = made_up(side)
+    raw = seed_tally(data_dir, tmp_path, name, values)
+    report_ = run(['measure', *measure_args(raw, write_registry(tmp_path), codes)], code=1)
+    assert measured_tally(report_, name) == {'too_many_values': len(values) + 1}
+    assert (report_['stops'], report_['ok']) == ([f'{name}_not_coded'], False)
+    assert_values_withheld(report_)
+
+
+# Each year's reports in `seed`, and a date in each year's format.
+YEAR_REPORTS = {2024: (window_reports, '2024-06-01'),
+                2025: (lambda: [report(P1, S1, '2024/12/01', '310.00', year=2025)],
+                       '2024/12/01'),
+                2026: (list, '2026-01-05')}
+SEEDED_TYPES = {'2024': {'sub-contract': 5}, '2025': {'sub-contract': 1}, '2026': {}}
+
+
+def with_long_type(year):
+    '''The seeded reports of `year` and one more whose type is 41 characters long.'''
+    reports, action = YEAR_REPORTS[year]
+    long = made_up('41 characters')[0]
+    return {MEMBER: reports() + [report(P1, S1, action, year=year, subaward_type=long)]}
+
+
+@pytest.mark.parametrize('year', WINDOW)
+def test_the_subaward_types_of_each_year_are_guarded(year, run, data_dir, tmp_path, codes):
+    raw = seed(data_dir, tmp_path, years={year: with_long_type(year)})
+    report_ = run(['measure', *measure_args(raw, write_registry(tmp_path), codes)], code=1)
+    distinct = len(SEEDED_TYPES[str(year)]) + 1
+    assert report_['e4']['subaward_types'] == SEEDED_TYPES | {
+        str(year): {'too_many_values': distinct}}
+    assert report_['stops'] == ['subaward_types_not_coded']
+    assert_values_withheld(report_)
+
+
+def test_subaward_types_not_coded_in_two_years_are_one_stop(run, data_dir, tmp_path, codes):
+    raw = seed(data_dir, tmp_path, years={2024: with_long_type(2024),
+                                          2026: with_long_type(2026)})
+    report_ = run(['measure', *measure_args(raw, write_registry(tmp_path), codes)], code=1)
+    assert report_['e4']['subaward_types'] == {'2024': {'too_many_values': 2},
+                                               '2025': {'sub-contract': 1},
+                                               '2026': {'too_many_values': 1}}
+    assert report_['stops'] == ['subaward_types_not_coded']
+
+
+def test_tally_stops_follow_the_spec_stops_also_without_firm_counts(run, data_dir, tmp_path,
+                                                                    codes):
+    long = made_up('41 characters')[0]
+    firms = window_firms({P1: '54151A'}) + [firm('TALLY0000001', '541511', status=long,
+                                                 evs=long)]
+    raw = seed(data_dir, tmp_path, years={2024: with_long_type(2024)}, firms=firms)
+    report_ = run(['measure', *measure_args(raw, write_registry(tmp_path), codes)], code=1)
+    assert sorted(report_['e5']) == ['extract', 'malformed']
+    assert report_['e5']['extract']['by_registration_status'] == {'too_many_values': 2}
+    assert report_['e5']['extract']['evs_source'] == {'too_many_values': 2}
+    assert report_['stops'] == ['malformed_read_codes', 'subaward_types_not_coded',
+                                'by_registration_status_not_coded', 'evs_source_not_coded']
+    assert_values_withheld(report_)
 
 
 # ---- stop and ask rules
