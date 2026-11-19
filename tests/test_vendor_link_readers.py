@@ -685,6 +685,7 @@ EXTRACT_MEMBER_CASES = {
     'other_name': ('readme.txt',),
     'two_matching': (EXTRACT_MEMBER, 'SAM_PUBLIC_UTF-8_MONTHLY_V2_20261103.dat'),
     'and_a_folder': ('folder/', EXTRACT_MEMBER),
+    'v3': ('SAM_PUBLIC_UTF-8_MONTHLY_V3_20261102.dat',),
 }
 
 
@@ -737,8 +738,12 @@ def test_a_quote_is_literal_text(tmp_path):
     {'bof': BOF.replace('00000000 ', '00000000', 1)},
     {'eof': 'X' + EOF},
     {'eof': EOF.lower()},
+    {'eof': EOF.replace('00000000 ', '00000000', 1)},
     {'bof': EOF, 'eof': BOF},
-], ids=['bof_inside', 'bof_case', 'bof_without_space', 'eof_inside', 'eof_case', 'swapped'])
+    {'bof': BOF.replace(' V2 ', ' V3 ')},
+    {'eof': EOF.replace(' V2 ', ' V3 ')},
+], ids=['bof_inside', 'bof_case', 'bof_without_space', 'eof_inside', 'eof_case',
+        'eof_without_space', 'swapped', 'bof_v3', 'eof_v3'])
 def test_the_framing_lines_start_with_their_prefixes(framing, tmp_path):
     with exactly('missing extract framing'):
         vendor_link_readers.read_extract(extract_file(tmp_path, [firm(1)], **framing), EXTRACT)
@@ -814,7 +819,12 @@ def test_extract_summary_counts_the_lines_and_shows_matching_framing(tmp_path):
     {'bof': firm(8), 'eof': firm(9)},
     {'bof': 'X' + BOF},
     {'eof': 'X' + EOF},
-], ids=['bof', 'eof', 'both', 'bof_inside', 'eof_inside'])
+    {'bof': BOF.replace('00000000 ', '00000000', 1)},
+    {'eof': EOF.replace('00000000 ', '00000000', 1)},
+    {'bof': BOF.replace(' V2 ', ' V3 ')},
+    {'eof': EOF.replace(' V2 ', ' V3 ')},
+], ids=['bof', 'eof', 'both', 'bof_inside', 'eof_inside', 'bof_without_space',
+        'eof_without_space', 'bof_v3', 'eof_v3'])
 def test_extract_summary_hides_framing_lines_that_do_not_match(framing, tmp_path):
     summary = vendor_link_readers.extract_summary(
         extract_file(tmp_path, [firm(1)], **framing), EXTRACT)
