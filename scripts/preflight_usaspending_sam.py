@@ -10,9 +10,11 @@ counts are the ones the build will see, and prints E4, E5 and the spec's stops a
 Both commands print one sorted JSON object. They exit 0 when no stop holds, 1 when one
 does and 2 on a refusal. Output holds counts, shares, header cells, value shapes and tallies
 of coded values, never a UEI, a name, an address, an amount or any other row value. Two
-guards hold this structurally: `headers` prints a year's header cells only when they are
-lower-case names, and a tally whose values do not look coded is replaced by its number of
-distinct values. Either withholding is a stop. A refusal prints a fixed reason and never
+guards hold this structurally: `headers` prints a year's header cells only when each is a
+name (a letter, then letters, digits, `_` or `-`), and a tally whose values do not look
+coded is replaced by its number of distinct values. Either withholding is a stop. An extract
+line that the build skips for its field count appears only in counts, and its values reach
+no shape or tally. A refusal prints a fixed reason and never
 exception text. The script loads no `.env`, reads no key, opens no HTTP client and runs no
 upstream builder. `measure` reads in a temporary directory outside the data root, and
 neither command writes under the data root.
@@ -59,8 +61,10 @@ TALLIED_FIELDS = ('registration_status', 'evs_source')
 # The tallies of delivered extract values in the E5 extract counts. Its other tallies count
 # fixed statuses or the years and months of parsed dates.
 EXTRACT_TALLIES = ('by_registration_status', 'evs_source')
-# A delivered header cell is a lower-case snake_case name. A UEI, an amount or a date is not.
-HEADER_NAME = re.compile(r'[a-z][a-z0-9_]*')
+# A delivered header cell is a name: a letter, then letters, digits, `_` or `-`. Four real
+# cells carry an upper-case token and a hyphen with digits. A blank cell, an amount, a date
+# and a value with a space, a slash or a dot are not names.
+HEADER_NAME = re.compile(r'[A-Za-z][A-Za-z0-9_-]*')
 # A tally of a coded field has few distinct values, and each is short.
 TALLY_VALUES = 25
 TALLY_LENGTH = 40
@@ -70,10 +74,9 @@ MESSAGES = frozenset({
     'missing or extra raw file', 'raw file is not recorded', 'raw file changed',
     'month is not YYYY-MM', 'unexpected ZIP member', 'changed header',
     'ragged subaward record', 'subaward file is not UTF-8', 'malformed subaward CSV',
-    'unexpected extract member', 'missing extract framing', 'wrong field count',
-    'missing record end'})
+    'unexpected extract member', 'missing extract framing', 'missing record end'})
 # The extract reader's refusals that the extract summary already shows.
-FRAMING = frozenset({'missing extract framing', 'wrong field count', 'missing record end'})
+FRAMING = frozenset({'missing extract framing', 'missing record end'})
 
 
 class Refused(Exception):
@@ -143,15 +146,15 @@ def relative(data_dir: Path, file: Path) -> str:
 # ---- headers
 
 def names(header: list[str] | None) -> bool:
-    '''Whether every cell of a member's first record is a lower-case name. An empty member
-    has no first record to print.'''
+    '''Whether every cell of a member's first record is a name. An empty member has no
+    first record to print.'''
     return header is None or all(HEADER_NAME.fullmatch(cell) for cell in header)
 
 
 def describe_year(data_dir: Path, file: Path) -> dict:
     '''A year's file and members. The header cells and hints appear only when every member
-    has the same first record and its cells are lower-case names, because a member without
-    a header row would put a data row in their place.'''
+    has the same first record and its cells are names, because a member without a header
+    row would put a data row in their place.'''
     with step('subaward file is unreadable'):
         members = vendor_link_readers.subaward_headers(file)['members']
     first = members[0]['header'] if members else None
@@ -240,13 +243,16 @@ def measure_asks(layouts: dict[int, vendor_link_layouts.SubawardLayout], e5: dic
 
 
 def evaluate(read: vendor_link_readers.SubawardRead, extract: pl.DataFrame,
+             unreadable: pl.DataFrame,
              layouts: dict[int, vendor_link_layouts.SubawardLayout],
              layout: vendor_link_layouts.ExtractLayout, node_ids: frozenset[str]) -> dict:
     '''E4 and E5 through the build's functions, and the stops and asks.
 
-    A malformed code on a read firm makes `firms` raise, so then the firm table is empty
-    and only the counts that do not depend on it are printed. The pair tally is never
-    printed, so the pair table is always empty.
+    `unreadable` holds the extract lines that the reader skipped for their field count, and
+    the one `report_counts` call counts them in both branches. A malformed code on a read
+    firm makes `firms` raise, so then the firm table is empty and only the counts that do
+    not depend on it are printed. The pair tally is never printed, so the pair table is
+    always empty.
     '''
     reported = vendor_link_pairs.reports(read.rows, layouts)
     usable = reported.filter(pl.col('report_status') == 'usable')
@@ -259,7 +265,7 @@ def evaluate(read: vendor_link_readers.SubawardRead, extract: pl.DataFrame,
         e5_keys = ('firms', 'join_coverage', 'trigger', 'extract')
     pair_table = pl.DataFrame(schema=vendor_link_pairs.PAIR_SCHEMA)
     counts = vendor_link_pairs.report_counts(reported, firm_table, pair_table, extract,
-                                             layouts, layout, node_ids)
+                                             layouts, layout, node_ids, unreadable)
 
     def in_year(year: int) -> pl.LazyFrame:
         return read.rows.filter(pl.col('file_year') == year)
@@ -316,7 +322,8 @@ def measure(options: argparse.Namespace) -> dict:
             read = vendor_link_readers.read_subawards(files, layouts, Path(scratch))
         with step('extract is unreadable', not_utf8='extract is not UTF-8'):
             extract = vendor_link_readers.read_extract(extract_file, layout)
-        return evaluate(read, extract, layouts, layout, nodes.node_ids)
+            unreadable = vendor_link_readers.unreadable_extract_lines(extract_file, layout)
+        return evaluate(read, extract, unreadable, layouts, layout, nodes.node_ids)
 
 
 COMMANDS = {'headers': headers, 'measure': measure}

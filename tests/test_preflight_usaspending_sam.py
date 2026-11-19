@@ -268,15 +268,16 @@ def build_counts(data_dir, layouts, codes, scratch):
     _, run_id, pin = codes
     node_ids = vendor_link_codes.select_nodes(data_dir, run_id, codes_outputs_sha256=pin).node_ids
     files = usaspending_raw.select_files(data_dir, SNAPSHOT)
-    extract = vendor_link_readers.read_extract(sam_raw.select_extract(data_dir, MONTH),
-                                               TEST_EXTRACT_LAYOUT)
+    extract_file = sam_raw.select_extract(data_dir, MONTH)
+    extract = vendor_link_readers.read_extract(extract_file, TEST_EXTRACT_LAYOUT)
+    unreadable = vendor_link_readers.unreadable_extract_lines(extract_file, TEST_EXTRACT_LAYOUT)
     rows = vendor_link_readers.read_subawards(files, layouts, scratch).rows
     reported = vendor_link_pairs.reports(rows, layouts)
     usable = reported.filter(pl.col('report_status') == 'usable')
     firms = vendor_link_pairs.firms(usable, extract, TEST_EXTRACT_LAYOUT, node_ids)
     pairs = vendor_link_pairs.pairs(usable, firms)
     counts = vendor_link_pairs.report_counts(reported, firms, pairs, extract, layouts,
-                                             TEST_EXTRACT_LAYOUT, node_ids)
+                                             TEST_EXTRACT_LAYOUT, node_ids, unreadable)
     return json.loads(json.dumps(counts))
 
 
@@ -448,16 +449,15 @@ def assert_cells_withheld(text, *headers):
             assert not cell or json.dumps(cell)[1:-1] not in text
 
 
-# Cells that are not lower-case snake_case names: an upper-case letter first or last, a
-# digit or `_` first, a `-`, a space or a non-ASCII letter inside, an empty cell, a trailing
-# line break, and the UEI, amount and date of a data row.
-NOT_NAMES = ['Zqcell', 'zqcelL', '1zqcell', '_zqcell', 'zq-cell', 'zq cell', '', 'zqcellé',
-             'zqcell\n', 'PRIME0000001', '4817.23', '2024-03-01']
+# Cells that are not names: a digit, `_` or `-` first, a space, a slash, a dot or a
+# non-ASCII letter inside, a blank or an empty cell, a trailing line break, and the amount
+# and date of a data row.
+NOT_NAMES = ['1zqcell', '_zqcell', '-zqcell', 'zq cell', 'zq/cell', 'zq.cell', 'zqcellé',
+             '   ', '', 'zqcell\n', '4817.23', '2024-03-01']
 
 
 @pytest.mark.parametrize('cell', NOT_NAMES, ids=[repr(cell) for cell in NOT_NAMES])
-def test_a_header_cell_that_is_not_a_lower_case_name_withholds_the_year(cell, run, data_dir,
-                                                                        tmp_path):
+def test_a_header_cell_that_is_not_a_name_withholds_the_year(cell, run, data_dir, tmp_path):
     raw = seed(data_dir, tmp_path, years={2025: None})
     import_subawards(data_dir, tmp_path, 2025, {
         MEMBER: csv_bytes([zq_header(cell), report(P1, S1, '2024-12-01', year=2025)])})
@@ -485,6 +485,50 @@ def test_a_lower_case_name_with_digits_and_underscores_is_printed(cell, run, dat
     assert (report_['subawards']['2025']['header_not_names'],
             report_['subawards']['2025']['hints'], report_['stops']) == (
         False, expected_hints(0), [])
+
+
+# Names beyond lower-case snake_case: an upper-case letter first, inside, last or alone, a
+# hyphen inside or last, and the shape of the real cells that carry an upper-case token and a
+# hyphen with digits.
+NAMES = ['Zqcell', 'zqcelL', 'ZQCELL', 'Z', 'zq-cell', 'zqcell-', 'prime_award_AAAAA-99_text']
+
+
+@pytest.mark.parametrize('cell', NAMES)
+def test_a_name_with_upper_case_letters_or_hyphens_is_printed(cell, run, data_dir, tmp_path):
+    raw = seed(data_dir, tmp_path, years={2025: None})
+    import_subawards(data_dir, tmp_path, 2025, {MEMBER: csv_bytes([with_cell(2025, cell)])})
+    report_ = run(['headers', *raw])
+    assert report_['subawards']['2025']['members'][0]['header'] == with_cell(2025, cell)
+    assert (report_['subawards']['2025']['header_not_names'],
+            report_['subawards']['2025']['hints'], report_['stops']) == (
+        False, expected_hints(0), [])
+
+
+# Four cells in the shape of the real header's cells that carry an upper-case token and a
+# hyphen with two digits. They replace four test cells that no hint matches.
+REAL_LIKE_CELLS = ['prime_award_AAAAA-99_text', 'prime_award_BBBBB-98_text',
+                   'prime_award_CCCCC-97_text', 'prime_award_DDDDD-96_text']
+
+
+def real_like_header(year):
+    header = list(HEADERS[year])
+    header[24:28] = REAL_LIKE_CELLS
+    return header
+
+
+def test_real_like_headers_are_printed_in_every_year(run, data_dir, tmp_path):
+    raw = seed(data_dir, tmp_path, years=dict.fromkeys(WINDOW))
+    for year in WINDOW:
+        import_subawards(data_dir, tmp_path, year, {
+            MEMBER: csv_bytes([real_like_header(year), report(P1, S1, '2024-03-01', year=year)])})
+    report_ = run(['headers', *raw])
+    for year in WINDOW:
+        described = report_['subawards'][str(year)]
+        assert described['members'][0]['header'] == real_like_header(year)
+        assert (described['header_mismatch'], described['header_not_names'],
+                described['hints']) == (False, False, expected_hints(year == 2026))
+    assert report_['stops'] == []
+    assert_no_row_values(json.dumps(report_))
 
 
 @pytest.mark.parametrize('year', WINDOW)
@@ -528,19 +572,18 @@ def test_members_whose_lower_case_names_differ_withhold_only_for_the_mismatch(ru
     assert 'zq' not in text.lower()
 
 
-def test_identical_upper_case_headers_are_withheld_as_not_names(run, data_dir, tmp_path):
+def test_identical_upper_case_headers_are_printed(run, data_dir, tmp_path):
     raw = seed(data_dir, tmp_path, years={2025: None})
     upper = [cell.upper() for cell in zq_header('zqcell')]
     import_subawards(data_dir, tmp_path, 2025, {MEMBER: csv_bytes([upper]),
                                                 MEMBER_2: csv_bytes([upper])})
-    report_ = run(['headers', *raw], code=1)
+    report_ = run(['headers', *raw])
     assert [member['header'] for member in report_['subawards']['2025']['members']] == [
-        None, None]
+        upper, upper]
     assert (report_['subawards']['2025']['header_mismatch'],
             report_['subawards']['2025']['header_not_names'],
             report_['subawards']['2025']['hints'], report_['stops']) == (
-        False, True, None, ['headers_not_names_2025'])
-    assert 'zq' not in json.dumps(report_).lower()
+        False, False, dict.fromkeys(HINT_CELLS, []), [])
 
 
 def test_identical_member_headers_are_printed(run, data_dir, tmp_path):
@@ -776,6 +819,94 @@ def test_headers_prints_the_summary_of_an_extract_that_the_build_refuses(
         'tallies': None} | summary
     status, out, err = invoke(['measure', *measure_args(raw, write_registry(tmp_path), codes)])
     assert (status, err, json.loads(out)) == (2, '', {'reason': message, 'refused': True})
+
+
+# ---- skipped extract lines (owner decision 2026-11-19: skip and count them)
+
+SKIPPED_UEI = 'SKIPD0000009'
+
+
+def skipped_line(uei, change):
+    '''An extract line of `uei` with `change` fields more or fewer than the layout's 40.
+
+    `SKIPPED_UEI` sits at position 32 and `DNB_SENTINEL` at each restricted position. A
+    longer line has `DNB_SENTINEL` inserted at position 5. With one more field, a read that
+    does not skip the line takes `DNB_SENTINEL` as the registration status and
+    `SKIPPED_UEI` as the EVS source, the two tallied values. A shorter line loses fields
+    just before the record end.
+    '''
+    fields = firm(uei, '541511').split('|')
+    fields[31] = SKIPPED_UEI
+    if change > 0:
+        fields[4:4] = [DNB_SENTINEL] * change
+    else:
+        del fields[change - 1:-1]
+    return '|'.join(fields)
+
+
+# P2 (a prime with a readable row), S1 (a subcontractor with a readable row), S2 (a
+# subcontractor not in SAM.gov) and OTHER_2 (on no report).
+SKIPPED_LINES = [skipped_line(P2, 1), skipped_line(S1, -1), skipped_line(S2, 3),
+                 skipped_line(OTHER_2, -2)]
+SKIPPED_COUNTS = {'unreadable_lines': 4,
+                  'unreadable_firms': {'prime': 1, 'subcontractor': 2, 'all': 3},
+                  'unreadable_firms_not_in_sam': {'prime': 0, 'subcontractor': 1, 'all': 1}}
+# The shapes and tallies of the four readable window firms.
+WINDOW_SHAPES = {
+    'uei': [{'count': 4, 'shape': 'AAAAA9999999'}],
+    'registration_status': [{'count': 4, 'shape': 'A'}],
+    'last_update_date': [{'count': 4, 'shape': '99999999'}],
+    'primary_naics': [{'count': 3, 'shape': '999999'}, {'count': 1, 'shape': '9999A9'}],
+    'naics_code_string': [{'count': 3, 'shape': '999999A'}, {'count': 1, 'shape': '9999A9A'}],
+    'evs_source': [{'count': 4, 'shape': 'AAA'}],
+}
+
+
+def test_headers_counts_skipped_lines_and_shows_only_readable_values(run, data_dir, tmp_path):
+    raw = seed(data_dir, tmp_path, firms=window_firms() + SKIPPED_LINES)
+    report_ = run(['headers', *raw])
+    extract = report_['extract']
+    assert {key: extract[key] for key in ('data_lines', 'field_counts', 'unreadable_lines',
+                                          'record_end_matches')} == {
+        'data_lines': 8, 'field_counts': {'40': 4, '41': 1, '39': 1, '43': 1, '38': 1},
+        'unreadable_lines': 4, 'record_end_matches': 8}
+    assert extract['shapes'] == WINDOW_SHAPES
+    assert extract['tallies'] == {'registration_status': {'A': 4}, 'evs_source': {'SAM': 4}}
+    assert report_['stops'] == []
+
+
+def test_measure_counts_the_skipped_lines_and_their_report_firms(run, data_dir, tmp_path,
+                                                                 codes):
+    raw = seed(data_dir, tmp_path, firms=window_firms() + SKIPPED_LINES)
+    report_ = run(['measure', *measure_args(raw, write_registry(tmp_path), codes)])
+    extract = report_['e5']['extract']
+    assert {key: extract[key] for key in SKIPPED_COUNTS} == SKIPPED_COUNTS
+    assert extract['rows'] == 4
+    expected = build_counts(data_dir, TEST_SUBAWARD_LAYOUTS, codes, tmp_path / 'expected')
+    assert (report_['e5']['extract'], report_['e5']['firms']) == (expected['extract'],
+                                                                  expected['firms'])
+    # S2 has only a skipped line, so it stays not in SAM.gov.
+    assert report_['e5']['firms']['subcontractor']['not_in_sam'] == 1
+    assert (report_['stops'], report_['asks'], report_['ok']) == ([], [], True)
+
+
+def test_measure_counts_the_skipped_lines_also_without_firm_counts(run, data_dir, tmp_path,
+                                                                   codes):
+    raw = seed(data_dir, tmp_path, firms=window_firms({P1: '54151A'}) + SKIPPED_LINES)
+    report_ = run(['measure', *measure_args(raw, write_registry(tmp_path), codes)], code=1)
+    assert sorted(report_['e5']) == ['extract', 'malformed']
+    assert {key: report_['e5']['extract'][key] for key in SKIPPED_COUNTS} == SKIPPED_COUNTS
+    assert report_['stops'] == ['malformed_read_codes']
+
+
+def test_skipped_lines_put_no_value_in_the_output(invoke, data_dir, tmp_path, codes):
+    raw = seed(data_dir, tmp_path, firms=window_firms() + SKIPPED_LINES)
+    for argv in (['headers', *raw],
+                 ['measure', *measure_args(raw, write_registry(tmp_path), codes)]):
+        status, out, err = invoke(argv)
+        assert (status, err) == (0, '')
+        assert_no_row_values(out)
+        assert SKIPPED_UEI not in out
 
 
 # ---- measure
