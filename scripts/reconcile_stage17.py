@@ -16,11 +16,14 @@ and 1 otherwise. A refusal prints a fixed reason.
 `freeze` and `preservation` prove spec item 7: the stage's runs wrote nothing outside their own
 directories. `freeze` records the SHA-256 and size of every regular file under `raw` and
 `derived` in `derived/acs/wage-microdata-controls/<ID>/freeze.json`, except the raw manifest,
-whose SHA-256, size and line count it records apart, and the stage's own trees. `preservation`
-authenticates that record against a detached pin, walks the same trees again and prints one JSON
-line of paths and flags. Both read each file in fixed-size chunks and refuse a symlink anywhere
-in the walk. They print paths and counts only, never file contents. A refusal prints a fixed
-reason (and, for an entry in the walk, its path) and returns 1, as does a changed tree.
+whose SHA-256, size and line count it records apart. That includes the runs and the control
+directories that are already there, such as a run that was published and rejected before a
+retry. `preservation` authenticates that record against a detached pin, walks the same trees
+again and prints one JSON line of paths and flags. It leaves free only the files below a named
+run that the freeze did not record and below the control directory's own directory. Both read
+each file in fixed-size chunks and refuse a symlink anywhere in the walk. They print paths and
+counts only, never file contents. A refusal prints a fixed reason (and, for an entry in the
+walk, its path) and returns 1, as does a changed tree.
 '''
 
 import argparse
@@ -332,10 +335,10 @@ def walk(top: Path, root: Path) -> dict[str, int]:
 
 
 def tracked(data_dir: Path) -> dict[str, int]:
-    '''The size of every regular file under `raw` and `derived`, but the manifest and the runs.
+    '''The size of every regular file under `raw` and `derived`, but the manifest.
 
-    The runs and the control directories are the stage's own trees. The walk still enters
-    them, so a symlink in one is refused.
+    The runs and the control directories that are already there count like any other file. A
+    retry after a rejected run freezes the rejected run's files too.
     '''
     sizes = {}
     for name in TREES:
@@ -345,9 +348,8 @@ def tracked(data_dir: Path) -> dict[str, int]:
         if not top.is_dir():
             raise Refused('raw or derived is not a directory')
         sizes.update(walk(top, data_dir))
-    stage = (BUNDLES.parts, CONTROLS.parts)
-    return {path: size for path, size in sizes.items()
-            if path != MANIFEST.as_posix() and Path(path).parts[:3] not in stage}
+    sizes.pop(MANIFEST.as_posix(), None)
+    return sizes
 
 
 def manifest_facts(data_dir: Path) -> dict | None:
@@ -372,6 +374,12 @@ def run_names(data_dir: Path) -> list[str]:
     '''The names under `derived/acs/wage-microdata/`, sorted. Absent means none.'''
     directory = data_dir / BUNDLES
     return sorted(os.listdir(directory)) if directory.is_dir() else []
+
+
+def under(path: str, tree: Path) -> bool:
+    '''True when the POSIX path, relative to the data directory, names a file below `tree`.'''
+    parts = Path(path).parts
+    return len(parts) > len(tree.parts) and parts[:len(tree.parts)] == tree.parts
 
 
 def freeze(data_dir: Path, control_dir: Path) -> dict:
@@ -404,21 +412,27 @@ def preservation(data_dir: Path, control_dir: Path, pin: str, runs: str) -> dict
     '''Check the frozen files, the manifest and the runs directory against the freeze record.
 
     It hashes `freeze.json` against the pin before anything else. The result is `preserved`
-    only when every frozen file is equal, no file is added outside the runs and the control
-    directory, the manifest's SHA-256 and size are equal, and `wage-microdata/` holds exactly the
-    frozen runs and the named ones, with no `.part`.
+    only when every frozen file is equal, the manifest's SHA-256 and size are equal, and
+    `wage-microdata/` holds exactly the frozen runs and the named ones, with no `.part`. No file
+    may be added, except below a named run that was not frozen and below the control
+    directory's own directory, which did not exist when the files were hashed. A run or control
+    directory that was there at the freeze stays checked file by file, even when it is named.
     '''
-    record_file = control_directory(data_dir, control_dir) / FREEZE
+    control = control_directory(data_dir, control_dir)
+    record_file = control / FREEZE
     if not record_file.is_file() or sha256(record_file) != pin:
         raise Refused('freeze pin differs')
     record = json.loads(record_file.read_text())
     named = named_runs(runs)
     frozen = record['files']
     sizes = tracked(data_dir)
+    free = [BUNDLES / name for name in sorted(set(named) - set(record['runs']))]
+    free.append(CONTROLS / control.name)
     changed = [path for path, entry in frozen.items() if path in sizes and (
         sizes[path] != entry['size'] or sha256(data_dir / path) != entry['sha256'])]
     missing = [path for path in frozen if path not in sizes]
-    added = [path for path in sizes if path not in frozen]
+    added = [path for path in sizes if path not in frozen
+             and not any(under(path, tree) for tree in free)]
     present = run_names(data_dir)
     expected = {*record['runs'], *named}
     prefix = BUNDLES.as_posix()
@@ -430,8 +444,9 @@ def preservation(data_dir: Path, control_dir: Path, pin: str, runs: str) -> dict
     manifest_equal = facts is not None and (facts['sha256'], facts['size']) == (
         kept['sha256'], kept['size'])
     clean = manifest_equal and not (changed or missing or added)
+    # A file directly under `wage-microdata/` is both a file and a name there, so it can repeat.
     return {'status': 'preserved' if clean else 'changed', 'changed': sorted(changed),
-            'missing': sorted(missing), 'added': sorted(added),
+            'missing': sorted(set(missing)), 'added': sorted(set(added)),
             'manifest_equal': manifest_equal, 'runs': present}
 
 

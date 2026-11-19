@@ -752,14 +752,12 @@ def tree(data_dir):
 
 
 def frozen_files(data_dir):
-    '''Every regular file under raw and derived but the manifest and the two stage trees.'''
-    skipped = (data_dir / WAGE_RUNS, data_dir / CONTROL_ROOT)
+    '''Every regular file under raw and derived but the manifest, runs and controls included.'''
     return {
         path.relative_to(data_dir).as_posix():
             {'sha256': manifest.sha256_file(path), 'size': path.stat().st_size}
         for tree_name in ('raw', 'derived') for path in sorted((data_dir / tree_name).rglob('*'))
         if path.is_file() and path != data_dir / MANIFEST
-        and not any(path.is_relative_to(tree_path) for tree_path in skipped)
     }
 
 
@@ -859,6 +857,14 @@ def change_stage4_byte(data_dir):
     return {'changed': [path]}
 
 
+def add_a_dot_named_file(data_dir):
+    # A tool that skipped dot-named entries would miss scratch files such as this one.
+    scratch = data_dir / 'derived/acs/mapping/.scratch'
+    scratch.mkdir()
+    (scratch / 'part.csv').write_text('scratch')
+    return {'added': ['derived/acs/mapping/.scratch/part.csv']}
+
+
 def change_add_and_remove_many(data_dir):
     # A file and a run in each list: the lists are sorted over files and runs together.
     removed = a_raw_file(data_dir)
@@ -900,7 +906,7 @@ OTHER_DAMAGE = {
         change_raw_byte, change_stage4_byte, grow_a_derived_file, add_stray_raw_file,
         remove_derived_file, rewrite_manifest_with_the_same_size, remove_manifest,
         add_an_unnamed_run, add_a_stray_file_among_the_runs, remove_a_named_run,
-        change_add_and_remove_many)
+        add_a_dot_named_file, change_add_and_remove_many)
 }
 
 
@@ -923,8 +929,14 @@ def test_preservation_leaves_the_files_of_the_named_runs_and_the_control_directo
     assert (status, result) == (0, checked())
 
 
+# A run that is built but not named is not free: its directory and each of its files are added.
+REPLAY_ADDED = [f'{WAGE_RUNS}/replay', *(
+    f'{WAGE_RUNS}/replay/{name}' for name in (
+        'acs_wage_persons.parquet', 'inputs.json', 'outputs.json', 'report.json'))]
+
+
 @pytest.mark.parametrize(('runs', 'changes'), [
-    ('first', {'added': [f'{WAGE_RUNS}/replay']}),
+    ('first', {'added': REPLAY_ADDED}),
     ('first,replay,third', {'missing': [f'{WAGE_RUNS}/third']}),
     ('replay,first', {}),
 ], ids=['an_unnamed_run', 'an_absent_named_run', 'any_order'])
@@ -948,10 +960,14 @@ def test_frozen_runs_stay_without_being_named(chain_build):
     shutil.copytree(bundle(chain_build), data_dir / WAGE_RUNS / 'replay')
     status, result = run_preservation(data_dir, frozen['freeze_sha256'], runs='replay')
     assert (status, result) == (0, checked())
+    # The frozen run's files were recorded, so each one is missing with the run's directory.
+    recorded = json.loads((control_dir(data_dir) / 'freeze.json').read_text())['files']
+    in_the_run = [path for path in recorded if path.startswith(f'{WAGE_RUNS}/first/')]
+    assert in_the_run
     shutil.rmtree(bundle(chain_build))
     status, result = run_preservation(data_dir, frozen['freeze_sha256'], runs='replay')
-    assert (status, result) == (1, checked(status='changed', missing=[f'{WAGE_RUNS}/first'],
-                                           runs=['replay']))
+    assert (status, result) == (1, checked(
+        status='changed', missing=sorted([f'{WAGE_RUNS}/first', *in_the_run]), runs=['replay']))
 
 
 def test_a_part_directory_that_was_frozen_still_fails_the_check(chain_build):
@@ -965,11 +981,11 @@ def test_a_part_directory_that_was_frozen_still_fails_the_check(chain_build):
                                            runs=['first', 'old.part', 'replay']))
 
 
-def test_freeze_records_every_file_outside_the_excluded_trees(chain_build):
+def test_freeze_records_every_file_but_the_manifest(chain_build):
+    # Run `first` is published. An earlier freeze and a loose file already sit in the controls.
     data_dir = chain_build['data_dir']
-    earlier = data_dir / CONTROL_ROOT / 'earlier'
-    earlier.mkdir(parents=True)
-    (earlier / 'freeze.json').write_text('{}')
+    assert run_freeze(data_dir, control_dir(data_dir, 'earlier'))[0] == 0
+    (data_dir / CONTROL_ROOT / 'notes.txt').write_text('notes')
     expected = frozen_files(data_dir)
     manifest_file = data_dir / MANIFEST
     status, result = run_freeze(data_dir)
@@ -986,8 +1002,122 @@ def test_freeze_records_every_file_outside_the_excluded_trees(chain_build):
     assert manifest_file.read_bytes().endswith(b'\n')
     assert STAGE8_CORE in expected and a_raw_file(data_dir) in expected
     assert MANIFEST not in expected
-    assert not [path for path in expected if path.startswith((WAGE_RUNS, CONTROL_ROOT))]
-    assert any(bundle(chain_build).iterdir())
+    # The files of the published run and of the earlier controls are recorded.
+    assert {path for path in expected if path.startswith(f'{WAGE_RUNS}/first/')} == {
+        f'{WAGE_RUNS}/first/{path.name}' for path in bundle(chain_build).iterdir()}
+    assert {f'{CONTROL_ROOT}/earlier/freeze.json', f'{CONTROL_ROOT}/notes.txt'} <= set(expected)
+    # The new control directory did not exist when the files were hashed.
+    assert not [path for path in expected if path.startswith(f'{CONTROL_ROOT}/first/')]
+
+
+@pytest.fixture
+def retry(chain_build):
+    '''Run `first` was published and rejected. Freeze under `retry`, then a new run `replay`.'''
+    data_dir = chain_build['data_dir']
+    status, frozen = run_freeze(data_dir, control_dir(data_dir, 'retry'))
+    assert status == 0
+    shutil.copytree(bundle(chain_build), data_dir / WAGE_RUNS / 'replay')
+    return chain_build | {'freeze_pin': frozen['freeze_sha256']}
+
+
+def run_retry(retry, runs='replay'):
+    data_dir = retry['data_dir']
+    return run_preservation(data_dir, retry['freeze_pin'], runs=runs,
+                            control=control_dir(data_dir, 'retry'))
+
+
+FIRST_RUN = f'{WAGE_RUNS}/first'
+
+
+def change_a_frozen_run_byte(data_dir):
+    flip_a_byte(data_dir / FIRST_RUN / 'report.json')
+    return {'changed': [f'{FIRST_RUN}/report.json']}
+
+
+def add_a_file_to_a_frozen_run(data_dir):
+    (data_dir / FIRST_RUN / 'extra.bin').write_bytes(b'extra')
+    return {'added': [f'{FIRST_RUN}/extra.bin']}
+
+
+def remove_a_file_from_a_frozen_run(data_dir):
+    (data_dir / FIRST_RUN / 'report.json').unlink()
+    return {'missing': [f'{FIRST_RUN}/report.json']}
+
+
+def add_a_file_in_another_control_directory(data_dir):
+    # Its name starts like the own control directory's name, `retry`.
+    other = data_dir / CONTROL_ROOT / 'retry2'
+    other.mkdir()
+    (other / 'notes.txt').write_text('notes')
+    return {'added': [f'{CONTROL_ROOT}/retry2/notes.txt']}
+
+
+def add_a_file_directly_under_the_controls(data_dir):
+    (data_dir / CONTROL_ROOT / 'notes.txt').write_text('notes')
+    return {'added': [f'{CONTROL_ROOT}/notes.txt']}
+
+
+def add_a_file_to_an_unnamed_run(data_dir):
+    # Its name starts like the named run's name, `replay`.
+    unnamed = data_dir / WAGE_RUNS / 'replay2'
+    unnamed.mkdir()
+    (unnamed / 'extra.bin').write_bytes(b'extra')
+    return {'added': [f'{WAGE_RUNS}/replay2', f'{WAGE_RUNS}/replay2/extra.bin'],
+            'runs': ['first', 'replay', 'replay2']}
+
+
+RETRY_DAMAGE = {
+    function.__name__: function for function in (
+        change_a_frozen_run_byte, add_a_file_to_a_frozen_run, remove_a_file_from_a_frozen_run,
+        add_a_file_in_another_control_directory, add_a_file_directly_under_the_controls,
+        add_a_file_to_an_unnamed_run)
+}
+
+
+@pytest.mark.parametrize('damage', RETRY_DAMAGE)
+def test_preservation_keeps_checking_what_existed_at_the_freeze(retry, damage):
+    # `first` and the earlier controls were there at the freeze, so no change in them is free.
+    expected = RETRY_DAMAGE[damage](retry['data_dir'])
+    status, result = run_retry(retry)
+    assert (status, result) == (1, checked(status='changed', **expected))
+
+
+@pytest.mark.parametrize('runs', ['replay', 'first,replay'], ids=['replay', 'first_and_replay'])
+def test_a_new_run_and_the_own_control_directory_stay_free(retry, runs):
+    data_dir = retry['data_dir']
+    (data_dir / WAGE_RUNS / 'replay' / 'extra.bin').write_bytes(b'extra')
+    flip_a_byte(data_dir / WAGE_RUNS / 'replay' / 'inputs.json')
+    (control_dir(data_dir, 'retry') / 'notes.txt').write_text('notes')
+    status, result = run_retry(retry, runs=runs)
+    assert (status, result) == (0, checked())
+
+
+def test_a_file_directly_under_the_runs_directory_is_listed_once(chain):
+    # Such a file is a recorded file and a name there at once, so two checks can report it.
+    data_dir = chain['data_dir']
+    runs = data_dir / WAGE_RUNS
+    runs.mkdir()
+    (runs / 'notes.txt').write_text('notes')
+    status, frozen = run_freeze(data_dir)
+    assert status == 0
+    (runs / 'first').mkdir()
+    status, result = run_preservation(data_dir, frozen['freeze_sha256'], runs='first')
+    assert (status, result) == (0, checked(runs=['first', 'notes.txt']))
+    (runs / 'notes.txt').unlink()
+    (runs / 'other.txt').write_text('other')
+    status, result = run_preservation(data_dir, frozen['freeze_sha256'], runs='first')
+    assert (status, result) == (1, checked(
+        status='changed', missing=[f'{WAGE_RUNS}/notes.txt'], added=[f'{WAGE_RUNS}/other.txt'],
+        runs=['first', 'other.txt']))
+
+
+def test_a_named_run_that_was_frozen_is_still_checked(retry):
+    # Naming `first` does not free it: its recorded file is compared and nothing is added to it.
+    flip_a_byte(retry['data_dir'] / FIRST_RUN / 'report.json')
+    (retry['data_dir'] / FIRST_RUN / 'extra.bin').write_bytes(b'extra')
+    status, result = run_retry(retry, runs='first,replay')
+    assert (status, result) == (1, checked(
+        status='changed', changed=[f'{FIRST_RUN}/report.json'], added=[f'{FIRST_RUN}/extra.bin']))
 
 
 def test_freeze_before_any_build_records_no_runs(chain):
