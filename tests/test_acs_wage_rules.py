@@ -201,19 +201,17 @@ def test_earners_selects_the_carried_columns_in_order_whatever_the_input_order()
     assert result.height == 1
 
 
-def test_earners_is_a_lazy_plan():
-    assert isinstance(rules.earners(core_frame([core_row()])), pl.LazyFrame)
-    assert isinstance(rules.wage_persons(core_frame([core_row()])), pl.LazyFrame)
-
-
 def test_the_plans_stay_lazy_over_a_parquet_scan(tmp_path):
-    # A plan that collected the earners and made them lazy again would still be a LazyFrame.
-    # In production it would hold every earner row and all carried columns in memory. The
-    # plan text shows it: the scan must still be in it.
+    # Both functions return a LazyFrame. A plan that collected the earners and made them lazy
+    # again would still be a LazyFrame, so the type alone proves nothing. In production it would
+    # hold every earner row and all carried columns in memory. The plan text shows it: the scan
+    # must still be in it.
     rows = [core_row(), core_row(INCWAGE=0), core_row(INCWAGE=7)]
     path = tmp_path / 'core.parquet'
     core_frame(rows).collect().write_parquet(path)
     scan = pl.scan_parquet(path)
+    assert isinstance(rules.earners(scan), pl.LazyFrame)
+    assert isinstance(rules.wage_persons(scan), pl.LazyFrame)
     assert 'Parquet SCAN' in rules.earners(scan).explain()
     assert 'Parquet SCAN' in rules.wage_persons(scan).explain()
     assert rules.wage_persons(scan).collect().equals(persons_of(*rows))
