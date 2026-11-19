@@ -718,6 +718,24 @@ def test_year_report_counts_a_facility_year_once_however_many_territory_forms_it
     assert report_for(records)['2023']['in_territories'] == 1
 
 
+def test_year_report_counts_a_facility_year_once_however_many_distinct_values_it_has():
+    # T1 has two secondary codes on one form, and two forms that differ in the foreign parent,
+    # the parent and the D&B number. T2 has none of them.
+    records = [
+        form('T1', naics_2='325110', naics_3='325120', standardized_foreign_parent='ACME ABROAD',
+             standardized_parent='ACME', parent_dnb='900000001'),
+        form('T1', standardized_foreign_parent='ZED ABROAD', standardized_parent='BETA',
+             parent_dnb='900000002'),
+        form('T2'),
+    ]
+    counts = report_for(records)['2023']
+    assert counts['facility_years'] == 2
+    assert counts['with_secondary_codes'] == 1
+    assert counts['with_foreign_parent'] == 1
+    assert counts['with_parent'] == 1
+    assert counts['with_usable_dnb'] == 1
+
+
 def test_year_report_counts_only_rows_with_both_a_name_and_a_usable_dnb():
     records = [
         form('T1', standardized_parent='ACME', parent_dnb='900000001'),
