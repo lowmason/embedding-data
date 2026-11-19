@@ -426,6 +426,10 @@ EXTRACT_ACCEPTED = [
     pytest.param(lambda v: v.update(record_end='\xa0'), id='record_end_of_a_no_break_space'),
     pytest.param(lambda v: v.update(eof_prefix=v['bof_prefix'] + 'x'),
                  id='one_prefix_extends_the_other'),
+    pytest.param(lambda v: v.update(eof_prefix=v['bof_prefix'].lower()),
+                 id='prefixes_differ_by_case'),
+    pytest.param(lambda v: v.update(eof_prefix=v['bof_prefix'].rstrip()),
+                 id='prefixes_differ_by_padding'),
 ]
 
 
@@ -600,6 +604,15 @@ def test_parse_does_not_keep_the_registry_value_it_was_given():
     assert 'changed' not in layouts[2024].header
 
 
+def test_parse_extract_layout_does_not_keep_the_value_it_was_given():
+    value = extract_value()
+    layout = vendor_link_layouts.parse_extract_layout(value)
+    value['positions']['uei'] = 2
+    value['restricted_positions'].append(12)
+    assert layout.positions['uei'] == 1
+    assert 12 not in layout.restricted_positions
+
+
 @pytest.mark.parametrize('value, message', EXTRACT_REFUSALS)
 def test_parse_extract_layout_refuses(value, message):
     with exactly(message):
@@ -703,6 +716,7 @@ def test_production_member_pattern_matches_the_member_names(name):
     'SAM_PUBLIC_UTF-8_MONTHLY_V2_2026110.dat',
     'SAM_PUBLIC_UTF-8_MONTHLY_V2_202611021.dat',
     'SAM_PUBLIC_UTF-8_MONTHLY_V2_20261102.Dat',
+    'SAM_PUBLIC_UTF-8_MONTHLY_V2_20261102_dat',
     'SAM_PUBLIC_UTF-8_DAILY_V2_20261102.dat',
     'SAM_PUBLIC_UTF-8_UTF-8_MONTHLY_V2_20261102.dat',
     'xSAM_PUBLIC_MONTHLY_V2_20200414.dat',

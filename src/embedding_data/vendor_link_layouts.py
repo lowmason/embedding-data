@@ -130,7 +130,7 @@ def _columns(columns, header: tuple[str, ...], label: str, draft: bool) -> dict:
     _keys(columns, SUBAWARD_FIELDS, f'{label} columns')
     for field in SUBAWARD_FIELDS:
         cell = columns[field]
-        if cell is not None and (not isinstance(cell, str) or cell not in header):
+        if cell is not None and cell not in header:
             raise ValueError(f'{label} column {field} is not a header cell')
     mapped = [columns[field] for field in SUBAWARD_FIELDS if columns[field] is not None]
     if len(set(mapped)) != len(mapped):
