@@ -52,6 +52,17 @@ def drop_last_row(plan):
     return plan.head(plan.select(pl.len()).collect().item() - 1)
 
 
+def repeat_first_row(plan):
+    '''The first earner twice and the last earner missing: the row count is unchanged.'''
+    rows = plan.select(pl.len()).collect().item()
+    return pl.concat([plan.head(1), plan.head(rows - 1)])
+
+
+def extra_row(plan):
+    '''One more row after the last, still in strictly increasing source order.'''
+    return pl.concat([plan, plan.tail(1).with_columns(pl.col('source_row') + 1)])
+
+
 def all_headline(plan):
     return plan.with_columns(pl.lit(True).alias('flag_headline'))
 
@@ -68,6 +79,8 @@ def swap_first_columns(plan):
 DISTORTIONS = {
     'reverse': reverse,
     'drop_last_row': drop_last_row,
+    'repeat_first_row': repeat_first_row,
+    'extra_row': extra_row,
     'all_headline': all_headline,
     'unknown_node': unknown_node,
     'carried_type': lambda plan: plan.with_columns(pl.col('AGE').cast(pl.Int32)),
@@ -207,6 +220,14 @@ def test_ordered_compare_counts_every_row_of_each_side():
                                         (5, 5, False), (5, 5, True)]
     assert ordered_compare(five, five) == {'schema_equal': True, 'values_equal': True,
                                            'first_rows': 5, 'second_rows': 5}
+
+
+def test_ordered_compare_sees_a_type_change_under_the_same_name():
+    # DataFrame.equals ignores dtypes, so only the ordered schema can tell these apart.
+    narrow = pl.LazyFrame({'a': [1]}, schema={'a': pl.Int32})
+    wide = pl.LazyFrame({'a': [1]}, schema={'a': pl.Int64})
+    assert ordered_compare(narrow, wide, chunk_size=2) == {
+        'schema_equal': False, 'values_equal': False, 'first_rows': 1, 'second_rows': 1}
 
 
 @pytest.mark.parametrize('chunk_size', [0, -2, True, 2.0])
@@ -393,6 +414,16 @@ def test_cleanup_refuses_a_staging_path_that_became_a_symlink(chain, monkeypatch
 
 @pytest.mark.parametrize('distortion', ['reverse', 'drop_last_row'])
 def test_build_refuses_reordered_or_missing_staged_rows(chain, monkeypatch, distortion):
+    distort(monkeypatch, distortion)
+    with pytest.raises(ValueError, match='staged rows differ from the earners'):
+        build(chain, 'first')
+    assert entries(runs_root(chain)) == []
+
+
+@pytest.mark.parametrize('distortion', ['repeat_first_row', 'extra_row'])
+def test_build_refuses_a_repeated_or_extra_staged_row(chain, monkeypatch, distortion):
+    # A repeated row keeps the count, so only the strict order check can refuse it.
+    # An extra row keeps the order, so only the count check can refuse it.
     distort(monkeypatch, distortion)
     with pytest.raises(ValueError, match='staged rows differ from the earners'):
         build(chain, 'first')
@@ -618,6 +649,16 @@ def test_verify_refuses_a_part_directory(chain, monkeypatch):
         verify(chain, part, result['outputs_sha256'])
 
 
+def forge_published(chain, monkeypatch, distortion):
+    '''Publish a distorted table under a rewritten pin, and make the recomputation match it.'''
+    directory = built(chain)
+    plan = acs_wage_rules.wage_persons(pl.scan_parquet(stage8_core(chain)))
+    DISTORTIONS[distortion](plan).collect().write_parquet(directory / 'acs_wage_persons.parquet')
+    pin = rehash(directory)
+    distort(monkeypatch, distortion)
+    return directory, pin
+
+
 @pytest.mark.parametrize(('distortion', 'message'), [
     ('reverse', 'published rows differ from the earners'),
     ('drop_last_row', 'published rows differ from the earners'),
@@ -627,12 +668,15 @@ def test_verify_refuses_a_part_directory(chain, monkeypatch):
 def test_verify_runs_the_row_checks_on_the_published_table(chain, monkeypatch, distortion,
                                                            message):
     # The recomputation makes the same mistake, so only verify's own checks can refuse.
-    directory = built(chain)
-    plan = acs_wage_rules.wage_persons(pl.scan_parquet(stage8_core(chain)))
-    DISTORTIONS[distortion](plan).collect().write_parquet(directory / 'acs_wage_persons.parquet')
-    pin = rehash(directory)
-    distort(monkeypatch, distortion)
+    directory, pin = forge_published(chain, monkeypatch, distortion)
     with pytest.raises(ValueError, match=message):
+        verify(chain, directory, pin)
+
+
+@pytest.mark.parametrize('distortion', ['repeat_first_row', 'extra_row'])
+def test_verify_refuses_a_repeated_or_extra_published_row(chain, monkeypatch, distortion):
+    directory, pin = forge_published(chain, monkeypatch, distortion)
+    with pytest.raises(ValueError, match='published rows differ from the earners'):
         verify(chain, directory, pin)
 
 
