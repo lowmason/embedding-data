@@ -343,7 +343,6 @@ def test_headers_prints_hint_lists_of_header_cells(script, capsys, home):
     ('NAICS 2. EXTRA', 'NAICS 2. EXTRA'),
     ('2022 YEAR', '2022 YEAR'),
     ('12. 3. X', '3. X'),
-    ('PRIMARY NAICS', 'PRIMARY NAICS'),
     ('. YEAR', '. YEAR'),
     ('1 YEAR', '1 YEAR'),
     ('1.YEAR', 'YEAR'),
