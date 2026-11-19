@@ -184,3 +184,25 @@ def install_sam(monkeypatch, handler):
     monkeypatch.setattr(sam_access, 'make_client',
                         lambda: REAL_SAM_MAKE_CLIENT(httpx.MockTransport(handler)))
     return handler
+
+
+def seed_codes_bundle(data_dir, directory):
+    '''Build a real Stage 4 codes bundle from the committed Stage 10 fixtures.
+
+    It seeds the raw summary releases and the Stage 2 table, imports the committed exact
+    public Stage 4 originals into `directory`, and builds the bundle. It skips the Stage 10
+    index import and Stage 3 expectations. Returns the run ID and the detached pin.
+    '''
+    # Imported here so that every vendor-link test module does not load the Stage 10 chain.
+    import ita_establishment_fixtures
+    import ita_fixtures
+
+    from embedding_data import code_build, ita_summary, manifest
+
+    for year, rows in ita_establishment_fixtures.golden_releases().items():
+        ita_fixtures.write_release(data_dir, year, ita_fixtures.year_file(year, rows))
+    ita_summary.build_summary_table(data_dir)
+    ita_establishment_fixtures.import_stage4_originals(data_dir, directory)
+    bundle = code_build.build(data_dir, ita_establishment_fixtures.CODES_RUN)
+    return (ita_establishment_fixtures.CODES_RUN,
+            manifest.sha256_file(bundle / 'outputs.json'))
