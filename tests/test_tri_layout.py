@@ -122,6 +122,13 @@ def test_layout_json_round_trip():
     }
 
 
+def test_layouts_json_renders_the_years_in_order_whatever_the_argument_order():
+    layouts = parse_layouts(document())
+    reversed_layouts = dict(reversed(list(layouts.items())))
+    assert list(reversed_layouts) == [2024, 2023, 2022]
+    assert list(layouts_json(reversed_layouts)['years']) == ['2022', '2023', '2024']
+
+
 def test_parse_layouts_builds_typed_layouts():
     layouts = parse_layouts(document())
     assert sorted(layouts) == [2022, 2023, 2024]
@@ -167,6 +174,8 @@ REFUSALS = {
     'a_foreign_column_is_not_a_header_cell': set_column(
         'foreign_parent_name', 'NO SUCH CELL', '2023'),
     'a_mapped_column_is_not_a_string': set_column('state', 7),
+    'a_mapped_column_differs_in_case_from_its_cell': set_column('trifd', 'trifd'),
+    'a_mapped_column_has_padding': set_column('state', 'ST '),
     'other_naics_cell_is_not_a_header_cell': set_column('other_naics', ['NAICS2', 'NO SUCH']),
     'other_naics_is_not_a_list': set_column('other_naics', 'NAICS2'),
     'other_naics_has_six_cells': with_other_naics(OTHER + ['NAICS7']),
@@ -199,10 +208,11 @@ def test_parse_layouts_refuses(edit):
         parse_layouts(value)
 
 
+@pytest.mark.parametrize('year', ['2022', '2023', '2024'])
 @pytest.mark.parametrize('field', REQUIRED_FIELDS)
-def test_parse_layouts_refuses_an_unmapped_required_field(field):
+def test_parse_layouts_refuses_an_unmapped_required_field(field, year):
     value = document()
-    set_column(field, None, '2023')(value)
+    set_column(field, None, year)(value)
     with pytest.raises(ValueError):
         parse_layouts(value)
 
@@ -215,10 +225,11 @@ def test_parse_layouts_refuses_a_foreign_field_in_2022(field):
         parse_layouts(value)
 
 
+@pytest.mark.parametrize('year', ['2022', '2023', '2024'])
 @pytest.mark.parametrize('name', VALUE_SETS)
-def test_parse_layouts_refuses_a_missing_value_set(name):
+def test_parse_layouts_refuses_a_missing_value_set(name, year):
     value = document()
-    drop_key('values', name, '2024')(value)
+    drop_key('values', name, year)(value)
     with pytest.raises(ValueError):
         parse_layouts(value)
 
@@ -253,6 +264,8 @@ ACCEPTED = {
         set_column(field, None, '2024')(value) for field in FOREIGN_FIELDS[1:]],
     'an_inner_space_in_a_value': set_values('no_parent', ['N A', 'NOT AVAILABLE']),
     'an_unmapped_header_cell': add_header_cell('EXTRA'),
+    'header_cells_that_differ_in_case': add_header_cell('facility'),
+    'header_cells_that_differ_in_padding': add_header_cell('FACILITY '),
 }
 
 

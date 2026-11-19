@@ -119,8 +119,8 @@ def known_2023():
     rows = []
     rows += fy(2023, 'T23V01', parent='DELTA INC', standardized='DELTA INC', dnb='111111111')
     rows += fy(2023, 'T23V02', parent='NA', standardized='EPSILON CO')
-    rows += fy(2023, 'T23V03', parent='ZETA LP')
-    rows += fy(2023, 'T23V04', dnb='666666666')
+    rows += fy(2023, 'T23V03', parent='ZETA LP', dnb='700000001')
+    rows += fy(2023, 'T23V04', parent='OMEGA', dnb='666666666')
     rows += fy(2023, 'T23M01', ('',), standardized='ETA CO', dnb='NA')
     rows += fy(2023, 'T23C01', VALID[:2], parent='THETA', standardized='THETA INC')
     rows += fy(2023, 'T23C02', VALID[1:], parent='IOTA', dnb='333333333')
@@ -344,6 +344,9 @@ def test_headers_prints_hint_lists_of_header_cells(script, capsys, home):
     ('2022 YEAR', '2022 YEAR'),
     ('12. 3. X', '3. X'),
     ('PRIMARY NAICS', 'PRIMARY NAICS'),
+    ('. YEAR', '. YEAR'),
+    ('1 YEAR', '1 YEAR'),
+    ('1.YEAR', 'YEAR'),
 ])
 def test_normalize_reads_a_header_cell_for_the_hint_match(script, cell, normalized):
     assert script.normalize(cell) == normalized
@@ -366,6 +369,17 @@ def test_headers_hints_match_the_normalized_cell_exactly(script, capsys, home):
     assert hints['state'] == []
     assert hints['reporting_year'] == []
     assert hints['trifd'] == []
+
+
+def test_headers_normalizes_a_hint_phrase_like_a_cell(script, capsys, home, monkeypatch):
+    monkeypatch.setitem(script.HINTS, 'state', ('Province_Code', ' 9. Region  Name'))
+    cells = ['1. PROVINCE CODE', 'region name', 'PROVINCE_CODE_2']
+    stream = io.StringIO()
+    csv.writer(stream, lineterminator='\r\n').writerows([cells, ['a', 'b', 'c']])
+    content = stream.getvalue().encode()
+    import_years(home, {year: content for year in WINDOW})
+    hints = run_headers(script, capsys, home)['2022']['hints']
+    assert hints['state'] == ['1. PROVINCE CODE', 'region name']
 
 
 def test_headers_exits_2_with_no_file_under_the_snapshot_date(script, capsys, home):
@@ -416,6 +430,17 @@ def test_headers_refuses_a_field_beyond_the_csv_limit(script, capsys, home):
     assert report == {'ok': False, 'reason': 'file is not valid CSV'}
 
 
+def test_headers_counts_an_invalid_byte_in_the_header_line_and_decodes_it(script, capsys, home):
+    cells = ['1. YEAR', '2. TRIFD', '3. CAFE']
+    content = ('\r\n'.join([','.join(cells), '2022,T1,x', '']).encode()).replace(
+        b'CAFE', b'CAF\xe9')
+    import_years(home, {year: content for year in WINDOW})
+    report = run_headers(script, capsys, home)
+    assert report['2022']['invalid_utf8_lines'] == 1
+    assert report['2022']['header'] == ['1. YEAR', '2. TRIFD', '3. CAF\u00e9']
+    assert report['2022']['records'] == 1
+
+
 # measure
 
 
@@ -458,11 +483,11 @@ def test_measure_counts_the_parent_cases_and_fills(script, capsys, env):
     stage(env, {2022: known_2022(), 2023: known_2023(), 2024: known_2024()})
     years = run_measure(script, capsys, env)['years']
     second = years['2023']
-    assert (second['case_a'], second['case_b'], second['case_c']) == (2, 3, 4)
+    assert (second['case_a'], second['case_b'], second['case_c']) == (2, 4, 5)
     assert second['fill'] == {
-        'parent_name': {'facility_years': 6, 'rows': 8},
+        'parent_name': {'facility_years': 7, 'rows': 9},
         'standardized_parent': {'facility_years': 5, 'rows': 6},
-        'parent_dnb': {'facility_years': 5, 'rows': 6},
+        'parent_dnb': {'facility_years': 6, 'rows': 7},
     }
     assert (second['standardized_compared'], second['standardized_differs']) == (3, 1)
     first = years['2022']
@@ -533,11 +558,12 @@ def test_measure_counts_document_control_number_uniqueness(script, capsys, env):
         record(2022, 'T5', dcn='D2'), record(2022, 'T6', dcn=''),
         record(2022, 'T7', dcn='  '), record(2022, 'T8', dcn='D3'),
         record(2022, 'T9', dcn='D3'), record(2022, 'T10', dcn='D3'),
+        record(2022, 'T11', dcn=' D2 '),
     ]
     stage(env, calm_window(y2022=rows))
     years = run_measure(script, capsys, env)['years']
     assert years['2022']['document_control_number'] == {
-        'blank': 2, 'distinct': 5, 'repeated': 2}
+        'blank': 2, 'distinct': 5, 'repeated': 3}
     assert years['2023']['document_control_number'] == {
         'blank': 0, 'distinct': 2, 'repeated': 0}
 
@@ -742,6 +768,17 @@ def test_measure_asks_about_a_missing_column_and_exits_0(field, script, capsys, 
     assert report['asks'] == [{'reason': f'no_{field}', 'year': 2023}]
     assert report['stops'] == []
     assert report['ok'] is True
+    third = report['years']['2023']
+    if field == 'form_type':
+        assert third['form_type'] is None
+        assert report['years']['2022']['form_type'] == {'R': 2}
+    if field == 'parent_dnb':
+        for key in ('parent_dnb_not_nine_digits_top', 'case_c', 'standardized_with_many_dnb',
+                    'dnb_with_many_standardized'):
+            assert third[key] is None, key
+        assert third['fill']['parent_dnb'] is None
+        assert third['case_a'] == 0
+        assert report['years']['2022']['case_c'] == 0
 
 
 def test_measure_leaves_the_facility_year_measures_null_without_a_trifd_column(
@@ -815,6 +852,16 @@ def test_measure_asks_above_one_percent_and_exits_0(script, capsys, env):
     assert report['ok'] is True
 
 
+def test_measure_asks_just_above_one_percent(script, capsys, env):
+    # 2 outside codes in 199 facility-years is 1.005%.
+    rows = fixed_window(2022, 2, total=199)
+    assert len({row[CELLS['trifd']] for row in rows}) == 199
+    stage(env, calm_window(y2022=rows))
+    report = run_measure(script, capsys, env)
+    assert report['asks'] == [{'facility_years': 199, 'naics_not_2022': 2,
+                               'reason': 'naics_not_2022_above_1_percent', 'year': 2022}]
+
+
 def test_measure_asks_in_each_year_that_is_above_one_percent(script, capsys, env):
     stage(env, {2022: calm(2022), 2023: fixed_window(2023, 2), 2024: fixed_window(2024, 2)})
     report = run_measure(script, capsys, env)
@@ -863,8 +910,23 @@ def test_measure_reads_a_draft_with_absent_column_and_value_entries(script, caps
     report = run_measure(script, capsys, env, document)
     assert report['stops'] == []
     assert report['years']['2023']['state'] is None
+    assert report['years']['2023']['other_naics_fill'] == {}
     assert [ask['reason'] for ask in report['asks'] if ask['year'] == 2023] == [
         'no_form_type', 'no_parent_dnb', 'no_reporting_year', 'parent_name_unmapped']
+
+
+def test_measure_reads_a_draft_year_with_no_columns_object(script, capsys, env):
+    stage(env, calm_window())
+    document = draft_document()
+    del year_entry(document, 2022)['columns']
+    del year_entry(document, 2023)['values']
+    report = run_measure(script, capsys, env, document, expect=1)
+    assert [stop['reason'] for stop in report['stops']] == [
+        'no_federal', 'no_primary', 'no_standardized']
+    assert {stop['year'] for stop in report['stops']} == {2022}
+    assert report['years']['2022']['rows'] == 2
+    assert report['years']['2022']['facility_years'] is None
+    assert report['years']['2023']['facility_years'] == 2
 
 
 def test_measure_accepts_the_strict_committed_format(script, capsys, env):
@@ -881,6 +943,95 @@ def test_measure_reads_the_year_of_each_file_not_another(script, capsys, env):
     stage(env, rows)
     years = run_measure(script, capsys, env)['years']
     assert [years[year]['rows'] for year in ('2022', '2023', '2024')] == [2, 12, 2]
+
+
+def test_measure_strips_primary_codes_and_reads_a_blank_as_absent(script, capsys, env):
+    rows = (fy(2022, 'T1', (VALID[0], f' {VALID[0]} ')) + fy(2022, 'T2', ('  ',))
+            + fy(2022, 'T3', ('', VALID[1])) + fy(2022, 'T4', (VALID[0], VALID[1]))
+            + fy(2022, 'T5', (f' {NOT_2022[0]}', NOT_2022[0], '')))
+    stage(env, calm_window(y2022=rows))
+    first = run_measure(script, capsys, env)['years']['2022']
+    assert first['facility_years'] == 5
+    assert (first['naics_valid'], first['naics_missing'], first['naics_conflict'],
+            first['naics_not_2022']) == (2, 1, 1, 1)
+
+
+def test_measure_compares_padded_values_with_the_none_strings_after_stripping(
+        script, capsys, env):
+    rows = [record(2022, 'T1', parent=' NA ', standardized='NA ', dnb=' NA'),
+            record(2022, 'T2', parent='\tNA', standardized=' NA', dnb='NA\t')]
+    stage(env, calm_window(y2022=rows))
+    first = run_measure(script, capsys, env)['years']['2022']
+    assert first['fill'] == {
+        'parent_name': {'facility_years': 0, 'rows': 0},
+        'standardized_parent': {'facility_years': 0, 'rows': 0},
+        'parent_dnb': {'facility_years': 0, 'rows': 0},
+    }
+    assert (first['case_a'], first['case_b'], first['case_c']) == (0, 0, 0)
+
+
+def test_measure_judges_a_parent_by_no_parent_strings_and_a_dnb_number_by_its_own(
+        script, capsys, env):
+    sets = {**VALUES, 'no_parent': ['', 'NONE'], 'no_dnb': ['', 'UNKNOWN']}
+    # Three facility-years hold NONE in all three cells, one holds UNKNOWN, one holds names.
+    rows = [record(2022, f'T{n}', parent='NONE', standardized='NONE', dnb='NONE')
+            for n in range(1, 4)]
+    rows += [record(2022, 'T4', parent='UNKNOWN', standardized='UNKNOWN', dnb='UNKNOWN'),
+             record(2022, 'T5', parent='ALPHA', standardized='ALPHA', dnb='500000001')]
+    stage(env, calm_window(y2022=rows))
+    first = run_measure(script, capsys, env, draft_document(values=sets))['years']['2022']
+    assert first['fill'] == {
+        'parent_name': {'facility_years': 2, 'rows': 2},
+        'standardized_parent': {'facility_years': 2, 'rows': 2},
+        'parent_dnb': {'facility_years': 4, 'rows': 4},
+    }
+
+
+def test_measure_keeps_what_any_form_of_a_facility_year_says(script, capsys, env):
+    # The first form has a standardized name and a D&B number, the second form has neither.
+    rows = (fy(2023, 'T1', parent='ALPHA', standardized='ALPHA INC', dnb='500000009')
+            + fy(2023, 'T1', parent='ALPHA') + fy(2023, 'T2', parent='BETA'))
+    stage(env, calm_window(y2023=rows))
+    third = run_measure(script, capsys, env)['years']['2023']
+    assert third['fill'] == {
+        'parent_name': {'facility_years': 2, 'rows': 3},
+        'standardized_parent': {'facility_years': 1, 'rows': 1},
+        'parent_dnb': {'facility_years': 1, 'rows': 1},
+    }
+    assert (third['case_a'], third['case_b'], third['case_c']) == (0, 1, 0)
+
+
+def test_measure_decides_whether_a_facility_year_differs_from_all_of_its_forms(
+        script, capsys, env):
+    def forms(trifd, *names):
+        return [row for name in names for row in fy(2022, trifd, parent='A', standardized=name)]
+
+    # T1 and T2: one form agrees and one differs, in each order. T3: two forms differ. T4: the
+    # form with no standardized name is not compared. T5: the names differ only in case.
+    rows = (forms('T1', 'A', 'B') + forms('T2', 'B', 'A') + forms('T3', 'B', 'C')
+            + forms('T4', 'A', '') + forms('T5', 'a'))
+    stage(env, calm_window(y2022=rows))
+    first = run_measure(script, capsys, env)['years']['2022']
+    assert (first['standardized_compared'], first['standardized_differs']) == (5, 4)
+
+
+def test_measure_counts_names_and_numbers_only_for_forms_that_have_both(script, capsys, env):
+    rows = (
+        # A name with one usable number and one unusable number has one number.
+        fy(2022, 'T1', standardized='RHO', dnb='700000001') + fy(2022, 'T2', standardized='RHO',
+                                                                dnb='NA')
+        # A blank name with two numbers pairs no number.
+        + fy(2022, 'T3', standardized='', dnb='700000002')
+        + fy(2022, 'T4', standardized='', dnb='700000003')
+        + fy(2022, 'T5', standardized='NA', dnb='700000004')
+        # One number under a name, one number under the same name written with padding.
+        + fy(2022, 'T6', standardized='SIGMA', dnb='700000005')
+        + fy(2022, 'T7', standardized=' SIGMA ', dnb=' 700000005')
+    )
+    stage(env, calm_window(y2022=rows))
+    first = run_measure(script, capsys, env)['years']['2022']
+    assert first['standardized_with_many_dnb'] == 0
+    assert first['dnb_with_many_standardized'] == 0
 
 
 # refusals
@@ -1035,6 +1186,14 @@ def test_measure_refuses_a_record_with_the_wrong_number_of_fields(script, capsys
     assert report == {'ok': False, 'reason': 'a record has the wrong number of fields'}
 
 
+def test_measure_refuses_a_record_with_too_many_fields(script, capsys, env):
+    stage(env, {2022: calm(2022), 2023: calm(2023)})
+    long = csv_bytes(2024, calm(2024)).replace(b'ALPHA,', b'ALPHA,EXTRA,')
+    import_years(env, {2024: long})
+    report = run_measure(script, capsys, env, expect=2)
+    assert report == {'ok': False, 'reason': 'a record has the wrong number of fields'}
+
+
 def test_measure_refuses_a_file_that_cannot_be_decoded(script, capsys, env):
     stage(env, {2022: calm(2022), 2023: calm(2023)})
     bad = csv_bytes(2024, [record(2024, 'T1', facility='CAFE')]).replace(b'CAFE', b'CAF\x8d')
@@ -1043,15 +1202,16 @@ def test_measure_refuses_a_file_that_cannot_be_decoded(script, capsys, env):
     assert report == {'ok': False, 'reason': 'a line cannot be decoded'}
 
 
-def test_an_unexpected_error_prints_only_its_type(script, capsys, env, monkeypatch):
+@pytest.mark.parametrize('error', [RuntimeError, KeyError, ZeroDivisionError])
+def test_an_unexpected_error_prints_only_its_type(error, script, capsys, env, monkeypatch):
     stage(env, calm_window())
 
     def explode(*args, **kwargs):
-        raise RuntimeError('secret 123456789 row text')
+        raise error('secret 123456789 row text')
 
     monkeypatch.setattr(script, 'measure_year', explode)
     report = run_measure(script, capsys, env, expect=2)
-    assert report == {'ok': False, 'reason': 'unexpected error: RuntimeError'}
+    assert report == {'ok': False, 'reason': f'unexpected error: {error.__name__}'}
 
 
 def test_both_commands_require_an_explicit_data_directory(script, capsys):
@@ -1076,6 +1236,7 @@ def test_both_commands_require_a_snapshot_date(script, capsys, tmp_path):
 def test_measure_requires_a_layout_and_the_codes_pin(script, capsys, tmp_path):
     base = ['measure', '--data-dir', str(tmp_path), '--processed-as-of', '2025-11-05']
     for extra in ([], ['--layout', 'x'], ['--layout', 'x', '--codes-run', 'r'],
+                  ['--layout', 'x', '--codes-outputs-sha256', '0' * 64],
                   ['--codes-run', 'r', '--codes-outputs-sha256', '0' * 64]):
         with pytest.raises(SystemExit) as raised:
             script.main(base + extra)
@@ -1090,7 +1251,7 @@ def test_no_nine_digit_value_is_printed_by_any_command_or_refusal(script, capsys
     stage(env, {2022: known_2022(), 2023: known_2023(), 2024: known_2024()}, bom=(2023,))
     nine = {value for rows in (known_2022(), known_2023(), known_2024()) for row in rows
             for value in row.values() if NINE_DIGITS.fullmatch(value.strip())}
-    assert len(nine) == 12
+    assert len(nine) == 13
     texts = [run_headers(script, capsys, env).text, run_measure(script, capsys, env).text,
              run_measure(script, capsys, env, pin='0' * 64, expect=2).text,
              run_measure(script, capsys, env, draft_document(
