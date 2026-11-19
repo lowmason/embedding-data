@@ -941,6 +941,38 @@ def test_measure_reads_a_draft_year_with_no_columns_object(script, capsys, env):
     assert report['years']['2023']['facility_years'] == 2
 
 
+@pytest.mark.parametrize('other_naics', [None, []])
+def test_measure_reads_a_null_or_empty_other_naics_as_no_secondary_cells(
+        other_naics, script, capsys, env):
+    stage(env, calm_window())
+    document = draft_document()
+    year_entry(document)['columns']['other_naics'] = other_naics
+    report = run_measure(script, capsys, env, document)
+    assert report['ok'] is True
+    assert report['years']['2023']['other_naics_fill'] == {}
+    # The years that still map their five cells list each of them.
+    for year in ('2022', '2024'):
+        assert report['years'][year]['other_naics_fill'] == dict.fromkeys(OTHER_CELLS, 0)
+
+
+@pytest.mark.parametrize('other_naics', ['', 0, False, {}])
+def test_measure_refuses_an_other_naics_that_is_neither_a_list_nor_null(
+        other_naics, script, capsys, env):
+    stage(env, calm_window())
+    document = draft_document()
+    year_entry(document)['columns']['other_naics'] = other_naics
+    report = run_measure(script, capsys, env, document, expect=2)
+    assert report == {'ok': False, 'reason': 'layout year is malformed'}
+
+
+def test_measure_prints_every_mapped_secondary_cell_for_a_file_with_no_records(
+        script, capsys, env):
+    stage(env, calm_window(y2022=[]))
+    year = run_measure(script, capsys, env)['years']['2022']
+    assert year['rows'] == 0
+    assert year['other_naics_fill'] == dict.fromkeys(OTHER_CELLS, 0)
+
+
 def test_measure_accepts_the_strict_committed_format(script, capsys, env):
     stage(env, calm_window())
     strict = tri_layout.layouts_json(tri_layout.parse_layouts(draft_document()))
@@ -955,6 +987,25 @@ def test_measure_reads_the_year_of_each_file_not_another(script, capsys, env):
     stage(env, rows)
     years = run_measure(script, capsys, env)['years']
     assert [years[year]['rows'] for year in ('2022', '2023', '2024')] == [2, 12, 2]
+
+
+def test_measure_reads_every_column_as_a_string_and_keeps_its_leading_zeros(
+        script, capsys, env):
+    # Each pair differs only by leading zeros, so a number reading would join the two.
+    rows = (fy(2022, '00501ACME0001', parent='ALPHA', standardized='ALPHA INC',
+               dnb='012345678', dcn='0001')
+            + fy(2022, '501ACME0001', parent='BETA', standardized='BETA INC',
+                 dnb='000000000', dcn='1'))
+    stage(env, calm_window(y2022=rows))
+    report = run_measure(script, capsys, env)
+    year = report['years']['2022']
+    assert year['facility_years'] == 2
+    assert year['document_control_number'] == {'blank': 0, 'distinct': 2, 'repeated': 0}
+    # Both numbers are nine ASCII digits, so neither is listed or printed.
+    assert year['parent_dnb_not_nine_digits_top'] == []
+    assert year['fill']['parent_dnb'] == {'facility_years': 2, 'rows': 2}
+    for value in ('012345678', '000000000'):
+        assert json.dumps(value) not in report.text
 
 
 def test_measure_strips_primary_codes_and_reads_a_blank_as_absent(script, capsys, env):

@@ -218,7 +218,9 @@ def _draft_year(year: int, entry: object) -> tri_layout.HeaderLayout:
             or set(raw_values) - set(tri_layout.VALUE_SETS)):
         raise Refused('layout names an unknown field')
     columns = {name: raw_columns.get(name) for name in tri_layout.SCALAR_FIELDS}
-    other = raw_columns.get(tri_layout.OTHER_NAICS, [])
+    other = raw_columns.get(tri_layout.OTHER_NAICS)
+    if other is None:
+        other = []
     if not isinstance(other, list):
         raise Refused('layout year is malformed')
     mapped = [cell for cell in columns.values() if cell is not None] + other
