@@ -9,7 +9,7 @@
   ],
   "field_count": 142,
   "layout": "SAM Master Extract Mapping v6.0 Public File V2 Layout",
-  "member_pattern": "SAM_PUBLIC_(?:UTF-8_)?MONTHLY_V2_[0-9]{8}\\.(?:dat|DAT)",
+  "member_pattern": "SAM_PUBLIC_UTF-8_MONTHLY_V2_[0-9]{8}_[0-9a-f]{32}\\.dat",
   "positions": {
     "evs_source": 122,
     "last_update_date": 10,

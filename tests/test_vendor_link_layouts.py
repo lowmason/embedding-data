@@ -30,7 +30,7 @@ ALL_ASCII_WHITESPACE = ' \t\n\r\x0b\x0c'
 PRODUCTION = {
     'version': 'sam-extract-layout-v1',
     'layout': 'SAM Master Extract Mapping v6.0 Public File V2 Layout',
-    'member_pattern': r'SAM_PUBLIC_(?:UTF-8_)?MONTHLY_V2_[0-9]{8}\.(?:dat|DAT)',
+    'member_pattern': r'SAM_PUBLIC_UTF-8_MONTHLY_V2_[0-9]{8}_[0-9a-f]{32}\.dat',
     'encoding': 'utf-8',
     'delimiter': '|',
     'field_count': 142,
@@ -707,27 +707,55 @@ def test_production_extract_layout_text_is_the_canonical_json():
     assert vendor_link_layouts.EXTRACT_FILE.read_text(encoding='utf-8') == canonical
 
 
-@pytest.mark.parametrize('name', [
-    'SAM_PUBLIC_UTF-8_MONTHLY_V2_20261102.dat',
-    'SAM_PUBLIC_UTF-8_MONTHLY_V2_20261102.DAT',
-    'SAM_PUBLIC_MONTHLY_V2_20200414.dat',
-])
+# The one member of the first real public monthly V2 UTF-8 extract ZIP, seen in 2026: the
+# month's date, an underscore, 32 lower-case hex characters and `.dat`. The registry fits only
+# this form on purpose, so a name of any other form fails closed. Each refused name differs
+# from the real member in one place.
+REAL_MEMBER = 'SAM_PUBLIC_UTF-8_MONTHLY_V2_20261005_897fa9aa54ba4f0fa78f34a447e93956.dat'
+HEAD, DATE, HEX = 'SAM_PUBLIC_UTF-8_MONTHLY_V2_', '20261005', '897fa9aa54ba4f0fa78f34a447e93956'
+STEM = REAL_MEMBER.removesuffix('.dat')
+
+MATCHED_MEMBERS = {
+    'the_real_member': REAL_MEMBER,
+    'another_date_and_every_hex_digit': f'{HEAD}20260105_{"0123456789abcdef" * 2}.dat',
+}
+
+REFUSED_MEMBERS = {
+    'unsuffixed_utf8_form': f'{HEAD}{DATE}.dat',
+    'ascii_form': f'SAM_PUBLIC_MONTHLY_V2_{DATE}_{HEX}.dat',
+    'ascii_unsuffixed_form': 'SAM_PUBLIC_MONTHLY_V2_20200414.dat',
+    'upper_case_extension': f'{STEM}.DAT',
+    'mixed_case_extension': f'{STEM}.Dat',
+    'underscore_for_the_dot': f'{STEM}_dat',
+    'zip_extension': f'{STEM}.ZIP',
+    'no_extension': STEM,
+    'hex_of_31_characters': f'{HEAD}{DATE}_{HEX[:-1]}.dat',
+    'hex_of_33_characters': f'{STEM}0.dat',
+    'empty_hex': f'{HEAD}{DATE}_.dat',
+    'upper_case_hex': f'{HEAD}{DATE}_{HEX.upper()}.dat',
+    'non_hex_letter': f'{HEAD}{DATE}_{HEX[:-1]}g.dat',
+    'date_of_7_digits': f'{HEAD}{DATE[:-1]}_{HEX}.dat',
+    'date_of_9_digits': f'{HEAD}{DATE}0_{HEX}.dat',
+    'date_with_a_letter': f'{HEAD}{DATE[:-1]}a_{HEX}.dat',
+    'no_underscore_before_hex': f'{HEAD}{DATE}{HEX}.dat',
+    'daily_extract': f'SAM_PUBLIC_UTF-8_DAILY_V2_{DATE}_{HEX}.dat',
+    'version_3': f'SAM_PUBLIC_UTF-8_MONTHLY_V3_{DATE}_{HEX}.dat',
+    'doubled_encoding_tag': f'SAM_PUBLIC_UTF-8_UTF-8_MONTHLY_V2_{DATE}_{HEX}.dat',
+    'lower_case_prefix': REAL_MEMBER.replace('SAM_PUBLIC', 'sam_public'),
+    'nested_path': f'dir/{REAL_MEMBER}',
+    'leading_character': f'x{REAL_MEMBER}',
+    'trailing_character': f'{REAL_MEMBER}x',
+    'trailing_extension': f'{REAL_MEMBER}.bak',
+}
+
+
+@pytest.mark.parametrize('name', MATCHED_MEMBERS.values(), ids=MATCHED_MEMBERS.keys())
 def test_production_member_pattern_matches_the_member_names(name):
     layout = vendor_link_layouts.load_extract_layout()
     assert re.fullmatch(layout.member_pattern, name)
 
 
-@pytest.mark.parametrize('name', [
-    'SAM_PUBLIC_UTF-8_MONTHLY_V2_20261102.ZIP',
-    'SAM_PUBLIC_UTF-8_MONTHLY_V2_2026110.dat',
-    'SAM_PUBLIC_UTF-8_MONTHLY_V2_202611021.dat',
-    'SAM_PUBLIC_UTF-8_MONTHLY_V2_20261102.Dat',
-    'SAM_PUBLIC_UTF-8_MONTHLY_V2_20261102_dat',
-    'SAM_PUBLIC_UTF-8_DAILY_V2_20261102.dat',
-    'SAM_PUBLIC_UTF-8_UTF-8_MONTHLY_V2_20261102.dat',
-    'xSAM_PUBLIC_MONTHLY_V2_20200414.dat',
-    'SAM_PUBLIC_MONTHLY_V2_20200414.dat.bak',
-])
+@pytest.mark.parametrize('name', REFUSED_MEMBERS.values(), ids=REFUSED_MEMBERS.keys())
 def test_production_member_pattern_refuses_other_names(name):
     layout = vendor_link_layouts.load_extract_layout()
     assert not re.fullmatch(layout.member_pattern, name)
