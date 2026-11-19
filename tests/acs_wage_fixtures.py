@@ -92,6 +92,22 @@ CORE_SCHEMA: dict[str, pl.DataType] = {
 
 CARRIED_COLUMNS = tuple(name for name in CORE_SCHEMA if name not in DROPPED)
 
+# The spec leaves these out of the file: household identifiers, PUMA, county, the workplace and
+# migration geography, and the design variables. The fixture schema holds only SERIAL and PUMA.
+EXCLUDED_COLUMNS = (
+    'SERIAL',
+    'CBSERIAL',
+    'PERNUM',
+    'PUMA',
+    'COUNTYFIP',
+    'POWSTATE',
+    'POWPUMA',
+    'MIGPLAC1',
+    'MIGPUMA1',
+    'CLUSTER',
+    'STRATA',
+)
+
 COMMON_NODE = 'naics:2022:national_industry:623110'
 DELIVERED_NODE = 'naics:2022:industry_group:6231'
 
@@ -137,6 +153,14 @@ def core_row(**overrides) -> dict:
         **{name: 0 for name in Q_COLUMNS},
     }
     return row | overrides
+
+
+def with_excluded_columns(frame: pl.LazyFrame) -> pl.LazyFrame:
+    '''Return the frame with every column of `EXCLUDED_COLUMNS` that it lacks, as Int64.'''
+    have = set(frame.collect_schema().names())
+    return frame.with_columns(
+        pl.lit(7, dtype=pl.Int64).alias(name) for name in EXCLUDED_COLUMNS if name not in have
+    )
 
 
 def core_frame(rows: list[dict]) -> pl.LazyFrame:

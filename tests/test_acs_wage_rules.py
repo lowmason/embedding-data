@@ -11,10 +11,12 @@ from acs_wage_fixtures import (
     CORE_SCHEMA,
     DELIVERED_NODE,
     DROPPED,
+    EXCLUDED_COLUMNS,
     Q_COLUMNS,
     REPLICATES,
     core_frame,
     core_row,
+    with_excluded_columns,
 )
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -204,6 +206,46 @@ def test_earners_is_a_lazy_plan():
     assert isinstance(rules.wage_persons(core_frame([core_row()])), pl.LazyFrame)
 
 
+def test_the_plans_stay_lazy_over_a_parquet_scan(tmp_path):
+    # A plan that collected the earners and made them lazy again would still be a LazyFrame.
+    # In production it would hold every earner row and all carried columns in memory. The
+    # plan text shows it: the scan must still be in it.
+    rows = [core_row(), core_row(INCWAGE=0), core_row(INCWAGE=7)]
+    path = tmp_path / 'core.parquet'
+    core_frame(rows).collect().write_parquet(path)
+    scan = pl.scan_parquet(path)
+    assert 'Parquet SCAN' in rules.earners(scan).explain()
+    assert 'Parquet SCAN' in rules.wage_persons(scan).explain()
+    assert rules.wage_persons(scan).collect().equals(persons_of(*rows))
+
+
+def narrowed_core_frame() -> pl.LazyFrame:
+    '''Return a core frame whose carried columns all differ from the Stage 8 types.'''
+    casts = {}
+    for name, dtype in CORE_SCHEMA.items():
+        if name in REPLICATES:
+            casts[name] = pl.Float64
+        elif name == 'PERWT':
+            casts[name] = pl.Float32
+        elif name == 'source_row':
+            casts[name] = pl.UInt32
+        elif dtype == pl.Int64:
+            casts[name] = pl.Int32
+    return core_frame([core_row(), core_row(INCWAGE=7)]).cast(casts).with_columns(
+        pl.col('REPWTP3') + 0.5
+    )
+
+
+def test_every_carried_column_keeps_the_type_and_value_of_the_input():
+    frame = narrowed_core_frame()
+    expected = frame.collect_schema()
+    persons = rules.wage_persons(frame).collect()
+    for name in CARRIED_COLUMNS:
+        assert persons.schema[name] == expected[name], name
+    assert persons['REPWTP3'].to_list() == [93.5, 93.5]
+    assert persons['source_row'].to_list() == [0, 1]
+
+
 def test_carried_types_follow_the_input_schema():
     # an input with REPWTP37 as Float64 and OCC as String keeps those types
     frame = core_frame([core_row()]).with_columns(
@@ -243,7 +285,43 @@ def test_extra_columns_are_not_required():
     assert rules.wage_persons(frame).collect().columns == list(rules.OUTPUT_COLUMNS)
 
 
+def test_identifier_and_geography_columns_never_reach_the_file():
+    # SERIAL and PUMA are in the fixture schema. This core also carries the other household
+    # identifiers, the county, the workplace and migration geography, and the design variables.
+    frame = with_excluded_columns(core_frame([core_row(), core_row(INCWAGE=7)]))
+    assert set(EXCLUDED_COLUMNS) <= set(frame.collect_schema().names())
+    persons = rules.wage_persons(frame).collect()
+    assert persons.columns == list(rules.OUTPUT_COLUMNS)
+    assert not set(EXCLUDED_COLUMNS) & set(persons.columns)
+    assert not set(EXCLUDED_COLUMNS) & set(rules.OUTPUT_COLUMNS)
+    assert not set(EXCLUDED_COLUMNS) & set(rules.earners(frame).collect_schema().names())
+
+
 # --- Allocation --------------------------------------------------------------------------
+
+
+def test_rows_that_are_not_headline_stay_in_the_file():
+    # One row leaves the headline for each reason, and one row stays. The file keeps all of them,
+    # in source order, so that a panel can report what each exclusion does.
+    rows = [
+        core_row(),
+        core_row(QIND=4),
+        core_row(UHRSWORK=20),
+        core_row(CLASSWKRD=13),
+        core_row(
+            INDNAICS='X',
+            industry_canonical_common_node_id=OTHER_COMMON,
+            industry_native_node_id=OTHER_DELIVERED,
+        ),
+        core_row(
+            INDNAICS='Y',
+            industry_canonical_common_node_id=OTHER_COMMON,
+            industry_native_node_id='naics:2022:industry:62321',
+        ),
+    ]
+    persons = rules.wage_persons(core_frame(rows)).collect()
+    assert persons['source_row'].to_list() == [0, 1, 2, 3, 4, 5]
+    assert persons['flag_headline'].to_list() == [True, False, False, False, False, False]
 
 
 def test_a_clean_row_is_a_headline_row():
