@@ -455,6 +455,59 @@ def test_the_sensitivities_read_only_the_rows_they_name():
     assert result.report['n_owners'] == {'headline': 1, 'dnb': 1, 'federal': 2}
 
 
+def federal_first(reason: str) -> list[dict]:
+    '''Form rows of the federal facility-year T2 of 2023 that an earlier rule excludes first.
+
+    T2 names P (and Q for a parent conflict) and carries the federal flag on every form.
+    '''
+    if reason == 'naics_missing':
+        return [form(2023, 'T2', B, 'P', QUARTZ, federal='YES', primary_naics='')]
+    if reason == 'naics_conflict':
+        return [form(2023, 'T2', node, 'P', QUARTZ, federal='YES') for node in (A, B)]
+    if reason == 'naics_not_2022':
+        return [form(2023, 'T2', B, 'P', QUARTZ, federal='YES', primary_naics='999999')]
+    assert reason == 'parent_conflict'
+    return [form(2023, 'T2', B, name, QUARTZ, federal='YES') for name in ('P', 'Q')]
+
+
+@pytest.mark.parametrize('reason, partial_a, partial_b, partial_owners', [
+    ('naics_missing', 1, 0, 1), ('naics_conflict', 1, 0, 1), ('naics_not_2022', 1, 0, 1),
+    ('parent_conflict', 2, 1, 2)])
+def test_a_federal_facility_year_that_an_earlier_rule_excludes_is_not_a_federal_row(
+        reason, partial_a, partial_b, partial_owners):
+    # Spec 411 adds the facility-years excluded only as federal. T2 has the federal flag, but
+    # its reason is the earlier rule, so the federal sensitivity leaves it out: no owner, no
+    # node and no raise. By hand: P in a (T1); Q in a (T3) and b (T4) with one D&B number.
+    # Headline n(a) = 2 (P, Q) and n(b) = 1 (Q), so J(a, b) = 1: value 1/2 and 1. The D&B owners
+    # are P's number and Q's number (2), the federal owners are P and Q (2), and the
+    # sensitivities add no cell. T2 is excluded, so it is in no facility count. T2 names P
+    # (and Q for a parent conflict) in 2023: P (and Q) is partial for the 2023 nodes.
+    records = [form(2023, 'T1', A, 'P', PINE), form(2023, 'T3', A, 'Q', ROCK),
+               form(2023, 'T4', B, 'Q', ROCK), *federal_first(reason)]
+    row = reduced(records).filter(pl.col('trifd') == 'T2').row(0, named=True)
+    assert (row['exclusion_reason'], row['federal_values']) == (reason, ['YES'])
+    result = run(records)
+    assert result.targets.select('unit_a', 'unit_b', 'value', 'n_unweighted', 'flags').rows() == [
+        (B, A, 1.0, 1, [SIZE_LABEL]), (A, B, 0.5, 1, [SIZE_LABEL])]
+    assert result.support.rows() == [(B, A, 1, 0, 1, 0, 1, 1), (A, B, 1, 0, 1, 0, 1, 1)]
+    assert result.marginals.rows() == [
+        (B, 1, 1, 1, 1, 1, 1, 1, partial_b), (A, 2, 2, 1, 2, 2, 2, 2, partial_a)]
+    assert result.report['n_owners'] == {'headline': 2, 'dnb': 2, 'federal': 2}
+    assert result.report['cells_only_dnb'] == 0 and result.report['cells_only_federal'] == 0
+    assert result.report['partial_owners'] == partial_owners
+
+
+def test_a_federal_facility_year_with_no_code_still_has_its_parent_partial():
+    # the reviewer's case: P in a, and T2 federal with no code in b. Nothing forms a cell.
+    records = [form(2023, 'T1', A, 'P', PINE), *federal_first('naics_missing')]
+    result = run(records)
+    assert result.targets.is_empty() and result.support.is_empty()
+    assert result.report['n_owners'] == {'headline': 1, 'dnb': 1, 'federal': 1}
+    assert result.report['cells_only_federal'] == 0
+    assert marginal(result, A)['n_owners_partial'] == 1
+    assert result.report['partial_owners'] == 1
+
+
 def test_an_owner_present_in_all_three_years_counts_once_in_j_and_once_a_year():
     records = [form(year, f'T{year}{node[-1]}', node, 'P', PINE)
                for year in YEARS for node in (A, B)]
