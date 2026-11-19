@@ -345,3 +345,9 @@ def test_the_production_file_sits_beside_the_module():
     assert tri_layout.PRODUCTION_FILE == Path(tri_layout.__file__).with_name('tri_layouts.json')
     default = inspect.signature(load_layouts).parameters['file'].default
     assert default == tri_layout.PRODUCTION_FILE
+
+
+def test_production_layout_covers_the_window():
+    layouts = tri_layout.load_layouts()
+    assert sorted(layouts) == [2022, 2023, 2024]
+    assert all(layout.columns['standardized_parent'] for layout in layouts.values())
