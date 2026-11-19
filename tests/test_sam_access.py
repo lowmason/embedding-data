@@ -128,10 +128,16 @@ def test_spellings_are_the_utf8_bytes_of_the_five_forms():
         stem + b'\xc3\xa9')
 
 
+# The five spellings of PUNCTUATED_KEY, built with the standard library, not by the code under
+# test, so a spelling that the code drops is still sent.
+PUNCTUATED_FORMS = [form.encode() for form in (
+    PUNCTUATED_KEY, quote(PUNCTUATED_KEY, safe=''), quote_plus(PUNCTUATED_KEY, safe=''),
+    json.dumps(PUNCTUATED_KEY)[1:-1], html.escape(PUNCTUATED_KEY))]
+FORM_IDS = ['plain', 'quoted', 'form_quoted', 'json', 'html']
+
+
 def test_spellings_match_the_standard_library_forms():
-    forms = (PUNCTUATED_KEY, quote(PUNCTUATED_KEY, safe=''), quote_plus(PUNCTUATED_KEY, safe=''),
-             json.dumps(PUNCTUATED_KEY)[1:-1], html.escape(PUNCTUATED_KEY))
-    assert sam_access.spellings(PUNCTUATED_KEY) == tuple(form.encode() for form in forms)
+    assert sam_access.spellings(PUNCTUATED_KEY) == tuple(PUNCTUATED_FORMS)
 
 
 # Each row is found by exactly one inspection pass, so dropping that pass misses it.
@@ -185,21 +191,19 @@ def test_holdback_covers_the_longest_spelling(cut):
     assert not any(spelling in written for spelling in spellings)
 
 
-@pytest.mark.parametrize('index', range(5))
-def test_scan_refuses_each_spelling(index):
-    spellings = sam_access.spellings(PUNCTUATED_KEY)
-    chunks = [b'PK\x03\x04 lead ', spellings[index] + b' tail']
+@pytest.mark.parametrize('form', PUNCTUATED_FORMS, ids=FORM_IDS)
+def test_scan_refuses_each_spelling(form):
+    chunks = [b'PK\x03\x04 lead ', form + b' tail']
     with pytest.raises(ValueError, match='credential echoed by response'):
-        list(sam_access.scan_chunks(chunks, spellings))
+        list(sam_access.scan_chunks(chunks, sam_access.spellings(PUNCTUATED_KEY)))
 
 
-@pytest.mark.parametrize('index', range(5))
-def test_scan_writes_no_spelling_that_sits_early_in_a_long_chunk(index):
-    spellings = sam_access.spellings(PUNCTUATED_KEY)
-    chunks = [b'PK\x03\x04 lead ' + spellings[index] + b'x' * 200]
+@pytest.mark.parametrize('form', PUNCTUATED_FORMS, ids=FORM_IDS)
+def test_scan_writes_no_spelling_that_sits_early_in_a_long_chunk(form):
+    chunks = [b'PK\x03\x04 lead ' + form + b'x' * 200]
     written = bytearray()
     with pytest.raises(ValueError, match='credential echoed by response'):
-        for part in sam_access.scan_chunks(chunks, spellings):
+        for part in sam_access.scan_chunks(chunks, sam_access.spellings(PUNCTUATED_KEY)):
             written.extend(part)
     assert bytes(written) == b''
 
@@ -214,6 +218,7 @@ def test_scan_writes_no_spelling_that_sits_early_in_a_long_chunk(index):
 def test_scan_passes_a_clean_body_through_unchanged(chunks):
     out = list(sam_access.scan_chunks(chunks, sam_access.spellings(PUNCTUATED_KEY)))
     assert b''.join(out) == b''.join(chunks)
+    assert all(out), 'no empty piece is yielded'
 
 
 def test_scan_holds_back_exactly_the_longest_spelling_less_one_byte():
@@ -593,15 +598,16 @@ def test_a_blank_environment_value_fails_closed_without_reading_the_env_file(tmp
     unavailable(env_file=file)
 
 
-@pytest.mark.parametrize('character', ['\x00', '\t', '\n', '\x1f', '\x7f', '\x85'],
-                         ids=['nul', 'tab', 'newline', 'unit_separator', 'delete', 'next_line'])
 @pytest.mark.parametrize('position', ['start', 'middle', 'end'])
-def test_read_credential_refuses_any_control_character(character, position, tmp_path):
+def test_read_credential_refuses_any_control_character(position, tmp_path):
     # An env file carries every control character, NUL included, which the environment cannot.
-    value = {'start': character + FAKE_KEY, 'middle': FAKE_KEY[:9] + character + FAKE_KEY[9:],
-             'end': FAKE_KEY + character}[position]
-    error = unavailable(env_file=env_file(tmp_path, f'SAM_API_KEY="{value}"\n'))
-    assert FAKE_KEY[:9] not in str(error)
+    # NUL, tab, newline and unit separator (C0), delete, and next line (C1).
+    for character in ('\x00', '\t', '\n', '\x1f', '\x7f', '\x85'):
+        value = {'start': character + FAKE_KEY,
+                 'middle': FAKE_KEY[:9] + character + FAKE_KEY[9:],
+                 'end': FAKE_KEY + character}[position]
+        error = unavailable(env_file=env_file(tmp_path, f'SAM_API_KEY="{value}"\n'))
+        assert FAKE_KEY[:9] not in str(error)
 
 
 def test_read_credential_accepts_printable_non_ascii(tmp_path):

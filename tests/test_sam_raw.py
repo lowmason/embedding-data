@@ -57,9 +57,11 @@ def test_constants_and_layout(data_directory):
     assert sam_raw.month_dir(data_directory, '2026-11') == data_directory / EXTRACTS / '2026-11'
 
 
-@pytest.mark.parametrize('month', ['2026-01', '2026-09', '2026-10', '2026-12', '1999-07'])
-def test_parse_month_accepts_yyyy_mm(month):
-    assert sam_raw.parse_month(month) == month
+def test_parse_month_accepts_every_month_of_any_year():
+    for year in ('1999', '2026'):
+        for number in range(1, 13):
+            month = f'{year}-{number:02d}'
+            assert sam_raw.parse_month(month) == month
 
 
 @pytest.mark.parametrize('month', [
