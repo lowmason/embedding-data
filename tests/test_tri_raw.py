@@ -234,6 +234,35 @@ def test_acquire_refuses_a_short_unsized_or_encoded_body(length, data_directory,
     assert files_under(data_directory) == []
 
 
+def test_acquire_refuses_an_empty_download(data_directory, monkeypatch):
+    epa = Epa(monkeypatch)
+    epa.responses[URLS[2022]] = (200, b'', {'Content-Length': '0'})
+    with pytest.raises(ValueError, match='empty download'):
+        tri_raw.acquire(data_directory)
+    assert epa.requests == [tri_raw.PAGE_URL, URLS[2022]]
+    assert files_under(data_directory) == []
+
+
+def test_acquire_downloads_only_the_missing_years(data_directory, monkeypatch, tmp_path):
+    epa = Epa(monkeypatch)
+    original = tmp_path / 'download.csv'
+    original.write_bytes(b'imported 2022\n')
+    imported = tri_raw.import_file(data_directory, 2022, original, processed_as_of=RECORDED)
+    ledger = paths.manifest_path(data_directory)
+    [entry] = manifest.read_manifest(ledger)
+    files = tri_raw.acquire(data_directory)
+    assert epa.requests == [tri_raw.PAGE_URL, URLS[2023], URLS[2024]]
+    assert files == [tri_raw.raw_path(data_directory, y, RECORDED) for y in (2022, 2023, 2024)]
+    assert files[0] == imported
+    assert [file.read_bytes() for file in files] == [
+        b'imported 2022\n', BODIES[2023], BODIES[2024]]
+    entries = manifest.read_manifest(ledger)
+    assert entries[0] == entry
+    assert [(e.path, e.client, e.source_url) for e in entries[1:]] == [
+        (files[1].relative_to(data_directory / 'raw').as_posix(), 'httpx', URLS[2023]),
+        (files[2].relative_to(data_directory / 'raw').as_posix(), 'httpx', URLS[2024])]
+
+
 def test_acquire_refuses_a_body_longer_than_its_content_length(data_directory, monkeypatch):
     epa = Epa(monkeypatch)
     epa.responses[URLS[2022]] = (200, BODIES[2022], {'Content-Length': str(len(BODIES[2022]) - 1)})

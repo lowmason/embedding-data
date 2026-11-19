@@ -243,6 +243,10 @@ def _download(client: httpx.Client, data_dir: Path, url: str, destination: Path,
             expected = response.headers.get('Content-Length')
             if expected is None:
                 raise ValueError('download has no Content-Length')
+            # A recorded empty file would be kept by every later acquire, and import-file
+            # refuses an occupied destination, so the year could never be filled.
+            if int(expected) == 0:
+                raise ValueError('empty download')
             for chunk in response.iter_raw(CHUNK_SIZE):
                 output.write(chunk)
         if response.num_bytes_downloaded != int(expected):

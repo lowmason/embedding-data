@@ -17,12 +17,12 @@ RAW = 'raw/epa_tri/basic'
 SECRET = 'DUNS 123456789 at 1 Main St'
 
 
-def serve(monkeypatch, page_status: int = 200) -> None:
-    '''Serve the fixture page and a synthetic body for every other URL.'''
+def serve(monkeypatch, page_status: int = 200, file_body: bytes | None = None) -> None:
+    '''Serve the fixture page, and file_body or a synthetic body for every other URL.'''
     def respond(request):
         if str(request.url) == tri_raw.PAGE_URL:
             return httpx.Response(page_status, stream=httpx.ByteStream(PAGE.read_bytes()))
-        body = f'synthetic {request.url.path}\n'.encode()
+        body = f'synthetic {request.url.path}\n'.encode() if file_body is None else file_body
         return httpx.Response(200, headers={'Content-Length': str(len(body))},
                               stream=httpx.ByteStream(body))
 
@@ -93,6 +93,15 @@ def test_acquire_failure_prints_only_the_fixed_line(cli_runner, data_directory, 
     assert result.stderr == failure('acquire', 'network')
     assert result.stdout == ''
     assert not data_directory.exists()
+
+
+def test_an_empty_download_is_a_validation_failure(cli_runner, data_directory, monkeypatch):
+    serve(monkeypatch, file_body=b'')
+    result = cli_runner.invoke(app, ['acquire', '--data-dir', str(data_directory)])
+    assert result.exit_code == 2
+    assert result.stderr == failure('acquire', 'validation')
+    assert result.stdout == ''
+    assert [path for path in data_directory.rglob('*') if not path.is_dir()] == []
 
 
 @pytest.mark.parametrize('error,reason', [
