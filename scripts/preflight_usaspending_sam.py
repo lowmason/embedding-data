@@ -9,14 +9,17 @@ counts are the ones the build will see, and prints E4, E5 and the spec's stops a
 
 Both commands print one sorted JSON object. They exit 0 when no stop holds, 1 when one
 does and 2 on a refusal. Output holds counts, shares, header cells, value shapes and tallies
-of coded values, never a UEI, a name, an address, an amount or any other row value. A
-refusal prints a fixed reason and never exception text. The script loads no `.env`, reads
-no key, opens no HTTP client and runs no upstream builder. `measure` reads in a temporary
-directory outside the data root, and neither command writes under the data root.
+of coded values, never a UEI, a name, an address, an amount or any other row value. A guard
+holds this structurally: `headers` prints a year's header cells only when they are
+lower-case names, and withholding them is a stop. A refusal prints a fixed reason and never
+exception text. The script loads no `.env`, reads no key, opens no HTTP client and runs no
+upstream builder. `measure` reads in a temporary directory outside the data root, and
+neither command writes under the data root.
 '''
 
 import argparse
 import json
+import re
 import sys
 import tempfile
 from collections.abc import Iterator
@@ -52,6 +55,8 @@ STOP_FIELDS = ('prime_uei', 'sub_uei', 'action_date')
 ASK_FIELDS = ('subaward_type', 'amount')
 SHAPED_FIELDS = ('action_date', 'amount')
 TALLIED_FIELDS = ('registration_status', 'evs_source')
+# A delivered header cell is a lower-case snake_case name. A UEI, an amount or a date is not.
+HEADER_NAME = re.compile(r'[a-z][a-z0-9_]*')
 # The fixed messages of the raw-file selectors and the readers. A refusal prints one of
 # these or the fixed reason of the step that failed, never other exception text.
 MESSAGES = frozenset({
@@ -112,21 +117,29 @@ def relative(data_dir: Path, file: Path) -> str:
 
 # ---- headers
 
+def names(header: list[str] | None) -> bool:
+    '''Whether every cell of a member's first record is a lower-case name. An empty member
+    has no first record to print.'''
+    return header is None or all(HEADER_NAME.fullmatch(cell) for cell in header)
+
+
 def describe_year(data_dir: Path, file: Path) -> dict:
     '''A year's file and members. The header cells and hints appear only when every member
-    has the same first record, because a member without a header row would put a data
-    row in their place.'''
+    has the same first record and its cells are lower-case names, because a member without
+    a header row would put a data row in their place.'''
     with step('subaward file is unreadable'):
         members = vendor_link_readers.subaward_headers(file)['members']
     first = members[0]['header'] if members else None
     mismatch = any(member['header'] != first for member in members)
+    not_names = not all(names(member['header']) for member in members)
+    withheld = mismatch or not_names
     for member in members:
         member['cells'] = None if member['header'] is None else len(member['header'])
-        if mismatch:
+        if withheld:
             member['header'] = None
     return {'path': relative(data_dir, file), 'sha256': manifest.sha256_file(file),
-            'members': members, 'header_mismatch': mismatch,
-            'hints': None if mismatch or first is None else hints(first)}
+            'members': members, 'header_mismatch': mismatch, 'header_not_names': not_names,
+            'hints': None if withheld or first is None else hints(first)}
 
 
 def describe_extract(data_dir: Path, file: Path,
@@ -158,9 +171,12 @@ def headers(options: argparse.Namespace) -> dict:
     with step('extract layout is unreadable'):
         layout = vendor_link_layouts.load_extract_layout()
     subawards = {str(year): describe_year(data_dir, files[year]) for year in WINDOW}
-    return {'subawards': subawards, 'extract': describe_extract(data_dir, extract_file, layout),
-            'stops': [f'headers_differ_{year}' for year, described in subawards.items()
-                      if described['header_mismatch']]}
+    extract = describe_extract(data_dir, extract_file, layout)
+    stops = [f'headers_differ_{year}' for year, described in subawards.items()
+             if described['header_mismatch']]
+    stops += [f'headers_not_names_{year}' for year, described in subawards.items()
+              if described['header_not_names']]
+    return {'subawards': subawards, 'extract': extract, 'stops': stops}
 
 
 # ---- measure

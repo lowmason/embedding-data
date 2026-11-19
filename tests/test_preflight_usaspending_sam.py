@@ -400,6 +400,7 @@ def test_headers_prints_each_year_and_the_extract_exactly(run, seeded, tmp_path)
                          'utf8_valid': True, 'records': records[year], 'ragged': 0,
                          'cells': 30}],
             'header_mismatch': False,
+            'header_not_names': False,
             'hints': expected_hints(year == 2026),
         }
     assert report['extract'] == {
@@ -428,14 +429,118 @@ def test_each_hint_lists_the_cells_that_hold_every_keyword(field, run, seeded):
     assert hints == {'2024': HINT_CELLS[field][0], '2026': HINT_CELLS[field][1]}
 
 
-def test_hints_read_the_cells_in_lower_case(run, data_dir, tmp_path):
-    upper = dataclasses.replace(TEST_SUBAWARD_LAYOUTS[2025],
-                                header=tuple(cell.upper() for cell in HEADERS[2025]))
-    raw = seed(data_dir, tmp_path, years={2025: {MEMBER: []}},
-               layouts=TEST_SUBAWARD_LAYOUTS | {2025: upper})
-    hints = run(['headers', *raw])['subawards']['2025']['hints']
-    assert hints == {field: [cell.upper() for cell in cells[0]]
-                     for field, cells in HINT_CELLS.items()}
+def with_cell(year, cell):
+    '''The test header of `year` with its `description` cell replaced by `cell`.'''
+    return [cell if name == 'description' else name for name in HEADERS[year]]
+
+
+def zq_header(cell):
+    '''Twenty-nine lower-case names with `cell` at index 12. No other output text holds a
+    `zq`: hashes, paths, keys and the test headers have none.'''
+    names = [f'zqname_{index:02d}' for index in range(29)]
+    return [*names[:12], cell, *names[12:]]
+
+
+def assert_cells_withheld(text, *headers):
+    '''No non-empty cell of `headers` appears in the JSON `text`, escaped as JSON escapes it.'''
+    for header in headers:
+        for cell in header:
+            assert not cell or json.dumps(cell)[1:-1] not in text
+
+
+# Cells that are not lower-case snake_case names: an upper-case letter first or last, a
+# digit or `_` first, a `-`, a space or a non-ASCII letter inside, an empty cell, a trailing
+# line break, and the UEI, amount and date of a data row.
+NOT_NAMES = ['Zqcell', 'zqcelL', '1zqcell', '_zqcell', 'zq-cell', 'zq cell', '', 'zqcellé',
+             'zqcell\n', 'PRIME0000001', '4817.23', '2024-03-01']
+
+
+@pytest.mark.parametrize('cell', NOT_NAMES, ids=[repr(cell) for cell in NOT_NAMES])
+def test_a_header_cell_that_is_not_a_lower_case_name_withholds_the_year(cell, run, data_dir,
+                                                                        tmp_path):
+    raw = seed(data_dir, tmp_path, years={2025: None})
+    import_subawards(data_dir, tmp_path, 2025, {
+        MEMBER: csv_bytes([zq_header(cell), report(P1, S1, '2024-12-01', year=2025)])})
+    report_ = run(['headers', *raw], code=1)
+    assert report_['subawards']['2025']['members'] == [
+        {'name': MEMBER, 'header': None, 'bom': False, 'utf8_valid': True, 'records': 1,
+         'ragged': 0, 'cells': 30}]
+    assert (report_['subawards']['2025']['header_mismatch'],
+            report_['subawards']['2025']['header_not_names'],
+            report_['subawards']['2025']['hints']) == (False, True, None)
+    assert report_['stops'] == ['headers_not_names_2025']
+    text = json.dumps(report_)
+    assert_cells_withheld(text, zq_header(cell))
+    assert 'zq' not in text.lower()
+    assert_no_row_values(text)
+
+
+@pytest.mark.parametrize('cell', ['description_2', 'd', 'a_1_b'])
+def test_a_lower_case_name_with_digits_and_underscores_is_printed(cell, run, data_dir,
+                                                                  tmp_path):
+    raw = seed(data_dir, tmp_path, years={2025: None})
+    import_subawards(data_dir, tmp_path, 2025, {MEMBER: csv_bytes([with_cell(2025, cell)])})
+    report_ = run(['headers', *raw])
+    assert report_['subawards']['2025']['members'][0]['header'] == with_cell(2025, cell)
+    assert (report_['subawards']['2025']['header_not_names'],
+            report_['subawards']['2025']['hints'], report_['stops']) == (
+        False, expected_hints(0), [])
+
+
+@pytest.mark.parametrize('year', WINDOW)
+def test_a_single_member_whose_first_record_is_a_data_row_is_withheld(year, run, data_dir,
+                                                                       tmp_path):
+    raw = seed(data_dir, tmp_path, years={year: None})
+    data_row = [S2, '5511.42', '2026-02-14']
+    import_subawards(data_dir, tmp_path, year, {
+        MEMBER: csv_bytes([data_row, [P2, '310.00', '2025-11-03']])})
+    report_ = run(['headers', *raw], code=1)
+    assert report_['subawards'][str(year)] == {
+        'path': f'raw/usaspending/subcontracts/2026-11-20/FY{year}/FY{year}_custom.zip',
+        'sha256': manifest.sha256_file(tmp_path / 'custom' / f'FY{year}_custom.zip'),
+        'members': [{'name': MEMBER, 'header': None, 'bom': False, 'utf8_valid': True,
+                     'records': 1, 'ragged': 0, 'cells': 3}],
+        'header_mismatch': False, 'header_not_names': True, 'hints': None}
+    assert report_['stops'] == [f'headers_not_names_{year}']
+    text = json.dumps(report_)
+    assert_cells_withheld(text, data_row)
+    assert '2025-11-03' not in text
+    assert_no_row_values(text)
+
+
+def test_members_whose_lower_case_names_differ_withhold_only_for_the_mismatch(run, data_dir,
+                                                                              tmp_path):
+    raw = seed(data_dir, tmp_path, years={2025: None})
+    alpha, beta = zq_header('zqcell_alpha'), zq_header('zqcell_beta')
+    import_subawards(data_dir, tmp_path, 2025, {MEMBER: csv_bytes([alpha]),
+                                                MEMBER_2: csv_bytes([beta])})
+    report_ = run(['headers', *raw], code=1)
+    member = {'header': None, 'bom': False, 'utf8_valid': True, 'records': 0, 'ragged': 0,
+              'cells': 30}
+    assert report_['subawards']['2025']['members'] == [
+        {'name': MEMBER} | member, {'name': MEMBER_2} | member]
+    assert (report_['subawards']['2025']['header_mismatch'],
+            report_['subawards']['2025']['header_not_names'],
+            report_['subawards']['2025']['hints'], report_['stops']) == (
+        True, False, None, ['headers_differ_2025'])
+    text = json.dumps(report_)
+    assert_cells_withheld(text, alpha, beta)
+    assert 'zq' not in text.lower()
+
+
+def test_identical_upper_case_headers_are_withheld_as_not_names(run, data_dir, tmp_path):
+    raw = seed(data_dir, tmp_path, years={2025: None})
+    upper = [cell.upper() for cell in zq_header('zqcell')]
+    import_subawards(data_dir, tmp_path, 2025, {MEMBER: csv_bytes([upper]),
+                                                MEMBER_2: csv_bytes([upper])})
+    report_ = run(['headers', *raw], code=1)
+    assert [member['header'] for member in report_['subawards']['2025']['members']] == [
+        None, None]
+    assert (report_['subawards']['2025']['header_mismatch'],
+            report_['subawards']['2025']['header_not_names'],
+            report_['subawards']['2025']['hints'], report_['stops']) == (
+        False, True, None, ['headers_not_names_2025'])
+    assert 'zq' not in json.dumps(report_).lower()
 
 
 def test_identical_member_headers_are_printed(run, data_dir, tmp_path):
@@ -451,8 +556,8 @@ def test_identical_member_headers_are_printed(run, data_dir, tmp_path):
          'records': 1, 'ragged': 0, 'cells': 30},
         {'name': MEMBER_2, 'header': list(HEADER_2024), 'bom': True, 'utf8_valid': True,
          'records': 2, 'ragged': 0, 'cells': 30}]
-    assert (year['header_mismatch'], year['hints'], report_['stops']) == (
-        False, expected_hints(0), [])
+    assert (year['header_mismatch'], year['header_not_names'], year['hints'],
+            report_['stops']) == (False, False, expected_hints(0), [])
 
 
 @pytest.mark.parametrize('year', WINDOW)
@@ -470,8 +575,10 @@ def test_a_year_whose_members_differ_prints_no_header_cell(year, run, data_dir, 
         {'name': MEMBER_2, 'header': None, 'bom': False, 'utf8_valid': True, 'records': 1,
          'ragged': 1, 'cells': 31}]
     assert status_report['subawards'][str(year)]['header_mismatch'] is True
+    # The data row is also not a header of names.
+    assert status_report['subawards'][str(year)]['header_not_names'] is True
     assert status_report['subawards'][str(year)]['hints'] is None
-    assert status_report['stops'] == [f'headers_differ_{year}']
+    assert status_report['stops'] == [f'headers_differ_{year}', f'headers_not_names_{year}']
     text = json.dumps(status_report)
     assert MISMATCH_CELL not in text
     assert_no_row_values(text)
@@ -486,7 +593,11 @@ def test_two_years_whose_members_differ_stop_in_year_order(run, data_dir, tmp_pa
         MEMBER: csv_bytes([HEADER_2024]),
         MEMBER_2: csv_bytes([report(P1, S1, '2024-03-01')])})
     report_ = run(['headers', *raw], code=1)
-    assert report_['stops'] == ['headers_differ_2024', 'headers_differ_2026']
+    # By rule and then by year: the 2024 data row is also not a header of names.
+    assert report_['stops'] == ['headers_differ_2024', 'headers_differ_2026',
+                                'headers_not_names_2024']
+    assert [report_['subawards'][year]['header_not_names'] for year in ('2024', '2025', '2026')
+            ] == [True, False, False]
     member = {'header': None, 'bom': False, 'utf8_valid': True, 'records': 0, 'ragged': 0}
     assert report_['subawards']['2024']['members'] == [
         {'name': MEMBER, 'cells': 30} | member, {'name': MEMBER_2, 'cells': 30} | member]
@@ -504,7 +615,8 @@ def test_a_year_of_one_empty_member_has_no_header_and_no_hints(run, data_dir, tm
         {'name': MEMBER, 'header': None, 'bom': False, 'utf8_valid': True, 'records': 0,
          'ragged': 0, 'cells': None}]
     assert (report_['subawards']['2026']['header_mismatch'],
-            report_['subawards']['2026']['hints'], report_['stops']) == (False, None, [])
+            report_['subawards']['2026']['header_not_names'],
+            report_['subawards']['2026']['hints'], report_['stops']) == (False, False, None, [])
 
 
 def shape_lines(**columns):
