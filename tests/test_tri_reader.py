@@ -75,6 +75,16 @@ def entries(directory: Path) -> list[str]:
     return sorted(path.name for path in directory.iterdir()) if directory.exists() else []
 
 
+def test_read_schema_is_the_documented_one():
+    assert list(READ_SCHEMA.items()) == [
+        ('year', pl.Int64), ('reporting_year', pl.String), ('trifd', pl.String),
+        ('form_type', pl.String), ('state', pl.String), ('federal', pl.String),
+        ('primary_naics', pl.String), ('naics_2', pl.String), ('naics_3', pl.String),
+        ('naics_4', pl.String), ('naics_5', pl.String), ('naics_6', pl.String),
+        ('parent_name', pl.String), ('parent_dnb', pl.String),
+        ('standardized_parent', pl.String), ('standardized_foreign_parent', pl.String)]
+
+
 def test_reads_the_mapped_columns_as_strings(tmp_path):
     rows = [tri_row(2023, 'T1', form='A', federal=True, **ACME),
             tri_row(2023, 'T2', form='R', federal=False, **{**ACME, 'parent_dnb': '000000042'})]
