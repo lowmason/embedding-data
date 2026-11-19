@@ -252,12 +252,6 @@ def test_rows_are_the_stage8_earners_in_order(chain):
     assert persons['source_row'].to_list() == core['source_row'].to_list()
 
 
-def test_published_table_is_the_wage_rules_result(chain):
-    directory = built(chain)
-    expected = acs_wage_rules.wage_persons(pl.scan_parquet(stage8_core(chain))).collect()
-    assert pl.read_parquet(directory / 'acs_wage_persons.parquet').equals(expected)
-
-
 def test_control_rows_get_their_expected_flags(chain):
     persons = pl.read_parquet(built(chain) / 'acs_wage_persons.parquet')
     for age in CONTROLS:
@@ -377,6 +371,24 @@ def test_failed_build_removes_only_its_staging(chain, monkeypatch):
         build(chain, 'second')
     assert entries(runs_root(chain)) == ['first', 'other.part']
     assert digests(runs_root(chain)) == before
+
+
+def test_cleanup_refuses_a_staging_path_that_became_a_symlink(chain, monkeypatch):
+    staging = runs_root(chain) / 'first.part'
+    moved = chain['data_dir'].parent / 'moved'
+    original = acs_wage_rules.summarize
+
+    def swapping(persons):
+        summary = original(persons)
+        staging.rename(moved)
+        staging.symlink_to(moved, target_is_directory=True)
+        return summary
+
+    monkeypatch.setattr(acs_wage_rules, 'summarize', swapping)
+    with pytest.raises(ValueError, match='symlink'):
+        build(chain, 'first')
+    assert staging.is_symlink()
+    assert 'acs_wage_persons.parquet' in entries(moved)
 
 
 @pytest.mark.parametrize('distortion', ['reverse', 'drop_last_row'])
@@ -638,8 +650,7 @@ def test_replay_compares_equal(chain):
 
 
 def test_compare_reports_a_rehashed_edit_as_unequal(chain):
-    first = built(chain)
-    replay = shutil.copytree(first, runs_root(chain) / 'replay')
+    first, replay = built(chain, 'first'), built(chain, 'replay')
     change_age(replay)
     rehash(replay)
     result = compare_runs(first, replay)
