@@ -757,6 +757,23 @@ def test_year_report_counts_each_year_on_its_own_and_ignores_other_years():
         assert counts['dnb_with_several_names'] == 0
 
 
+def test_year_report_reads_each_years_own_registered_strings():
+    layouts = with_values(2024, **ODD_SETS)
+    report = report_for([
+        form('T1', 2023, standardized_parent='NONE', parent_dnb='0'),
+        form('T1', 2024, form_type='AA', federal='Y', standardized_parent='NONE', parent_dnb='0'),
+        form('T2', 2024, form_type='RR', federal='N', standardized_parent='NA', parent_dnb='NA'),
+    ], layouts)
+    # In 2023 `NONE` and `0` are values. In 2024 they stand for no parent and no number.
+    assert (report['2023']['with_parent'], report['2023']['with_usable_dnb']) == (1, 1)
+    counts = report['2024']
+    assert counts['rows_by_form_type'] == {'form_r': 1, 'form_a': 1}
+    assert counts['facility_years_by_reason'] == {
+        'eligible': 1, 'naics_missing': 0, 'naics_conflict': 0, 'naics_not_2022': 0,
+        'parent_conflict': 0, 'federal': 1}
+    assert (counts['with_parent'], counts['with_usable_dnb']) == (1, 1)
+
+
 @pytest.mark.parametrize('parents, case_a, case_b', [
     # reported, standardized
     ([('NA', 'ACME')], 1, 0),
