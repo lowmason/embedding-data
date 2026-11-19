@@ -5,6 +5,8 @@ import importlib.util
 import json
 import math
 import operator
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -658,3 +660,524 @@ def test_node_checks_count_rows_over_every_pair(script):
     pairs = [('A111', 'A1', 2), ('A111', 'A', 3), ('Z', 'A', 4), ('B111', 'B', 5)]
     assert script.node_failures(pairs, *forest()) == {'unknown_node': 4,
                                                       'delivered_node_chain': 8}
+
+
+# The preservation controls (spec item 7): `freeze` and `preservation`.
+
+CONTROL_ROOT = 'derived/acs/wage-microdata-controls'
+WAGE_RUNS = 'derived/acs/wage-microdata'
+STAGE8_CORE = 'derived/acs/mapping/mapping/acs_core_canonical.parquet'
+MANIFEST = 'raw/manifest.jsonl'
+RUNS = 'first,replay'
+UNSAFE_CONTROL = 'unsafe control directory'
+CONTROL_EXISTS = 'control directory exists'
+WRONG_TREES = 'raw or derived is not a directory'
+PIN_DIFFERS = 'freeze pin differs'
+
+
+@pytest.fixture
+def chain(template, tmp_path):
+    '''The fixture chain before any build, copied so that a test can freeze and change it.'''
+    copied = copy_template(template, tmp_path)
+    shutil.rmtree(copied['data_dir'] / WAGE_RUNS)
+    return copied
+
+
+@pytest.fixture(scope='module')
+def frozen_template(template, tmp_path_factory):
+    '''The chain frozen before any build, then built twice into the runs `first` and `replay`.'''
+    copied = copy_template(template, tmp_path_factory.mktemp('stage17-preservation'))
+    data_dir = copied['data_dir']
+    shutil.rmtree(data_dir / WAGE_RUNS)
+    status, frozen = run_freeze(data_dir)
+    assert status == 0
+    with pytest.MonkeyPatch.context() as patches:
+        forbid_external_access(patches)
+        for run in ('first', 'replay'):
+            acs_wage_bundle.build(
+                data_dir, run, mapping_run=copied['mapping_run'],
+                mapping_outputs_sha256=copied['mapping_outputs_sha256'],
+                codes_run=copied['codes_run'],
+                codes_outputs_sha256=copied['codes_outputs_sha256'])
+    return copied | {'freeze_pin': frozen['freeze_sha256'], 'freeze_files': frozen['files']}
+
+
+@pytest.fixture
+def frozen(frozen_template, tmp_path):
+    '''The frozen and built chain, copied so that a test can damage it.'''
+    return copy_template(frozen_template, tmp_path)
+
+
+def run_control(command, data_dir, *arguments):
+    '''Run a preservation subcommand in a subprocess. Return its status and its one JSON line.'''
+    completed = subprocess.run(
+        [sys.executable, str(SCRIPT), command, '--data-dir', str(data_dir), *arguments],
+        cwd=ROOT, capture_output=True, text=True, check=False)
+    assert completed.stderr == ''
+    lines = completed.stdout.splitlines()
+    assert len(lines) == 1
+    result = json.loads(lines[0])
+    assert lines[0] == json.dumps(result, sort_keys=True)
+    return completed.returncode, result
+
+
+def control_dir(data_dir, name='first'):
+    return data_dir / CONTROL_ROOT / name
+
+
+def run_freeze(data_dir, control=None):
+    return run_control('freeze', data_dir, '--control-dir',
+                       str(control or control_dir(data_dir)))
+
+
+def run_preservation(data_dir, pin, runs=RUNS, control=None):
+    return run_control('preservation', data_dir, '--control-dir',
+                       str(control or control_dir(data_dir)), '--freeze-sha256', pin, '--runs',
+                       runs)
+
+
+def control_refusal(command, reason):
+    return {'check': command, 'reason': reason, 'status': 'refused'}
+
+
+def checked(**changes):
+    '''A clean result on the frozen chain after its two builds, with some fields changed.'''
+    return {'status': 'preserved', 'changed': [], 'missing': [], 'added': [],
+            'manifest_equal': True, 'runs': ['first', 'replay']} | changes
+
+
+def tree(data_dir):
+    '''Every path under the data directory, files and directories, without any content.'''
+    return sorted(path.relative_to(data_dir).as_posix() for path in data_dir.rglob('*'))
+
+
+def frozen_files(data_dir):
+    '''Every regular file under raw and derived but the manifest and the two stage trees.'''
+    skipped = (data_dir / WAGE_RUNS, data_dir / CONTROL_ROOT)
+    return {
+        path.relative_to(data_dir).as_posix():
+            {'sha256': manifest.sha256_file(path), 'size': path.stat().st_size}
+        for tree_name in ('raw', 'derived') for path in sorted((data_dir / tree_name).rglob('*'))
+        if path.is_file() and path != data_dir / MANIFEST
+        and not any(path.is_relative_to(tree_path) for tree_path in skipped)
+    }
+
+
+def flip_a_byte(file):
+    '''Change one byte in the middle of a file and keep its size.'''
+    content = bytearray(file.read_bytes())
+    content[len(content) // 2] ^= 1
+    file.write_bytes(content)
+
+
+def a_raw_file(data_dir):
+    '''The first raw file by path, other than the manifest.'''
+    return min(path.relative_to(data_dir).as_posix() for path in (data_dir / 'raw').rglob('*')
+               if path.is_file() and path.name != 'manifest.jsonl')
+
+
+def change_stage8_byte(data_dir):
+    flip_a_byte(data_dir / STAGE8_CORE)
+    return {'changed': [STAGE8_CORE]}
+
+
+def add_stray_derived_file(data_dir):
+    # The name starts like the run tree's, so a prefix test on the name would skip it.
+    stray = 'derived/acs/wage-microdata-extra.txt'
+    (data_dir / stray).write_text('stray')
+    return {'added': [stray]}
+
+
+def append_manifest_line(data_dir):
+    with (data_dir / MANIFEST).open('a') as stream:
+        stream.write('{}\n')
+    return {'manifest_equal': False}
+
+
+def leave_part_directory(data_dir):
+    (data_dir / WAGE_RUNS / 'replay2.part').mkdir()
+    return {'added': [f'{WAGE_RUNS}/replay2.part'], 'runs': ['first', 'replay', 'replay2.part']}
+
+
+def remove_raw_file(data_dir):
+    path = a_raw_file(data_dir)
+    (data_dir / path).unlink()
+    return {'missing': [path]}
+
+
+def change_raw_byte(data_dir):
+    path = a_raw_file(data_dir)
+    flip_a_byte(data_dir / path)
+    return {'changed': [path]}
+
+
+def grow_a_derived_file(data_dir):
+    file = data_dir / STAGE8_CORE
+    file.write_bytes(file.read_bytes() + b'\0')
+    return {'changed': [STAGE8_CORE]}
+
+
+def add_stray_raw_file(data_dir):
+    (data_dir / 'raw' / 'stray.txt').write_text('stray')
+    return {'added': ['raw/stray.txt']}
+
+
+def remove_derived_file(data_dir):
+    (data_dir / STAGE8_CORE).unlink()
+    return {'missing': [STAGE8_CORE]}
+
+
+def rewrite_manifest_with_the_same_size(data_dir):
+    flip_a_byte(data_dir / MANIFEST)
+    return {'manifest_equal': False}
+
+
+def remove_manifest(data_dir):
+    (data_dir / MANIFEST).unlink()
+    return {'manifest_equal': False}
+
+
+def add_an_unnamed_run(data_dir):
+    (data_dir / WAGE_RUNS / 'third').mkdir()
+    return {'added': [f'{WAGE_RUNS}/third'], 'runs': ['first', 'replay', 'third']}
+
+
+def add_a_stray_file_among_the_runs(data_dir):
+    (data_dir / WAGE_RUNS / 'notes.txt').write_text('stray')
+    return {'added': [f'{WAGE_RUNS}/notes.txt'], 'runs': ['first', 'notes.txt', 'replay']}
+
+
+def remove_a_named_run(data_dir):
+    shutil.rmtree(data_dir / WAGE_RUNS / 'replay')
+    return {'missing': [f'{WAGE_RUNS}/replay'], 'runs': ['first']}
+
+
+def change_stage4_byte(data_dir):
+    path = min(path.relative_to(data_dir).as_posix()
+               for path in (data_dir / 'derived/codes').rglob('*.parquet'))
+    flip_a_byte(data_dir / path)
+    return {'changed': [path]}
+
+
+def change_add_and_remove_many(data_dir):
+    # A file and a run in each list: the lists are sorted over files and runs together.
+    removed = a_raw_file(data_dir)
+    (data_dir / removed).unlink()
+    shutil.rmtree(data_dir / WAGE_RUNS / 'replay')
+    (data_dir / WAGE_RUNS / 'third').mkdir()
+    (data_dir / 'raw' / 'stray.txt').write_text('stray')
+    flip_a_byte(data_dir / STAGE8_CORE)
+    return {'changed': [STAGE8_CORE], 'added': [f'{WAGE_RUNS}/third', 'raw/stray.txt'],
+            'missing': [f'{WAGE_RUNS}/replay', removed], 'runs': ['first', 'third']}
+
+
+def test_preserved_after_a_fixture_build(frozen):
+    status, result = run_preservation(frozen['data_dir'], frozen['freeze_pin'])
+    assert (status, result) == (0, checked())
+    assert frozen['freeze_files'] > 0
+    assert sorted(path.name for path in (frozen['data_dir'] / WAGE_RUNS).iterdir()) == [
+        'first', 'replay']
+
+
+@pytest.mark.parametrize('damage', ['change_stage8_byte', 'add_stray_derived_file',
+                                    'append_manifest_line', 'leave_part_directory',
+                                    'remove_raw_file'])
+def test_preservation_reports_each_kind_of_change(frozen, damage):
+    expected = {
+        'change_stage8_byte': change_stage8_byte,
+        'add_stray_derived_file': add_stray_derived_file,
+        'append_manifest_line': append_manifest_line,
+        'leave_part_directory': leave_part_directory,
+        'remove_raw_file': remove_raw_file,
+    }[damage](frozen['data_dir'])
+    exit_code, result = run_preservation(frozen['data_dir'], frozen['freeze_pin'])
+    assert result['status'] == 'changed' and exit_code == 1
+    assert result == checked(status='changed', **expected)
+
+
+OTHER_DAMAGE = {
+    function.__name__: function for function in (
+        change_raw_byte, change_stage4_byte, grow_a_derived_file, add_stray_raw_file,
+        remove_derived_file, rewrite_manifest_with_the_same_size, remove_manifest,
+        add_an_unnamed_run, add_a_stray_file_among_the_runs, remove_a_named_run,
+        change_add_and_remove_many)
+}
+
+
+@pytest.mark.parametrize('damage', OTHER_DAMAGE)
+def test_preservation_reports_every_other_kind_of_change(frozen, damage):
+    expected = OTHER_DAMAGE[damage](frozen['data_dir'])
+    exit_code, result = run_preservation(frozen['data_dir'], frozen['freeze_pin'])
+    assert exit_code == 1
+    assert result == checked(status='changed', **expected)
+
+
+def test_preservation_leaves_the_files_of_the_named_runs_and_the_control_directory_free(frozen):
+    data_dir = frozen['data_dir']
+    flip_a_byte(data_dir / WAGE_RUNS / 'first' / 'inputs.json')
+    (data_dir / WAGE_RUNS / 'replay' / 'extra.bin').write_bytes(b'extra')
+    (data_dir / WAGE_RUNS / 'first' / 'nested').mkdir()
+    (control_dir(data_dir) / 'notes.txt').write_text('notes')
+    (data_dir / CONTROL_ROOT / 'other').mkdir()
+    status, result = run_preservation(data_dir, frozen['freeze_pin'])
+    assert (status, result) == (0, checked())
+
+
+@pytest.mark.parametrize(('runs', 'changes'), [
+    ('first', {'added': [f'{WAGE_RUNS}/replay']}),
+    ('first,replay,third', {'missing': [f'{WAGE_RUNS}/third']}),
+    ('replay,first', {}),
+], ids=['an_unnamed_run', 'an_absent_named_run', 'any_order'])
+def test_preservation_needs_exactly_the_named_runs(frozen, runs, changes):
+    status, result = run_preservation(frozen['data_dir'], frozen['freeze_pin'], runs=runs)
+    assert status == (1 if changes else 0)
+    assert result == checked(status='changed' if changes else 'preserved', **changes)
+
+
+@pytest.mark.parametrize('runs', ['first.part', '../first', '', 'first,bad name', 'first,,replay'],
+                         ids=['part', 'path', 'empty', 'one_unsafe', 'empty_item'])
+def test_preservation_refuses_an_unsafe_run_name(frozen, runs):
+    status, result = run_preservation(frozen['data_dir'], frozen['freeze_pin'], runs=runs)
+    assert (status, result) == (1, control_refusal('preservation', 'unsafe run ID'))
+
+
+def test_frozen_runs_stay_without_being_named(chain_build):
+    data_dir = chain_build['data_dir']
+    status, frozen = run_freeze(data_dir)
+    assert status == 0
+    shutil.copytree(bundle(chain_build), data_dir / WAGE_RUNS / 'replay')
+    status, result = run_preservation(data_dir, frozen['freeze_sha256'], runs='replay')
+    assert (status, result) == (0, checked())
+    shutil.rmtree(bundle(chain_build))
+    status, result = run_preservation(data_dir, frozen['freeze_sha256'], runs='replay')
+    assert (status, result) == (1, checked(status='changed', missing=[f'{WAGE_RUNS}/first'],
+                                           runs=['replay']))
+
+
+def test_a_part_directory_that_was_frozen_still_fails_the_check(chain_build):
+    data_dir = chain_build['data_dir']
+    (data_dir / WAGE_RUNS / 'old.part').mkdir()
+    status, frozen = run_freeze(data_dir)
+    assert status == 0
+    shutil.copytree(bundle(chain_build), data_dir / WAGE_RUNS / 'replay')
+    status, result = run_preservation(data_dir, frozen['freeze_sha256'], runs='replay')
+    assert (status, result) == (1, checked(status='changed', added=[f'{WAGE_RUNS}/old.part'],
+                                           runs=['first', 'old.part', 'replay']))
+
+
+def test_freeze_records_every_file_outside_the_excluded_trees(chain_build):
+    data_dir = chain_build['data_dir']
+    earlier = data_dir / CONTROL_ROOT / 'earlier'
+    earlier.mkdir(parents=True)
+    (earlier / 'freeze.json').write_text('{}')
+    expected = frozen_files(data_dir)
+    manifest_file = data_dir / MANIFEST
+    status, result = run_freeze(data_dir)
+    file = control_dir(data_dir) / 'freeze.json'
+    assert status == 0
+    assert result == {'freeze_sha256': manifest.sha256_file(file), 'files': len(expected)}
+    assert json.loads(file.read_text()) == {
+        'files': expected,
+        'manifest': {'sha256': manifest.sha256_file(manifest_file),
+                     'size': manifest_file.stat().st_size,
+                     'lines': manifest_file.read_bytes().count(b'\n')},
+        'runs': ['first'],
+    }
+    assert manifest_file.read_bytes().endswith(b'\n')
+    assert STAGE8_CORE in expected and a_raw_file(data_dir) in expected
+    assert MANIFEST not in expected
+    assert not [path for path in expected if path.startswith((WAGE_RUNS, CONTROL_ROOT))]
+    assert any(bundle(chain_build).iterdir())
+
+
+def test_freeze_before_any_build_records_no_runs(chain):
+    status, _result = run_freeze(chain['data_dir'])
+    assert status == 0
+    record = json.loads((control_dir(chain['data_dir']) / 'freeze.json').read_text())
+    assert record['runs'] == []
+
+
+CONTROL_PLACES = {
+    'existing': (lambda data_dir, outside: control_dir(data_dir), CONTROL_EXISTS),
+    'other_parent': (lambda data_dir, outside: data_dir / 'derived/acs/controls/first',
+                     UNSAFE_CONTROL),
+    'nested': (lambda data_dir, outside: control_dir(data_dir) / 'inner', UNSAFE_CONTROL),
+    'unsafe_id': (lambda data_dir, outside: control_dir(data_dir, 'first.v1'), UNSAFE_CONTROL),
+    'part_suffix': (lambda data_dir, outside: control_dir(data_dir, 'first.part'),
+                    UNSAFE_CONTROL),
+    'the_controls_root': (lambda data_dir, outside: data_dir / CONTROL_ROOT, UNSAFE_CONTROL),
+    'outside_the_data_dir': (lambda data_dir, outside: outside / CONTROL_ROOT / 'first',
+                             UNSAFE_CONTROL),
+}
+
+
+@pytest.mark.parametrize('case', CONTROL_PLACES)
+def test_freeze_refuses_an_existing_or_misplaced_control_dir(chain, tmp_path, case):
+    data_dir = chain['data_dir']
+    place, reason = CONTROL_PLACES[case]
+    path = place(data_dir, tmp_path / 'outside')
+    if reason == CONTROL_EXISTS:
+        path.mkdir(parents=True)
+    before = tree(data_dir)
+    status, result = run_freeze(data_dir, control=path)
+    assert (status, result) == (1, control_refusal('freeze', reason))
+    assert tree(data_dir) == before
+    assert not (tmp_path / 'outside').exists()
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason='a superuser can read an unreadable file')
+def test_freeze_hashes_every_file_before_it_creates_the_control_directory(chain):
+    data_dir = chain['data_dir']
+    unreadable = data_dir / a_raw_file(data_dir)
+    unreadable.chmod(0)
+    try:
+        before = tree(data_dir)
+        status, result = run_freeze(data_dir)
+    finally:
+        unreadable.chmod(0o644)
+    assert (status, result) == (1, control_refusal('freeze', 'freeze failed'))
+    assert tree(data_dir) == before
+
+
+def test_freeze_twice_with_the_same_control_dir_is_refused(chain):
+    assert run_freeze(chain['data_dir'])[0] == 0
+    file = control_dir(chain['data_dir']) / 'freeze.json'
+    before = file.read_bytes()
+    status, result = run_freeze(chain['data_dir'])
+    assert (status, result) == (1, control_refusal('freeze', CONTROL_EXISTS))
+    assert file.read_bytes() == before
+
+
+def link_in_raw(data_dir):
+    os.symlink(data_dir / MANIFEST, data_dir / 'raw' / 'link.txt')
+    return 'symlink in the walk: raw/link.txt'
+
+
+def link_to_a_directory(data_dir):
+    os.symlink(data_dir / 'raw', data_dir / 'derived' / 'linked')
+    return 'symlink in the walk: derived/linked'
+
+
+def broken_link(data_dir):
+    os.symlink(data_dir / 'nowhere', data_dir / 'raw' / 'broken')
+    return 'symlink in the walk: raw/broken'
+
+
+def link_inside_a_run(data_dir):
+    run = data_dir / WAGE_RUNS / 'first'
+    run.mkdir(parents=True)
+    os.symlink(data_dir / MANIFEST, run / 'link.txt')
+    return f'symlink in the walk: {WAGE_RUNS}/first/link.txt'
+
+
+def raw_as_a_link(data_dir):
+    (data_dir / 'raw').rename(data_dir / 'raw_real')
+    os.symlink(data_dir / 'raw_real', data_dir / 'raw')
+    return 'symlink in the walk: raw'
+
+
+def pipe_in_raw(data_dir):
+    os.mkfifo(data_dir / 'raw' / 'pipe')
+    return 'not a regular file in the walk: raw/pipe'
+
+
+WALK_CASES = {function.__name__: function for function in (
+    link_in_raw, link_to_a_directory, broken_link, link_inside_a_run, raw_as_a_link,
+    pipe_in_raw)}
+
+
+@pytest.mark.parametrize('case', WALK_CASES)
+def test_freeze_refuses_a_symlink_or_other_entry_in_the_walk(chain, case):
+    data_dir = chain['data_dir']
+    reason = WALK_CASES[case](data_dir)
+    before = tree(data_dir)
+    status, result = run_freeze(data_dir)
+    assert (status, result) == (1, control_refusal('freeze', reason))
+    assert tree(data_dir) == before
+
+
+@pytest.mark.parametrize('case', WALK_CASES)
+def test_preservation_refuses_a_symlink_or_other_entry_in_the_walk(chain, case):
+    data_dir = chain['data_dir']
+    status, frozen = run_freeze(data_dir)
+    assert status == 0
+    reason = WALK_CASES[case](data_dir)
+    status, result = run_preservation(data_dir, frozen['freeze_sha256'], runs='first')
+    assert (status, result) == (1, control_refusal('preservation', reason))
+
+
+TREE_CASES = {
+    'neither': ((), WRONG_TREES),
+    'no_raw': (('derived',), WRONG_TREES),
+    'no_derived': (('raw',), WRONG_TREES),
+    'no_manifest': (('raw', 'derived'), 'manifest is missing'),
+}
+
+
+@pytest.mark.parametrize('case', TREE_CASES)
+def test_freeze_refuses_a_data_directory_without_the_expected_files(tmp_path, case):
+    directories, reason = TREE_CASES[case]
+    for name in directories:
+        (tmp_path / name).mkdir()
+    status, result = run_freeze(tmp_path)
+    assert (status, result) == (1, control_refusal('freeze', reason))
+    assert not (tmp_path / CONTROL_ROOT).exists()
+
+
+def test_preservation_refuses_a_wrong_freeze_pin(chain):
+    data_dir = chain['data_dir']
+    status, frozen = run_freeze(data_dir)
+    assert status == 0
+    # The tree is damaged twice over, and a symlink would refuse the walk, so only a pin
+    # check that comes first gives this reason.
+    remove_raw_file(data_dir)
+    link_in_raw(data_dir)
+    status, result = run_preservation(data_dir, '0' * 64, runs='first')
+    assert (status, result) == (1, control_refusal('preservation', PIN_DIFFERS))
+    assert frozen['freeze_sha256'] != '0' * 64
+
+
+def test_preservation_refuses_a_control_directory_without_a_freeze_record(chain):
+    data_dir = chain['data_dir']
+    status, frozen = run_freeze(data_dir)
+    assert status == 0
+    (control_dir(data_dir) / 'freeze.json').unlink()
+    status, result = run_preservation(data_dir, frozen['freeze_sha256'], runs='first')
+    assert (status, result) == (1, control_refusal('preservation', PIN_DIFFERS))
+    other = control_dir(data_dir, 'absent')
+    status, result = run_preservation(data_dir, frozen['freeze_sha256'], runs='first',
+                                      control=other)
+    assert (status, result) == (1, control_refusal('preservation', PIN_DIFFERS))
+
+
+def test_preservation_refuses_a_misplaced_control_directory(chain, tmp_path):
+    data_dir = chain['data_dir']
+    status, frozen = run_freeze(data_dir)
+    assert status == 0
+    # The copy holds the pinned record, so only the placement check refuses.
+    elsewhere = tmp_path / 'elsewhere' / 'first'
+    shutil.copytree(control_dir(data_dir), elsewhere)
+    status, result = run_preservation(data_dir, frozen['freeze_sha256'], runs='first',
+                                      control=elsewhere)
+    assert (status, result) == (1, control_refusal('preservation', UNSAFE_CONTROL))
+
+
+def test_preservation_prints_a_fixed_reason_for_an_unreadable_record(chain):
+    data_dir = chain['data_dir']
+    assert run_freeze(data_dir)[0] == 0
+    file = control_dir(data_dir) / 'freeze.json'
+    file.write_bytes(b'not json at all')
+    status, result = run_preservation(data_dir, manifest.sha256_file(file), runs='first')
+    assert (status, result) == (1, control_refusal('preservation', 'preservation failed'))
+
+
+@pytest.mark.parametrize(('content', 'lines'), [
+    (b'', 0), (b'a\n', 1), (b'a\nb', 2), (b'a\nb\n', 2), (b'\n\n\n', 3), (b'abcdefghij\n', 1),
+], ids=['empty', 'one', 'unterminated', 'two', 'blank_lines', 'longer_than_a_chunk'])
+def test_manifest_facts_count_lines_across_chunks(script, monkeypatch, tmp_path, content, lines):
+    monkeypatch.setattr(script, 'READ_SIZE', 4)
+    (tmp_path / 'raw').mkdir()
+    (tmp_path / MANIFEST).write_bytes(content)
+    assert script.manifest_facts(tmp_path) == {
+        'sha256': manifest.sha256_file(tmp_path / MANIFEST), 'size': len(content),
+        'lines': lines}
