@@ -227,6 +227,36 @@ def test_acquire_refuses_and_leaves_nothing(case, data_directory, monkeypatch):
     assert_nothing_written(data_directory)
 
 
+def test_acquire_accepts_an_explicit_identity_content_encoding(data_directory, monkeypatch):
+    body = sample_zip()
+    server = FakeUsaspending(body=body, headers={
+        'Content-Length': str(len(body)), 'Content-Encoding': 'identity'})
+    install_usaspending(monkeypatch, server)
+    path = usaspending_raw.acquire(data_directory, 2025, snapshot=SNAPSHOT)
+    assert path.read_bytes() == body
+
+
+def test_acquire_refuses_a_body_longer_than_its_content_length(data_directory, monkeypatch):
+    server = FakeUsaspending(headers={'Content-Length': str(len(sample_zip()) - 3)})
+    install_usaspending(monkeypatch, server)
+    with pytest.raises(httpx.RemoteProtocolError, match='received'):
+        usaspending_raw.acquire(data_directory, 2025, snapshot=SNAPSHOT)
+    assert_nothing_written(data_directory)
+
+
+def test_acquire_never_writes_over_an_existing_part_file(data_directory, monkeypatch):
+    # The occupancy check normally stops this first, so switch it off to reach the open.
+    install_usaspending(monkeypatch, FakeUsaspending())
+    monkeypatch.setattr(usaspending_raw, 'require_free_directory', lambda *arguments: None)
+    directory = snapshot_directory(data_directory)
+    directory.mkdir(parents=True)
+    (directory / f'{NAME}.part').write_bytes(b'someone else')
+    with pytest.raises(FileExistsError):
+        usaspending_raw.acquire(data_directory, 2025, snapshot=SNAPSHOT)
+    assert not (directory / NAME).exists()
+    assert manifest_lines(data_directory) == []
+
+
 def test_acquire_gives_up_after_exactly_max_polls(data_directory, monkeypatch):
     server = FakeUsaspending(statuses=('running',))
     slept = install_usaspending(monkeypatch, server)
@@ -281,25 +311,30 @@ def test_acquire_refuses_more_shapes_before_downloading(case, data_directory, mo
 
 
 def break_one_request(server, where, response):
-    '''A transport that answers `response` to one stage of the exchange.'''
+    '''A transport that answers `response` to one stage of the exchange.
+
+    `handle.hits` lists the requests that got `response`.
+    '''
     def handle(request):
-        if where == 'post' and request.method == 'POST':
-            return response
-        if where == 'poll' and request.url.path == usaspending_raw.STATUS_PATH:
-            return response
-        if where == 'download' and str(request.url) == URL:
+        if ((where == 'post' and request.method == 'POST')
+                or (where == 'poll' and request.url.path == usaspending_raw.STATUS_PATH)
+                or (where == 'download' and str(request.url) == URL)):
+            handle.hits.append(request)
             return response
         return server(request)
 
+    handle.hits = []
     return handle
 
 
 @pytest.mark.parametrize('where', ['post', 'poll', 'download'])
 def test_acquire_raises_on_an_http_error_status(where, data_directory, monkeypatch):
     server = FakeUsaspending()
-    install_usaspending(monkeypatch, break_one_request(server, where, httpx.Response(503)))
+    handle = break_one_request(server, where, httpx.Response(503))
+    install_usaspending(monkeypatch, handle)
     with pytest.raises(httpx.HTTPStatusError):
         usaspending_raw.acquire(data_directory, 2025, snapshot=SNAPSHOT)
+    assert len(handle.hits) == 1
     assert_nothing_written(data_directory)
 
 
@@ -506,6 +541,10 @@ IMPORT_REFUSALS = {
                        'safe .zip name'),
     'name_with_a_capital_suffix': (2025, lambda tmp_path: make_original(tmp_path, 'FILE.ZIP'),
                                    'safe .zip name'),
+    'name_with_a_trailing_suffix': (2025, lambda tmp_path: make_original(
+        tmp_path, 'file.zip.exe'), 'safe .zip name'),
+    'name_with_a_longer_suffix': (2025, lambda tmp_path: make_original(tmp_path, 'file.zipx'),
+                                  'safe .zip name'),
     'name_starting_with_a_dot': (2025, lambda tmp_path: make_original(
         tmp_path, '.hidden.zip'), 'safe .zip name'),
 }
@@ -540,6 +579,19 @@ def test_import_never_replaces_an_earlier_import(data_directory, tmp_path):
     assert path.read_bytes() == first.read_bytes()
     assert manifest_lines(data_directory) == before
     assert sorted(file.name for file in path.parent.iterdir()) == [NAME]
+
+
+def test_import_never_writes_over_an_existing_part_file(data_directory, tmp_path,
+                                                        monkeypatch):
+    original = make_original(tmp_path)
+    monkeypatch.setattr(usaspending_raw, 'require_free_directory', lambda *arguments: None)
+    directory = snapshot_directory(data_directory)
+    directory.mkdir(parents=True)
+    (directory / f'{NAME}.part').write_bytes(b'someone else')
+    with pytest.raises(FileExistsError):
+        usaspending_raw.import_file(data_directory, 2025, original, snapshot=SNAPSHOT)
+    assert not (directory / NAME).exists()
+    assert manifest_lines(data_directory) == []
 
 
 def test_import_refuses_a_copy_whose_hash_differs_and_leaves_nothing(
