@@ -1,0 +1,36 @@
+{
+  "bof_prefix": "BOF PUBLIC V2 00000000 ",
+  "date_format": "%Y%m%d",
+  "delimiter": "|",
+  "encoding": "utf-8",
+  "eof_prefix": "EOF PUBLIC V2 00000000 ",
+  "evs_dnb": [
+    "D&B"
+  ],
+  "field_count": 142,
+  "layout": "SAM Master Extract Mapping v6.0 Public File V2 Layout",
+  "member_pattern": "SAM_PUBLIC_(?:UTF-8_)?MONTHLY_V2_[0-9]{8}\\.(?:dat|DAT)",
+  "positions": {
+    "evs_source": 122,
+    "last_update_date": 10,
+    "naics_code_string": 35,
+    "primary_naics": 33,
+    "registration_status": 6,
+    "uei": 1
+  },
+  "record_end": "!end",
+  "restricted_positions": [
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22
+  ],
+  "version": "sam-extract-layout-v1"
+}
