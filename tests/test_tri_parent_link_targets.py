@@ -553,8 +553,13 @@ def test_owner_key_changes_count_trifds_whose_eligible_owner_key_differs():
         form(2022, 'T5', C, 'P', PINE), *excluded('naics_missing', 2023, 'T5', 'Q'),
         form(2024, 'T5', C, 'P', PINE),
         # T6 has no parent in any year: facility:T6 each time, not counted
-        form(2022, 'T6', C), form(2023, 'T6', C), form(2024, 'T6', C)])
-    assert result.report['owner_key_changes'] == 2
+        form(2022, 'T6', C), form(2023, 'T6', C), form(2024, 'T6', C),
+        # T7 keeps its parent and changes its D&B number: the owner key is the same
+        form(2022, 'T7', C, 'P', PINE), form(2024, 'T7', C, 'P', QUARTZ),
+        # T8 changes its parent and keeps its D&B number: the owner key differs
+        form(2022, 'T8', D, 'P', PINE), form(2023, 'T8', D, 'Q', PINE),
+        form(2022, 'T9', B, 'P', PINE), form(2023, 'T9', B, 'Q', PINE)])
+    assert result.report['owner_key_changes'] == 4
 
 
 def test_the_n_unweighted_distribution_is_taken_over_the_target_rows():
@@ -580,6 +585,9 @@ def test_the_n_unweighted_distribution_is_taken_over_the_target_rows():
     (list(range(1, 12)), {
         'count': 11, 'min': 1, 'p25': 3, 'median': 6, 'p75': 9, 'p90': 10, 'max': 11,
         'ge_1': 11, 'ge_2': 10, 'ge_3': 9, 'ge_5': 7, 'ge_10': 2}),
+    (list(range(100, 0, -1)), {
+        'count': 100, 'min': 1, 'p25': 25, 'median': 50, 'p75': 75, 'p90': 90, 'max': 100,
+        'ge_1': 100, 'ge_2': 99, 'ge_3': 98, 'ge_5': 96, 'ge_10': 91}),
     ([5, 5, 5, 20], {'count': 4, 'min': 5, 'p25': 5, 'median': 5, 'p75': 5, 'p90': 20,
                      'max': 20, 'ge_1': 4, 'ge_2': 4, 'ge_3': 4, 'ge_5': 4, 'ge_10': 1})])
 def test_distribution_uses_nearest_rank_percentiles_and_cumulative_counts(values, expected):
@@ -797,6 +805,8 @@ def test_the_validator_accepts_the_example_and_other_valid_results(example):
     validate_parent_links(run([]), NODES)
     validate_parent_links(run([form(2023, 'T1', A)]), NODES)
     validate_parent_links(example, NODES | {'naics:2022:national_industry:999999'})
+    # the order of the target rows is not the validator's concern, and the support is sorted
+    validate_parent_links(replace(example, targets=example.targets.reverse()), NODES)
 
 
 def test_the_validator_rejects_a_mirror_with_another_count(example):

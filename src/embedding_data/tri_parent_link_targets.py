@@ -231,11 +231,11 @@ def _flags() -> pl.Expr:
 def _targets(support: pl.DataFrame, marginals: pl.DataFrame, universe: str) -> pl.DataFrame:
     '''The target rows of the support table: `value = J / n(a)`, in `TARGET_SCHEMA`.
 
-    `n_weighted` is `float(J)`: `_typed` casts the count.
+    `n_weighted` is `float(J)`: `_typed` casts the count. The rows keep the order of `support`.
     '''
-    owners = marginals.select(pl.col('node_id').alias('unit_a'), pl.col('n_owners'))
+    owners = dict(marginals.select('node_id', 'n_owners').iter_rows())
     return _typed(
-        support.join(owners, on='unit_a', how='left').select(
+        support.select(
             pl.lit(METADATA['source']).alias('source'),
             pl.lit(METADATA['family']).alias('family'),
             pl.lit(METADATA['unit_a_type']).alias('unit_a_type'),
@@ -243,7 +243,7 @@ def _targets(support: pl.DataFrame, marginals: pl.DataFrame, universe: str) -> p
             pl.lit(METADATA['unit_b_type']).alias('unit_b_type'),
             'unit_b',
             pl.lit(METADATA['measure']).alias('measure'),
-            (pl.col('j_owners') / pl.col('n_owners')).alias('value'),
+            (pl.col('j_owners') / pl.col('unit_a').replace_strict(owners)).alias('value'),
             pl.lit(None, dtype=pl.Float64).alias('se'),
             pl.lit(METADATA['se_method']).alias('se_method'),
             pl.col('j_owners').alias('n_unweighted'),
@@ -252,7 +252,7 @@ def _targets(support: pl.DataFrame, marginals: pl.DataFrame, universe: str) -> p
             pl.lit(METADATA['vintage']).alias('vintage'),
             pl.lit(universe).alias('universe'),
             _flags().alias('flags')),
-        TARGET_SCHEMA).sort('unit_a', 'unit_b')
+        TARGET_SCHEMA)
 
 
 def _owner_counts(presence: dict[str, pl.DataFrame], year: int | None = None) -> dict[str, int]:
