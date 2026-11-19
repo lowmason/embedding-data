@@ -2,6 +2,7 @@
 their JSON line, exit codes and fixed failure line.'''
 
 import json
+import os
 import subprocess
 import sys
 
@@ -381,6 +382,65 @@ def test_module_lists_the_sam_commands(tmp_path):
     assert result.returncode == 0, result.stderr
     for command in ('acquire-sam-extract', 'import-sam-extract'):
         assert command in result.stdout
+
+
+# Runs both import commands in a fresh interpreter where every dotenv import is refused and no
+# HTTP client can be built, then reports what was attempted.
+OFFLINE_IMPORTS = """
+import json
+import os
+import sys
+
+
+class RefuseDotenv:
+    attempts = []
+
+    def find_spec(self, name, path=None, target=None):
+        if name.partition('.')[0] == 'dotenv':
+            RefuseDotenv.attempts.append(name)
+            raise ImportError('dotenv refused')
+        return None
+
+
+sys.meta_path.insert(0, RefuseDotenv())
+import httpx
+
+
+def no_client(*args, **kwargs):
+    raise AssertionError('HTTP client constructed')
+
+
+httpx.Client.__init__ = no_client
+from typer.testing import CliRunner
+
+from embedding_data import usaspending_vendor_links
+
+data_dir, extract, month, subawards = sys.argv[1:]
+before = dict(os.environ)
+runner = CliRunner()
+codes = [runner.invoke(usaspending_vendor_links.app, arguments).exit_code for arguments in (
+    ['import-sam-extract', extract, '--month', month, '--data-dir', data_dir],
+    ['import-subawards', '2025', subawards, '--snapshot', '2026-11-20', '--data-dir', data_dir])]
+print(json.dumps({'codes': codes, 'dotenv_imports': RefuseDotenv.attempts,
+                  'dotenv_loaded': 'dotenv' in sys.modules,
+                  'environ_unchanged': dict(os.environ) == before}))
+"""
+
+
+def test_import_commands_load_no_environment_file(data_directory, tmp_path):
+    # dotenv cannot even be imported, so a wrong version that loads an env file fails here
+    # without ever reading one.
+    environment = {name: value for name, value in os.environ.items()
+                   if name not in ('SAM_API_KEY', 'IPUMS_API_KEY')}
+    result = subprocess.run(
+        [sys.executable, '-c', OFFLINE_IMPORTS, str(data_directory),
+         str(extract_original(tmp_path, MONTH)), MONTH, str(original_file(tmp_path))],
+        capture_output=True, text=True, cwd=tmp_path, env=environment, check=False)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {'codes': [0, 0], 'dotenv_imports': [],
+                                         'dotenv_loaded': False, 'environ_unchanged': True}
+    entries = manifest.read_manifest(paths.manifest_path(data_directory))
+    assert [entry.client for entry in entries] == ['manual-import', 'manual-import']
 
 
 def test_importing_the_command_module_loads_no_census_access_module(tmp_path):
