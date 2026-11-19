@@ -60,6 +60,7 @@ SOFTWARE_ROOT = paths.PROJECT_ROOT
 # command group add their own files.
 SOFTWARE_FILES = (
     'src/embedding_data/__init__.py',
+    'src/embedding_data/acs_wage_bundle.py',
     'src/embedding_data/acs_wage_checks.py',
     'src/embedding_data/acs_wage_inputs.py',
     'src/embedding_data/acs_wage_rules.py',
