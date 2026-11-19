@@ -824,6 +824,23 @@ def test_unmapped_type_and_amount_columns_ask_and_are_not_tallied(run, data_dir,
                                                                 'shape': '9999-99-99'}]
 
 
+# Delivered types that differ from `sub-contract` only by padding, and a blank type. The
+# build compares the delivered value exactly, so each one is another type.
+NEAR_TYPES = [' sub-contract', 'sub-contract ', '']
+
+
+@pytest.mark.parametrize('value', NEAR_TYPES, ids=['leading_space', 'trailing_space', 'blank'])
+def test_a_padded_or_blank_type_is_another_delivered_type(value, run, data_dir, tmp_path,
+                                                          codes):
+    # the only type in the window that is not exactly `sub-contract`
+    raw = seed(data_dir, tmp_path, reports=window_reports(row1={'subaward_type': value}))
+    report_ = run(['measure', *measure_args(raw, write_registry(tmp_path), codes)])
+    assert report_['e4']['subaward_types'] == {
+        '2024': {'sub-contract': 4, value: 1}, '2025': {'sub-contract': 1}, '2026': {}}
+    assert (report_['stops'], report_['asks'], report_['ok']) == (
+        [], ['subaward_type_not_sub_contract'], True)
+
+
 def test_a_malformed_read_code_skips_the_firm_counts(run, data_dir, tmp_path, codes):
     firms = window_firms({P1: '54151A'}) + [firm(OTHER_2, '12345')]
     raw = seed(data_dir, tmp_path, firms=firms)
