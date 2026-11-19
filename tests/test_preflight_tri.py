@@ -387,15 +387,16 @@ def test_headers_exits_2_with_no_file_under_the_snapshot_date(script, capsys, ho
     assert report == {'ok': False, 'reason': 'raw files cannot be selected'}
 
 
-def test_headers_refuses_an_unrecorded_file(script, capsys, home):
-    staged_headers(home)
+def test_preflight_refuses_an_unrecorded_file(script, capsys, env):
+    stage(env, calm_window())
     other = date(2025, 12, 1)
     for year in WINDOW:
-        directory = tri_raw.snapshot_dir(home.data_dir, year, other)
+        directory = tri_raw.snapshot_dir(env.data_dir, year, other)
         directory.mkdir(parents=True)
-        (directory / tri_raw.file_name(year)).write_bytes(b'YEAR\n')
-    report = run_headers(script, capsys, home, expect=2, processed=other)
-    assert report == {'ok': False, 'reason': 'raw files cannot be selected'}
+        (directory / tri_raw.file_name(year)).write_bytes(csv_bytes(year, calm(year)))
+    refused = {'ok': False, 'reason': 'raw files cannot be selected'}
+    assert run_headers(script, capsys, env, expect=2, processed=other) == refused
+    assert run_measure(script, capsys, env, expect=2, processed=other) == refused
 
 
 def test_headers_refuses_a_file_that_changed_after_it_was_recorded(script, capsys, home):
@@ -448,9 +449,9 @@ def test_measure_counts_a_small_known_window(script, capsys, env):
     stage(env, {2022: known_2022(), 2023: known_2023(), 2024: known_2024()}, bom=(2023,),
           terminators=(2024,))
     report = run_measure(script, capsys, env)
+    assert report['years']['2022']['facility_years'] == 3
     first = report['years']['2022']
     assert first['rows'] == 5
-    assert first['facility_years'] == 3
     assert first['naics_valid'] == 1
     assert first['naics_missing'] == 0
     assert report['years']['2022']['naics_not_2022'] == 1
@@ -654,10 +655,10 @@ STOP_FIELDS = {'no_primary': 'primary_naics', 'no_federal': 'federal',
                'no_standardized': 'standardized_parent'}
 
 
-@pytest.mark.parametrize('year', WINDOW)
-@pytest.mark.parametrize('stop', ['no_primary', 'no_federal', 'no_standardized',
-                                  'standardized_always_blank'])
-def test_measure_reports_each_stop_and_exits_1(stop, year, script, capsys, env):
+STOPS = ['no_primary', 'no_federal', 'no_standardized', 'standardized_always_blank']
+
+
+def check_one_stop(script, capsys, env, stop, year):
     rows = calm_window()
     unmapped = {}
     if stop == 'standardized_always_blank':
@@ -669,6 +670,18 @@ def test_measure_reports_each_stop_and_exits_1(stop, year, script, capsys, env):
     assert report['stops'] == [{'reason': stop, 'year': year}]
     assert report['ok'] is False
     assert report['asks'] == []
+
+
+@pytest.mark.parametrize('stop', ['no_primary', 'no_federal', 'no_standardized',
+                                  'standardized_always_blank'])
+def test_measure_reports_each_stop_and_exits_1(stop, script, capsys, env):
+    check_one_stop(script, capsys, env, stop, 2023)
+
+
+@pytest.mark.parametrize('year', WINDOW)
+@pytest.mark.parametrize('stop', STOPS)
+def test_measure_reports_each_stop_in_every_year(stop, year, script, capsys, env):
+    check_one_stop(script, capsys, env, stop, year)
 
 
 def test_measure_reports_every_stop_of_a_year(script, capsys, env):
