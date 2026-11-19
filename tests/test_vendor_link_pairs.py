@@ -952,6 +952,9 @@ KNOWN_ROWS = [
     extract_row(KNOWN['G1'], code='54151A')]
 
 
+NO_TRIGGER = {'naics_not_2022': 0, 'with_code': 0, 'share': None}
+
+
 def tally(statuses, **counts):
     return {status: counts.get(status, 0) for status in statuses}
 
@@ -1012,7 +1015,11 @@ def test_report_counts_on_a_known_window():
                      'subcontractor': {'eligible': 1, 'total': 4, 'share': 0.25}},
             '2026': {'prime': {'eligible': 2, 'total': 2, 'share': 1.0},
                      'subcontractor': {'eligible': 3, 'total': 4, 'share': 0.75}}}}
-    assert counts['trigger'] == {'naics_not_2022': 1, 'with_code': 5, 'share': 0.2}
+    assert counts['trigger'] == {
+        'naics_not_2022': 1, 'with_code': 5, 'share': 0.2,
+        'by_fiscal_year': {'2024': {'naics_not_2022': 0, 'with_code': 2, 'share': 0.0},
+                           '2025': {'naics_not_2022': 1, 'with_code': 5, 'share': 0.2},
+                           '2026': {'naics_not_2022': 0, 'with_code': 3, 'share': 0.0}}}
     assert counts['extract'] == {
         'rows': 11, 'by_registration_status': {'A': 10, 'E': 1},
         'rows_per_uei': {'1': 7, '2': 2, '3+': 0},
@@ -1209,9 +1216,33 @@ def test_the_trigger_pools_roles_and_counts_firms_with_a_code():
             extract_row(SUB, code='541511'), extract_row(SUB, code='541512'),
             extract_row(OTHER, code=''), extract_row(PARENT, update='20200101')]
     counts = counts_of(records, rows)
-    assert counts['trigger'] == {'naics_not_2022': 1, 'with_code': 3, 'share': 1 / 3}
-    assert counts_of([], [])['trigger'] == {'naics_not_2022': 0, 'with_code': 0,
-                                            'share': None}
+    pooled = {'naics_not_2022': 1, 'with_code': 3, 'share': 1 / 3}
+    assert counts['trigger'] == pooled | {
+        'by_fiscal_year': {'2024': pooled, '2025': NO_TRIGGER, '2026': NO_TRIGGER}}
+    assert counts_of([], [])['trigger'] == NO_TRIGGER | {
+        'by_fiscal_year': dict.fromkeys(('2024', '2025', '2026'), NO_TRIGGER)}
+
+
+def test_the_trigger_is_split_by_the_reports_own_fiscal_year():
+    a1, a2, b1 = PRIME, 'AAAAAAAAAAA2', FIRM
+    s1, s2, s3 = SUB, 'BBBBBBBBBBB3', 'BBBBBBBBBBB4'
+    records = [report(prime_uei=a1, sub_uei=s1, action_date='2024-01-05'),
+               report(prime_uei=a1, sub_uei=b1, action_date='2024-10-01'),
+               report(file_year=2025, prime_uei=b1, sub_uei=s2, action_date='2025-03-01'),
+               report(file_year=2025, prime_uei=a2, sub_uei=s1, action_date='2025-04-01'),
+               report(file_year=2026, prime_uei=a1, sub_uei=s3, action_date='2026-01-01'),
+               report(file_year=2026, prime_uei=s1, sub_uei=b1, action_date='2026-02-01'),
+               report(prime_uei='', sub_uei=s2, action_date='2024-02-01')]
+    rows = [extract_row(a1, code='236220'), extract_row(b1, code='541512'),
+            extract_row(s1, code='517311'), extract_row(s2, code='541511'),
+            extract_row(s2, code='541512'), extract_row(s3, code='')]
+    trigger = counts_of(records, rows)['trigger']
+    assert {key: trigger[key] for key in ('naics_not_2022', 'with_code', 'share')} == {
+        'naics_not_2022': 1, 'with_code': 4, 'share': 0.25}
+    assert trigger['by_fiscal_year'] == {
+        '2024': {'naics_not_2022': 1, 'with_code': 2, 'share': 0.5},
+        '2025': {'naics_not_2022': 1, 'with_code': 4, 'share': 0.25},
+        '2026': {'naics_not_2022': 1, 'with_code': 3, 'share': 1 / 3}}
 
 
 def test_report_and_extract_counts_do_not_need_the_firm_and_pair_tables():
@@ -1223,7 +1254,8 @@ def test_report_and_extract_counts_do_not_need_the_firm_and_pair_tables():
                             NODE_IDS)
     for key in ('reports', 'usable_by_fiscal_year', 'extract', 'missing_fields'):
         assert partial[key] == full[key]
-    assert partial['trigger'] == {'naics_not_2022': 0, 'with_code': 0, 'share': None}
+    assert partial['trigger'] == NO_TRIGGER | {
+        'by_fiscal_year': dict.fromkeys(('2024', '2025', '2026'), NO_TRIGGER)}
     assert partial['pairs']['total'] == 0
 
 

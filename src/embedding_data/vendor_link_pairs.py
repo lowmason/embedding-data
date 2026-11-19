@@ -391,12 +391,24 @@ def _coverage(usable: pl.LazyFrame, firm_table: pl.DataFrame) -> dict:
     return coverage
 
 
-def _trigger(firm_table: pl.DataFrame) -> dict:
-    status = firm_table['firm_status']
+def _trigger_counts(status: pl.Series) -> dict:
     not_2022 = int((status == 'naics_not_2022').sum())
     with_code = int(status.is_in(_CODED).sum())
     return {'naics_not_2022': not_2022, 'with_code': with_code,
             'share': _share(not_2022, with_code)}
+
+
+def _trigger(usable: pl.LazyFrame, firm_table: pl.DataFrame) -> dict:
+    '''The not-2022 share of the firms with a code: over the firm table, and over the
+    distinct UEIs of both roles on each fiscal year's usable reports.'''
+    statuses = firm_table.lazy().select('uei', 'firm_status')
+    by_year = {}
+    for year in WINDOW:
+        in_year = usable.filter(pl.col('fiscal_year') == year)
+        ueis = pl.concat([in_year.select(uei=column) for _, column in _ROLES]).unique()
+        status = ueis.join(statuses, on='uei', how='left').collect()['firm_status']
+        by_year[str(year)] = _trigger_counts(status)
+    return _trigger_counts(firm_table['firm_status']) | {'by_fiscal_year': by_year}
 
 
 def _extract_counts(extract: pl.DataFrame, layout: ExtractLayout, node_ids: frozenset[str],
@@ -443,7 +455,7 @@ def report_counts(reported: pl.LazyFrame, firm_table: pl.DataFrame, pair_table: 
             'by_fiscal_year': {
                 str(year): _coverage(usable.filter(pl.col('fiscal_year') == year), firm_table)
                 for year in WINDOW}},
-        'trigger': _trigger(firm_table),
+        'trigger': _trigger(usable, firm_table),
         'extract': _extract_counts(extract, layout, node_ids, usable),
         'missing_fields': {
             'subawards': {str(year): list(layouts[year].missing) for year in WINDOW},
