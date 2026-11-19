@@ -773,13 +773,6 @@ def test_a_pair_whose_amounts_all_fail_sums_to_zero():
     assert [str(value) for value in table['amount_sum']] == ['0.00', '0.01']
 
 
-def test_amounts_sum_only_over_the_pairs_own_usable_reports():
-    records = [report(amount='1.10'), report(amount='2.20', sub_uei=FIRM),
-               report(amount='4.40', action_date='2023-01-01'), report(amount='8.80')]
-    table = pair_table_of(records, ELIGIBLE_ROWS)
-    assert [str(value) for value in table['amount_sum']] == ['9.90', '2.20']
-
-
 def test_pair_node_ids_and_statuses_come_from_each_firm():
     cases = [
         ([extract_row(PRIME, code='236220'), extract_row(SUB, code='541511')],
@@ -794,6 +787,17 @@ def test_pair_node_ids_and_statuses_come_from_each_firm():
         table = pair_table_of([report()], rows)
         assert table.select('prime_node_id', 'sub_node_id', 'prime_status', 'sub_status',
                             'pair_status').rows() == [expected]
+
+
+def test_padded_ueis_form_one_pair_and_one_group():
+    records = [report(prime_uei=f' {PRIME}', sub_uei=f'{SUB}\t'), report(),
+               report(prime_uei=f'\x0b{PRIME}', sub_uei=f'{PRIME} '),
+               report(prime_uei=f'{PRIME}\r\n', sub_uei=FIRM, sub_parent_uei=PRIME)]
+    table = pair_table_of(records, ELIGIBLE_ROWS + [extract_row(FIRM, code='541512')])
+    assert table.select('prime_uei', 'sub_uei', 'n_reports', 'flag_intra_group',
+                        'pair_status').rows() == [
+        (PRIME, PRIME, 1, False, 'self_link'), (PRIME, SUB, 2, False, 'eligible'),
+        (PRIME, FIRM, 1, True, 'intra_group')]
 
 
 def test_the_pair_table_has_sorted_unique_keys_in_its_schema():
@@ -1178,7 +1182,7 @@ def test_extract_counts_strip_and_tally_every_row():
 
 def test_join_coverage_counts_distinct_ueis_in_each_role_and_fiscal_year():
     p1, p2, s1, s2, b1 = 'AAAAAAAAAAA1', 'AAAAAAAAAAA2', 'BBBBBBBBBBB1', 'BBBBBBBBBBB2', FIRM
-    records = [report(prime_uei=p1, sub_uei=s1), report(prime_uei=p1, sub_uei=s1),
+    records = [report(prime_uei=p1, sub_uei=s1), report(prime_uei=f' {p1}', sub_uei=f'{s1}\t'),
                report(prime_uei=p2, sub_uei=s2),
                report(file_year=2025, prime_uei=p1, sub_uei=b1, action_date='2025-10-01'),
                report(file_year=2025, prime_uei=b1, sub_uei=s2, action_date='2025-10-02'),

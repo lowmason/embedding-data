@@ -211,7 +211,7 @@ def firms(usable: pl.LazyFrame, extract: pl.DataFrame, layout: ExtractLayout,
              .with_columns(pl.col('n_extract_rows').fill_null(0),
                            pl.col('flag_mixed_blank', 'flag_last_update_invalid')
                            .fill_null(False),
-                           n_codes=pl.col('codes').list.len().fill_null(0),
+                           n_codes=pl.col('codes').list.len(),
                            code=pl.col('codes').list.first())
              .with_columns(firm_status=_firm_status(node_ids))
              .join(runs, on=['uei', 'code'], how='left')
@@ -314,8 +314,7 @@ def _section(frame: pl.LazyFrame, duplicate_rows: int, report_ids: bool,
     both = (sub_naics != '') & (prime_naics != '')
     stats = frame.select(
         rows=pl.len(),
-        outside_file_year=_count(pl.col('action').is_not_null()
-                                 & (pl.col('fiscal_year') != pl.col('file_year'))),
+        outside_file_year=_count(pl.col('fiscal_year') != pl.col('file_year')),
         amount_unparseable=_count((pl.col('report_status') == 'usable')
                                   & pl.col('amount_value').is_null()),
         blank_prime=_count(blank['prime']), blank_sub=_count(blank['sub']),
