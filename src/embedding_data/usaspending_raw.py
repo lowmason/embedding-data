@@ -19,6 +19,7 @@ from dataclasses import asdict, replace
 from datetime import UTC, date, datetime
 from importlib.metadata import version
 from pathlib import Path
+from typing import BinaryIO
 from urllib.parse import urlsplit
 
 import httpx
@@ -178,8 +179,8 @@ def wait_for_url(client: httpx.Client, file_name: str) -> str:
     raise ValueError('download request timed out')
 
 
-def download_zip(client: httpx.Client, url: str, partial: Path) -> None:
-    '''Stream the file as delivered into a new `.part` and check its length and type.'''
+def download_body(client: httpx.Client, url: str, stream: BinaryIO) -> None:
+    '''Stream the file as delivered into `stream` and check its declared length.'''
     with client.stream('GET', url) as response:
         response.raise_for_status()
         length = response.headers.get('Content-Length')
@@ -187,17 +188,13 @@ def download_zip(client: httpx.Client, url: str, partial: Path) -> None:
             raise ValueError('download has no Content-Length')
         if response.headers.get('Content-Encoding', 'identity').strip().lower() != 'identity':
             raise ValueError('encoded download')
-        partial.parent.mkdir(parents=True, exist_ok=True)
-        with partial.open('xb') as stream:
-            for chunk in response.iter_raw(CHUNK_SIZE):
-                stream.write(chunk)
+        for chunk in response.iter_raw(CHUNK_SIZE):
+            stream.write(chunk)
         if response.num_bytes_downloaded != int(length):
             raise httpx.RemoteProtocolError(
                 f'received {response.num_bytes_downloaded:,} of {int(length):,} bytes',
                 request=response.request,
             )
-    if not is_zip(partial):
-        raise ValueError('download is not a ZIP file')
 
 
 def acquire(data_dir: Path, fiscal_year: int, *, snapshot: date) -> Path:
@@ -213,8 +210,14 @@ def acquire(data_dir: Path, fiscal_year: int, *, snapshot: date) -> Path:
         url = wait_for_url(client, file_name)
         destination = directory / file_name
         partial = part_of(destination)
+        directory.mkdir(parents=True, exist_ok=True)
+        # Opened before the try: a `.part` that is already there is not this call's to remove.
+        stream = partial.open('xb')
         try:
-            download_zip(client, url, partial)
+            with stream:
+                download_body(client, url, stream)
+            if not is_zip(partial):
+                raise ValueError('download is not a ZIP file')
             return publish_partial(
                 data_dir,
                 partial,
@@ -246,8 +249,10 @@ def import_file(data_dir: Path, fiscal_year: int, original: Path, *, snapshot: d
     partial = part_of(destination)
     expected = manifest.sha256_file(original)
     directory.mkdir(parents=True, exist_ok=True)
+    # Opened before the try: a `.part` that is already there is not this call's to remove.
+    target = partial.open('xb')
     try:
-        with original.open('rb') as source, partial.open('xb') as target:
+        with target, original.open('rb') as source:
             shutil.copyfileobj(source, target)
         if manifest.sha256_file(partial) != expected:
             raise ValueError('SHA-256 changed while copying the original')

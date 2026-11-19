@@ -255,6 +255,8 @@ def test_acquire_never_writes_over_an_existing_part_file(data_directory, monkeyp
         usaspending_raw.acquire(data_directory, 2025, snapshot=SNAPSHOT)
     assert not (directory / NAME).exists()
     assert manifest_lines(data_directory) == []
+    # The .part belongs to someone else, so a failed call must leave it as it found it.
+    assert (directory / f'{NAME}.part').read_bytes() == b'someone else'
 
 
 def test_acquire_gives_up_after_exactly_max_polls(data_directory, monkeypatch):
@@ -339,14 +341,21 @@ def test_acquire_raises_on_an_http_error_status(where, data_directory, monkeypat
 
 
 @pytest.mark.parametrize('where', ['post', 'poll'])
-@pytest.mark.parametrize('content', [b'not json', b'[]', b'null', b'"text"'])
-def test_acquire_refuses_an_answer_that_is_not_a_json_object(where, content, data_directory,
-                                                              monkeypatch):
+@pytest.mark.parametrize('content, message', [
+    (b'not json', 'Expecting value'), (b'[]', 'not a JSON object'),
+    (b'null', 'not a JSON object'), (b'"text"', 'not a JSON object')])
+def test_acquire_refuses_an_answer_that_is_not_a_json_object(where, content, message,
+                                                              data_directory, monkeypatch):
+    # Settled Default 15: no automatic retry. A bad answer ends the call at the first hit,
+    # and its own message survives (it is not swallowed into an empty answer).
     server = FakeUsaspending()
     answer = httpx.Response(200, content=content)
-    install_usaspending(monkeypatch, break_one_request(server, where, answer))
-    with pytest.raises(ValueError):
+    handle = break_one_request(server, where, answer)
+    install_usaspending(monkeypatch, handle)
+    with pytest.raises(ValueError, match=message):
         usaspending_raw.acquire(data_directory, 2025, snapshot=SNAPSHOT)
+    assert len(handle.hits) == 1
+    assert server.downloads == []
     assert_nothing_written(data_directory)
 
 
@@ -592,6 +601,38 @@ def test_import_never_writes_over_an_existing_part_file(data_directory, tmp_path
         usaspending_raw.import_file(data_directory, 2025, original, snapshot=SNAPSHOT)
     assert not (directory / NAME).exists()
     assert manifest_lines(data_directory) == []
+    # The .part belongs to someone else, so a failed call must leave it as it found it.
+    assert (directory / f'{NAME}.part').read_bytes() == b'someone else'
+
+
+def record_without_a_file(data_directory, tmp_path, name=NAME):
+    '''Put the destination path of FY2025 in the manifest while no file exists there.'''
+    scratch = make_original(tmp_path, 'scratch.zip', folder='scratch')
+    earlier = manifest.describe_file(
+        scratch, scratch.parent, retrieved_at=datetime.now(UTC), client='httpx',
+        client_version='1')
+    manifest.append_entries(paths.manifest_path(data_directory), [replace(
+        earlier, path=f'usaspending/subcontracts/2026-11-20/FY2025/{name}')])
+    return manifest_lines(data_directory)
+
+
+def test_acquire_removes_the_part_it_made_when_publishing_fails(data_directory, tmp_path,
+                                                                monkeypatch):
+    install_usaspending(monkeypatch, FakeUsaspending())
+    before = record_without_a_file(data_directory, tmp_path)
+    with pytest.raises(ValueError, match='already recorded'):
+        usaspending_raw.acquire(data_directory, 2025, snapshot=SNAPSHOT)
+    assert list(snapshot_directory(data_directory).iterdir()) == []
+    assert manifest_lines(data_directory) == before
+
+
+def test_import_removes_the_part_it_made_when_publishing_fails(data_directory, tmp_path):
+    original = make_original(tmp_path)
+    before = record_without_a_file(data_directory, tmp_path)
+    with pytest.raises(ValueError, match='already recorded'):
+        usaspending_raw.import_file(data_directory, 2025, original, snapshot=SNAPSHOT)
+    assert list(snapshot_directory(data_directory).iterdir()) == []
+    assert manifest_lines(data_directory) == before
 
 
 def test_import_refuses_a_copy_whose_hash_differs_and_leaves_nothing(
