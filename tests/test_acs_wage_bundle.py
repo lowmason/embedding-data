@@ -649,6 +649,24 @@ def test_replay_compares_equal(chain):
     }
 
 
+def outside_runs(data_dir):
+    '''Every path under the data directory outside the wage-microdata runs, with file bytes.'''
+    runs = data_dir / 'derived/acs/wage-microdata'
+    return {path.relative_to(data_dir).as_posix(): path.read_bytes() if path.is_file() else None
+            for path in sorted(data_dir.rglob('*')) if not path.is_relative_to(runs)}
+
+
+def test_build_verify_and_compare_write_only_their_runs(chain):
+    before = outside_runs(chain['data_dir'])
+    first = build(chain, 'first')
+    verify(chain, Path(first['directory']), first['outputs_sha256'])
+    replay = build(chain, 'replay')
+    verify(chain, Path(replay['directory']), replay['outputs_sha256'])
+    assert compare_runs(Path(first['directory']), Path(replay['directory']))['equal'] is True
+    assert outside_runs(chain['data_dir']) == before
+    assert entries(runs_root(chain)) == ['first', 'replay']
+
+
 def test_compare_reports_a_rehashed_edit_as_unequal(chain):
     first, replay = built(chain, 'first'), built(chain, 'replay')
     change_age(replay)
