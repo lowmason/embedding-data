@@ -39,6 +39,7 @@ from vendor_link_fixtures import (  # noqa: F401
 
 from embedding_data import (
     manifest,
+    paths,
     sam_raw,
     usaspending_raw,
     vendor_link_codes,
@@ -477,14 +478,22 @@ def test_a_year_whose_members_differ_prints_no_header_cell(year, run, data_dir, 
 
 
 def test_two_years_whose_members_differ_stop_in_year_order(run, data_dir, tmp_path):
+    # 2024: a header beside a data row of as many cells; 2026: a header beside an empty member
     raw = seed(data_dir, tmp_path, years={2024: None, 2026: None})
-    for year in (2026, 2024):
-        import_subawards(data_dir, tmp_path, year, {
-            MEMBER: csv_bytes([HEADERS[year]]),
-            MEMBER_2: csv_bytes([report(P1, S1, '2024-03-01', year=year)])})
+    import_subawards(data_dir, tmp_path, 2026, {MEMBER: csv_bytes([HEADERS[2026]]),
+                                                MEMBER_2: b''})
+    import_subawards(data_dir, tmp_path, 2024, {
+        MEMBER: csv_bytes([HEADER_2024]),
+        MEMBER_2: csv_bytes([report(P1, S1, '2024-03-01')])})
     report_ = run(['headers', *raw], code=1)
     assert report_['stops'] == ['headers_differ_2024', 'headers_differ_2026']
-    assert report_['subawards']['2025']['header_mismatch'] is False
+    member = {'header': None, 'bom': False, 'utf8_valid': True, 'records': 0, 'ragged': 0}
+    assert report_['subawards']['2024']['members'] == [
+        {'name': MEMBER, 'cells': 30} | member, {'name': MEMBER_2, 'cells': 30} | member]
+    assert report_['subawards']['2026']['members'] == [
+        {'name': MEMBER, 'cells': 30} | member, {'name': MEMBER_2, 'cells': None} | member]
+    assert [report_['subawards'][year]['header_mismatch'] for year in ('2024', '2025', '2026')
+            ] == [True, False, True]
 
 
 def test_a_year_of_one_empty_member_has_no_header_and_no_hints(run, data_dir, tmp_path):
@@ -642,6 +651,17 @@ def test_a_malformed_read_code_skips_the_firm_counts(run, data_dir, tmp_path, co
     assert report_['e5']['extract']['malformed_unread_rows'] == 2
     assert report_['e4']['reports']['by_file_year']['2024']['by_status']['usable'] == 3
     assert (report_['stops'], report_['ok']) == (['malformed_read_codes'], False)
+
+
+def test_a_malformed_code_only_on_a_non_usable_report_does_not_stop(run, data_dir, tmp_path,
+                                                                   codes):
+    # OTHER_2 is the subcontractor of the outside-window report only, so no build step reads
+    # its code
+    raw = seed(data_dir, tmp_path, reports=window_reports(row4={'sub': OTHER_2}),
+               firms=window_firms({OTHER_2: '12345'}))
+    report_ = run(['measure', *measure_args(raw, write_registry(tmp_path), codes)])
+    assert report_['e5']['malformed'] == {'read_rows': 0, 'unread_rows': 2}
+    assert (report_['stops'], report_['ok']) == ([], True)
 
 
 @pytest.mark.parametrize('field, year', [('prime_uei', 2026), ('action_date', 2025)])
@@ -984,6 +1004,29 @@ def test_each_refusal_prints_only_its_fixed_reason(prepare, command, reason, inv
         2, '', json.dumps({'reason': reason, 'refused': True}, sort_keys=True) + '\n')
     assert_no_row_values(out)
     assert tree(data_dir) == before
+
+
+RAW_OPTIONS = ('--data-dir', '--snapshot', '--sam-month')
+MEASURE_OPTIONS = ('--registry', '--codes-run', '--codes-outputs-sha256')
+
+
+@pytest.mark.parametrize('command, option', [
+    *(('headers', option) for option in RAW_OPTIONS),
+    *(('measure', option) for option in RAW_OPTIONS + MEASURE_OPTIONS)])
+def test_each_option_is_required(command, option, script, seeded, tmp_path, codes,
+                                 monkeypatch, capsys):
+    # A default data root would point at the real tree, so the test moves it out of reach.
+    monkeypatch.setattr(paths, 'DATA_DIR', tmp_path / 'nowhere')
+    monkeypatch.setattr(vendor_link_layouts, 'load_extract_layout', lambda: TEST_EXTRACT_LAYOUT)
+    argv = (['headers', *seeded] if command == 'headers'
+            else ['measure', *measure_args(seeded, write_registry(tmp_path), codes)])
+    index = argv.index(option)
+    del argv[index:index + 2]
+    with pytest.raises(SystemExit) as exit_:
+        script.main(argv)
+    out, err = capsys.readouterr()
+    assert (exit_.value.code, out) == (2, '')
+    assert f'the following arguments are required: {option}' in err
 
 
 # ---- scratch and isolation
