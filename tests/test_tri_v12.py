@@ -144,6 +144,24 @@ def test_v12_chain_is_offline_verified_and_replay_equal(tmp_path, monkeypatch):
         assert equal['first_rows'] == equal['second_rows'] > 0
 
 
+def test_v12_compares_the_first_bundle_with_the_second(tmp_path, monkeypatch):
+    # `compare_runs` returns no run identity, so only a spy shows which bundles it received.
+    calls, returned = [], []
+    real = tri_bundle.compare_runs
+
+    def spy(*args, **kwargs):
+        calls.append((args, kwargs))
+        returned.append(real(*args, **kwargs))
+        return returned[-1]
+
+    monkeypatch.setattr(tri_bundle, 'compare_runs', spy)
+    result = run_tri_v12(tmp_path, monkeypatch)
+    assert calls == [((result['first'], result['second']), {})]
+    assert result['first'] != result['second']
+    assert len(returned) == 1
+    assert returned[0] is result['comparison']
+
+
 def test_v12_fixture_holds_every_required_case(tmp_path, monkeypatch):
     result = run_tri_v12(tmp_path, monkeypatch)
     years = pl.read_parquet(result['first'] / 'tri_facility_years.parquet')
@@ -391,6 +409,8 @@ def test_v12_chain_blocks_external_access_before_it_seeds_anything(tmp_path, mon
                 dotenv.load_dotenv()
             with pytest.raises(AssertionError, match='external access'):
                 httpx.Client()
+            with pytest.raises(AssertionError, match='external access'):
+                httpx.AsyncClient()
             checked.append(name)
             return real(*args, **kwargs)
         monkeypatch.setattr(tri_fixtures, name, checking)
