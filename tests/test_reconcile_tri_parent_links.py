@@ -357,6 +357,9 @@ TAMPERED = {
     'targets_se': (cell(TARGETS, 'se', lambda v: 0.0), {'targets'}),
     'targets_n_unweighted': (cell(TARGETS, 'n_unweighted', plus_one), {'targets'}),
     'targets_n_weighted': (cell(TARGETS, 'n_weighted', lambda v: v + 1.0), {'targets'}),
+    # Equal numbers of another type: 1 is not 1.0.
+    'targets_n_weighted_integer': (whole(TARGETS, lambda f: f.with_columns(
+        pl.col('n_weighted').cast(pl.Int64))), {'targets'}),
     'targets_flags': (cell(TARGETS, 'flags', lambda v: v[:-1]), {'targets'}),
     'targets_unit_a': (cell(TARGETS, 'unit_a', lambda v: NODE + '111110'), {'targets'}),
     'targets_unit_b': (cell(TARGETS, 'unit_b', lambda v: NODE + '111110'), {'targets'}),
@@ -600,6 +603,15 @@ def linked_raw_file(chain, tmp_path):
     inputs = json.loads((bundle / 'inputs.json').read_text())
     link_elsewhere(data_dir / 'raw' / raw_entry(inputs, 2022)['path'],
                    tmp_path / 'elsewhere' / '2022_us.csv')
+    return data_dir, bundle.name, chain['first_pin'], 'raw path is unsafe'
+
+
+@refusal
+def linked_raw_file_inside_the_tree(chain, tmp_path):
+    data_dir, bundle = data_copy(chain, tmp_path)
+    inputs = json.loads((bundle / 'inputs.json').read_text())
+    link_elsewhere(data_dir / 'raw' / raw_entry(inputs, 2022)['path'],
+                   data_dir / 'raw' / 'epa_tri' / 'moved_2022_us.csv')
     return data_dir, bundle.name, chain['first_pin'], 'raw path is unsafe'
 
 
@@ -860,6 +872,11 @@ def test_decoded_lines_fall_back_to_windows_1252_line_by_line():
     assert list(reconcile.decoded_lines(stream)) == ['Café\n', 'Café\n', 'x“y”\n']
 
 
+def test_decoded_lines_strip_the_mark_before_decoding_and_return_to_utf8():
+    stream = io.BytesIO(b'\xef\xbb\xbf' + 'Café\n'.encode('cp1252') + 'naïve\n'.encode())
+    assert list(reconcile.decoded_lines(stream)) == ['Café\n', 'naïve\n']
+
+
 def test_decoded_lines_refuse_a_line_outside_both_encodings():
     with pytest.raises(reconcile.Refused, match='neither UTF-8 nor Windows-1252'):
         list(reconcile.decoded_lines(io.BytesIO(b'a\n\x81\n')))
@@ -993,11 +1010,16 @@ def test_any_federal_form_makes_the_facility_year_federal(tmp_path):
     result = recomputed(tmp_path, {2022: [
         owned(2022, 'T1', '325110', 'P', federal=False),
         owned(2022, 'T1', '325110', 'P', federal=True),
-        owned(2022, 'T2', '325110', 'P', federal=False)]})
+        owned(2022, 'T2', '325110', 'P', federal=False),
+        owned(2022, 'T3', '325110', 'P', federal=True),
+        owned(2022, 'T3', '325110', 'P', federal=False)]})
     years = facility_years(result)
     assert years[(2022, 'T1')]['exclusion_reason'] == 'federal'
     assert years[(2022, 'T1')]['federal_values'] == ('NO', 'YES')
     assert years[(2022, 'T2')]['exclusion_reason'] is None
+    assert years[(2022, 'T3')]['exclusion_reason'] == 'federal'
+    # A blank state cell is no state value.
+    assert years[(2022, 'T2')]['state_values'] == ()
 
 
 def test_standardized_names_are_stripped_and_no_parent_strings_and_blanks_are_absent(tmp_path):
@@ -1155,6 +1177,7 @@ def test_partial_owners_need_a_non_federal_exclusion_in_the_same_year(tmp_path):
         2022: [owned(2022, 'T15', '325120', 'P'), owned(2022, 'T4', '', 'Q')],
         2023: [
             owned(2023, 'T1', '325110', 'P'), owned(2023, 'T2', '', 'P'),
+            owned(2023, 'T16', '324110', 'P'),
             owned(2023, 'T3', '325120', 'Q'),
             owned(2023, 'T5', '324110', 'R'), owned(2023, 'T6', '324110', 'R', federal=True),
             owned(2023, 'T7', '325199', 'S'),
@@ -1169,7 +1192,8 @@ def test_partial_owners_need_a_non_federal_exclusion_in_the_same_year(tmp_path):
     assert years[(2023, 'T8')]['exclusion_reason'] == 'parent_conflict'
     assert years[(2023, 'T10')]['exclusion_reason'] == 'naics_conflict'
     partial = {code: row['n_owners_partial'] for code, row in marginals(result).items()}
-    assert partial == {'324110': 0, '325110': 1, '325120': 0, '325199': 1, '325211': 2,
+    # P is partial in two industries and still counts once among the partial owners.
+    assert partial == {'324110': 1, '325110': 1, '325120': 0, '325199': 1, '325211': 2,
                        '331110': 0}
     assert result.report['partial_owners'] == 4
 
