@@ -473,13 +473,17 @@ def test_buyer_value_divides_by_the_buyer_industry():
 
 
 def test_rows_in_both_directions_are_different_cells():
-    # u (541511) sells to p (236220), g (236220) sells to f (541511), and w (541511) sells
-    # to f.
-    firms = {'P': '236220', 'U': '541511', 'F': '541511', 'G': '236220', 'W': '541511'}
-    result = run(firms, link('P', 'U'), link('F', 'G'), link('F', 'W'))
+    # u and u2 (541511) sell to p (236220), g (236220) sells to f (541511), and w (541511)
+    # sells to f. The two directions have different counts.
+    firms = {'P': '236220', 'U': '541511', 'U2': '541511', 'F': '541511', 'G': '236220',
+             'W': '541511'}
+    result = run(firms, link('P', 'U'), link('P', 'U2'), link('F', 'G'), link('F', 'W'))
     assert cells(result) == {(N541511, N236220), (N236220, N541511), (N541511, N541511)}
     target, support_row, marginal = lookups(result)
-    assert target('supplier_share', N541511, N236220)['value'] == 0.5
+    assert support_row(N541511, N236220)['l_pairs'] == 2
+    assert support_row(N236220, N541511)['l_pairs'] == 1
+    assert target('supplier_share', N541511, N236220)['value'] == pytest.approx(
+        2 / 3, abs=TOLERANCE)
     assert target('supplier_share', N236220, N541511)['value'] == 1.0
 
 
