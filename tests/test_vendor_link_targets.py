@@ -563,11 +563,25 @@ def test_partial_counts_ignore_the_other_excluded_statuses():
 
 def test_partial_counts_only_firms_in_the_target():
     # v's only pair is prime_ineligible, and r's only pair is sub_ineligible: no marginal row.
-    firms = {'P': '236220', 'U': '541511', 'V': '541512', 'R': '336411', 'X': 'not_in_sam'}
-    result = run(firms, link('P', 'U'), link('X', 'V'), link('R', 'X'))
+    # w and t have such pairs only, in industries that have marginal rows: no partial count.
+    firms = {'P': '236220', 'U': '541511', 'V': '541512', 'R': '336411', 'W': '541511',
+             'T': '236220', 'X': 'not_in_sam'}
+    result = run(firms, link('P', 'U'), link('X', 'V'), link('R', 'X'), link('X', 'W'),
+                 link('T', 'X'))
     assert result.marginals['node_id'].to_list() == [N236220, N541511]
     assert result.marginals['n_suppliers_partial'].to_list() == [0, 0]
     assert result.marginals['n_buyers_partial'].to_list() == [0, 0]
+
+
+def test_partial_counts_count_firms_not_pairs():
+    # u has two eligible pairs and one prime_ineligible pair. p has two eligible pairs and one
+    # sub_ineligible pair. Each counts once.
+    firms = {'P': '236220', 'Q': '236220', 'U': '541511', 'W': '541511', 'X': 'not_in_sam'}
+    result = run(firms, link('P', 'U'), link('Q', 'U'), link('P', 'W'), link('X', 'U'),
+                 link('P', 'X'))
+    target, support_row, marginal = lookups(result)
+    assert marginal(N541511)['n_suppliers_partial'] == 1
+    assert marginal(N236220)['n_buyers_partial'] == 1
 
 
 def test_node_in_one_role_has_zero_counts_in_the_other():
@@ -697,10 +711,12 @@ def test_report_distribution_counts_and_order_statistics():
 
 def test_report_diagonal_counts_cells_pairs_and_share():
     # Diagonal cells (541511, 541511) with 2 pairs and (236220, 236220) with 1; 5 pairs in P.
+    # Two intra_group pairs, one of them diagonal, change none of the three.
     firms = {'P': '541511', 'Q': '541511', 'U': '541511', 'C': '236220', 'D': '236220',
              'R': '336411'}
     result = run(firms, link('P', 'U'), link('Q', 'U'), link('C', 'D'), link('R', 'U'),
-                 link('R', 'D'))
+                 link('R', 'D'), link('P', 'D', intra=True), link('Q', 'P', intra=True))
+    assert result.report['n_pairs'] == {'eligible': 5, 'including_intra_group': 7}
     assert result.report['diagonal'] == {'cells': 2, 'pairs': 3, 'share_of_pairs': 0.6}
 
 
@@ -745,6 +761,18 @@ def test_validator_accepts_a_value_within_tolerance():
 def test_validator_rejects_a_unit_outside_the_node_set():
     with exactly(UNITS):
         validate_vendor_links(valid(), VALID_TABLE, NODE_IDS - {N336411})
+
+
+def test_validator_rejects_pairs_below_the_buyer_count():
+    # S = 1 and B = 2, so L = 1 is at least S but below max(S, B).
+    table = pair_table({'P': '236220', 'Q': '236220', 'U': '541511'},
+                       link('P', 'U'), link('Q', 'U'))
+    result = estimate(table, snapshot=SNAPSHOT, month=MONTH)
+    row = _only(result.support, **SD)
+    assert (row['s_suppliers'], row['b_buyers'], row['l_pairs']) == (1, 2, 2)
+    with exactly(PAIR_BOUNDS):
+        validate_vendor_links(replace(result, support=edit(result.support, SD, l_pairs=1)),
+                              table, NODE_IDS)
 
 
 def test_validator_rejects_a_pair_table_of_another_schema():
