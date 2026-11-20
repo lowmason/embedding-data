@@ -10,6 +10,8 @@ import csv
 import io
 import json
 import logging
+import subprocess
+import sys
 import zipfile
 from datetime import date
 from pathlib import Path
@@ -345,3 +347,23 @@ def seed_raw(data_dir: Path, directory: Path, subawards: dict[int, dict[str, lis
     extract = directory / extract_name(month)
     write_extract_zip(extract, extract_layout, extract_lines, member=extract_member)
     sam_raw.import_file(data_dir, extract, month=month)
+
+
+def subprocess_modules(name: str, *, prefix: str | None = 'embedding_data') -> set[str]:
+    '''Import `name` in a fresh `sys.executable` process and return the names in its
+    `sys.modules`: only those that start with `prefix`, or all of them when it is None.'''
+    code = ('import importlib, json, sys; importlib.import_module(sys.argv[1]); '
+            'print(json.dumps(sorted(sys.modules)))')
+    result = subprocess.run([sys.executable, '-c', code, name], capture_output=True,
+                            text=True, check=True)
+    loaded = set(json.loads(result.stdout))
+    return loaded if prefix is None else {module for module in loaded
+                                          if module.startswith(prefix)}
+
+
+def module_file(module: str) -> str:
+    '''The project-relative source file of an `embedding_data` module: the package itself is
+    `src/embedding_data/__init__.py` and `embedding_data.x` is `src/embedding_data/x.py`.'''
+    if module == 'embedding_data':
+        return 'src/embedding_data/__init__.py'
+    return 'src/' + module.replace('.', '/') + '.py'
