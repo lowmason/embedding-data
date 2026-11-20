@@ -156,3 +156,118 @@ def module_file(module: str) -> str:
     if not module.startswith('embedding_data.'):
         raise ValueError(f'{module} is not a module of embedding_data')
     return 'src/embedding_data/' + module.removeprefix('embedding_data.') + '.py'
+
+
+V12_DATE = date(2025, 11, 5)
+V12_RUNS = ('v12_first', 'v12_second')
+# Made-up D&B numbers, nine digits each. None belongs to a real company.
+_V12_NUMBERS = {
+    'alder': '482910573', 'alder_b': '482910584', 'birch': '593021684', 'cedar': '604132795',
+    'dogwood': '715243806', 'elm': '826354917', 'fir': '937465028', 'fern': '148576139',
+    'holly': '259687240', 'iris': '360798351', 'juniper': '471809462',
+}
+V12_DNB = tuple(_V12_NUMBERS.values())
+
+
+def v12_rows() -> dict[int, list[dict[str, str]]]:
+    '''The synthetic rows of the V12 chain, by reporting year, with every required case.
+
+    - Multi-form: T101 files a Form R and a Form A, both naming Alder, in 2022.
+    - Same-year pair: Birch owns T103 (324110) and T104 (325211) in 2023.
+    - D&B grouping differs: Alder's T102 reports another D&B number than T101, so Alder
+      owns 325110 and 325120 in 2022 and 2023, but the D&B keys split them.
+    - Primary-code conflict: T111's two forms give 325110 and 325120 in 2022.
+    - Parent conflict: T109's two forms name Elm and Fir in 2023. Elm's T110 is eligible in
+      the same industry, so Elm is a partial owner.
+    - Mixed blank: Cedar's T105 has a Form R that names Cedar and a Form A that gives `NA`.
+    - Self-owned: T112 gives `NA` as its parent in every year.
+    - Federal: Iris's T113 is federal in 2023. Holly's pair in 325110 and 324110 gains Iris in
+      the federal sensitivity.
+    - Code outside NAICS 2022: Juniper's T120 gives 336111, a 2017 code.
+    - Cross-year non-pair: Dogwood owns 562211 in 2022 and 562910 in 2024, never together.
+    - RY2023 foreign parent: Birch's T103 names one in 2023.
+    '''
+    def owner(name: str, number: str, reported: str) -> dict[str, str]:
+        return dict(standardized_parent=name, parent_name=reported,
+                    parent_dnb=_V12_NUMBERS[number])
+
+    alder = owner('Alder Holdings', 'alder', 'Alder Holdings LLC')
+    alder_b = dict(alder, parent_dnb=_V12_NUMBERS['alder_b'])
+    birch = owner('Birch Corp', 'birch', 'Birch Corporation')
+    cedar = owner('Cedar Inc', 'cedar', 'Cedar Incorporated')
+    dogwood = owner('Dogwood Ltd', 'dogwood', 'Dogwood Limited')
+    elm = owner('Elm Group', 'elm', 'Elm Group Inc')
+    fir = owner('Fir Group', 'fir', 'Fir Group Inc')
+    fern = owner('Fern Partners', 'fern', 'Fern Partners LP')
+    holly = owner('Holly Co', 'holly', 'Holly Company')
+    iris = owner('Iris Works', 'iris', 'Iris Works Inc')
+    juniper = owner('Juniper Brands', 'juniper', 'Juniper Brands Inc')
+    alone = dict(standardized_parent='NA', parent_name='NA', parent_dnb='NA')
+    return {
+        2022: [
+            tri_row(2022, 'T101', primary_naics='325110', state='TX', **alder),
+            tri_row(2022, 'T101', primary_naics='325110', state='TX', form='A', **alder),
+            tri_row(2022, 'T102', primary_naics='325120', state='TX', **alder_b),
+            tri_row(2022, 'T107', primary_naics='562211', state='OH', **dogwood),
+            tri_row(2022, 'T111', primary_naics='325110', state='LA', **fern),
+            tri_row(2022, 'T111', primary_naics='325120', state='LA', **fern),
+            tri_row(2022, 'T112', primary_naics='331110', state='OH', **alone),
+        ],
+        2023: [
+            tri_row(2023, 'T101', primary_naics='325110', state='TX', **alder),
+            tri_row(2023, 'T102', primary_naics='325120', state='TX', **alder_b),
+            tri_row(2023, 'T103', primary_naics='324110', state='LA',
+                    standardized_foreign_parent='Birch Holding SA', **birch),
+            tri_row(2023, 'T104', primary_naics='325211', state='NJ', **birch),
+            tri_row(2023, 'T109', primary_naics='325110', state='MI', **elm),
+            tri_row(2023, 'T109', primary_naics='325110', state='MI', **fir),
+            tri_row(2023, 'T110', primary_naics='325110', state='MI', **elm),
+            tri_row(2023, 'T113', primary_naics='325110', state='TX', federal=True, **iris),
+            tri_row(2023, 'T114', primary_naics='324110', state='LA', **iris),
+            tri_row(2023, 'T116', primary_naics='325110', state='LA', **holly),
+            tri_row(2023, 'T117', primary_naics='324110', state='LA', **holly),
+            tri_row(2023, 'T120', primary_naics='336111', state='MI', **juniper),
+            tri_row(2023, 'T112', primary_naics='331110', state='OH', **alone),
+        ],
+        2024: [
+            tri_row(2024, 'T105', primary_naics='325199', state='TX', **cedar),
+            tri_row(2024, 'T105', primary_naics='325199', state='TX', form='A', **alone),
+            tri_row(2024, 'T106', primary_naics='331110', state='TX', **cedar),
+            tri_row(2024, 'T108', primary_naics='562910', state='OH', **dogwood),
+            tri_row(2024, 'T112', primary_naics='331110', state='OH', **alone),
+        ],
+    }
+
+
+def run_tri_v12(tmp_path: Path, monkeypatch) -> dict:
+    '''Synthetic raw TRI files to two verified, replay-equal bundles, with external access blocked.
+
+    The guards go in first, so seeding, both builds, both verifications and the comparison
+    run under them. The returned dict holds `data_dir`, the `first` and `second` bundle
+    directories, their detached pins, both verification results and the comparison.
+    '''
+    import httpx
+    from target_fixtures import forbid_external_access
+
+    from embedding_data import tri_bundle
+
+    def no_client(*args, **kwargs):
+        raise AssertionError('the V12 fixture chain attempted external access')
+
+    forbid_external_access(monkeypatch)
+    monkeypatch.setattr(httpx.Client, '__init__', no_client)
+    monkeypatch.setattr(httpx.AsyncClient, '__init__', no_client)
+    data_dir = tmp_path / 'data'
+    codes_run, codes_pin = seed_codes_bundle(data_dir, tmp_path / 'codes-originals')
+    seed_tri_files(data_dir, tmp_path / 'originals', v12_rows(), V12_DATE)
+    result = {'data_dir': data_dir}
+    for name, run_id in zip(('first', 'second'), V12_RUNS, strict=True):
+        published = tri_bundle.build(
+            data_dir, run_id, codes_run=codes_run, codes_outputs_sha256=codes_pin,
+            processed_as_of=V12_DATE)
+        result[name] = Path(published['directory'])
+        result[name + '_pin'] = published['outputs_sha256']
+        result[name + '_verification'] = tri_bundle.verify_bundle(
+            result[name], data_dir, expected_outputs_sha256=published['outputs_sha256'])
+    result['comparison'] = tri_bundle.compare_runs(result['first'], result['second'])
+    return result
