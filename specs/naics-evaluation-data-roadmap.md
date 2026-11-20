@@ -20,7 +20,7 @@ also covers commuting and migration targets, and old Stage 11 covers occupation 
 and SOC work therefore returns for those two tracks.
 
 Amended again 2026-11-18 (owner: "Approve as drafted"): Track H adds the ACS wage microdata of the
-approved spec `specs/acs-wage-microdata.md`. It is a person-level input for naics-embedder's
+approved spec `specs/completed/acs-wage-microdata.md`. It is a person-level input for naics-embedder's
 wage panel, not a target family (that spec, "Amendments to the source spec", item 2).
 
 Choices made:
@@ -40,7 +40,7 @@ Choices made:
 - Shared resources (owner, 2026-11-18): run one acquisition at a time, because `manifest.append_entries` checks and then appends with no lock. Run one full-data build at a time, because the Stage 9 build was killed with exit 137 (`specs/findings/stage-9-acs-targets.md`). Every session passes the production `--data-dir`.
 - Frozen code (owner, 2026-11-18): frozen modules stay frozen, and new families add modules only. A family that needs a new dependency builds as a nested project with its own `pyproject.toml` and `uv.lock`. The selected runs record the root `pyproject.toml`, the root `uv.lock` and every installed distribution. A throwaway project showed that `uv` keeps a nested project out of the root lock. That test has not run in this repository.
 - Protocol sections (owner, 2026-11-18): each new family needs its own section in `specs/evaluation-protocol.md` before it is scored. It is the last Ranked-list item of its track (O17 to O21, and O24) and is written after that track's first real build. Stage 16 frames its section like Section 1 of the protocol: evidence, assignment and the conditions this repository keeps. The scores may stay with naics-embedder, because the protocol lists them under "What this repository does not decide".
-- Track H (owner, 2026-11-18): the "Roadmap placement" section of `specs/acs-wage-microdata.md`, approved on 2026-11-18, proposed the track. Track H reads Stage 8 in place and does not wait for Stage 9. Stage 17 goes to writing-plans against that spec, as its header says. Stage 17 keeps the replay check of the spec's Verification item 1, which the owner approved with the spec. Stages 1, 5, 14 and 15 left replay to a later stage or item.
+- Track H (owner, 2026-11-18): the "Roadmap placement" section of `specs/completed/acs-wage-microdata.md`, approved on 2026-11-18, proposed the track. Track H reads Stage 8 in place and does not wait for Stage 9. Stage 17 goes to writing-plans against that spec, as its header says. Stage 17 keeps the replay check of the spec's Verification item 1, which the owner approved with the spec. Stages 1, 5, 14 and 15 left replay to a later stage or item.
 
 | # | Outcome | Track | Rank | Cost (estimate; basis) |
 |---|---|---|---|---|
@@ -208,15 +208,17 @@ do not set an order.
       Leaves out: the scores, their intervals, the margin and the adoption decision, if they stay with naics-embedder (protocol, "What this repository does not decide"). Sections for the ACS and CPS families and each new evidence family → O17 to O21. The section for the ACS wage microdata → O24
       ROUTING: brainstorming
 
-- [ ] Stage 17: ACS wage microdata, first build
+- [x] Stage 17: ACS wage microdata, first build
       Objective: One person-level file of ACS 2023–2024 wage earners is built from Stage 8 on real data, verified and replayed.
       Outcomes: O22
       Track: H
-      Consumes: the approved spec `specs/acs-wage-microdata.md` (Owner decisions, Design, Amendments to the source spec, Constraints, Verification). The selected Stage 8 run `stage8_acs_mapping_20261018_r7` with its detached pin `1ec9701092f576b122b01464cdb6fa3fbee49db030e4ad3df7b64e621b8e75f4` (`CLAUDE.md`, Stage 8). The NAICS 2022 node table of codes run `stage4_v11_20261013_r2`, with detached pin `15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a`. The owner's go-ahead for each production write
+      Consumes: the approved spec `specs/completed/acs-wage-microdata.md` (Owner decisions, Design, Amendments to the source spec, Constraints, Verification). The selected Stage 8 run `stage8_acs_mapping_20261018_r7` with its detached pin `1ec9701092f576b122b01464cdb6fa3fbee49db030e4ad3df7b64e621b8e75f4` (`CLAUDE.md`, Stage 8). The NAICS 2022 node table of codes run `stage4_v11_20261013_r2`, with detached pin `15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a`. The owner's go-ahead for each production write
       Produces: one verified bundle in `data/derived/acs/wage-microdata/<RUN_ID>/` with its detached pin. A replay bundle and its `compare-runs` result. `specs/naics-evaluation-data-stage-17-findings.md`
       Exit: O22: items 1 to 9 of the spec's "Verification: observable outcomes" hold. The stage applies items 1 to 4 of the spec's "Amendments to the source spec". The findings file records the run ID, the pin, and the wall time, maximum RSS and bundle size of the real run
       Leaves out: the minimum number of headline earners for each category → O23. The protocol section for the file → O24. The wage panel itself → naics-embedder's panel spec (spec, Non-goals and "Handoff to naics-embedder"). New IPUMS variables, CPS and ACS 2025 → not staged (spec, Non-goals)
       ROUTING: writing-plans
+> Stage 17: COMPLETE (2026-11-19) — implemented by plan 14 (specs/plans/completed/14-acs-wage-microdata.md). Its Handoff section names what O23 and O24 consume.
+> Next: resume the roadmap.
 
 ## Ranked list — Track B
 
@@ -245,7 +247,7 @@ left the list as Stage 5. O11 is uncovered and parked in `specs/deferred_items.m
 
 ## Ranked list — Track H
 
-The order that `specs/acs-wage-microdata.md` ("Roadmap placement") proposed, ranked by the
+The order that `specs/completed/acs-wage-microdata.md` ("Roadmap placement") proposed, ranked by the
 owner on 2026-11-18.
 
 1. O23 — Minimum headline earners for each category. Small: one pass over Stage 17's counts

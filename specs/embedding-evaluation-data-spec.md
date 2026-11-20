@@ -526,6 +526,9 @@ counts, and its source, sample set, code vintage, and universe. *(chosen; D)*
 
 The co-ownership family is *(added at synthesis)*; the others are *(chosen; D)*.
 
+The ACS wage microdata are a person-level analysis file, not a target family. The
+worker-profile family above is unchanged. *(owner, plan 14, 2026-11-19)*
+
 **R7.3** Every target reports its unweighted count. The minimum count for
 headline use is set for each family from its observed distributions, not picked
 here. The [V9 ITA NAICS decision](findings/v9-ita-naics-minimum-counts.md) sets
@@ -541,6 +544,9 @@ in place of `unit_b`. Hierarchies (R5.2, R6.1) and ITA pairs are separate
 tables. Each output has a manifest listing its raw inputs by hash and its code,
 crosswalk, and transformation versions. *(added at synthesis)*
 
+The ACS wage microdata have their own schema, outside the long schema above.
+*(owner, plan 14, 2026-11-19)*
+
 ### R8 — Licensing, disclosure, and leakage
 
 **R8.1** IPUMS terms prohibit redistributing the data without permission, apart
@@ -548,6 +554,13 @@ from subsets published to meet a journal's data requirements. Only aggregate
 targets leave the machine they were built on, and IPUMS microdata are never
 committed to a repository. If microdata-level release is ever needed, build from
 the Census Bureau's own public-domain PUMS files instead. *(verified; USA)*
+
+One person-level analysis file, the ACS wage microdata, may be read in place on the
+machine that built it, under its detached pin, to judge an economic candidate of
+naics-embedder. The file never leaves that machine and never enters a repository. The
+reader's results for single persons, such as predictions, residuals, cached folds and
+debug output, are bound by the same rule. Only aggregate scores and decisions are
+shared. *(owner, plan 14, 2026-11-19)*
 
 **R8.2** Cite IPUMS USA and IPUMS CPS as their terms require. *(verified; USA)*
 
@@ -559,6 +572,9 @@ description enters training, curriculum construction, hard-negative mining, or
 model selection for an embedder it evaluates. A family used for tuning is split
 first, and only its held-out part is reported as evaluation. *(added at
 synthesis)*
+
+The ACS wage microdata only judge and never train. Their section in the evaluation
+protocol states which part selects and which part judges. *(owner, plan 14, 2026-11-19)*
 
 ### R9 — Pipeline conventions
 

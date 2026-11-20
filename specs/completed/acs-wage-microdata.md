@@ -1,5 +1,7 @@
 # ACS wage microdata for naics-embedder's economic panel
 
+**Status: COMPLETE (2026-11-19)** — implemented by [plan 14](../plans/completed/14-acs-wage-microdata.md); measured runs in the [Stage 17 finding](../naics-evaluation-data-stage-17-findings.md).
+
 > Next step: derive-roadmap adds this work to
 > `specs/naics-evaluation-data-roadmap.md` as a new track (see Roadmap
 > placement). That stage then goes to writing-plans against this file. Do not
