@@ -462,6 +462,10 @@ def test_commands_wire_arguments_and_print_data_relative_paths(cli_runner, data_
 def test_the_failure_path_is_the_data_relative_run_directory(data_directory):
     assert run_directory(data_directory, 'run_1').relative_to(
         data_directory).as_posix() == bundle_path('run_1')
+    # The command module prints that same root before the run ID, whatever the run ID is.
+    assert tri_parent_links.BUNDLES == BUNDLES
+    assert tri_parent_links._run_path('run_1') == bundle_path('run_1')
+    assert tri_parent_links._run_path('../escape') == f'{BUNDLES}/../escape'
 
 
 @pytest.mark.parametrize('command,arguments,run_id,path', [
