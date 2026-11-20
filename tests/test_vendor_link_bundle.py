@@ -761,6 +761,36 @@ def test_malformed_codes_outside_a_read_primary_code_are_only_counted(built, tmp
     assert report_ == expected
 
 
+# Well-formed UEIs whose only reports are unusable for a date reason, each with one extract
+# row whose primary code is malformed.
+UNREAD_WINDOW, UNREAD_DATE = 'UNREDW000014', 'UNREDD000015'
+
+
+def test_a_malformed_code_of_a_firm_on_unusable_reports_only_is_only_counted(built, tmp_path):
+    '''A firm is read only through usable reports. A prime whose only report is outside the
+    window and a subcontractor whose only report has an invalid action date are not firms,
+    so their malformed primary codes are counted as unread and fail nothing.'''
+    reports = window_reports()
+    reports[2026] += [report(UNREAD_WINDOW, S1, '2023-06-01', '7.00', year=2026),
+                      report(P1, UNREAD_DATE, 'not a date', '8.00', year=2026)]
+    firms = [*window_firms(), firm(UNREAD_WINDOW, '5415X1'), firm(UNREAD_DATE, '5415X1')]
+    data_dir = seeded_root(built, tmp_path, reports=reports, firms=firms)
+    result = build_run(built, 'unread_firms', data_dir=data_dir)
+    directory = Path(result['directory'])
+    verify(built, directory, result['outputs_sha256'], data_dir=data_dir)
+    report_, default = read(directory, 'report.json'), read(built.directory, 'report.json')
+    assert report_['reports']['total']['by_status'] == {
+        'uei_unusable': 1, 'action_date_invalid': 1, 'outside_window': 2, 'usable': 12}
+    # OTHER's row and the two new rows: all three malformed codes are on unread rows.
+    assert report_['extract']['primary_codes']['malformed'] == 3
+    assert report_['extract']['malformed_unread_rows'] == 3
+    for key in ('usable_by_fiscal_year', 'firms', 'pairs', 'join_coverage', 'trigger'):
+        assert report_[key] == default[key]
+    comparison = compare_runs(built.directory, directory)
+    assert all(table['schema_equal'] and table['values_equal']
+               for table in comparison['tables'].values())
+
+
 def test_inputs_record_selection_and_provenance(built):
     inputs = read(built.directory, 'inputs.json')
     assert set(inputs) == INPUT_FIELDS
