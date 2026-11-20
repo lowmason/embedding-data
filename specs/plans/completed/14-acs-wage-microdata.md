@@ -1,5 +1,7 @@
 # ACS Wage Microdata Implementation Plan
 
+**Status: COMPLETE (2026-11-19)** — executed via subagent-driven-development; nothing deferred
+
 > **For agentic workers:** REQUIRED SUB-SKILL: implement this plan task-by-task via subagent-driven-development (the default) — or executing-plans when your human partner chose inline execution at the handoff. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 > Roadmap: specs/naics-evaluation-data-roadmap.md, Stage 17 — on plan
@@ -130,6 +132,7 @@ below are this plan's own.
 - **D9** (owner, plan review, 2026-11-18): the exact wording of amendments 2 to 4 in Task 10, plus a README section and a Stage 17 paragraph in `CLAUDE.md`. Applied in: Task 10 (spec amendment).
 - **D10** (owner, plan review, 2026-11-18): this plan is numbered 14, because PR 32 merged plan 13 (Stage 5 TRI) during planning. Applied in: the plan file name and Task 10's tags.
 - **D11** (owner, plan review, 2026-11-18): the source spec's out-of-scope line "Microdata release (R8.1)" and `specs/evaluation-targets-methodology.md:35` stay unchanged. Applied in: Task 10.
+- **D12** (owner, plan handoff, 2026-11-18): the final whole-branch review (code-reviewer and its Codex second opinion) runs after Task 8 and before Task 9, and its findings are resolved first. From Task 9 Step 5 on, no file in `acs_wage_inputs.SOFTWARE_FILES`, `pyproject.toml` or `uv.lock` changes. A later change to one of them invalidates both runs and needs a fresh run ID and new owner gates. Applied in: Task 9 Step 1.
 
 ## File Structure
 
@@ -214,7 +217,7 @@ DDI_LABELS = {
 `RULES` holds one plain sentence for each new column and for `rows`, copied from the spec's
 "Rules for the new columns". It is recorded in `inputs.json`.
 
-- [ ] **Step 1: Write the test helpers**
+- [x] **Step 1: Write the test helpers**
 
 `CORE_SCHEMA` mirrors the production Stage 8 types: `source_row` UInt64; `PERWT`,
 `INCWAGE_CPIU_2010` Float64; `industry_canonical_finest_candidates` List(String);
@@ -227,7 +230,7 @@ common node `naics:2022:national_industry:623110`, delivered node
 `naics:2022:industry_group:6231`. `core_frame` numbers `source_row` from 0 in list order
 unless a row sets it.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 ```python
 def test_output_columns_follow_the_spec_order():
@@ -344,12 +347,12 @@ two of which share a common node. It assigns `source_row` in list order.
 `categories` is sorted by `INDNAICS`, then `YEAR`. The report has no run ID, time or
 commit, so a replay can compare equal.
 
-- [ ] **Step 3: Run the tests to verify they fail**
+- [x] **Step 3: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_acs_wage_rules.py -q`
 Expected: FAIL with `ModuleNotFoundError: No module named 'embedding_data.acs_wage_rules'`
 
-- [ ] **Step 4: Implement `acs_wage_rules.py`**
+- [x] **Step 4: Implement `acs_wage_rules.py`**
 
 - `earners(core)` refuses a core without every `CARRIED` column (`ValueError('core table
   lacks a carried column')`), keeps `INCWAGE > 0`, and selects `CARRIED` in order.
@@ -372,12 +375,12 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'embedding_data.acs_wa
   `log_wage_2010` is `pl.col('INCWAGE_CPIU_2010').log()`.
 - `summarize(persons)` computes the dict above with lazy aggregates.
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_acs_wage_rules.py -q`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 pgrep -fl 'embedding_data\.acs_targets|stage9_independent|reconcile_stage9'
@@ -417,7 +420,7 @@ messages:
 - `'delivered node chain branches'`: a node on the chain from the delivered node down to
   the join node's parent has more than one child in `edges`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 A test graph: `62 → 623 → 6231 → 62311 → 623110` (one child at each level) and
 `561 → 5614 → {56141, 56142}`.
@@ -439,23 +442,23 @@ def test_a_forged_headline_row_is_refused(change):
     with pytest.raises(ValueError, match='headline rule'): ...
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_acs_wage_checks.py -q`
 Expected: FAIL with `ModuleNotFoundError`
 
-- [ ] **Step 3: Implement `acs_wage_checks.py`**
+- [x] **Step 3: Implement `acs_wage_checks.py`**
 
 Both checks run lazy aggregates over the person rows. They collect only the distinct node
 tuples and one row of headline violation counts. Build the parent map and child counts
 from `edges` filtered to `edge_type == 'hierarchy'`.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_acs_wage_checks.py tests/test_acs_wage_rules.py -q`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 pgrep -fl 'embedding_data\.acs_targets|stage9_independent|reconcile_stage9'
@@ -565,7 +568,7 @@ Tests use a module-scoped template (`tmp_path_factory` and `pytest.MonkeyPatch.c
 as `tests/test_acs_target_inputs.py:15-27` does), `copy_template` for each test, and the
 autouse guard `acs_mapping_fixtures.forbid_external_access`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 def test_inventory_names_match_stages_8_and_4():
@@ -603,24 +606,24 @@ def test_read_json_is_strict(tmp_path):
     # duplicate key, NaN, a top-level list → ValueError each
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_acs_wage_inputs.py -q`
 Expected: FAIL with `ModuleNotFoundError`
 
-- [ ] **Step 3: Implement `acs_wage_inputs.py`**
+- [x] **Step 3: Implement `acs_wage_inputs.py`**
 
 Follow `src/embedding_data/ita_establishment_inputs.py` (`_snapshot`, `select_codes`)
 for the double snapshot and the frozen dataclass. `SelectedWageInputs.verify()`
 reselects with the same arguments and refuses any difference
 (`'selected inputs changed'`).
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_acs_wage_inputs.py -q --durations=5`
 Expected: PASS. Note the template's setup time for Step 5.
 
-- [ ] **Step 5: Mark slow tests and commit**
+- [x] **Step 5: Mark slow tests and commit**
 
 If a test's setup plus call takes 60 s or more, append its node ID to `SLOW_TESTS` in
 `tests/conftest.py`.
@@ -706,7 +709,7 @@ summarize(published)` and `inputs.json` equal to the recomputed inputs with the 
 own `outputs.json` by `verify_inventory`. Compare the table with `ordered_compare` and
 the reports exactly. Equality establishes replay, not trust.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `chain` is a per-test `copy_template` of the module-scoped Task 3 template, with the
 autouse offline guard. `build(chain, run_id)` calls `acs_wage_bundle.build` with the
@@ -778,19 +781,19 @@ def test_compare_reports_a_rehashed_edit_as_unequal(chain): ...
 def test_compare_refuses_an_inventory_mismatch(chain): ...
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_acs_wage_bundle.py -q`
 Expected: FAIL with `ModuleNotFoundError`
 
-- [ ] **Step 3: Implement `acs_wage_bundle.py`** as specified above.
+- [x] **Step 3: Implement `acs_wage_bundle.py`** as specified above.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_acs_wage_bundle.py -q --durations=5`
 Expected: PASS
 
-- [ ] **Step 5: Mark slow tests and commit**
+- [x] **Step 5: Mark slow tests and commit**
 
 ```bash
 pgrep -fl 'embedding_data\.acs_targets|stage9_independent|reconcile_stage9'
@@ -826,7 +829,7 @@ to stderr and exits 2. `<reason>` is `validation` (ValueError), `filesystem` (OS
 `compare-runs`. An unequal comparison prints its JSON line and exits 1, outside the
 failure guard (model: `src/embedding_data/ita_establishment_targets.py`).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 def test_exactly_three_commands(): ...                  # {'build', 'verify', 'compare-runs'}
@@ -859,21 +862,21 @@ def test_real_commands_touch_no_network_env_or_builder(cli_runner, chain, monkey
     # acs_mapping_bundle.build; run build, verify and compare-runs through the CLI
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_acs_wage_microdata.py -q`
 Expected: FAIL with `ModuleNotFoundError`
 
-- [ ] **Step 3: Implement `acs_wage_microdata.py`**, then set
+- [x] **Step 3: Implement `acs_wage_microdata.py`**, then set
   `acs_wage_inputs.SOFTWARE_FILES` to the list that
   `test_software_files_cover_loaded_modules` reports.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_acs_wage_microdata.py tests/test_acs_wage_bundle.py tests/test_acs_wage_inputs.py -q`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 pgrep -fl 'embedding_data\.acs_targets|stage9_independent|reconcile_stage9'
@@ -890,7 +893,7 @@ git commit -m "feat(acs-wage): add the offline wage microdata command group"
 - Consumes: `wage_mapping`, `CONTROLS` (Task 3); `app` (Task 5);
   `acs_target_fixtures.install_counted_guards`.
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 ```python
 def test_raw_to_wage_microdata_is_offline_verified_and_replayable(tmp_path, monkeypatch):
@@ -912,12 +915,12 @@ def test_raw_to_wage_microdata_is_offline_verified_and_replayable(tmp_path, monk
     assert report['funnel'][-1]['total'] == persons['flag_headline'].sum()
 ```
 
-- [ ] **Step 2: Run it**
+- [x] **Step 2: Run it**
 
 Run: `uv run --locked pytest tests/test_acs_wage_chain.py -q --durations=3`
 Expected: PASS. If setup plus call take 60 s or more, append the node ID to `SLOW_TESTS`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 pgrep -fl 'embedding_data\.acs_targets|stage9_independent|reconcile_stage9'
@@ -960,7 +963,7 @@ when `equal` is true. A refusal prints `equal: false` and a fixed `reason`, and 
 6. Recompute the funnel from the recomputed flags and compare it with `report.json`.
 7. Check spec item 6 against the Stage 4 tables.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `chain_build` is Task 4's `chain` plus one `build` named `first`. Tests run the script in a
 subprocess and parse its JSON line and exit code.
@@ -978,19 +981,19 @@ def test_reconcile_refuses_a_wrong_pin(chain_build): ...    # exit 1, reason
 def test_reconcile_refuses_a_missing_or_extra_row(chain_build): ...
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_reconcile_stage17.py -q`
 Expected: FAIL (script missing)
 
-- [ ] **Step 3: Implement `reconcile`** in `scripts/reconcile_stage17.py`.
+- [x] **Step 3: Implement `reconcile`** in `scripts/reconcile_stage17.py`.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_reconcile_stage17.py -q --durations=3`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 pgrep -fl 'embedding_data\.acs_targets|stage9_independent|reconcile_stage9'
@@ -1038,7 +1041,9 @@ directory is `ROOT/derived/acs/wage-microdata-controls/<FIRST_RUN_ID>`, after th
   - `wage-microdata/` holding exactly the frozen runs plus `--runs`, with no `.part`.
   It exits 0 only for `preserved`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
+
+> Deviation: `test_preserved_after_a_fixture_build` takes a new fixture `frozen` (a freeze, then two builds) in place of `chain`, so that "preserved after a build" has a freeze to compare with. No plan test was loosened.
 
 ```python
 def test_preserved_after_a_fixture_build(chain): ...
@@ -1050,14 +1055,16 @@ def test_freeze_refuses_an_existing_or_misplaced_control_dir(chain): ...
 def test_preservation_refuses_a_wrong_freeze_pin(chain): ...
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_reconcile_stage17.py -q`
 Expected: FAIL on the new tests
 
-- [ ] **Step 3: Implement `freeze` and `preservation`.**
+- [x] **Step 3: Implement `freeze` and `preservation`.**
 
-- [ ] **Step 4: Run the full suite and lint**
+> Deviation: after the Task 8 review, `freeze` records every regular file except `raw/manifest.jsonl`, with no tree exclusions, and `preservation` frees only the named runs (minus runs frozen) and its own control directory. This supersedes the `freeze.json` and `preserved` text above. Source: ledger, Task 8 Important 1, deciding sentence D2.
+
+- [x] **Step 4: Run the full suite and lint**
 
 ```bash
 pgrep -fl 'embedding_data\.acs_targets|stage9_independent|reconcile_stage9'
@@ -1070,7 +1077,7 @@ git diff --name-status main...HEAD -- src scripts tests features pyproject.toml 
 Expected: pytest and Behave pass (the `network` canary deselected), ruff is clean, and the
 diff shows only `A` lines, plus `M tests/conftest.py` if `SLOW_TESTS` grew.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 pgrep -fl 'embedding_data\.acs_targets|stage9_independent|reconcile_stage9'
@@ -1088,24 +1095,28 @@ Run the spec's `pgrep` line before each command and stop if it prints anything. 
 each command's stdout, stderr and `time` output to the ledger
 `.sdd/14-acs-wage-microdata/<step>.{out,err}`. `/usr/bin/time -l` writes to stderr.
 
-- [ ] **Step 1: Preconditions.** `.sdd/` is not ignored in this repository. If `git
+- [x] **Step 1: Preconditions.** `.sdd/` is not ignored in this repository. If `git
   check-ignore -q .sdd/` fails, append `.sdd/` to `$(git rev-parse
   --git-common-dir)/info/exclude`, a local file that is never committed. It applies to
   every worktree of this clone, including the primary checkout. Ledger files then cannot
   make the tree dirty. Tasks 1–8 are committed, and the full suite passed at this
-  HEAD. `git status --porcelain --untracked-files=normal` prints nothing. Record
+  HEAD. The final whole-branch review of Tasks 1–8 has run, and every finding is
+  resolved (D12). From Step 5 on, change no file in `acs_wage_inputs.SOFTWARE_FILES`,
+  `pyproject.toml` or `uv.lock`. `git status --porcelain --untracked-files=normal` prints nothing. Record
   `git rev-parse HEAD`. Choose `FIRST=stage17_acs_wage_microdata_<YYYYMMDD>_r1`,
   `REPLAY=${FIRST}_replay`, `CONTROL=$ROOT/derived/acs/wage-microdata-controls/$FIRST`.
   Confirm with `ls` that none of the three paths exists, and no `.part` beside them.
 
-- [ ] **Step 2: GATE 1.** Ask the owner for the go-ahead for the freeze and the first
+> Deviation: `main` (`6be42f2`, two `specs/` files only) was merged into the branch before this step, as merge commit `a800dd5`, after the final review reported that a later merge could invalidate the pinned runs. Task 10 then found `main` unchanged and ran the software-file diff check against the build commit (empty). Source: ledger, final review Important 1.
+
+- [x] **Step 2: GATE 1.** Ask the owner for the go-ahead for the freeze and the first
   build. Confirm that no Stage 9 freeze window is open and that no other stage's
   acquisition or full-data build is running. Show the output of `pgrep -fl
   'embedding_data|embedding-data'`. Tell the owner that Stage 17's preservation window
   opens at Step 4 and closes at Step 10, and that other stages' writes under `data/`
   wait until then.
 
-- [ ] **Step 3: Stage 8 preflight (read-only).**
+- [x] **Step 3: Stage 8 preflight (read-only).**
 
 ```bash
 /usr/bin/time -l uv run --offline --locked python -m embedding_data.acs_mapping verify stage8_acs_mapping_20261018_r7 --outputs-sha256 1ec9701092f576b122b01464cdb6fa3fbee49db030e4ad3df7b64e621b8e75f4 --data-dir "$ROOT"
@@ -1113,7 +1124,7 @@ each command's stdout, stderr and `time` output to the ledger
 
 Expected: exit 0 and `"status": "verified"`. Otherwise stop and ask the owner.
 
-- [ ] **Step 4: Freeze.**
+- [x] **Step 4: Freeze.**
 
 ```bash
 uv run --offline --locked python scripts/reconcile_stage17.py freeze --data-dir "$ROOT" --control-dir "$CONTROL"
@@ -1121,7 +1132,7 @@ uv run --offline --locked python scripts/reconcile_stage17.py freeze --data-dir 
 
 Record `freeze_sha256`.
 
-- [ ] **Step 5: First build.**
+- [x] **Step 5: First build.**
 
 ```bash
 /usr/bin/time -l uv run --offline --locked python -m embedding_data.acs_wage_microdata build "$FIRST" --data-dir "$ROOT" --mapping-run stage8_acs_mapping_20261018_r7 --mapping-outputs-sha256 1ec9701092f576b122b01464cdb6fa3fbee49db030e4ad3df7b64e621b8e75f4 --codes-run stage4_v11_20261013_r2 --codes-outputs-sha256 15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a
@@ -1131,7 +1142,7 @@ Expected: one JSON line with `outputs_sha256` (the first pin). Record the wall t
 `maximum resident set size`. If the build is killed and leaves `$FIRST.part`, leave it in
 place, stop, record the event and ask the owner (gate 3). Use a new run ID afterwards.
 
-- [ ] **Step 6: Verify the first run.**
+- [x] **Step 6: Verify the first run.**
 
 ```bash
 /usr/bin/time -l uv run --offline --locked python -m embedding_data.acs_wage_microdata verify "$FIRST" --data-dir "$ROOT" --outputs-sha256 <first pin>
@@ -1139,7 +1150,7 @@ place, stop, record the event and ask the owner (gate 3). Use a new run ID after
 
 Expected: exit 0.
 
-- [ ] **Step 7: Production counts (spec items 2 and 3).** From the first run's
+- [x] **Step 7: Production counts (spec items 2 and 3).** From the first run's
   `report.json`:
   - `rows.total` is 3,035,086 (2023: 1,512,735; 2024: 1,522,351);
   - the `headline` funnel step is 1,278,878 (2023: 639,002; 2024: 639,876);
@@ -1148,7 +1159,7 @@ Expected: exit 0.
   If any value differs, stop. The finding must explain the rule that differs before
   anything is adopted.
 
-- [ ] **Step 8: Reconcile the first run (spec items 4 to 6).**
+- [x] **Step 8: Reconcile the first run (spec items 4 to 6).**
 
 ```bash
 /usr/bin/time -l uv run --offline --locked python scripts/reconcile_stage17.py reconcile --data-dir "$ROOT" --run "$FIRST" --outputs-sha256 <first pin>
@@ -1156,7 +1167,7 @@ Expected: exit 0.
 
 Expected: exit 0, `"equal": true`, empty `mismatches`.
 
-- [ ] **Step 9: GATE 2 and the replay.** Ask for the replay go-ahead with the same two
+- [x] **Step 9: GATE 2 and the replay.** Ask for the replay go-ahead with the same two
   confirmations. Repeat Steps 5 and 6 with `$REPLAY` at the same commit and venv. Then
   compare:
 
@@ -1166,7 +1177,7 @@ Expected: exit 0, `"equal": true`, empty `mismatches`.
 
 Expected: exit 0, `"equal": true`, `"report_equal": true`, `"trust_established": false`.
 
-- [ ] **Step 10: Preservation and repository checks (spec items 7 and 8).**
+- [x] **Step 10: Preservation and repository checks (spec items 7 and 8).**
 
 ```bash
 /usr/bin/time -l uv run --offline --locked python scripts/reconcile_stage17.py preservation --data-dir "$ROOT" --control-dir "$CONTROL" --freeze-sha256 <freeze pin> --runs "$FIRST,$REPLAY"
@@ -1177,16 +1188,18 @@ git ls-files | grep -E '\.(parquet|csv|gz|jsonl)$'
 Expected: `"status": "preserved"`, `0 raw provenance discrepancies`, and no output from
 the `git ls-files` line. Confirm by reading `report.json` that it holds only counts.
 
-- [ ] **Step 11: Top-code comparison (spec, `flag_incwage_topcoded`).** Run a read-only
+> Deviation: the literal `git ls-files` line printed 24 paths, all Stage 8 test fixtures under `tests/fixtures/acs_mapping/`. The owner ruled on 2026-11-19 that the check reads "no file from `data/` and none added by this stage", and item 8 is met on that reading. The step also listed directories under `raw/` and `derived/` right after the freeze and after the check, and they differ only by the new runs. Source: ledger, Step 10 ruling.
+
+- [x] **Step 11: Top-code comparison (spec, `flag_incwage_topcoded`).** Run a read-only
   Polars query on the first run's table. For each `YEAR` and `STATEFIP` it gives the
   flagged `INCWAGE` value and its row count. Compare the values with IPUMS USA's "Values
   Exceeding Top codes, by State" page, for the years that page lists. Record the page's
   URL and the access date. A mismatch is recorded, not a stop. Record only state-level
   values.
 
-- [ ] **Step 12: Bundle sizes.** Sum the bytes of each run's files.
+- [x] **Step 12: Bundle sizes.** Sum the bytes of each run's files.
 
-- [ ] **Step 13: Write `specs/naics-evaluation-data-stage-17-findings.md`.** It is one
+- [x] **Step 13: Write `specs/naics-evaluation-data-stage-17-findings.md`.** It is one
   screen, in the shape of `specs/naics-evaluation-data-stage-1-findings.md`. Include:
   - the run IDs, the three file hashes of each run (detached pin first), the executing
     commit with `dirty: false`, the Python version, and the counts of distributions and
@@ -1201,7 +1214,7 @@ the `git ls-files` line. Confirm by reading `report.json` that it holds only cou
   - `Not claimed`: no headline minimum count (O23), no protocol section (O24), no panel
     result, and no fixture result as evidence.
 
-- [ ] **Step 14: Commit**
+- [x] **Step 14: Commit**
 
 ```bash
 pgrep -fl 'embedding_data\.acs_targets|stage9_independent|reconcile_stage9'
@@ -1230,7 +1243,7 @@ exact wording below at plan review (D9). `<date>` is the execution date. Leave t
 status line alone. Leave the source spec's out-of-scope line `**Microdata release**
 (R8.1)` and `specs/evaluation-targets-methodology.md:35` unchanged (D11).
 
-- [ ] **Step 1: Amend the source spec (spec amendments 1 to 3).**
+- [x] **Step 1: Amend the source spec (spec amendments 1 to 3).**
 
 After R7.2's line `The co-ownership family is *(added at synthesis)*; the others are
 *(chosen; D)*.`, add a new paragraph:
@@ -1267,7 +1280,7 @@ The ACS wage microdata only judge and never train. Their section in the evaluati
 protocol states which part selects and which part judges. *(owner, plan 14, <date>)*
 ```
 
-- [ ] **Step 2: Amend `CLAUDE.md` (spec amendment 4).** In line 232, replace
+- [x] **Step 2: Amend `CLAUDE.md` (spec amendment 4).** In line 232, replace
   `only aggregates are shared.` with `only aggregates are shared, except that
   naics-embedder may read the ACS wage microdata in place on this machine under their
   detached pin (R8.1).` Then append a short `**ACS wage microdata (Stage 17).**`
@@ -1275,7 +1288,7 @@ protocol states which part selects and which part judges. *(owner, plan 14, <dat
   commands, the explicit `--data-dir`, the selected runs and pins from Task 9, the
   owner gates, the `pgrep` rule, the R8.1 and R8.4 limits, and the finding's path.
 
-- [ ] **Step 3: Amend the deliverable map (spec amendment 4).** Refresh the line 1 stamp
+- [x] **Step 3: Amend the deliverable map (spec amendment 4).** Refresh the line 1 stamp
   to `as of <date> at `<commit>``. Add this row after the `ACS and CPS worker profiles`
   row:
 
@@ -1283,13 +1296,13 @@ protocol states which part selects and which part judges. *(owner, plan 14, <dat
 | ACS wage microdata (person level) | Built and replayed (Stage 17). No count gate yet (O23) | No | No | **Yes.** It judges and never trains (R8.4). naics-embedder reads it in place on this machine under its pin (R8.1) | Its section in [the evaluation protocol](evaluation-protocol.md) (O24), its count gate (O23) and naics-embedder's wage panel spec |
 ```
 
-- [ ] **Step 4: README.** Add `## ACS wage microdata (Stage 17)` before `## Data
+- [x] **Step 4: README.** Add `## ACS wage microdata (Stage 17)` before `## Data
   sources`, after the shape of `## ITA establishment targets (Stage 10)`
   (`README.md:285-441`): purpose, the command table, the exact production invocations of
   Task 9, the success and failure output, the bundle files, the owner gates and the
   `pgrep` rule, the limits (R8.1, R8.4), and the selected runs and pins.
 
-- [ ] **Step 5: Check and commit.**
+- [x] **Step 5: Check and commit.**
 
 ```bash
 git diff --stat
@@ -1303,4 +1316,30 @@ Expected: `git diff --stat` shows only the four files, and the source spec diff 
 exactly four paragraphs.
 
 After Task 10, run the Plan Completion Protocol of writing-plans, including step 3a for
-roadmap Stage 17 (O23 and O24 consume the counts in `report.json` and the finding).
+roadmap Stage 17 (O23 and O24 consume the counts in `report.json` and the finding). The
+final whole-branch review already ran before Task 9 (D12). Any later review covers only
+Tasks 9 and 10, which change docs, and changes no software file.
+
+## Handoff to later stages
+
+There is no later numbered stage. Two Track H ranked items consume this stage.
+
+- **O23 (minimum headline earners for each category).** It reads `report.json` of
+  `stage17_acs_wage_microdata_20261119_r1` (detached pin
+  `6cb253e2e5c2e48a5b31d2790a0378636d3b6ef9197cfb2d33cca2813ac201d1`) and
+  `specs/naics-evaluation-data-stage-17-findings.md`. `report.json` has `categories` (528
+  entries, each with `INDNAICS`, `YEAR`, `rows` and `headline_rows`), `headline_categories`
+  (233 in each year), `funnel`, `flags`, `node_levels` and `shared_nodes`. Differs from the
+  roadmap's Produces: none. Traps: the `INDNAICS` strings in `categories` are space-padded;
+  the counts are unweighted rows, not weighted persons; a category that shares a node is
+  not headline; headline rows join at mixed depths (`node_levels`), so the minimum applies
+  to each category and not to each node. Deferred into it: none.
+- **O24 (protocol section for the file).** It reads the same run and finding, and the four
+  paragraphs that Task 10 added to `specs/embedding-evaluation-data-spec.md` (R7.2, R7.4,
+  R8.1, R8.4; each tagged `(owner, plan 14, 2026-11-19)`). The section states which part
+  selects and which part judges (R8.4). Traps: `industry_node_level` is the level of the
+  join node, not of the delivered node (owner, 2026-11-19); the file is read in place on
+  the machine that built it, under its detached pin, and results for single persons follow
+  the same rule (R8.1); a change to any file in `acs_wage_inputs.SOFTWARE_FILES`,
+  `pyproject.toml` or `uv.lock` makes `verify` refuse both runs and needs a fresh run ID
+  and new owner gates. Deferred into it: none.
