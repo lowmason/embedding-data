@@ -446,7 +446,9 @@ Stage 17 builds one person-level analysis file from the selected Stage 8 core ta
 not a target family. Each row is a person in ACS 2023 or 2024 with `INCWAGE > 0`, in Stage 8
 source order. The file carries 120 Stage 8 columns and adds 10: `log_wage_2010`
 (the natural log of `INCWAGE_CPIU_2010`), `industry_node_code`,
-`industry_delivered_node_code`, `industry_node_level` and six flags. `flag_headline` marks the
+`industry_delivered_node_code`, `industry_node_level` and six flags. `industry_node_level` is
+the level of the join node in `industry_node_code`, not the level of the delivered node
+(owner, 2026-11-19). `flag_headline` marks the
 rows that a panel reads: no allocated value in the nine headline fields, full time and full
 year, a wage or salary employee, and no shared industry node. The file keeps the rows that are
 not headline, so a panel can report what each exclusion does. The [stage

@@ -51,7 +51,9 @@ before Gate 1 and printed aggregates only. This finding cites none of those figu
 1. Both `verify` calls pass with their pins. `compare-runs`: `equal`, `report_equal`, and
    table schema and values equal; `trust_established` is false. The Parquet and `report.json`
    are byte-identical.
-2. 3,035,086 rows (2023: 1,512,735; 2024: 1,522,351).
+2. 3,035,086 rows (2023: 1,512,735; 2024: 1,522,351). `industry_node_level` is the level of
+   the join node in `industry_node_code` (owner, 2026-11-19), not the level of the delivered
+   node.
 3. `flag_headline` is true on 1,278,878 rows (2023: 639,002; 2024: 639,876), over 233
    categories in each year. The funnel is 3,035,086, 2,126,596, 1,575,068, 1,496,864 and
    1,278,878. 31 categories share 11 nodes.
@@ -69,7 +71,8 @@ before Gate 1 and printed aggregates only. This finding cites none of those figu
    contract name and five funnel step names. The literal check, `git ls-files` filtered by
    `parquet`, `csv`, `gz` and `jsonl`, prints 24 paths. All 24 are Stage 8 test fixtures
    under `tests/fixtures/acs_mapping/`. None is under `data/`, and this stage adds none. The
-   owner decides whether the check should exclude `tests/fixtures/`.
+   owner ruled on 2026-11-19 that the check reads "no file from `data/` and none added by
+   this stage". On that reading, item 8 is met.
 9. No fixture result appears here as evidence.
 
 **Top codes.** In each of 2023 and 2024 the flagged `INCWAGE` has one value in each of 51
