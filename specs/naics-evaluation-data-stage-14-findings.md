@@ -1,7 +1,8 @@
 # NAICS evaluation data — Stage 14 findings: USAspending vendor links
 
 Status: Stage 14 in progress. Task 1 (document checks) is recorded below, read on
-2026-11-18. The owner closed E6 on 2026-11-19 (see "E6 status").
+2026-11-18. The owner closed E6 on 2026-11-19 (see "E6 status"). Task 9 (acquisition and
+preflight) is recorded in "Preflight", run on 2026-11-19.
 
 Stage 14 of `specs/naics-evaluation-data-roadmap.md` builds O6 from
 `specs/usaspending-vendor-links.md` under `specs/plans/15-usaspending-vendor-links.md`.
@@ -273,3 +274,220 @@ request body equals the draft.
   subaward NAICS column is absent from the `d1` list), the type value `sub-contract`, parent
   UEI letter case, the extract framing, EVS source values, and the retention and response
   form of the extract API.
+
+## Preflight
+
+Task 9 fetched the four raw files, read their headers and measured the real data with the
+draft registry. All of it ran on 2026-11-19. The preflight script is read-only. It prints
+counts, shapes and header names, and no row value. Scratch files lived under
+`/private/tmp/claude-501/`, outside the repository and the data root. The registry is
+`src/embedding_data/usaspending_subaward_headers.json`, committed with this section.
+
+### Raw files
+
+Snapshot label `2026-11-19`. Extract month `2026-10`. Every file is under `data/raw/` and
+is recorded in `raw/manifest.jsonl`. Each SHA-256 below equals its manifest entry.
+
+| File | Bytes | SHA-256 |
+|---|---:|---|
+| `sam/entity-extract/public-monthly-v2/2026-10/SAM_PUBLIC_UTF-8_MONTHLY_V2_20261005.ZIP` | 150,113,940 | `cbb7363ec16d774030805e3cebd53b6970c542014f51362b69d93556a7d063f6` |
+| `usaspending/subcontracts/2026-11-19/FY2024/All_Subawards_2026-11-19_H12M46S47368855.zip` | 55,050,781 | `4926b10cf6bc055e814bbd12d9caac228674cb212608864fed14ea8c3c312e5b` |
+| `usaspending/subcontracts/2026-11-19/FY2025/All_Subawards_2026-11-19_H12M27S45273786.zip` | 37,724,326 | `f3951726f1c6f350e47ec1c088da32fb5c9f7b0363a49a06af8097746ecc7c17` |
+| `usaspending/subcontracts/2026-11-19/FY2026/All_Subawards_2026-11-19_H12M00S15714527.zip` | 27,255,097 | `c5d8b07a416274618fdc5a07db288cfcdc959a65f8618f85786e0ee2c1dc7fcb` |
+
+The three subaward files came from `acquire-subawards` with the owner's go-ahead. The owner
+chained FY2025 and FY2026 after FY2024, with the host-rule check before each. The extract
+came from the owner's browser download, imported with `import-sam-extract` (a manual-import
+entry).
+
+**The extract was wrapped twice.** The owner's file
+`SAM_PUBLIC_UTF-8_MONTHLY_V2_20261005.ZIP` (150,133,435 bytes, SHA-256
+`d732f9753f87ed67eb53edcc7b057f2486817befeadf54d1b65f12c06019352d`) is an outer ZIP with
+one member. That member is a ZIP of the same name (150,113,940 bytes), and `unzip -t` found
+no error in it. With the owner's go-ahead, only the inner ZIP was imported, because it is
+the file the layout describes. The outer file stays in `/private/tmp/sam-download/`, outside
+the data root, and is not recorded.
+
+**The real member name differs from the 2020 sample.** The inner ZIP holds one member,
+`SAM_PUBLIC_UTF-8_MONTHLY_V2_20261005_897fa9aa54ba4f0fa78f34a447e93956.dat` (572,225,486
+bytes). It has a `UTF-8` tag and a 32-character hex suffix. The Task 5 pattern refused it.
+Task 9a changed the registry pattern to
+`SAM_PUBLIC_UTF-8_MONTHLY_V2_[0-9]{8}_[0-9a-f]{32}\.dat` and pinned the refused forms.
+
+**Preservation.** Before the first write, the manifest was 1,550,435 bytes with SHA-256
+`956b9feff2fe1be7035f1ef4785e1485f4ba7f1a51cc25ceda4b55f0f20b0b1b`. After the four
+writes it has 3,017 lines and 1,552,347 bytes, and its first 1,550,435 bytes still hash to
+that value. `embedding-data audit` ran before and after: exit 0, 0 raw provenance
+discrepancies each time.
+
+### Members and registry
+
+Each subaward ZIP holds one CSV member and no readme. All three members are valid UTF-8,
+have no byte-order mark and have no ragged row.
+
+| Year | Member | Bytes | Records |
+|---|---|---:|---:|
+| FY2024 | `All_Contracts_Subawards_2026-11-19_H13M50S12_1.csv` | 415,901,702 | 227,284 |
+| FY2025 | `All_Contracts_Subawards_2026-11-19_H12M28S47_1.csv` | 298,568,503 | 177,666 |
+| FY2026 | `All_Contracts_Subawards_2026-11-19_H12M01S15_1.csv` | 195,020,180 | 117,644 |
+
+The header row has 118 cells and is identical in all three years. The registry pattern is
+`All_Contracts_Subawards_[0-9]{4}-[0-9]{2}-[0-9]{2}_H[0-9]{2}M[0-9]{2}S[0-9]+_[0-9]+\.csv`.
+It matches each member (`re.fullmatch`). The date format is `%Y-%m-%d`. The mapped cells are
+the same in every year:
+
+| Field | Header cell |
+|---|---|
+| `prime_uei` | `prime_awardee_uei` |
+| `prime_parent_uei` | `prime_awardee_parent_uei` |
+| `sub_uei` | `subawardee_uei` |
+| `sub_parent_uei` | `subawardee_parent_uei` |
+| `action_date` | `subaward_action_date` |
+| `amount` | `subaward_amount` |
+| `subaward_type` | `subaward_type` |
+| `report_id` | `subaward_sam_report_id` |
+| `prime_naics` | `prime_award_naics_code` |
+| `subaward_naics` | none (missing in all three years) |
+
+The download has no subaward NAICS column. The missing-field list is `subaward_naics`
+alone, and it does not stop the stage. The `subaward_naics_equal_prime` diagnostic is
+therefore null in every year. Four of the 118 header cells (the sixth to the ninth) hold
+upper-case letters. Two of them (`COVID-19`) also hold a hyphen. The first `headers` run
+withheld the header for that reason, and Task 9b relaxed the name guard to
+`[A-Za-z][A-Za-z0-9_-]*`.
+
+### E4: subaward reports
+
+All three years use the same shapes. Every action date has the shape `9999-99-99`. The
+preflight prints the ten most frequent amount shapes. They cover 99.3% of FY2024 rows,
+99.2% of FY2025 rows and 99.4% of FY2026 rows, and each is an optional minus sign, digits,
+a dot and two digits. The rarer shapes are not printed. No amount fails to parse
+(`amount_unparseable` is 0 in each year). Every `subaward_type` is `sub-contract` (227,284,
+177,666 and 117,644 rows).
+
+| Measure | FY2024 | FY2025 | FY2026 | Total |
+|---|---:|---:|---:|---:|
+| Rows | 227,284 | 177,666 | 117,644 | 522,594 |
+| `usable` | 227,218 | 177,666 | 117,644 | 522,528 |
+| `uei_unusable` | 66 | 0 | 0 | 66 |
+| `action_date_invalid` | 0 | 0 | 0 | 0 |
+| `outside_window` | 0 | 0 | 0 | 0 |
+| Blank prime UEI | 66 | 0 | 0 | 66 |
+| Blank sub UEI | 0 | 0 | 0 | 0 |
+| Malformed UEI (prime, sub) | 0, 0 | 0, 0 | 0, 0 | 0, 0 |
+| Rows outside the file year | 0 | 0 | 0 | 0 |
+| Duplicate rows | 0 | 0 | 0 | 0 |
+| Distinct report IDs | 227,284 | 177,666 | 117,644 | 522,594 |
+| Unparseable amounts | 0 | 0 | 0 | 0 |
+| Negative amounts, in the ten printed shapes | 4,956 | 4,584 | 1,694 | 11,234 |
+
+The 66 unusable reports all have a blank prime UEI and all sit in FY2024. The spec sums
+every usable amount as a diagnostic, so negative amounts need no rule. The negative counts
+are a lower bound, because the rarer shapes are not printed.
+
+Rows by action month. Each file holds its own fiscal year, October to September.
+
+| Month | FY2024 | FY2025 | FY2026 |
+|---|---:|---:|---:|
+| Oct | 23,209 | 18,744 | 12,892 |
+| Nov | 17,329 | 15,203 | 10,309 |
+| Dec | 17,690 | 14,364 | 10,960 |
+| Jan | 21,500 | 14,604 | 9,143 |
+| Feb | 22,103 | 13,480 | 9,870 |
+| Mar | 20,375 | 14,722 | 11,269 |
+| Apr | 18,122 | 14,622 | 10,893 |
+| May | 17,139 | 13,949 | 9,897 |
+| Jun | 17,290 | 12,671 | 10,247 |
+| Jul | 16,429 | 16,249 | 9,726 |
+| Aug | 17,122 | 12,202 | 6,508 |
+| Sep | 18,976 | 16,856 | 5,930 |
+
+The last two months of FY2026 are lower (6,508 and 5,930). The snapshot is 2026-11-19, so
+late reports may still be missing. This is an observation. It is not a check.
+
+### E5: extract and join
+
+**Framing.** The BOF line is `BOF PUBLIC V2 00000000 20261005 0905712 0008359` and the EOF
+line has the same text after `EOF`. Both match the committed prefixes. The first count
+equals the 905,712 data lines. The 2020 sample's counts did not, so the reader still does
+not use them as a record count. Every data line ends with `!end`.
+
+**Skipped lines.** 905,436 data lines have 142 fields. 276 lines (0.030%) have 143 to 155
+fields (143: 89, 144: 124, 145: 38, 146: 8, 147: 3, 148: 12, 154: 1, 155: 1). The layout
+has no quoting, so a pipe inside a text field is the likely cause. That cause is not
+proven. 239 of the 276 lines have a last update date on or after 2022-04-04 and 37 have an
+invalid date. 249 are active and 27 are expired. They hold 273 distinct UEIs, and 16 of
+these appear on subaward reports (one as a prime, 16 as a subcontractor). None of the 16
+has a readable record elsewhere, so all 16 count as `not_in_sam`.
+
+| Extract measure | Value |
+|---|---:|
+| Rows read | 905,436 |
+| Skipped lines (`unreadable_lines`) | 276 |
+| Registration status `A` / `E` / `A~E` | 820,073 / 85,362 / 1 |
+| UEIs with 1 / 2 / 3 or more rows | 891,558 / 5,933 / 440 |
+| Last update year 2023 / 2024 / 2025 / 2026 | 1 / 3 / 133,711 / 670,466 |
+| Last update blank or invalid | 101,255 |
+| EVS source blank / `D&B` / `E&Y` | 80,802 / 422 / 824,212 |
+| Primary NAICS blank | 248,453 |
+| Primary NAICS well formed (in the 2022 list) | 656,983 (656,932) |
+| Primary NAICS malformed (read or unread rows) | 0 (0) |
+
+The EVS source position is filled in the real extract. The 2020 sample left it empty.
+
+**Firms.** 48,989 distinct UEIs sit on usable reports. 2,939 are primes and 47,676 are
+subcontractors, so 1,626 are both.
+
+| Firm status | All | Prime | Subcontractor |
+|---|---:|---:|---:|
+| `eligible` | 32,578 | 2,380 | 31,552 |
+| `not_in_sam` | 8,671 | 59 | 8,630 |
+| `dnb_era_record` | 6,457 | 498 | 6,211 |
+| `naics_missing` | 1,283 | 2 | 1,283 |
+| `naics_conflict` | 0 | 0 | 0 |
+| `naics_not_2022` | 0 | 0 | 0 |
+
+6,411 firms have a blank or invalid last update date on at least one row. The owner's D2
+rule makes each of them `dnb_era_record`. No valid last update date is before 2022-04-04
+(the earliest year is 2023). So the date rule fires on invalid dates alone, and EVS source
+`D&B` explains the other 46 firms. This costs about 13% of all firms their industry. The
+extract carries EVS source `D&B` on only 422 rows. The cost does not reach a trigger.
+
+**Join coverage** (eligible firms over firms of the role):
+
+| Role | Pooled | FY2024 | FY2025 | FY2026 |
+|---|---:|---:|---:|---:|
+| Prime | 0.810 (2,380 of 2,939) | 0.814 (1,745 of 2,145) | 0.807 (1,708 of 2,116) | 0.816 (1,379 of 1,690) |
+| Subcontractor | 0.662 (31,552 of 47,676) | 0.677 (20,112 of 29,716) | 0.708 (19,936 of 28,159) | 0.726 (17,082 of 23,522) |
+
+**Trigger.** The share of firms with a primary code outside the 2022 list is 0 of 32,578
+(0.0). By year it is 0 of 20,928 (FY2024), 0 of 20,808 (FY2025) and 0 of 17,825 (FY2026).
+The plan's trigger is a share above 1% or a coverage below 0.5 for either role. Neither
+holds.
+
+### Outcomes of stops and asks
+
+`measure` ended with `ok: true`, `stops: []` and `asks: []`. The plan's other stop
+conditions:
+
+- **A ZIP member that is not a subaward CSV.** None. Each subaward ZIP holds one CSV member.
+- **A year that is not valid UTF-8.** None.
+- **An extract that differs from the committed layout.** Two differences. (1) The member
+  name had a hex suffix and the ZIP was wrapped twice. The owner approved importing the
+  inner ZIP, and Task 9a fixed the pattern. (2) 276 data lines have the wrong field count.
+  The owner decided on 2026-11-19: "Skip and count them." The reader skips such lines and
+  counts them (`unreadable_lines`, `unreadable_firms`). This overrides the spec's rule that a
+  wrong field count fails the build, for that rule only. Task 16 amends the spec text. The
+  framing prefixes, the delimiter and the 142-field layout otherwise match.
+- **A date or amount shape the registry cannot express.** None.
+- **A missing optional field.** `subaward_naics`, recorded above. It does not stop.
+
+The owner's words, on 2026-11-19: "Yes, close E6" (close E6, see "E6 status"), "Yes, import
+inner ZIP" (import the inner ZIP only), "Approved for both" (the subaward downloads and the
+member-pattern change), "Yes, chain both" (FY2025 then FY2026) and "Skip and count them"
+(the 276 lines). The owner also chose the snapshot label `2026-11-19` and the extract month
+`2026-10`. The owner left the extract path open ("Either one, just give me detailed
+instructions"), and the controller chose the browser path.
+
+Not checked here: the retention and response form of the extract API. The browser path was
+used, so `acquire-sam-extract` was not run.

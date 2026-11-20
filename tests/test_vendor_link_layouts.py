@@ -1,9 +1,11 @@
-'''The Stage 14 registry model and the committed SAM.gov extract layout.
+'''The Stage 14 registry model, the committed SAM.gov extract layout and the production
+subaward header registry.
 
 The refusal tests build one defective registry per case from a valid one and match the
 exact message, so a refusal at the wrong check fails the test. The values below are
 synthetic and made up. The committed extract layout is checked against the findings file's
-Task 1 record, copied here as a literal.
+Task 1 record, copied here as a literal. The production subaward registry is checked only
+for its window years and its UEI columns, because its header cells are the measured ones.
 '''
 
 import copy
@@ -705,6 +707,13 @@ def test_production_extract_layout_text_is_the_canonical_json():
     canonical = json.dumps(vendor_link_layouts.extract_layout_json(layout), indent=2,
                            sort_keys=True) + '\n'
     assert vendor_link_layouts.EXTRACT_FILE.read_text(encoding='utf-8') == canonical
+
+
+def test_production_subaward_registry_covers_the_window():
+    layouts = vendor_link_layouts.load_subaward_layouts()
+    assert sorted(layouts) == [2024, 2025, 2026]
+    assert all(layout.columns['prime_uei'] and layout.columns['sub_uei']
+               for layout in layouts.values())
 
 
 # The one member of the first real public monthly V2 UTF-8 extract ZIP, seen in 2026: the
