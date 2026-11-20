@@ -565,6 +565,18 @@ def test_partial_counts_ignore_the_other_excluded_statuses():
     assert marginal(N236220)['n_buyers_partial'] == 0
 
 
+def test_partial_counts_ignore_intra_group_pairs_with_an_ineligible_counterparty():
+    # u is the subcontractor of the intra_group pairs x-u and y-u, whose primes are
+    # ineligible. p is the prime of the intra_group pair p-x, whose subcontractor is
+    # ineligible. Only a prime_ineligible or sub_ineligible pair makes a partial firm.
+    firms = {'P': '236220', 'U': '541511', 'X': 'not_in_sam', 'Y': 'naics_conflict'}
+    result = run(firms, link('P', 'U'), link('P', 'X', intra=True), link('X', 'U', intra=True),
+                 link('Y', 'U', intra=True))
+    target, support_row, marginal = lookups(result)
+    assert marginal(N541511)['n_suppliers_partial'] == 0
+    assert marginal(N236220)['n_buyers_partial'] == 0
+
+
 def test_partial_counts_only_firms_in_the_target():
     # v's only pair is prime_ineligible, and r's only pair is sub_ineligible: no marginal row.
     # w and t have such pairs only, in industries that have marginal rows: no partial count.
@@ -774,6 +786,18 @@ def test_validator_rejects_pairs_below_the_buyer_count():
     result = estimate(table, snapshot=SNAPSHOT, month=MONTH)
     row = _only(result.support, **SD)
     assert (row['s_suppliers'], row['b_buyers'], row['l_pairs']) == (1, 2, 2)
+    with exactly(PAIR_BOUNDS):
+        validate_vendor_links(replace(result, support=edit(result.support, SD, l_pairs=1)),
+                              table, NODE_IDS)
+
+
+def test_validator_rejects_pairs_below_the_supplier_count():
+    # S = 2 and B = 1, so L = 1 is at least B but below max(S, B).
+    table = pair_table({'P': '236220', 'U1': '541511', 'U2': '541511'},
+                       link('P', 'U1'), link('P', 'U2'))
+    result = estimate(table, snapshot=SNAPSHOT, month=MONTH)
+    row = _only(result.support, **SD)
+    assert (row['s_suppliers'], row['b_buyers'], row['l_pairs']) == (2, 1, 2)
     with exactly(PAIR_BOUNDS):
         validate_vendor_links(replace(result, support=edit(result.support, SD, l_pairs=1)),
                               table, NODE_IDS)
