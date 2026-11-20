@@ -128,3 +128,31 @@ def rows_frame(records: list[dict]) -> pl.LazyFrame:
         for name in tri_reader.READ_SCHEMA
     }
     return pl.DataFrame(columns, schema=tri_reader.READ_SCHEMA).lazy()
+
+
+def subprocess_modules(name: str, *, prefix: str | None = 'embedding_data') -> set[str]:
+    '''The names in `sys.modules` after a fresh `sys.executable` process imports `name`.
+
+    Only the names that start with `prefix` are kept, unless `prefix` is None.
+    '''
+    import json
+    import subprocess
+    import sys
+
+    code = ('import importlib, json, sys\n'
+            f'importlib.import_module({name!r})\n'
+            'print(json.dumps(sorted(sys.modules)))\n')
+    result = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True,
+                            check=True)
+    loaded = set(json.loads(result.stdout))
+    return loaded if prefix is None else {module for module in loaded
+                                          if module.startswith(prefix)}
+
+
+def module_file(module: str) -> str:
+    '''The repository-relative source file of a module of the `embedding_data` package.'''
+    if module == 'embedding_data':
+        return 'src/embedding_data/__init__.py'
+    if not module.startswith('embedding_data.'):
+        raise ValueError(f'{module} is not a module of embedding_data')
+    return 'src/embedding_data/' + module.removeprefix('embedding_data.') + '.py'
