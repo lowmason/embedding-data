@@ -648,6 +648,22 @@ def test_compare_unequal_exits_1_outside_the_failure_guard(cli_runner, data_dire
     assert result.stderr == ''
 
 
+@pytest.mark.parametrize('equal,report_equal,code', [
+    (True, True, 0),
+    (False, True, 1),  # The tables differ and the reports agree.
+    (False, False, 1),
+], ids=['equal', 'tables_differ', 'both_differ'])
+def test_the_compare_exit_code_follows_the_equal_field_alone(
+        cli_runner, data_directory, monkeypatch, equal, report_equal, code):
+    compared = {'equal': equal, 'report_equal': report_equal, 'tables': {},
+                'trust_established': False}
+    monkeypatch.setattr(tri_bundle, 'compare_runs', lambda first, second: compared)
+    result = invoke(cli_runner, 'compare-runs', data_directory, 'run_1', 'run_2')
+    assert result.exit_code == code
+    assert result.stdout == json.dumps(compared, sort_keys=True) + '\n'
+    assert result.stderr == ''
+
+
 def test_top_level_cli_does_not_register_the_tri_commands():
     from embedding_data import cli
 
