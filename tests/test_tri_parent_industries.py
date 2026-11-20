@@ -1,6 +1,7 @@
 '''TRI parent industry table (O8): one row for each parent and industry, on synthetic rows.'''
 
 import json
+from functools import cache
 
 import polars as pl
 import pytest
@@ -160,7 +161,9 @@ def test_an_excluded_row_that_carries_a_parent_key_is_left_out():
 
 
 def test_a_self_owned_facility_is_not_a_parent():
-    frame = minimal([(2023, 'T1', A, 'facility:T1', None), (2023, 'T2', A, 'parent:P', None)])
+    # the prefix must start the key: a `facility:` key that holds it later is still self-owned
+    frame = minimal([(2023, 'T1', A, 'facility:T1', None), (2023, 'T2', A, 'parent:P', None),
+                     (2023, 'T3', A, 'facility:parent:T3', None)])
     assert build_parent_industries(frame).rows() == [('P', A, 1, 1, 0, 1, 0)]
 
 
@@ -314,6 +317,11 @@ def test_the_report_counts_parents_not_rows():
     assert report['industries_per_parent']['count'] == 2
 
 
+def test_the_report_keeps_parent_names_that_differ_in_case_apart():
+    table = from_rows([('ACME', A, 1, 1, 1, 0, 0), ('Acme', A, 1, 1, 1, 0, 0)])
+    assert parent_report(table)['n_parents'] == 2
+
+
 def test_the_report_sums_facilities_over_the_industries_of_a_parent():
     # a facility that changes industry between years is counted in each industry of its parent
     table = table_of([form(2022, 'T1', A, 'P'), form(2023, 'T1', B, 'P')])
@@ -342,25 +350,34 @@ def test_the_report_is_plain_json_of_counts_only():
 
 # ---- the validator
 
-FRAME = reduced(example_records())
-GOOD = build_parent_industries(FRAME)
 PARENTS = 'parents differ from the facility-years'
 ROWS = 'rows differ from the facility-years'
 COUNT_MESSAGE = 'counts differ from the facility-years'
 KEY = 'key not unique and sorted'
+SCHEMA_MESSAGE = 'schema differs'
+
+
+@cache
+def example_frame() -> pl.DataFrame:
+    return reduced(example_records())
+
+
+@cache
+def example_table() -> pl.DataFrame:
+    return build_parent_industries(example_frame())
 
 
 def test_the_validator_accepts_the_table_that_the_builder_gives():
-    assert validate_parent_industries(GOOD, FRAME) is None
+    assert validate_parent_industries(example_table(), example_frame()) is None
 
 
 def test_the_validator_accepts_an_empty_table_of_an_empty_selection():
-    for frame in (reduced([]), reduced([form(2022, 'T1', A)])):
-        validate_parent_industries(build_parent_industries(frame), frame)
+    for empty in (reduced([]), reduced([form(2022, 'T1', A)])):
+        validate_parent_industries(build_parent_industries(empty), empty)
 
 
 def changed(column: str, row: int, delta: int) -> pl.DataFrame:
-    rows = GOOD.rows()
+    rows = example_table().rows()
     index = list(SCHEMA).index(column)
     rows[row] = (*rows[row][:index], rows[row][index] + delta, *rows[row][index + 1:])
     return from_rows(rows)
@@ -370,71 +387,82 @@ def changed(column: str, row: int, delta: int) -> pl.DataFrame:
 @pytest.mark.parametrize('delta', [1, -1], ids=['too high', 'too low'])
 def test_validator_rejects_counts_that_differ_from_the_facility_years(column, delta):
     # a row whose count is at least one, so that a count one too low is still a count
-    row = next(number for number, value in enumerate(GOOD[column]) if value >= 1)
+    row = next(number for number, value in enumerate(example_table()[column]) if value >= 1)
     with pytest.raises(ValueError, match=f'^{COUNT_MESSAGE}$'):
-        validate_parent_industries(changed(column, row, delta), FRAME)
+        validate_parent_industries(changed(column, row, delta), example_frame())
 
 
 @pytest.mark.parametrize('column', COUNTS)
 def test_the_validator_rejects_a_count_that_is_off_on_any_row(column):
-    for row in range(GOOD.height):
+    for row in range(example_table().height):
         with pytest.raises(ValueError, match=f'^{COUNT_MESSAGE}$'):
-            validate_parent_industries(changed(column, row, 2), FRAME)
+            validate_parent_industries(changed(column, row, 2), example_frame())
 
 
-def test_the_validator_rejects_a_null_count():
-    rows = GOOD.rows()
-    rows[2] = (*rows[2][:6], None)
+@pytest.mark.parametrize('row, count', [(0, 0), (2, 1)],
+                         ids=['where the count is 0', 'where the count is 1'])
+def test_the_validator_rejects_a_null_count(row, count):
+    rows = example_table().rows()
+    assert rows[row][6] == count
+    rows[row] = (*rows[row][:6], None)
     with pytest.raises(ValueError, match=f'^{COUNT_MESSAGE}$'):
-        validate_parent_industries(from_rows(rows), FRAME)
+        validate_parent_industries(from_rows(rows), example_frame())
 
 
-def breaks() -> dict[str, tuple[pl.DataFrame, str]]:
-    '''Each table breaks one rule of the validator, with the message that names the rule.'''
-    rows = GOOD.rows()
-    return {
-        'a wrong column type': (GOOD.cast({'n_facilities': pl.UInt32}), 'schema differs'),
-        'columns out of order': (GOOD.select(*reversed(GOOD.columns)), 'schema differs'),
-        'a missing column': (GOOD.drop('f_2024'), 'schema differs'),
-        'an extra column': (GOOD.with_columns(extra=pl.lit(1)), 'schema differs'),
-        'a renamed column': (GOOD.rename({'f_2024': 'f_2025'}), 'schema differs'),
-        'a duplicated first row': (from_rows([rows[0], *rows]), KEY),
-        'a duplicated last row': (from_rows([*rows, rows[-1]]), KEY),
-        'swapped rows': (from_rows([rows[1], rows[0], *rows[2:]]), KEY),
-        'a reversed table': (from_rows(rows[::-1]), KEY),
-        'node order first': (GOOD.sort('node_id', 'parent_name'), KEY),
-        'a null parent name': (from_rows([(None, *rows[0][1:]), *rows[1:]]), KEY),
-        'a null node': (from_rows([(rows[0][0], None, *rows[0][2:]), *rows[1:]]), KEY),
-        'a missing parent': (from_rows(rows[:3] + rows[4:]), PARENTS),
-        'a missing last parent': (from_rows(rows[:-1]), PARENTS),
-        'a parent with no facility-year': (
-            from_rows([*rows, ('Zulu', A, 1, 1, 1, 0, 0)]), PARENTS),
-        'a self-owned facility as a parent': (
-            from_rows([*rows, ('facility:T10', D, 1, 1, 1, 0, 0)]), PARENTS),
-        'an excluded parent': (from_rows([*rows, ('Dune', A, 1, 1, 0, 1, 0)]), PARENTS),
-        'a missing row of a parent': (from_rows(rows[:1] + rows[2:]), ROWS),
-        'an extra row of a parent': (
-            from_rows([*rows[:3], ('Acme', D, 1, 1, 1, 0, 0), *rows[3:]]), ROWS),
-        'a changed node': (
-            from_rows([*rows[:2], (rows[2][0], D, *rows[2][2:]), *rows[3:]]), ROWS),
-    }
+# Each break is a table that breaks one rule of the validator, built from the good table and
+# its rows, and the message that names the rule. The five rows are Acme in a, b and c, Beta in
+# a and Core in b.
+BREAKS = {
+    'a wrong column type': (lambda good, rows: good.cast({'n_facilities': pl.UInt32}),
+                            SCHEMA_MESSAGE),
+    'columns out of order': (lambda good, rows: good.select(*reversed(good.columns)),
+                             SCHEMA_MESSAGE),
+    'a missing column': (lambda good, rows: good.drop('f_2024'), SCHEMA_MESSAGE),
+    'an extra column': (lambda good, rows: good.with_columns(extra=pl.lit(1)), SCHEMA_MESSAGE),
+    'a renamed column': (lambda good, rows: good.rename({'f_2024': 'f_2025'}), SCHEMA_MESSAGE),
+    'a duplicated first row': (lambda good, rows: from_rows([rows[0], *rows]), KEY),
+    'a duplicated last row': (lambda good, rows: from_rows([*rows, rows[-1]]), KEY),
+    'swapped rows': (lambda good, rows: from_rows([rows[1], rows[0], *rows[2:]]), KEY),
+    'a reversed table': (lambda good, rows: from_rows(rows[::-1]), KEY),
+    'node order first': (lambda good, rows: good.sort('node_id', 'parent_name'), KEY),
+    'a null parent name': (lambda good, rows: from_rows([(None, *rows[0][1:]), *rows[1:]]), KEY),
+    'a null node': (lambda good, rows: from_rows([(rows[0][0], None, *rows[0][2:]), *rows[1:]]),
+                    KEY),
+    'a missing parent': (lambda good, rows: from_rows(rows[:3] + rows[4:]), PARENTS),
+    'a missing last parent': (lambda good, rows: from_rows(rows[:-1]), PARENTS),
+    'a renamed parent': (lambda good, rows: from_rows(
+        [*rows[:3], ('Bzzz', *rows[3][1:]), rows[4]]), PARENTS),
+    'a parent with no facility-year': (lambda good, rows: from_rows(
+        [*rows, ('Zulu', A, 1, 1, 1, 0, 0)]), PARENTS),
+    'a self-owned facility as a parent': (lambda good, rows: from_rows(
+        [*rows, ('facility:T10', D, 1, 1, 1, 0, 0)]), PARENTS),
+    'an excluded parent': (lambda good, rows: from_rows(
+        [*rows, ('Dune', A, 1, 1, 0, 1, 0)]), PARENTS),
+    'a missing row of a parent': (lambda good, rows: from_rows(rows[:1] + rows[2:]), ROWS),
+    'an extra row of a parent': (lambda good, rows: from_rows(
+        [*rows[:3], ('Acme', D, 1, 1, 1, 0, 0), *rows[3:]]), ROWS),
+    'a changed node': (lambda good, rows: from_rows(
+        [*rows[:2], (rows[2][0], D, *rows[2][2:]), *rows[3:]]), ROWS),
+    'counts swapped between two rows': (lambda good, rows: from_rows(
+        [(*rows[0][:2], *rows[1][2:]), (*rows[1][:2], *rows[0][2:]), *rows[2:]]), COUNT_MESSAGE),
+}
 
 
-BREAKS = breaks()
+def broken(name: str) -> pl.DataFrame:
+    return BREAKS[name][0](example_table(), example_table().rows())
 
 
 @pytest.mark.parametrize('name', BREAKS)
 def test_the_validator_rejects_each_break_with_the_message_of_its_rule(name):
-    broken, message = BREAKS[name]
-    with pytest.raises(ValueError, match=f'^{message}$'):
-        validate_parent_industries(broken, FRAME)
+    with pytest.raises(ValueError, match=f'^{BREAKS[name][1]}$'):
+        validate_parent_industries(broken(name), example_frame())
 
 
 def test_the_validator_messages_hold_no_cell_value():
-    values = {'Acme', 'Beta', 'Core', 'Zulu', 'Dune', 'T10', A, B, C, D, NODE_PREFIX}
-    for name, (broken, _) in BREAKS.items():
+    values = {'Acme', 'Beta', 'Core', 'Bzzz', 'Zulu', 'Dune', 'T10', A, B, C, D, NODE_PREFIX}
+    for name in BREAKS:
         with pytest.raises(ValueError) as failure:
-            validate_parent_industries(broken, FRAME)
+            validate_parent_industries(broken(name), example_frame())
         assert not [value for value in values if value in str(failure.value)], name
 
 
@@ -447,20 +475,20 @@ def test_the_validator_rejects_a_table_of_another_frame_by_its_counts():
 
 
 def test_the_validator_rejects_a_table_of_a_frame_with_no_parents():
-    for frame in (reduced([]), reduced([form(2022, 'T1', A)])):
+    for empty in (reduced([]), reduced([form(2022, 'T1', A)])):
         with pytest.raises(ValueError, match=f'^{PARENTS}$'):
-            validate_parent_industries(GOOD, frame)
+            validate_parent_industries(example_table(), empty)
 
 
 def test_the_validator_rejects_an_empty_table_for_a_frame_with_parents():
     with pytest.raises(ValueError, match=f'^{PARENTS}$'):
-        validate_parent_industries(from_rows([]), FRAME)
+        validate_parent_industries(from_rows([]), example_frame())
 
 
 @pytest.mark.parametrize('trifd', ['T1', 'T10', 'T11'], ids=['parent', 'self-owned', 'excluded'])
 def test_the_validator_rejects_a_frame_with_a_year_outside_the_window(trifd):
-    shifted = FRAME.with_columns(
+    shifted = example_frame().with_columns(
         pl.when(pl.col('trifd') == trifd).then(pl.lit(2025, dtype=pl.Int64))
         .otherwise(pl.col('reporting_year')).alias('reporting_year'))
     with pytest.raises(ValueError, match=OUTSIDE):
-        validate_parent_industries(GOOD, shifted)
+        validate_parent_industries(example_table(), shifted)
