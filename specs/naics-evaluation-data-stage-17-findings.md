@@ -18,7 +18,8 @@ and records 31,623 files and no earlier wage microdata run.
 | `report.json` | `32ad9b698c9b940760d74eec0ae3b234abd14ba4c08ca07f04770a8f11e413bd` | same |
 | `acs_wage_persons.parquet` | `a94471492dc91aebe3a3436e8d738d399520791b0eace6f01a719fad10fd5ff2` | same |
 
-The two `inputs.json` files differ only in the run ID. Executing commit `a800dd5`
+The two `inputs.json` files differ in the run ID and in `execution.created_at`, the time of
+each build (2026-11-20T02:20:15Z and 2026-11-20T02:21:47Z). Executing commit `a800dd5`
 (`dirty: false`). CPython 3.14.0, 63 distributions, 19 software files, `uv.lock` SHA-256
 `f57c3280a7c8286711bf6804ca4c02f0a19619c9db52f33941b9c5b996cba8e5`. Inputs: Stage 8 run
 `stage8_acs_mapping_20261018_r7` (pin `1ec97010…75f4`) and Stage 4 run
