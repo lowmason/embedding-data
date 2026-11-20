@@ -809,7 +809,22 @@ def test_build_keeps_its_scratch_inside_its_staging_and_removes_it(built, monkey
     assert {path.name for path in Path(result['directory']).iterdir()} == {*FILES, 'outputs.json'}
 
 
-def test_report_key_collision_fails_the_build(built, monkeypatch):
+def test_the_targets_go_through_the_shared_target_writer(built, monkeypatch):
+    real = target_contract.write_targets
+    written = []
+
+    def observe(frame, destination):
+        written.append(Path(destination).name)
+        return real(frame, destination)
+
+    monkeypatch.setattr(target_contract, 'write_targets', observe)
+    result = build_run(built, 'writer')
+    assert written == ['tri_parent_links.parquet']
+    published = pl.read_parquet(Path(result['directory']) / 'tri_parent_links.parquet')
+    assert published.equals(pl.read_parquet(built.directory / 'tri_parent_links.parquet'))
+
+
+def colliding_estimate(monkeypatch):
     real = tri_parent_link_targets.estimate
 
     def colliding(frame, *, processed_as_of):
@@ -817,6 +832,21 @@ def test_report_key_collision_fails_the_build(built, monkeypatch):
         return replace(result, report={**result.report, 'tables': {}})
 
     monkeypatch.setattr(tri_parent_link_targets, 'estimate', colliding)
+
+
+def colliding_year_report(monkeypatch):
+    real = tri_facility_years.year_report
+
+    def colliding(rows, frame, layouts):
+        return {year: {**counts, 'transcoded': True}
+                for year, counts in real(rows, frame, layouts).items()}
+
+    monkeypatch.setattr(tri_facility_years, 'year_report', colliding)
+
+
+@pytest.mark.parametrize('collision', [colliding_estimate, colliding_year_report])
+def test_report_key_collision_fails_the_build(collision, built, monkeypatch):
+    collision(monkeypatch)
     with pytest.raises(ValueError, match='report keys collide'):
         build_run(built, 'collision')
     assert no_publication(built.data_dir, 'collision')
