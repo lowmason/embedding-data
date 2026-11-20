@@ -440,6 +440,160 @@ with the basis `adopted_v1_v3_finding`, and `compare-runs` finds them equal. The
 [Stage 10 finding](specs/findings/stage-10-ita-establishment-targets.md) records the exact
 commands, the counts, the cost and what is not claimed.
 
+## TRI parent links (roadmap Stage 5)
+
+Stage 5 builds two evidence tables from the EPA Toxics Release Inventory (TRI). TRI is
+a program-selected list of facilities that meet EPA's reporting criteria. It is not a
+frame of all establishments or firms. Each facility reports one primary NAICS 2022
+code. EPA also names the standardized highest-level U.S. parent of each facility. A
+facility with no parent is its own owner. The window is reporting years 2022 to 2024.
+Federal facilities stay out of the headline cells.
+
+- **O7** is the use "peer and competitor detection". It reads the parent-link target
+  table. For two industries, that table gives the share of owners in one industry that
+  also run a facility in the other in the same year. Its rows use the shared
+  `targets-v1` contract.
+- **O8** is the use "holding-company classification". It reads the parent-industry
+  table. That table lists the NAICS 2022 industries of each parent's facilities.
+
+The [stage spec](specs/tri-parent-links.md) defines both tables.
+
+The standalone module `embedding_data.tri_parent_links` has five commands. It is
+separate from the top-level `embedding-data` CLI. Every command requires an explicit
+`--data-dir`.
+
+| Command | Network | Purpose |
+| --- | --- | --- |
+| `acquire` | Yes | Download the window's U.S. basic data files |
+| `import-file YEAR FILE --processed-as-of DATE` | No | Register an owner-downloaded file |
+| `build RUN_ID --codes-run ID --codes-outputs-sha256 PIN --processed-as-of DATE` | No | Build one immutable bundle |
+| `verify RUN_ID --outputs-sha256 PIN` | No | Authenticate the pin, then recompute and compare every table |
+| `compare-runs FIRST SECOND` | No | Exact logical comparison of two bundles, omitting run ID and time |
+
+Only `acquire` uses the network. The other four commands load no `.env` file, read no
+credentials and construct no HTTP client. They run no upstream builder and rewrite no
+earlier bundle. `DATE` is the "processed as of" date that EPA states for its files. Each
+raw file lives in `raw/epa_tri/basic/<RY>/<DATE>/`, where `<RY>` is the reporting year.
+So a later EPA snapshot lands beside the earlier one. `YEAR` is 2022, 2023 or 2024.
+
+Success prints one JSON line with sorted keys and exits 0. `acquire` prints the
+data-relative paths of the raw files. `import-file` prints the data-relative path of one
+raw file. `build` prints the run ID, the data-relative run directory and the detached
+`outputs_sha256`. That value is the SHA-256 of the bundle's `outputs.json`. Save it
+outside the bundle. `compare-runs` exits 1 when the bundles differ. Any failure prints
+one fixed line to stderr and exits 2:
+
+```text
+TRI parent links <command> failed: <reason>; run <run_id>; path <path>
+```
+
+The reason is `validation`, `filesystem`, `network` or `unexpected`. For `acquire` and
+`import-file`, the run ID is `-` and the path is `raw/epa_tri/basic`. For `build` and
+`verify`, the path is `derived/epa_tri/parent-links/<run_id>`. For `compare-runs`, the
+line names both run IDs and both paths, separated by a comma. Every path is relative to
+`--data-dir`. The line never holds exception text or row content.
+
+The production commands select the Stage 4 codes run `stage4_v11_20261013_r2` and its
+detached `outputs.json` pin. Replace `RUN_ID` with a fresh run ID. It must match
+`[A-Za-z0-9][A-Za-z0-9_-]*`. Replace `DATE` with the snapshot date of the raw files.
+Replace `RUN_PIN` with the `outputs_sha256` value that `build` prints. Replace
+`OTHER_RUN_ID` with the ID of a second published run.
+
+1. Get the three raw files. Download them:
+
+   ```bash
+   uv run --locked python -m embedding_data.tri_parent_links acquire --data-dir /Users/lowell/Projects/embedding-data/data
+   ```
+
+   Or register each file that the owner downloaded in a browser. `import-file` keeps the
+   exact bytes and records the local import time as a flagged retrieval-time proxy:
+
+   ```bash
+   uv run --locked python -m embedding_data.tri_parent_links import-file YEAR /path/to/exact-epa-file --processed-as-of DATE --data-dir /Users/lowell/Projects/embedding-data/data
+   ```
+
+2. Build one bundle:
+
+   ```bash
+   uv run --locked python -m embedding_data.tri_parent_links build RUN_ID --codes-run stage4_v11_20261013_r2 --codes-outputs-sha256 15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a --processed-as-of DATE --data-dir /Users/lowell/Projects/embedding-data/data
+   ```
+
+3. Verify it with its detached pin:
+
+   ```bash
+   uv run --locked python -m embedding_data.tri_parent_links verify RUN_ID --outputs-sha256 RUN_PIN --data-dir /Users/lowell/Projects/embedding-data/data
+   ```
+
+4. Compare two published runs exactly:
+
+   ```bash
+   uv run --locked python -m embedding_data.tri_parent_links compare-runs RUN_ID OTHER_RUN_ID --data-dir /Users/lowell/Projects/embedding-data/data
+   ```
+
+Existing raw files are never downloaded again or replaced. Each run lives in
+`data/derived/epa_tri/parent-links/<RUN_ID>/`. A bundle holds five Parquet tables and
+three JSON files:
+
+| File | Contents |
+| --- | --- |
+| `tri_parent_links.parquet` | O7 rows, written by the shared target writer |
+| `tri_parent_link_marginals.parquet` | Owner counts of each industry |
+| `tri_parent_link_support.parquet` | Owner counts of each target cell |
+| `tri_parent_industries.parquet` | O8 rows |
+| `tri_facility_years.parquet` | One row per facility-year |
+| `inputs.json` | Selection and provenance |
+| `report.json` | Accounting, distributions and limits |
+| `outputs.json` | Detached inventory of the other seven files |
+
+`outputs.json` records the byte size, SHA-256, row count and exact schema of each
+Parquet and the hash of both other JSON files. It excludes itself, so its checksum is
+the detached pin. `verify` requires the executing software to equal the recorded
+software. `compare-runs` shows exact replay only. It does not establish trust, so verify
+each run with its own pin.
+
+`build` stages into an exclusive `<RUN_ID>.part` directory. Its scratch files hold
+transcoded copies of the raw files. They stay in `<RUN_ID>.part/.scratch/` and are
+removed before publication. `build` rechecks its pinned inputs and its software just
+before it renames the directory. An existing final or `.part` name fails the run. A later
+run never reuses, overwrites or deletes it. A failed build removes only its own staging
+directory. A killed build can leave a `<RUN_ID>.part` directory. Choose a fresh run ID.
+Get the owner's go-ahead before you clean up any leftover staging.
+
+Production writes share this host and this data root with other stages. The host rule
+has five parts:
+
+1. Run one acquisition at a time, because the manifest append has no lock. Run one
+   full-data build at a time.
+2. Before each acquisition and each full-data build, run
+   `pgrep -fl 'embedding_data|embedding-data'` and show the owner its full output. It can
+   match editors or agents whose command line holds the project path. The owner judges.
+   Stop if it shows another acquisition or build.
+3. Also run `pgrep -fl 'embedding_data\.acs_targets|stage9_independent|reconcile_stage9'`.
+   Stop if it prints anything.
+4. The owner confirms that no other stage's acquisition or build is running. The owner
+   also confirms that no Stage 9 freeze window is open. That window is a time when Stage 9
+   acceptance holds a frozen inventory of `data/raw` and `data/derived`. Its preservation
+   check fails on a new file there that no manifest append explains. A recorded TRI raw
+   file passes it. A TRI bundle or a leftover `.part` directory fails it.
+5. Each production write needs the owner's go-ahead first. That covers each file fetch or
+   import, the build, and any cleanup of a failed run's staging.
+
+Code, tests and fixture runs use temporary data roots and need no go-ahead.
+
+TRI is a program-selected population, mostly industrial, so no table here represents all
+establishments or firms. Codes are self-reported and unvalidated. `report.json` lists
+all the limits of the stage spec. R8.4 is the source-spec rule that benchmark tables
+never become embedder training data. Under R8.4, no TRI table may feed embedder training,
+curriculum, hard-negative mining or model selection. TRI parent links and ITA
+co-ownership measure close relations, so neither should judge an embedding that the
+other trained.
+
+The tests and the fixture chain show software readiness only. Fixture results are never
+benchmarks. This README holds no run ID or pin yet. The owner-gated full-data run records
+its results in `specs/naics-evaluation-data-stage-5-findings.md`. The selected run IDs
+and detached pins wait for O12, the later TRI hardening step. O12 also runs the replay
+build and a full-data `compare-runs`.
+
 ## ACS wage microdata (Stage 17)
 
 Stage 17 builds one person-level analysis file from the selected Stage 8 core table. It is

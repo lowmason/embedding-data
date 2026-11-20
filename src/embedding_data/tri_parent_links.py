@@ -1,10 +1,11 @@
-'''Stage 5 TRI parent-link commands: acquire or import the EPA TRI basic data files.
+'''Stage 5 TRI parent-link commands: one acquisition and four offline commands.
 
 Run as `python -m embedding_data.tri_parent_links`. Every command needs an explicit
-`--data-dir`. Only `acquire` uses the network. `import-file` loads no environment file,
-reads no credential and constructs no HTTP client. Success prints one sorted JSON line. A
-failure prints one fixed line with a reason, the run ID and the data-relative path, and
-exits 2. It never prints the exception text, which can hold row content.
+`--data-dir`. Only `acquire` uses the network. `import-file`, `build`, `verify` and
+`compare-runs` load no environment file, read no credential and construct no HTTP client.
+Success prints one sorted JSON line. A failure prints one fixed line with a reason, the run
+ID and the data-relative path, and exits 2. It never prints the exception text, which can
+hold row content. An unequal `compare-runs` exits 1.
 '''
 
 import json
@@ -16,17 +17,18 @@ from typing import Annotated
 import httpx
 import typer
 
-from embedding_data import tri_raw
+from embedding_data import tri_bundle, tri_raw
 
 app = typer.Typer(pretty_exceptions_enable=False, pretty_exceptions_show_locals=False)
 DataRoot = Annotated[Path, typer.Option('--data-dir', help='Explicit local data root.')]
 NO_RUN = '-'
 RAW = 'raw/epa_tri/basic'
+BUNDLES = 'derived/epa_tri/parent-links'
 
 
 @app.callback()
 def main():
-    '''Acquire or import the EPA TRI basic data files of reporting years 2022-2024.'''
+    '''Acquire or import the EPA TRI basic data files, then build, verify and compare bundles.'''
 
 
 def _reason(error: Exception) -> str:
@@ -43,11 +45,16 @@ def _relative(file: Path, data_dir: Path) -> str:
     return Path(file).relative_to(data_dir).as_posix()
 
 
+def _run_path(run_id: str) -> str:
+    '''The data-relative run directory for the failure line. It does not validate the ID.'''
+    return f'{BUNDLES}/{run_id}'
+
+
 def _invoke(command: str, run_id: str, path: object, operation: Callable[[], object]):
     '''Print the JSON result of `operation`, or only the fixed failure line, then exit 2.'''
     try:
         result = operation()
-        typer.echo(json.dumps(result, sort_keys=True))
+        typer.echo(json.dumps(result, sort_keys=True, default=date.isoformat))
         return result
     except Exception as error:
         typer.echo(f'TRI parent links {command} failed: {_reason(error)}; run {run_id}; '
@@ -69,6 +76,44 @@ def import_file(year: int, file: Path, data_dir: DataRoot,
     '''Record the exact bytes of a file that the owner downloaded in a browser.'''
     _invoke('import-file', NO_RUN, RAW, lambda: _relative(tri_raw.import_file(
         data_dir, year, file, processed_as_of=date.fromisoformat(processed_as_of)), data_dir))
+
+
+@app.command('build')
+def build(run_id: str, data_dir: DataRoot,
+          codes_run: Annotated[str, typer.Option('--codes-run')],
+          codes_outputs_sha256: Annotated[str, typer.Option('--codes-outputs-sha256')],
+          processed_as_of: Annotated[str, typer.Option(
+              '--processed-as-of', help='EPA "processed as of" date, YYYY-MM-DD.')]):
+    '''Build one immutable bundle from the pinned Stage 4 codes run and one raw snapshot.'''
+    def operation() -> dict:
+        result = tri_bundle.build(
+            data_dir, run_id, codes_run=codes_run, codes_outputs_sha256=codes_outputs_sha256,
+            processed_as_of=date.fromisoformat(processed_as_of))
+        return {**result, 'directory': _relative(result['directory'], data_dir)}
+
+    _invoke('build', run_id, _run_path(run_id), operation)
+
+
+@app.command('verify')
+def verify(run_id: str, data_dir: DataRoot,
+           outputs_sha256: Annotated[str, typer.Option('--outputs-sha256')]):
+    '''Authenticate the detached pin, then recompute and compare every table.'''
+    _invoke('verify', run_id, _run_path(run_id), lambda: tri_bundle.verify_bundle(
+        tri_bundle.run_directory(data_dir, run_id), data_dir,
+        expected_outputs_sha256=outputs_sha256))
+
+
+@app.command('compare-runs')
+def compare_runs(first_id: str, second_id: str, data_dir: DataRoot):
+    '''Compare two published bundles exactly. Exit 1 when they differ.'''
+    result = _invoke(
+        'compare-runs', f'{first_id},{second_id}',
+        f'{_run_path(first_id)},{_run_path(second_id)}',
+        lambda: tri_bundle.compare_runs(tri_bundle.run_directory(data_dir, first_id),
+                                        tri_bundle.run_directory(data_dir, second_id)))
+    # Outside the guard: the guard would turn this exit into the fixed line and exit 2.
+    if not result['equal']:
+        raise typer.Exit(1)
 
 
 if __name__ == '__main__':
