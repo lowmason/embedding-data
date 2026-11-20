@@ -229,7 +229,7 @@ Invariants for new code (details in the spec):
 - Mixed-depth codes are parsed into candidate sets, never truncated or guessed; an unparseable code fails the build. Vintage concordances keep one-to-many relationships as flagged candidate sets.
 - Geography is typed node and edge tables (county → state → division → region, and county → CBSA), never a single tree. PUMAs map to counties through population-weighted factors, never majority assignment.
 - Raw downloads are immutable. Transformations are deterministic, offline, lazy Polars with method-style expressions; ipumspy's pandas readers are not used.
-- IPUMS microdata never leave the machine or enter git (`data/` is gitignored); only aggregates are shared. The API key is never written to a file, log, or manifest. Benchmark tables never become embedder training data (R8.4).
+- IPUMS microdata never leave the machine or enter git (`data/` is gitignored); only aggregates are shared, except that naics-embedder may read the ACS wage microdata in place on this machine under their detached pin (R8.1). The API key is never written to a file, log, or manifest. Benchmark tables never become embedder training data (R8.4).
 - ITA is a program-selected filing universe, not a frame. The Form 300A summaries that R2 requires are under `data/raw/osha/summary/`; the case-detail files directly under `data/raw/osha/` feed no target.
 
 ## Conventions
@@ -385,3 +385,37 @@ only judges, and no pair trains. Reads of the text–code pairs follow
 The published Stage 6 and Stage 10 bundles keep `size_gate_pending`, and
 `specs/findings/v9-ita-naics-minimum-counts.md` holds the headline minimum counts for ITA
 co-ownership, the 2023 ITA area mix and ITA text–code pairs.
+
+**ACS wage microdata (Stage 17).** `python -m embedding_data.acs_wage_microdata` exposes
+exactly `build`, `verify` and `compare-runs`, separate from the frozen top-level CLI. Always
+pass an explicit `--data-dir`. All three run offline: no `.env`, no credential, no HTTP client
+and no upstream builder. `build` takes the Stage 8 run with its detached pin and the Stage 4
+codes run with its detached pin. `verify` authenticates the detached pin before it reads any
+other file of the run. A bundle lives in `derived/acs/wage-microdata/<RUN_ID>/`:
+`acs_wage_persons.parquet`, `inputs.json`, `report.json` and the detached `outputs.json`.
+Failure prints only `ACS wage microdata <command> failed: <reason>; run <run_id>; path
+<path>` and exits 2. An unequal comparison exits 1. The file is a person-level analysis file,
+not a target family. It has one row for each Stage 8 core row with `INCWAGE > 0` (ACS
+2023–2024), carries 120 Stage 8 columns and adds 10: `log_wage_2010`, three industry node
+columns and six flags. `flag_headline` marks the rows that a panel reads. Person rows never
+leave this machine or enter git, and `report.json` holds counts only. naics-embedder may
+read the file in place on this machine under its detached pin (R8.1). It only judges and
+never trains (R8.4). The selected runs are `stage17_acs_wage_microdata_20261119_r1` and
+`..._r1_replay`, with detached pins
+`6cb253e2e5c2e48a5b31d2790a0378636d3b6ef9197cfb2d33cca2813ac201d1` and
+`f4e47d9c2e0d3274bc047372d440d73276df56b627d1d4c7c6da9a939a0658e8`, built from the Stage 8
+run `stage8_acs_mapping_20261018_r7` (pin
+`1ec9701092f576b122b01464cdb6fa3fbee49db030e4ad3df7b64e621b8e75f4`) at commit `a800dd5`
+(`dirty: false`). Both pass `verify`, `compare-runs` finds them equal, and the independent
+`scripts/reconcile_stage17.py reconcile` is equal. `freeze` and `preservation` of the same
+script showed that nothing outside the two runs changed. A change to any file in
+`acs_wage_inputs.SOFTWARE_FILES` (this includes `pyproject.toml` and `uv.lock`) makes `verify`
+refuse both runs and needs a fresh run ID and new owner gates. Before every commit, full
+pytest run and full-data command, run `pgrep -fl
+'embedding_data\.acs_targets|stage9_independent|reconcile_stage9'` and stop if it prints
+anything. Each production write needs the owner's go-ahead and the owner's confirmation that
+no Stage 9 freeze window is open: the freeze with the first build, the replay build and any
+cleanup of a failed run's leftover staging. The
+[Stage 17 finding](specs/naics-evaluation-data-stage-17-findings.md) records the commands,
+counts, cost and what is not claimed. No headline minimum count (O23) and no protocol section
+(O24) exist yet, so no panel result is claimed.
