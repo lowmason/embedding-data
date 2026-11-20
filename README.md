@@ -472,9 +472,10 @@ separate from the top-level `embedding-data` CLI. Every command requires an expl
 
 Only `acquire` uses the network. The other four commands load no `.env` file, read no
 credentials and construct no HTTP client. They run no upstream builder and rewrite no
-earlier bundle. `DATE` is the "processed as of" date that EPA states for its files. Each
-raw file lives in `raw/epa_tri/basic/<RY>/<DATE>/`, where `<RY>` is the reporting year.
-So a later EPA snapshot lands beside the earlier one. `YEAR` is 2022, 2023 or 2024.
+earlier bundle. `DATE` is the "processed as of" date that EPA states for its files. Write
+`DATE` in ISO form, `YYYY-MM-DD`, for example `2025-11-05`. Each raw file lives in
+`raw/epa_tri/basic/<RY>/<DATE>/`, where `<RY>` is the reporting year. So a later EPA
+snapshot lands beside the earlier one. `YEAR` is 2022, 2023 or 2024.
 
 Success prints one JSON line with sorted keys and exits 0. `acquire` prints the
 data-relative paths of the raw files. `import-file` prints the data-relative path of one
