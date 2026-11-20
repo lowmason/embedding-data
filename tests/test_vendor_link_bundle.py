@@ -210,8 +210,9 @@ def build_in(data_dir, run_id, codes, **overrides):
 
 
 @pytest.fixture(scope='module')
-def built(tmp_path_factory):
-    '''A pristine seeded root, and a copy of it that holds the published run `FIRST`.'''
+def seeded(tmp_path_factory):
+    '''The codes bundle and a pristine seeded root, with no build. A test that must fail on
+    its own build, not on the module fixture's, takes this fixture instead of `built`.'''
     root = tmp_path_factory.mktemp('vendor_links')
     codes_root = root / 'codes'
     codes = seed_codes_bundle(codes_root / 'data', codes_root / 'originals')
@@ -219,12 +220,18 @@ def built(tmp_path_factory):
     pristine = root / 'pristine'
     shutil.copytree(bundle, pristine / 'derived' / 'codes' / codes[0])
     seed(pristine, root / 'originals')
-    data_dir = root / 'data'
-    shutil.copytree(pristine, data_dir)
-    first = build_in(data_dir, FIRST, codes)
-    return SimpleNamespace(root=root, bundle=bundle, pristine=pristine, data_dir=data_dir,
-                           codes=codes, first=first, directory=Path(first['directory']),
-                           pin=first['outputs_sha256'])
+    return SimpleNamespace(root=root, bundle=bundle, pristine=pristine, codes=codes)
+
+
+@pytest.fixture(scope='module')
+def built(seeded):
+    '''A pristine seeded root, and a copy of it that holds the published run `FIRST`.'''
+    data_dir = seeded.root / 'data'
+    shutil.copytree(seeded.pristine, data_dir)
+    first = build_in(data_dir, FIRST, seeded.codes)
+    return SimpleNamespace(root=seeded.root, bundle=seeded.bundle, pristine=seeded.pristine,
+                           data_dir=data_dir, codes=seeded.codes, first=first,
+                           directory=Path(first['directory']), pin=first['outputs_sha256'])
 
 
 def build_run(built, run_id, *, data_dir=None, **overrides):
@@ -592,6 +599,8 @@ def test_software_files_equal_the_measured_closure_plus_the_named_files():
 
 def test_bundle_module_loads_no_dotenv_ipumspy_or_census_access():
     loaded = subprocess_modules('embedding_data.vendor_link_bundle', prefix=None)
+    # The unfiltered list holds third-party modules, so a missing name below means absent.
+    assert {'polars', 'embedding_data.vendor_link_bundle'} <= loaded
     assert not {'dotenv', 'ipumspy', 'embedding_data.ipums_census_access'} & loaded
 
 
@@ -681,6 +690,75 @@ def test_fixture_window_reaches_every_wire(built):
     intra = targets.filter(pl.col('flags').list.contains(vendor_link_targets.INTRA_LABEL))
     assert intra.select('measure', 'unit_a', 'unit_b', 'value').rows() == [
         ('supplier_share', NODE + '541512', NODE + '236220', 0.5)]
+
+
+# The UEIs of the states that the default window lacks. 517311 is a 2017 code with no 2022
+# node.
+MISSING, CONFLICT, NOT_2022 = 'MISSNG000011', 'CONFLT000012', 'NOTTWO000013'
+BAD_UEI = 'PRIME-BAD-01'
+# Appended to FY2026: a self-link, a subcontractor with no code, a prime with two codes, a
+# subcontractor with a 2017 code, an invalid action date and a malformed prime UEI.
+MORE_STATES = [dict(prime=P1, sub=P1, action='2026-05-01', amount='5.00'),
+               dict(prime=P4, sub=MISSING, action='2026-05-02', amount='1.00'),
+               dict(prime=CONFLICT, sub=S1, action='2026-05-03', amount='2.00'),
+               dict(prime=P4, sub=NOT_2022, action='2026-05-04', amount='3.00'),
+               dict(prime=P1, sub=S1, action='not a date', amount='4.00'),
+               dict(prime=BAD_UEI, sub=S1, action='2026-05-05', amount='6.00')]
+
+
+def test_expected_data_states_are_kept_not_refused(seeded, tmp_path):
+    '''Every report, firm and pair status and a duplicate row: the build publishes, verify
+    passes and the report counts each state.'''
+    reports = window_reports()
+    reports[2026] += [report(**row, year=2026) for row in MORE_STATES]
+    firms = [*window_firms(), firm(MISSING, ''), firm(CONFLICT, '541511'),
+             firm(CONFLICT, '541512'), firm(NOT_2022, '517311')]
+    data_dir = seeded_root(seeded, tmp_path, reports=reports, firms=firms)
+    result = build_in(data_dir, 'states', seeded.codes)
+    directory = Path(result['directory'])
+    verify_bundle(directory, data_dir, expected_outputs_sha256=result['outputs_sha256'],
+                  **TEST_REGISTRIES)
+    report_ = read(directory, 'report.json')
+    total = report_['reports']['total']
+    assert total['by_status'] == {'uei_unusable': 2, 'action_date_invalid': 1,
+                                  'outside_window': 1, 'usable': 16}
+    assert (total['blank_uei'], total['malformed_uei']) == ({'prime': 1, 'sub': 0},
+                                                            {'prime': 1, 'sub': 0})
+    assert total['duplicate_rows'] == 1
+    assert report_['usable_by_fiscal_year'] == {'2024': 3, '2025': 5, '2026': 8}
+    assert report_['firms']['all'] == {
+        'not_in_sam': 1, 'dnb_era_record': 1, 'naics_missing': 1, 'naics_conflict': 1,
+        'naics_not_2022': 1, 'eligible': 8}
+    assert report_['pairs'] == {'self_link': 1, 'intra_group': 1, 'prime_ineligible': 2,
+                                'sub_ineligible': 3, 'eligible': 6, 'total': 13}
+
+
+def test_malformed_codes_outside_a_read_primary_code_are_only_counted(built, tmp_path):
+    '''A malformed other code in a read firm's code string and a malformed subaward NAICS code
+    on a usable report fail nothing and change no status. The default window's unread
+    extract row (OTHER, 5415X1) stays counted. Only the FY2024 NAICS pair count changes.'''
+    reports = window_reports({(2024, 0): {'subaward_naics': '54151A', 'prime_naics': '541511'}})
+    other_codes = extract_line(TEST_EXTRACT_LAYOUT, uei=S2, registration_status='A',
+                               last_update_date='20250115', primary_naics='541512',
+                               naics_code_string='541512Y~54151AY', evs_source='SAM')
+    firms = [other_codes if line == firm(S2, FIRM_CODES[S2]) else line
+             for line in window_firms()]
+    assert other_codes in firms
+    data_dir = seeded_root(built, tmp_path, reports=reports, firms=firms)
+    result = build_run(built, 'malformed_elsewhere', data_dir=data_dir)
+    directory = Path(result['directory'])
+    verify(built, directory, result['outputs_sha256'], data_dir=data_dir)
+    report_ = read(directory, 'report.json')
+    assert report_['reports']['by_file_year']['2024']['subaward_naics_equal_prime'] == {
+        'both': 1, 'equal': 0}
+    assert report_['firms']['all']['eligible'] == 8
+    assert report_['firms']['code_not_in_string'] == 0
+    assert report_['extract']['primary_codes']['malformed'] == 1
+    assert report_['extract']['malformed_unread_rows'] == 1
+    expected = read(built.directory, 'report.json')
+    expected['reports']['by_file_year']['2024']['subaward_naics_equal_prime'] = {
+        'both': 1, 'equal': 0}
+    assert report_ == expected
 
 
 def test_inputs_record_selection_and_provenance(built):
@@ -840,6 +918,13 @@ def broken_pairs(real):
     return pairs
 
 
+def lost_pairs(real):
+    '''Row loss: the pair table drops its last pair.'''
+    def pairs(usable, firm_table):
+        return real(usable, firm_table).head(-1)
+    return pairs
+
+
 def broken_estimate(real):
     def estimate(pair_table, *, snapshot, month):
         result = real(pair_table, snapshot=snapshot, month=month)
@@ -850,6 +935,8 @@ def broken_estimate(real):
 RECOMPUTED_CASES = {
     'pairs': (vendor_link_pairs, 'pairs', broken_pairs,
               'pair reports differ from the usable reports'),
+    'pairs_lost': (vendor_link_pairs, 'pairs', lost_pairs,
+                   'pair reports differ from the usable reports'),
     'estimate': (vendor_link_targets, 'estimate', broken_estimate,
                  'vendor-link support does not match the target cells'),
 }
@@ -1287,19 +1374,21 @@ def test_verify_detects_each_table_tamper(built, tmp_path, name):
         verify(built, directory, pin)
 
 
-def test_verify_recomputes_from_the_recorded_selection(built, monkeypatch):
+def test_verify_recomputes_from_the_recorded_selection(built, monkeypatch, tmp_path):
+    '''A copy outside the data root reads its inputs from the supplied data root.'''
+    directory = copy_bundle(built, tmp_path)
     seen = {}
     for module, name in ((vendor_link_codes, 'select_nodes'), (usaspending_raw, 'select_files'),
                          (sam_raw, 'select_extract')):
         def observe(*args, real=getattr(module, name), name=name, **kwargs):
-            seen[name] = (args[1:], kwargs)
+            seen[name] = (args, kwargs)
             return real(*args, **kwargs)
         monkeypatch.setattr(module, name, observe)
-    verify(built)
+    verify(built, directory)
     run, pin = built.codes
-    assert seen == {'select_nodes': ((run,), {'codes_outputs_sha256': pin}),
-                    'select_files': ((SNAPSHOT,), {}),
-                    'select_extract': ((MONTH,), {})}
+    assert seen == {'select_nodes': ((built.data_dir, run), {'codes_outputs_sha256': pin}),
+                    'select_files': ((built.data_dir, SNAPSHOT), {}),
+                    'select_extract': ((built.data_dir, MONTH), {})}
 
 
 def test_verify_recomputes_in_a_temporary_directory_outside_the_data_root(built, monkeypatch):
