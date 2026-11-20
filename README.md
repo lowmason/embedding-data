@@ -452,7 +452,7 @@ the level of the join node in `industry_node_code`, not the level of the deliver
 rows that a panel reads: no allocated value in the nine headline fields, full time and full
 year, a wage or salary employee, and no shared industry node. The file keeps the rows that are
 not headline, so a panel can report what each exclusion does. The [stage
-spec](specs/acs-wage-microdata.md) defines every column and rule.
+spec](specs/completed/acs-wage-microdata.md) defines every column and rule.
 
 The standalone module `embedding_data.acs_wage_microdata` has three commands. It is
 separate from the top-level `embedding-data` CLI. Every command requires an explicit

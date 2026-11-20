@@ -1,7 +1,8 @@
 # ACS wage microdata — Stage 17 findings: first build and replay
 
-Plan 14 (`specs/plans/14-acs-wage-microdata.md`) ran Task 9 on 2026-11-19. The spec is
-`specs/acs-wage-microdata.md`. Both runs verify, and the replay is equal to the first run.
+Plan 14 (`specs/plans/completed/14-acs-wage-microdata.md`) ran Task 9 on 2026-11-19. The
+spec is `specs/completed/acs-wage-microdata.md`. Both runs verify, and the replay is equal to
+the first run.
 This finding records measured results only. It adopts no headline minimum count.
 
 **Runs.** `stage17_acs_wage_microdata_20261119_r1` and `..._r1_replay`, in
