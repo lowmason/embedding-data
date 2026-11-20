@@ -6,7 +6,8 @@ leaves out the self-owned facilities, so a parent is only a name that EPA gives.
 holds one row for each parent and industry: the distinct TRIFDs of the parent in that
 industry, its facility-years, and its distinct TRIFDs in each reporting year. The table lists
 the child industries of a parent. It does not give the industry of the parent, which TRI does
-not report. The table and its report hold counts and parent names, never a D&B number.
+not report. The table holds counts and parent names and its report holds counts only. Neither
+holds a D&B number.
 '''
 
 import polars as pl
@@ -33,6 +34,15 @@ def _require(holds: bool, message: str) -> None:
         raise ValueError(message)
 
 
+def _parent_rows(frame: pl.DataFrame) -> pl.DataFrame:
+    '''The eligible facility-years with a `parent:` owner key, with `parent_name` added.
+
+    `parent_name` is the owner key without its prefix, as the exact string.
+    '''
+    return (frame.filter(ELIGIBLE & pl.col('owner_key').str.starts_with(PARENT_PREFIX))
+            .with_columns(pl.col('owner_key').str.strip_prefix(PARENT_PREFIX).alias('parent_name')))
+
+
 def build_parent_industries(frame: pl.DataFrame) -> pl.DataFrame:
     '''One row for each parent and industry of the eligible facility-years, sorted by the key.
 
@@ -45,12 +55,11 @@ def build_parent_industries(frame: pl.DataFrame) -> pl.DataFrame:
     '''
     _require(frame['reporting_year'].is_in(list(YEARS)).fill_null(False).all(),
              'reporting year outside the window')
-    parents = frame.filter(ELIGIBLE & pl.col('owner_key').str.starts_with(PARENT_PREFIX))
+    parents = _parent_rows(frame)
     _require(parents['naics_2022_node_id'].null_count() == 0, 'node is null')
     trifd = pl.col('trifd')
     return (parents
-            .group_by(pl.col('owner_key').str.strip_prefix(PARENT_PREFIX).alias('parent_name'),
-                      pl.col('naics_2022_node_id').alias('node_id'))
+            .group_by('parent_name', pl.col('naics_2022_node_id').alias('node_id'))
             .agg(trifd.n_unique().alias('n_facilities'),
                  pl.len().alias('n_facility_years'),
                  *(trifd.filter(pl.col('reporting_year') == year).n_unique().alias(f'f_{year}')
@@ -80,19 +89,25 @@ def validate_parent_industries(table: pl.DataFrame, frame: pl.DataFrame) -> None
     _require(table.equals(expected), 'counts differ from the facility-years')
 
 
-def parent_report(table: pl.DataFrame) -> dict:
+def parent_report(table: pl.DataFrame, frame: pl.DataFrame) -> dict:
     '''The number of parents and the distributions of facilities and industries per parent.
 
-    `facilities_per_parent` is the sum of `n_facilities` over the rows of a parent, so a
-    facility that changes industry between years counts once for each industry. The table
-    does not say which rows share a TRIFD. `industries_per_parent` is the number of rows of a
-    parent. Each distribution has the shape of `distribution`. The report holds counts only,
-    never a parent name.
+    `frame` is the output of `tri_facility_years.reduce` that the table was built from.
+    `facilities_per_parent` is the number of distinct TRIFDs of each parent across all years
+    and industries, counted in the eligible `parent:` facility-years of `frame`, so a facility
+    that changes industry between years counts once. `industries_per_parent` is the number of
+    table rows of each parent, and `n_parents` the number of parent names in the table. Each
+    distribution has the shape of `distribution`. If the parents of the table and of `frame`
+    are not the same set, a `ValueError` with a fixed message holding no name is raised. The
+    report holds counts only, never a parent name.
     '''
-    per_parent = table.group_by('parent_name').agg(
-        pl.col('n_facilities').sum().alias('facilities'), pl.len().alias('industries'))
+    facilities = _parent_rows(frame).group_by('parent_name').agg(
+        pl.col('trifd').n_unique().alias('facilities'))
+    industries = table.group_by('parent_name').agg(pl.len().alias('industries'))
+    _require(set(industries['parent_name']) == set(facilities['parent_name']),
+             'parents differ from the facility-years')
     return {
-        'n_parents': per_parent.height,
-        'facilities_per_parent': distribution(per_parent['facilities'].to_list()),
-        'industries_per_parent': distribution(per_parent['industries'].to_list()),
+        'n_parents': industries.height,
+        'facilities_per_parent': distribution(facilities['facilities'].to_list()),
+        'industries_per_parent': distribution(industries['industries'].to_list()),
     }

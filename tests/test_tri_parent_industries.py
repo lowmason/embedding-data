@@ -24,6 +24,11 @@ A, B, C, D = (NODE_PREFIX + code for code in ('212311', '221114', '311111', '325
 NODES = frozenset({A, B, C, D})
 COUNTS = ['n_facilities', 'n_facility_years', 'f_2022', 'f_2023', 'f_2024']
 OUTSIDE = '^reporting year outside the window$'
+PARENTS = 'parents differ from the facility-years'
+ROWS = 'rows differ from the facility-years'
+COUNT_MESSAGE = 'counts differ from the facility-years'
+KEY = 'key not unique and sorted'
+SCHEMA_MESSAGE = 'schema differs'
 
 
 def form(year: int, trifd: str, node: str, parent: str = '', **fields: str) -> dict:
@@ -283,79 +288,7 @@ def test_a_null_node_in_a_row_that_the_table_leaves_out_is_ignored():
     assert build_parent_industries(frame).rows() == [('P', A, 1, 1, 0, 1, 0)]
 
 
-# ---- the report
-
-
-def test_the_report_gives_the_distributions_of_facilities_and_industries_per_parent():
-    report = parent_report(table_of(example_records()))
-    assert report == {
-        'n_parents': 3,
-        # Acme 4 (T1 is counted in a and in c), Beta 1, Core 5
-        'facilities_per_parent': {
-            'count': 3, 'min': 1, 'p25': 1, 'median': 4, 'p75': 5, 'p90': 5, 'max': 5,
-            'ge_1': 3, 'ge_2': 2, 'ge_3': 2, 'ge_5': 1, 'ge_10': 0},
-        # Acme 3, Beta 1, Core 1
-        'industries_per_parent': {
-            'count': 3, 'min': 1, 'p25': 1, 'median': 1, 'p75': 3, 'p90': 3, 'max': 3,
-            'ge_1': 3, 'ge_2': 1, 'ge_3': 1, 'ge_5': 0, 'ge_10': 0},
-    }
-
-
-def test_the_report_of_an_empty_table_has_no_parents():
-    empty = {'count': 0, 'min': None, 'p25': None, 'median': None, 'p75': None, 'p90': None,
-             'max': None, 'ge_1': 0, 'ge_2': 0, 'ge_3': 0, 'ge_5': 0, 'ge_10': 0}
-    assert parent_report(from_rows([])) == {
-        'n_parents': 0, 'facilities_per_parent': empty, 'industries_per_parent': empty}
-
-
-def test_the_report_counts_parents_not_rows():
-    table = from_rows([('Acme', A, 1, 1, 1, 0, 0), ('Acme', B, 1, 1, 1, 0, 0),
-                       ('Acme', C, 1, 1, 1, 0, 0), ('Beta', A, 2, 3, 1, 1, 1)])
-    report = parent_report(table)
-    assert report['n_parents'] == 2
-    assert report['facilities_per_parent']['count'] == 2
-    assert report['industries_per_parent']['count'] == 2
-
-
-def test_the_report_keeps_parent_names_that_differ_in_case_apart():
-    table = from_rows([('ACME', A, 1, 1, 1, 0, 0), ('Acme', A, 1, 1, 1, 0, 0)])
-    assert parent_report(table)['n_parents'] == 2
-
-
-def test_the_report_sums_facilities_over_the_industries_of_a_parent():
-    # a facility that changes industry between years is counted in each industry of its parent
-    table = table_of([form(2022, 'T1', A, 'P'), form(2023, 'T1', B, 'P')])
-    report = parent_report(table)
-    assert report['facilities_per_parent']['max'] == 2
-    assert report['industries_per_parent']['max'] == 2
-
-
-def test_the_report_is_plain_json_of_counts_only():
-    report = parent_report(table_of(example_records()))
-    text = json.dumps(report, sort_keys=True)
-    assert json.loads(text) == report
-    assert set(report) == {'n_parents', 'facilities_per_parent', 'industries_per_parent'}
-    assert not any(name in text for name in ('Acme', 'Beta', 'Core'))
-
-    def leaves(value):
-        if isinstance(value, dict):
-            assert all(type(key) is str for key in value)
-            for item in value.values():
-                yield from leaves(item)
-        else:
-            yield value
-
-    assert all(leaf is None or type(leaf) is int for leaf in leaves(report))
-
-
 # ---- the validator
-
-PARENTS = 'parents differ from the facility-years'
-ROWS = 'rows differ from the facility-years'
-COUNT_MESSAGE = 'counts differ from the facility-years'
-KEY = 'key not unique and sorted'
-SCHEMA_MESSAGE = 'schema differs'
-
 
 @cache
 def example_frame() -> pl.DataFrame:
@@ -492,3 +425,177 @@ def test_the_validator_rejects_a_frame_with_a_year_outside_the_window(trifd):
         .otherwise(pl.col('reporting_year')).alias('reporting_year'))
     with pytest.raises(ValueError, match=OUTSIDE):
         validate_parent_industries(example_table(), shifted)
+
+
+# ---- the report
+
+
+def report_of(records: list[dict]) -> dict:
+    frame = reduced(records)
+    return parent_report(build_parent_industries(frame), frame)
+
+
+EMPTY = {'count': 0, 'min': None, 'p25': None, 'median': None, 'p75': None, 'p90': None,
+         'max': None, 'ge_1': 0, 'ge_2': 0, 'ge_3': 0, 'ge_5': 0, 'ge_10': 0}
+PARENT_BREAKS = [name for name, (_, message) in BREAKS.items() if message == PARENTS]
+NAMES = ('Acme', 'Beta', 'Core', 'Bzzz', 'Zulu', 'Dune', 'T10')
+
+
+def test_the_report_gives_the_distributions_of_facilities_and_industries_per_parent():
+    report = report_of(example_records())
+    assert report == {
+        'n_parents': 3,
+        # Acme 3 (T1 is in a and in c, and counts once), Beta 1, Core 5
+        'facilities_per_parent': {
+            'count': 3, 'min': 1, 'p25': 1, 'median': 3, 'p75': 5, 'p90': 5, 'max': 5,
+            'ge_1': 3, 'ge_2': 2, 'ge_3': 2, 'ge_5': 1, 'ge_10': 0},
+        # Acme 3, Beta 1, Core 1
+        'industries_per_parent': {
+            'count': 3, 'min': 1, 'p25': 1, 'median': 1, 'p75': 3, 'p90': 3, 'max': 3,
+            'ge_1': 3, 'ge_2': 1, 'ge_3': 1, 'ge_5': 0, 'ge_10': 0},
+    }
+
+
+def test_a_facility_that_changes_industry_counts_once_in_the_report():
+    # T1 of P is in a in 2022 and in b in 2023: one facility and two industries
+    report = report_of([form(2022, 'T1', A, 'P'), form(2023, 'T1', B, 'P')])
+    assert report == {
+        'n_parents': 1,
+        'facilities_per_parent': {
+            'count': 1, 'min': 1, 'p25': 1, 'median': 1, 'p75': 1, 'p90': 1, 'max': 1,
+            'ge_1': 1, 'ge_2': 0, 'ge_3': 0, 'ge_5': 0, 'ge_10': 0},
+        'industries_per_parent': {
+            'count': 1, 'min': 2, 'p25': 2, 'median': 2, 'p75': 2, 'p90': 2, 'max': 2,
+            'ge_1': 1, 'ge_2': 1, 'ge_3': 0, 'ge_5': 0, 'ge_10': 0},
+    }
+
+
+def test_a_facility_that_changes_industry_beside_another_facility_counts_once():
+    # T1 is in a in 2022 and in b in 2023, and T2 is in a in 2023: two facilities and two
+    # industries, where the rows of the table hold 2 facilities in a and 1 in b
+    report = report_of([
+        form(2022, 'T1', A, 'P'), form(2023, 'T1', B, 'P'), form(2023, 'T2', A, 'P')])
+    facilities, industries = report['facilities_per_parent'], report['industries_per_parent']
+    assert (facilities['count'], facilities['min'], facilities['max']) == (1, 2, 2)
+    assert (industries['count'], industries['min'], industries['max']) == (1, 2, 2)
+
+
+def test_a_facility_in_three_industries_counts_once_in_the_report():
+    report = report_of([
+        form(2022, 'T1', A, 'P'), form(2023, 'T1', B, 'P'), form(2024, 'T1', C, 'P')])
+    assert report['facilities_per_parent']['max'] == 1
+    assert report['industries_per_parent']['max'] == 3
+
+
+def test_a_facility_in_each_year_of_one_industry_counts_once_in_the_report():
+    # three facility-years of one TRIFD: one facility, one industry, and one parent
+    report = report_of([form(year, 'T1', A, 'P') for year in (2022, 2023, 2024)])
+    assert report['n_parents'] == 1
+    assert report['facilities_per_parent'] == {
+        'count': 1, 'min': 1, 'p25': 1, 'median': 1, 'p75': 1, 'p90': 1, 'max': 1,
+        'ge_1': 1, 'ge_2': 0, 'ge_3': 0, 'ge_5': 0, 'ge_10': 0}
+    assert report['industries_per_parent']['max'] == 1
+
+
+def test_several_facilities_per_parent_are_counted_across_years_and_industries():
+    # P: T1 to T4 in a (T1 in two years), so four facilities and one industry
+    # Q: T5 in a and T6 in b, so two facilities and two industries
+    report = report_of([
+        form(2022, 'T1', A, 'P'), form(2022, 'T2', A, 'P'), form(2023, 'T1', A, 'P'),
+        form(2023, 'T3', A, 'P'), form(2024, 'T4', A, 'P'),
+        form(2022, 'T5', A, 'Q'), form(2023, 'T6', B, 'Q')])
+    assert report == {
+        'n_parents': 2,
+        'facilities_per_parent': {
+            'count': 2, 'min': 2, 'p25': 2, 'median': 2, 'p75': 4, 'p90': 4, 'max': 4,
+            'ge_1': 2, 'ge_2': 2, 'ge_3': 1, 'ge_5': 0, 'ge_10': 0},
+        'industries_per_parent': {
+            'count': 2, 'min': 1, 'p25': 1, 'median': 1, 'p75': 2, 'p90': 2, 'max': 2,
+            'ge_1': 2, 'ge_2': 1, 'ge_3': 0, 'ge_5': 0, 'ge_10': 0},
+    }
+
+
+def test_the_report_counts_parents_not_rows():
+    report = report_of([
+        form(2022, 'T1', A, 'Acme'), form(2022, 'T2', B, 'Acme'), form(2022, 'T3', C, 'Acme'),
+        form(2023, 'T4', A, 'Beta'), form(2024, 'T5', A, 'Beta')])
+    assert report['n_parents'] == 2
+    assert report['facilities_per_parent']['count'] == 2
+    assert report['industries_per_parent']['count'] == 2
+
+
+def test_the_report_keeps_parent_names_that_differ_in_case_apart():
+    report = report_of([form(2023, 'T1', A, 'ACME'), form(2023, 'T2', A, 'Acme')])
+    assert report['n_parents'] == 2
+    assert report['facilities_per_parent']['count'] == 2
+
+
+def test_the_report_counts_industries_in_the_table_and_facilities_in_the_frame():
+    # the table lacks the row of Acme in b, so Acme has two rows, and still three facilities
+    table = broken('a missing row of a parent')
+    report = parent_report(table, example_frame())
+    assert report['n_parents'] == 3
+    assert report['facilities_per_parent'] == {
+        'count': 3, 'min': 1, 'p25': 1, 'median': 3, 'p75': 5, 'p90': 5, 'max': 5,
+        'ge_1': 3, 'ge_2': 2, 'ge_3': 2, 'ge_5': 1, 'ge_10': 0}
+    assert report['industries_per_parent'] == {
+        'count': 3, 'min': 1, 'p25': 1, 'median': 1, 'p75': 2, 'p90': 2, 'max': 2,
+        'ge_1': 3, 'ge_2': 1, 'ge_3': 0, 'ge_5': 0, 'ge_10': 0}
+
+
+def test_an_excluded_facility_year_is_not_a_facility_of_the_report():
+    # `reduce` gives an excluded row no owner key, but the report names both conditions
+    frame = minimal([
+        (2023, 'T1', A, 'parent:P', None), (2023, 'T2', A, 'parent:P', 'federal'),
+        (2023, 'T3', B, 'parent:P', 'naics_conflict'), (2023, 'T4', A, 'facility:T4', None)])
+    report = parent_report(build_parent_industries(frame), frame)
+    assert report['n_parents'] == 1
+    assert report['facilities_per_parent']['max'] == 1
+    assert report['industries_per_parent']['max'] == 1
+
+
+@pytest.mark.parametrize('records', [
+    [], [form(2022, 'T1', A)], excluded('federal', 2022, 'T1', 'P')
+], ids=['no rows', 'self-owned only', 'excluded only'])
+def test_the_report_of_an_empty_selection_has_no_parents(records):
+    assert report_of(records) == {
+        'n_parents': 0, 'facilities_per_parent': EMPTY, 'industries_per_parent': EMPTY}
+
+
+@pytest.mark.parametrize('name', PARENT_BREAKS)
+def test_the_report_rejects_a_table_whose_parents_differ_from_the_frame(name):
+    with pytest.raises(ValueError, match=f'^{PARENTS}$') as failure:
+        parent_report(broken(name), example_frame())
+    assert not [value for value in NAMES if value in str(failure.value)]
+
+
+@pytest.mark.parametrize('records', [
+    [], [form(2022, 'T1', A)], [form(2022, 'T1', A, 'Acme')]
+], ids=['no rows', 'self-owned only', 'a part of the parents'])
+def test_the_report_rejects_a_frame_whose_parents_differ_from_the_table(records):
+    with pytest.raises(ValueError, match=f'^{PARENTS}$') as failure:
+        parent_report(example_table(), reduced(records))
+    assert not [value for value in NAMES if value in str(failure.value)]
+
+
+def test_the_report_rejects_an_empty_table_for_a_frame_with_parents():
+    with pytest.raises(ValueError, match=f'^{PARENTS}$'):
+        parent_report(from_rows([]), example_frame())
+
+
+def test_the_report_is_plain_json_of_counts_only():
+    report = report_of(example_records())
+    text = json.dumps(report, sort_keys=True)
+    assert json.loads(text) == report
+    assert set(report) == {'n_parents', 'facilities_per_parent', 'industries_per_parent'}
+    assert not any(name in text for name in ('Acme', 'Beta', 'Core'))
+
+    def leaves(value):
+        if isinstance(value, dict):
+            assert all(type(key) is str for key in value)
+            for item in value.values():
+                yield from leaves(item)
+        else:
+            yield value
+
+    assert all(leaf is None or type(leaf) is int for leaf in leaves(report))
