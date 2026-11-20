@@ -6,7 +6,7 @@ import re
 import shutil
 import sys
 from dataclasses import replace
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -1164,6 +1164,9 @@ SERIALIZED_CASES = {
     'facility_years_row_loss': ('tri_facility_years.parquet',
                                 lambda frame: frame.slice(1),
                                 'n_forms differ from source rows'),
+    'facility_years_duplicate_row': ('tri_facility_years.parquet',
+                                     lambda frame: pl.concat([frame, frame.head(1)]),
+                                     'key not unique and sorted'),
     'facility_years_order': ('tri_facility_years.parquet',
                              change_first('state_values', lambda c: pl.lit(['ZZ'])),
                              'tri_facility_years: serialized table differs'),
@@ -1346,3 +1349,94 @@ def test_build_verify_and_compare_are_offline(built, monkeypatch):
                              expected_outputs_sha256=result['outputs_sha256'])
     assert verified['run_id'] == 'offline'
     assert compare_runs(built.directory, directory)['equal'] is True
+
+
+def fake_git(status, calls):
+    '''A stand-in for `subprocess.check_output` that answers the two git calls of a build.
+
+    `status` holds porcelain lines. Like git, the stand-in leaves out the untracked (`??`)
+    lines when the call asks for `--untracked-files=no`.
+    '''
+    def check_output(args, **kwargs):
+        calls.append((tuple(args), Path(kwargs['cwd'])))
+        if args[:2] == ['git', 'rev-parse']:
+            return 'f' * 40 + '\n'
+        assert args[:3] == ['git', 'status', '--porcelain']
+        untracked = '--untracked-files=no' not in args
+        return ''.join(line + '\n' for line in status.splitlines()
+                       if untracked or not line.startswith('??'))
+    return check_output
+
+
+EXECUTION_CASES = {
+    'modified': (' M src/embedding_data/tri_bundle.py', True),
+    'untracked': ('?? notes.txt', True),
+    'clean': ('', False),
+}
+
+
+@pytest.mark.parametrize('case', EXECUTION_CASES)
+def test_execution_records_the_commit_and_whether_the_checkout_is_dirty(case, monkeypatch):
+    status, dirty = EXECUTION_CASES[case]
+    calls = []
+    monkeypatch.setattr(tri_bundle.subprocess, 'check_output', fake_git(status, calls))
+    execution = tri_bundle._execution()
+    assert execution['dirty'] is dirty
+    assert execution['commit'] == 'f' * 40
+    assert datetime.fromisoformat(execution['created_at']).utcoffset() == timedelta(0)
+    assert {cwd for _, cwd in calls} == {paths.PROJECT_ROOT}
+
+
+def test_build_records_the_execution_it_measured(built, monkeypatch):
+    calls = []
+    monkeypatch.setattr(tri_bundle.subprocess, 'check_output', fake_git('?? notes.txt', calls))
+    result = build_run(built, 'dirty_build')
+    directory = Path(result['directory'])
+    execution = read(directory, 'inputs.json')['execution']
+    assert execution['commit'] == 'f' * 40
+    assert execution['dirty'] is True
+    verified = verify_bundle(directory, built.data_dir,
+                             expected_outputs_sha256=result['outputs_sha256'])
+    assert verified['run_id'] == 'dirty_build'
+    assert read(directory, 'inputs.json')['execution'] == execution
+
+
+def test_build_and_verify_use_the_stage_5_selector_and_read_no_ita_data(built, monkeypatch):
+    '''Spec lines 192 and 196: the TRI codes selector alone, and no ITA source or raw file.'''
+    selections = []
+    touched = []
+    real_select = tri_codes.select_nodes
+
+    def select(data_dir, codes_run, *, codes_outputs_sha256):
+        selections.append((codes_run, codes_outputs_sha256))
+        return real_select(data_dir, codes_run, codes_outputs_sha256=codes_outputs_sha256)
+
+    def recording(real):
+        def call(source, *args, **kwargs):
+            touched.append(Path(source).absolute())
+            return real(source, *args, **kwargs)
+        return call
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError('Stage 5 read the ITA source')
+
+    monkeypatch.setattr(tri_codes, 'select_nodes', select)
+    monkeypatch.setattr(code_build, 'check_source', forbidden)
+    for module, name in ((manifest, 'sha256_file'), (pl, 'scan_parquet'),
+                         (pl, 'read_parquet'), (pl, 'scan_csv')):
+        monkeypatch.setattr(module, name, recording(getattr(module, name)))
+    result = build_run(built, 'stage5_selector')
+    directory = Path(result['directory'])
+    verify_bundle(directory, built.data_dir, expected_outputs_sha256=result['outputs_sha256'])
+    assert selections
+    assert set(selections) == {(built.codes_run, built.codes_pin)}
+    data_dir = built.data_dir.absolute()
+    allowed = (data_dir / 'derived' / 'codes' / built.codes_run,
+               run_root(built.data_dir).absolute(), data_dir / 'raw' / 'epa_tri' / 'basic')
+    inside = [path for path in touched if path.is_relative_to(data_dir)]
+    assert any(path.is_relative_to(allowed[2]) for path in inside)
+    assert [path for path in inside
+            if not any(path.is_relative_to(root) for root in allowed)] == []
+    raw = read(directory, 'inputs.json')['raw']
+    assert len(raw) == 3
+    assert all(citation['path'].startswith('epa_tri/basic/') for citation in raw)
