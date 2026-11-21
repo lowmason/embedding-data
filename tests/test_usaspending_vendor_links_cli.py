@@ -1056,8 +1056,13 @@ def test_new_constants_and_the_failure_path_follow_the_run_directory(tmp_path):
 
 def test_command_module_loads_no_dotenv_ipumspy_or_census_access():
     loaded = subprocess_modules('embedding_data.usaspending_vendor_links', prefix=None)
-    assert {'polars', 'embedding_data.vendor_link_bundle'} <= loaded
     assert not {'dotenv', 'ipumspy', 'embedding_data.ipums_census_access'} & loaded
+
+
+def test_importing_the_command_module_loads_the_bundle_module():
+    # The unfiltered list holds third-party modules, so a missing name below means absent.
+    loaded = subprocess_modules('embedding_data.usaspending_vendor_links', prefix=None)
+    assert {'polars', 'embedding_data.vendor_link_bundle'} <= loaded
 
 
 def test_software_files_equal_the_command_import_closure():
