@@ -554,6 +554,114 @@ needs as `--outputs-sha256`, are
 [Stage 17 finding](specs/naics-evaluation-data-stage-17-findings.md) records the exact
 commands, the counts, the cost and what is not claimed.
 
+## USAspending vendor links (roadmap Stage 14)
+
+Stage 14 builds the evidence for use case O6, KYB (know your business) and anomaly detection.
+It relates NAICS 2022 industries as supplier and buyer through federal contract subawards.
+A federal prime contractor reports each subcontract that it awards. USAspending.gov publishes
+those reports. The build joins each firm to its SAM.gov registration by the UEI, the
+12-character Unique Entity ID of a registrant. The firm's primary NAICS 2022 code in SAM.gov
+gives its industry. The [stage spec](specs/usaspending-vendor-links.md) defines every rule.
+
+The one `targets-v1` family is `vendor_links`. Each cell is a supplier industry and a buyer
+industry. `supplier_share` is the share of subcontractor firms in the supplier industry that
+work for a prime in the buyer industry. `buyer_share` is the share of prime firms in the buyer
+industry that use a subcontractor in the supplier industry. Each firm counts once. The window
+is federal fiscal years 2024 to 2026, by subaward action date. Only contract subawards count.
+Links inside one corporate group do not count. A bundle holds four Parquet tables,
+`inputs.json`, `report.json` and the detached `outputs.json`.
+
+The standalone module `embedding_data.usaspending_vendor_links` has seven commands. It is
+separate from the top-level `embedding-data` CLI. Every command requires an explicit
+`--data-dir`.
+
+| Command | Network | Key | Purpose |
+| --- | --- | --- | --- |
+| `acquire-subawards FY --snapshot DATE` | Yes | No | Download one fiscal year of contract subawards |
+| `acquire-sam-extract --month YYYY-MM` | Yes | Yes | Download one public monthly extract |
+| `import-subawards FY FILE --snapshot DATE` | No | No | Register a subaward file that the owner downloaded |
+| `import-sam-extract FILE --month YYYY-MM` | No | No | Register an extract that the owner downloaded |
+| `build RUN_ID --codes-run ID --codes-outputs-sha256 PIN --snapshot DATE --sam-month YYYY-MM` | No | No | Build one immutable bundle |
+| `verify RUN_ID --outputs-sha256 PIN` | No | No | Authenticate the detached pin, then recompute and compare every table |
+| `compare-runs FIRST SECOND` | No | No | Compare two bundles exactly, table by table and report by report |
+
+Two commands use the network. `acquire-subawards` needs no key. `acquire-sam-extract` is the
+only command that reads the SAM.gov key. The other five commands load no `.env` file, read no
+credential, construct no HTTP client and run no upstream builder. Never run either
+acquisition command unless the owner asks.
+
+Success prints one sorted JSON line. A failure prints one fixed line to stderr and exits 2:
+
+```text
+USAspending vendor links <command> failed: <reason>; run <run_id>; path <path>
+```
+
+The reason is `validation`, `filesystem`, `network` or `unexpected`. The path is relative to
+the data root. The line never holds exception text, row content, a URL or the key.
+`compare-runs` prints both run IDs and both paths, joined by a comma. It exits 1 when the two
+bundles differ.
+
+Only `acquire-sam-extract` needs the SAM.gov key. It takes the key from one of three places:
+
+- The environment variable `SAM_API_KEY`.
+- An explicit `--env-file`. The command reads the file and never loads it into the environment.
+- A hidden `--prompt` in a local terminal.
+
+The command adds the key to the first request URL only, as `api_key`. It mutes transport
+logging while it uses the key. It refuses a response body or a redirect that holds the key.
+The key never reaches a file, a log, a manifest entry or a printed line. The SAM.gov terms
+require a new key every 90 days. Before an acquisition, the owner makes a new key if the
+current key is older than 90 days. The owner gets the key at
+`https://sam.gov/workspace/profile/account-details` and keeps it outside the repository.
+
+The production commands select the Stage 4 codes run `stage4_v11_20261013_r2` and its
+detached `outputs.json` pin. Replace `FY` with 2024, 2025 or 2026. Replace `DATE` with the
+snapshot date, as YYYY-MM-DD. Replace `YYYY-MM` with the extract month. Replace `RUN_ID` and
+`REPLAY_ID` with fresh run IDs. Replace `RUN_PIN` and `REPLAY_PIN` with the `outputs_sha256`
+values that the two builds print:
+
+```bash
+uv run --locked python -m embedding_data.usaspending_vendor_links acquire-subawards FY --snapshot DATE --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --locked python -m embedding_data.usaspending_vendor_links acquire-sam-extract --month YYYY-MM --prompt --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked python -m embedding_data.usaspending_vendor_links import-subawards FY /path/to/original.zip --snapshot DATE --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked python -m embedding_data.usaspending_vendor_links import-sam-extract /path/to/original.ZIP --month YYYY-MM --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked python -m embedding_data.usaspending_vendor_links build RUN_ID --codes-run stage4_v11_20261013_r2 --codes-outputs-sha256 15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a --snapshot DATE --sam-month YYYY-MM --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked python -m embedding_data.usaspending_vendor_links build REPLAY_ID --codes-run stage4_v11_20261013_r2 --codes-outputs-sha256 15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a --snapshot DATE --sam-month YYYY-MM --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked python -m embedding_data.usaspending_vendor_links verify RUN_ID --outputs-sha256 RUN_PIN --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked python -m embedding_data.usaspending_vendor_links verify REPLAY_ID --outputs-sha256 REPLAY_PIN --data-dir /Users/lowell/Projects/embedding-data/data
+uv run --offline --locked python -m embedding_data.usaspending_vendor_links compare-runs RUN_ID REPLAY_ID --data-dir /Users/lowell/Projects/embedding-data/data
+```
+
+`acquire-sam-extract` also takes `--env-file PATH` in place of `--prompt`. Raw subaward files
+go to `raw/usaspending/subcontracts/<snapshot>/FY<YYYY>/`. The raw extract goes to
+`raw/sam/entity-extract/public-monthly-v2/<YYYY-MM>/`. Each raw file gets one manifest entry.
+A bundle goes to `derived/usaspending/vendor-links/<RUN_ID>/`. An existing run or `.part`
+directory fails the run. A later run never reuses, overwrites or deletes it. A killed download
+leaves a `.part` directory that blocks every retry. Its removal needs the owner's go-ahead.
+In a restricted workspace, put `UV_CACHE_DIR=/private/tmp/embedding-data-uv-cache` before
+each command.
+
+Each production write needs the owner's go-ahead first. That covers each file fetch or
+import, the build and any cleanup of a failed run's staging. Run one acquisition at a time,
+because `manifest.append_entries` checks and then appends with no lock. Run one full-data
+build at a time. Before each acquisition and each full-data build:
+
+1. Run `pgrep -fl 'embedding_data|embedding-data'`. Show the owner its full output. The run
+   stops if it shows another acquisition or build.
+2. Run `pgrep -fl 'embedding_data\.acs_targets|stage9_independent|reconcile_stage9'`.
+   Stop if it prints anything.
+3. The owner confirms that no other stage's acquisition or build is running. The owner also
+   confirms that no Stage 9 freeze window is open.
+
+Code, tests and fixture runs use temporary data roots and need no go-ahead.
+
+Under R8.4, no table from this stage feeds embedder training, curriculum, hard-negative
+mining or model selection. The tables only judge. `vendor_link_pairs.parquet` holds UEIs and
+amounts. Whether any table leaves the machine follows the E6 terms check of the stage spec.
+The tests and the fixture chain show software readiness only. Fixture results are never
+benchmarks. This section names no run pin. The selected run pins wait for a hardening stage,
+if the owner promotes one.
+
 ## Data sources
 
 | Source | Samples or coverage | Purpose |
