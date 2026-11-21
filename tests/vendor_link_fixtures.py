@@ -367,3 +367,186 @@ def module_file(module: str) -> str:
     if module == 'embedding_data':
         return 'src/embedding_data/__init__.py'
     return 'src/' + module.replace('.', '/') + '.py'
+
+
+# ---- the V12 fixture chain: raw files in the production layouts to replay-equal bundles
+
+V12_SNAPSHOT = date(2026, 11, 20)
+V12_MONTH = '2026-11'
+V12_RUNS = ('v12_first', 'v12_second')
+# Member names that match the committed registries' patterns. Each year's ZIP holds one.
+V12_MEMBER = 'All_Contracts_Subawards_2026-11-20_H10M00S00_1.csv'
+V12_EXTRACT_MEMBER = f'SAM_PUBLIC_UTF-8_MONTHLY_V2_20261102_{"0123456789abcdef" * 2}.dat'
+# Made-up UEIs. The industry of each firm is in `_V12_FIRMS`.
+V12_PRIME_A = 'V12PRIMEA001'
+V12_PRIME_B = 'V12PRIMEB002'
+V12_PRIME_C = 'V12PRIMEC003'
+V12_PRIME_D = 'V12PRIMED004'
+V12_PRIME_OLD = 'V12PRIMEOLD5'
+V12_SELF = 'V12SELFLINK6'
+V12_SUB_A = 'V12SUBAWA001'
+V12_SUB_B = 'V12SUBAWB002'
+V12_SUB_C = 'V12SUBAWC003'
+V12_SUB_EDGE = 'V12SUBEDGE04'
+V12_NOT_IN_SAM = 'V12NOTSAM005'
+V12_NO_CODE = 'V12NOCODE006'
+V12_CONFLICT = 'V12CONFLT007'
+V12_NOT_2022 = 'V12NOTN22008'
+V12_BAD_CODE = 'V12BADCODE09'
+_V12_GROUP_X = 'V12GROUPX001'
+_V12_GROUP_Y = 'V12GROUPY002'
+_V12_GROUP_Z = 'V12GROUPZ003'
+_V12_UPDATE = '20250115'
+# Name and address cells of the subaward files. The reader keeps none of them.
+_V12_TEXT_CELLS = ('prime_awardee_name', 'prime_awardee_parent_name', 'subawardee_name',
+                   'subawardee_parent_name', 'prime_awardee_address_line_1',
+                   'subawardee_address_line_1')
+# The extract rows as `(UEI, primary code, last update date)`. Industries: prime A 541511,
+# B 236220, C 336411, D 238220; the old record, the self-linking firm and subcontractors A and
+# B 541512; subcontractor C 541511; the edge firm 336411. The old record was last updated the
+# day before the D&B cutoff and the edge firm on the cutoff day. The conflicting firm has two
+# rows. 517311 is a NAICS 2017 code and 54151A is malformed. The not-in-SAM firm has no row.
+_V12_FIRMS = (
+    (V12_PRIME_A, '541511', _V12_UPDATE),
+    (V12_PRIME_B, '236220', _V12_UPDATE),
+    (V12_PRIME_C, '336411', _V12_UPDATE),
+    (V12_PRIME_D, '238220', _V12_UPDATE),
+    (V12_PRIME_OLD, '541512', '20220403'),
+    (V12_SELF, '541512', _V12_UPDATE),
+    (V12_SUB_A, '541512', _V12_UPDATE),
+    (V12_SUB_B, '541512', _V12_UPDATE),
+    (V12_SUB_C, '541511', _V12_UPDATE),
+    (V12_SUB_EDGE, '336411', '20220404'),
+    (V12_NO_CODE, '', _V12_UPDATE),
+    (V12_CONFLICT, '541511', _V12_UPDATE),
+    (V12_CONFLICT, '541330', _V12_UPDATE),
+    (V12_NOT_2022, '517311', _V12_UPDATE),
+    (V12_BAD_CODE, '54151A', _V12_UPDATE),
+)
+
+
+def _v12_report(prime, sub, action, amount, **fields):
+    return dict(prime_uei=prime, sub_uei=sub, action_date=action, amount=amount, **fields)
+
+
+# The reports by file year: 24 rows, 19 of them usable. Every amount differs, so the one row
+# that `copies=2` writes twice is the only duplicate. `v12_inputs` adds a report ID to each row.
+_V12_REPORTS = {
+    2024: [
+        # 2023-10-01 is the first day of fiscal year 2024.
+        _v12_report(V12_PRIME_A, V12_SUB_A, '2023-10-01', '1000.00'),
+        _v12_report(V12_PRIME_A, V12_SUB_B, '2024-04-15', '250.50'),
+        _v12_report(V12_PRIME_A, V12_SUB_C, '2024-05-01', '75.25'),
+        _v12_report(V12_PRIME_B, V12_SUB_EDGE, '2024-06-01', '40.00'),
+        # A blank prime UEI and a malformed subcontractor UEI.
+        _v12_report('', V12_SUB_A, '2024-03-01', '11.00'),
+        _v12_report(V12_PRIME_A, 'bad-uei', '2024-03-02', '12.00'),
+        # Fiscal year 2023, so the extract row of this subcontractor (its code is malformed)
+        # is reached by no usable report. Then a date that does not exist.
+        _v12_report(V12_PRIME_A, V12_BAD_CODE, '2023-09-30', '13.00'),
+        _v12_report(V12_PRIME_A, V12_SUB_A, '2024-02-30', '14.00'),
+    ],
+    2025: [
+        # The duplicate row.
+        _v12_report(V12_PRIME_B, V12_SUB_EDGE, '2025-01-15', '500.00', copies=2),
+        # Group condition 1: the subcontractor's parent UEI is the prime.
+        _v12_report(V12_PRIME_B, V12_SUB_A, '2025-02-01', '21.00', sub_parent_uei=V12_PRIME_B),
+        _v12_report(V12_PRIME_B, V12_SUB_B, '2025-03-01', '22.00'),
+        _v12_report(V12_PRIME_OLD, V12_SUB_A, '2025-04-01', '23.00'),
+        _v12_report(V12_SELF, V12_SELF, '2025-05-01', '24.00'),
+        _v12_report(V12_PRIME_A, V12_NOT_IN_SAM, '2025-06-01', '25.00'),
+        _v12_report(V12_PRIME_A, V12_NO_CODE, '2025-07-01', '26.00'),
+        # Prime B is a subcontractor here, so it is a firm in both roles.
+        _v12_report(V12_PRIME_A, V12_PRIME_B, '2025-08-01', '27.00'),
+    ],
+    2026: [
+        # Group condition 2: the prime's parent UEI is the subcontractor.
+        _v12_report(V12_PRIME_C, V12_SUB_B, '2026-01-10', '31.00', prime_parent_uei=V12_SUB_B),
+        # Group condition 3: both parent UEIs are one other UEI.
+        _v12_report(V12_PRIME_D, V12_SUB_EDGE, '2026-02-01', '32.00',
+                    prime_parent_uei=_V12_GROUP_X, sub_parent_uei=_V12_GROUP_X),
+        # Two different valid parents are no group.
+        _v12_report(V12_PRIME_C, V12_SUB_C, '2026-03-01', '33.00',
+                    prime_parent_uei=_V12_GROUP_Y, sub_parent_uei=_V12_GROUP_Z),
+        _v12_report(V12_PRIME_B, V12_NOT_2022, '2026-04-01', '34.00'),
+        _v12_report(V12_PRIME_C, V12_CONFLICT, '2026-05-01', '35.00'),
+        # Fiscal year 2027, and the last day of fiscal year 2026.
+        _v12_report(V12_PRIME_C, V12_SUB_EDGE, '2026-10-01', '36.00'),
+        _v12_report(V12_PRIME_A, V12_SUB_C, '2026-09-30', '37.00'),
+    ],
+}
+
+
+def v12_inputs() -> tuple[dict[int, dict[str, list[list[str]]]], list[str]]:
+    '''The subaward members by year, in the committed header layout, and the extract lines in
+    the committed extract layout.
+
+    Each record has every header cell, and the name and address cells hold `DNB_SENTINEL`. Each
+    extract line has every field. The restricted positions hold `DNB_SENTINEL`, and the
+    last-update date, the code and the EVS source are set. The design is in `_V12_REPORTS` and
+    `_V12_FIRMS`.
+    '''
+    layouts = vendor_link_layouts.load_subaward_layouts()
+    layout = vendor_link_layouts.load_extract_layout()
+    text = {f'cell_{name}': DNB_SENTINEL for name in _V12_TEXT_CELLS}
+    subawards = {}
+    for year, reports in _V12_REPORTS.items():
+        records = []
+        for number, report in enumerate(reports, start=1):
+            fields = {key: value for key, value in report.items() if key != 'copies'}
+            record = subaward_record(layouts[year], subaward_type='sub-contract',
+                                     report_id=f'V12-{year}-{number:03d}', **fields, **text)
+            records.extend(list(record) for _ in range(report.get('copies', 1)))
+        subawards[year] = {V12_MEMBER: records}
+    lines = [extract_line(layout, uei=uei, registration_status='A', last_update_date=update,
+                          primary_naics=code, naics_code_string=f'{code}Y' if code else '',
+                          evs_source='SAM')
+             for uei, code, update in _V12_FIRMS]
+    return subawards, lines
+
+
+def _v12_no_client(*args, **kwargs):
+    raise AssertionError('the V12 fixture chain attempted external access')
+
+
+def run_vendor_link_v12(tmp_path: Path, monkeypatch) -> dict:
+    '''Raw subaward and extract files to two verified, replay-equal Stage 14 bundles, with
+    external access blocked.
+
+    The guards go in first, so seeding, both builds, both verifications and the comparison run
+    under them. The data root is `tmp_path / 'data'`, and every command gets it explicitly. The
+    returned dict holds `data_dir`, the `first` and `second` bundle directories, their detached
+    pins (`first_pin`, `second_pin`), both verification results and the `comparison`.
+    '''
+    # Imported here so that every vendor-link test module does not load these modules.
+    from target_fixtures import forbid_external_access
+
+    from embedding_data import vendor_link_bundle
+
+    forbid_external_access(monkeypatch)
+    monkeypatch.delenv('SAM_API_KEY', raising=False)
+    monkeypatch.setattr(httpx.Client, '__init__', _v12_no_client)
+    monkeypatch.setattr(httpx.AsyncClient, '__init__', _v12_no_client)
+    monkeypatch.setattr(usaspending_raw, 'make_client', _v12_no_client)
+    monkeypatch.setattr(sam_access, 'make_client', _v12_no_client)
+    data_dir = tmp_path / 'data'
+    codes_run, codes_pin = seed_codes_bundle(data_dir, tmp_path / 'stage4-originals')
+    subawards, lines = v12_inputs()
+    seed_raw(data_dir, tmp_path / 'raw-originals', subawards, lines, snapshot=V12_SNAPSHOT,
+             month=V12_MONTH, subaward_layouts=vendor_link_layouts.load_subaward_layouts(),
+             extract_layout=vendor_link_layouts.load_extract_layout(),
+             extract_member=V12_EXTRACT_MEMBER)
+    published = {}
+    for name, run_id in zip(('first', 'second'), V12_RUNS, strict=True):
+        published[name] = vendor_link_bundle.build(
+            data_dir, run_id, codes_run=codes_run, codes_outputs_sha256=codes_pin,
+            snapshot=V12_SNAPSHOT, sam_month=V12_MONTH)
+    result = {'data_dir': data_dir}
+    for name, run in published.items():
+        directory = Path(run['directory'])
+        result[name] = directory
+        result[name + '_pin'] = run['outputs_sha256']
+        result[name + '_verification'] = vendor_link_bundle.verify_bundle(
+            directory, data_dir, expected_outputs_sha256=run['outputs_sha256'])
+    result['comparison'] = vendor_link_bundle.compare_runs(result['first'], result['second'])
+    return result
