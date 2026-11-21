@@ -906,20 +906,23 @@ def bundle_counts(directory: Path) -> tuple[int, dict[str, int]]:
 
 def test_reconciler_agrees_with_a_build_from_a_line_in_both_encodings(tmp_path, monkeypatch):
     # One parent-name cell holds UTF-8 ë and Windows-1252 é. The same build has a padded
-    # other-NAICS cell and a blank state cell.
+    # other-NAICS cell, a padded state cell and a blank state cell.
     mixed = 'ë'.encode() + 'é'.encode('cp1252')
     directory, status, line = build_and_reconcile(
         tmp_path, monkeypatch,
-        {2023: [owned(2023, 'T201', '325110', 'Zinnia MIXED Co', state='TX'),
+        {2023: [owned(2023, 'T201', '325110', 'Zinnia MIXED Co', state=' TX '),
                 owned(2023, 'T202', '325120', 'Zinnia MIXED Co', naics_2=' 325199 ')]},
         lambda year, body: body.replace(b'MIXED', mixed) if year == 2023 else body)
     assert status == 0, line
     assert line['equal'] is True
     names = pl.read_parquet(directory / 'tri_parent_industries.parquet')
     assert 'Zinnia ëé Co' in set(names['parent_name'])
-    years = pl.read_parquet(directory / 'tri_facility_years.parquet').filter(
-        pl.col('trifd') == 'T202').row(0, named=True)
-    assert (years['other_naics_values'], years['state_values']) == (['325199'], [''])
+    years = {row['trifd']: row for row in pl.read_parquet(
+        directory / 'tri_facility_years.parquet').filter(
+        pl.col('trifd').is_in(['T201', 'T202'])).iter_rows(named=True)}
+    assert years['T201']['state_values'] == [' TX ']
+    assert (years['T202']['other_naics_values'], years['T202']['state_values']) == (
+        ['325199'], [''])
 
 
 def test_reconciler_agrees_with_a_build_on_a_naics_conflict_with_two_parents(
@@ -1061,7 +1064,8 @@ def owned(year, trifd, code, parent, **fields):
 def test_forms_reduce_to_one_facility_year_with_counts_by_form_type(tmp_path):
     result = recomputed(tmp_path, {2022: [
         owned(2022, 'T1', ' 325110', 'P', state='TX', naics_2='325120'),
-        owned(2022, 'T1', '325110 ', 'P', state='LA', naics_2=' 331110', naics_3='  ', form='A'),
+        owned(2022, 'T1', '325110 ', 'P', state=' LA', naics_2=' 331110', naics_3='  ',
+              form='A'),
         owned(2022, 'T1', '325110', 'P', state='TX', naics_2='331110'),
     ]})
     item = facility_years(result)[(2022, 'T1')]
@@ -1069,7 +1073,8 @@ def test_forms_reduce_to_one_facility_year_with_counts_by_form_type(tmp_path):
     assert item['primary_naics_values'] == ('325110',)
     # Other codes are stripped like the primary code: a padded and a plain 331110 are one.
     assert item['other_naics_values'] == ('325120', '331110')
-    assert item['state_values'] == ('LA', 'TX')
+    # State cells are kept exactly as delivered.
+    assert item['state_values'] == (' LA', 'TX')
     assert item['federal_values'] == ('NO',)
     assert (item['naics_2022_node_id'], item['owner_key'], item['exclusion_reason']) == (
         NODE + '325110', 'parent:P', None)
@@ -1123,11 +1128,15 @@ def test_any_federal_form_makes_the_facility_year_federal(tmp_path):
         owned(2022, 'T3', '325110', 'P', federal=True),
         owned(2022, 'T3', '325110', 'P', federal=False),
         owned(2022, 'T4', '325110', 'P', federal=''),
-        owned(2022, 'T4', '325110', 'P', federal=False)]})
+        owned(2022, 'T4', '325110', 'P', federal=False),
+        owned(2022, 'T5', '325110', 'P', federal=' YES ')]})
     years = facility_years(result)
     # A blank federal cell is the delivered value '' and does not make a form federal.
     assert years[(2022, 'T4')]['federal_values'] == ('', 'NO')
     assert years[(2022, 'T4')]['exclusion_reason'] is None
+    # A padded cell is listed as delivered, and its stripped value is a federal yes.
+    assert years[(2022, 'T5')]['federal_values'] == (' YES ',)
+    assert years[(2022, 'T5')]['exclusion_reason'] == 'federal'
     assert years[(2022, 'T1')]['exclusion_reason'] == 'federal'
     assert years[(2022, 'T1')]['federal_values'] == ('NO', 'YES')
     assert years[(2022, 'T2')]['exclusion_reason'] is None
