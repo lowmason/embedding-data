@@ -424,6 +424,13 @@ REQUIRED_CASES = (
 )
 
 
+def build_leftovers(derived):
+    '''Every path at any depth under `derived` that a build leaves behind when it stops: a
+    `.part` entry (a staging directory or a partial file) and a `.scratch` entry.'''
+    return sorted(path.relative_to(derived).as_posix() for path in derived.rglob('*')
+                  if path.name.endswith('.part') or path.name == '.scratch')
+
+
 def leaked_values(directory, part):
     '''The tables' cells and the JSON files that hold `part`, as text.
 
@@ -496,6 +503,11 @@ def test_v12_replay_registries_and_guards(tmp_path, monkeypatch):
     root = result['data_dir'] / 'derived' / 'usaspending' / 'vendor-links'
     assert sorted(path.relative_to(root).as_posix() for path in root.rglob('*')) == sorted(
         [*V12_RUNS, *(f'{run}/{name}' for run in V12_RUNS for name in [*FILES, 'outputs.json'])])
+    # No build leaves a `.part` or `.scratch` entry anywhere under the derived tree (the other
+    # sources' tables are there too), and this source's directory holds only `vendor-links`.
+    derived = result['data_dir'] / 'derived'
+    assert build_leftovers(derived) == []
+    assert sorted(path.name for path in (derived / 'usaspending').iterdir()) == ['vendor-links']
     # The guards are still in force.
     with pytest.raises(AssertionError):
         socket.create_connection(('127.0.0.1', 9))
