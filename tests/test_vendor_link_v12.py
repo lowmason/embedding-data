@@ -18,16 +18,22 @@ import pytest
 from vendor_link_fixtures import (  # noqa: F401
     DNB_SENTINEL,
     V12_BAD_CODE,
+    V12_BAD_DATE,
+    V12_BLANK_DATE,
     V12_CONFLICT,
+    V12_EVS_DNB,
     V12_MEMBER,
+    V12_MIXED,
     V12_MONTH,
     V12_NO_CODE,
     V12_NOT_2022,
     V12_NOT_IN_SAM,
+    V12_PADDED,
     V12_PRIME_A,
     V12_PRIME_B,
     V12_PRIME_C,
     V12_PRIME_D,
+    V12_PRIME_E,
     V12_PRIME_OLD,
     V12_RUNS,
     V12_SELF,
@@ -35,13 +41,16 @@ from vendor_link_fixtures import (  # noqa: F401
     V12_SUB_A,
     V12_SUB_B,
     V12_SUB_C,
+    V12_SUB_D1,
+    V12_SUB_D2,
     V12_SUB_EDGE,
+    V12_TWO_ROWS,
     no_live_sam,
     run_vendor_link_v12,
     v12_inputs,
 )
 
-from embedding_data import sam_raw, usaspending_raw, vendor_link_layouts
+from embedding_data import sam_raw, usaspending_raw, vendor_link_bundle, vendor_link_layouts
 from embedding_data.vendor_link_bundle import FILES, TABLES, run_directory
 from embedding_data.vendor_link_pairs import FIRM_STATUSES, PAIR_STATUSES, REPORT_STATUSES
 
@@ -102,13 +111,13 @@ def target(bundle, measure, supplier_code, buyer_code):
 
 def check_report_statuses(bundle):
     total = bundle.report['reports']['total']
-    assert total['rows'] == 24
-    assert total['by_status'] == {'uei_unusable': 2, 'action_date_invalid': 1,
-                                  'outside_window': 2, 'usable': 19}
+    assert total['rows'] == 36
+    assert total['by_status'] == {'uei_unusable': 3, 'action_date_invalid': 1,
+                                  'outside_window': 2, 'usable': 30}
     assert set(total['by_status']) == set(REPORT_STATUSES)
     assert {year: section['rows']
             for year, section in bundle.report['reports']['by_file_year'].items()} == {
-                '2024': 8, '2025': 9, '2026': 7}
+                '2024': 11, '2025': 16, '2026': 9}
 
 
 def check_self_link(bundle):
@@ -148,15 +157,18 @@ def check_record_last_updated_before_the_cutoff_on_a_prime(bundle):
     assert row['pair_status'] == 'prime_ineligible'
     # A record last updated on 2022-04-04 is not a D&B-era record.
     assert bundle.pairs[(V12_PRIME_B, V12_SUB_EDGE)]['sub_status'] == 'eligible'
-    assert bundle.report['extract']['last_update_by_year'] == {'2022': 2, '2025': 13,
-                                                               'invalid': 0}
+    # Two rows were last updated in 2022 and 22 in 2025. Two rows hold no usable date (see
+    # `check_blank_and_unparsable_last_update`).
+    assert bundle.report['extract']['last_update_by_year'] == {'2022': 2, '2025': 22,
+                                                               'invalid': 2}
 
 
 def check_missing_code(bundle):
     row = bundle.pairs[(V12_PRIME_A, V12_NO_CODE)]
     assert row['sub_status'] == 'naics_missing'
     assert row['pair_status'] == 'sub_ineligible'
-    assert bundle.report['extract']['primary_codes']['blank'] == 1
+    # The blank rows are that firm's row and the blank row of the mixed firm.
+    assert bundle.report['extract']['primary_codes']['blank'] == 2
 
 
 def check_code_conflict(bundle):
@@ -164,7 +176,8 @@ def check_code_conflict(bundle):
     assert row['sub_status'] == 'naics_conflict'
     assert row['sub_node_id'] is None
     assert row['pair_status'] == 'sub_ineligible'
-    assert bundle.report['extract']['rows_per_uei'] == {'1': 13, '2': 1, '3+': 0}
+    # 23 UEIs: the conflicting firm, the two-row firm and the mixed firm have two rows each.
+    assert bundle.report['extract']['rows_per_uei'] == {'1': 20, '2': 3, '3+': 0}
 
 
 def check_well_formed_code_outside_naics_2022(bundle):
@@ -175,7 +188,7 @@ def check_well_formed_code_outside_naics_2022(bundle):
     codes = bundle.report['extract']['primary_codes']
     assert codes['well_formed'] - codes['in_2022'] == 1
     trigger = bundle.report['trigger']
-    assert (trigger['naics_not_2022'], trigger['with_code']) == (1, 11)
+    assert (trigger['naics_not_2022'], trigger['with_code']) == (1, 17)
 
 
 def check_malformed_code_on_a_row_no_usable_report_reaches(bundle):
@@ -189,19 +202,22 @@ def check_malformed_code_on_a_row_no_usable_report_reaches(bundle):
 def check_blank_uei(bundle):
     total = bundle.report['reports']['total']
     assert total['blank_uei'] == {'prime': 1, 'sub': 0}
-    assert total['malformed_uei']['prime'] == 0
+    # The lowercase prime UEI is malformed, not blank.
+    assert total['malformed_uei']['prime'] == 1
 
 
 def check_malformed_uei(bundle):
     total = bundle.report['reports']['total']
-    assert total['malformed_uei'] == {'prime': 0, 'sub': 1}
+    # One malformed subcontractor UEI and one lowercase prime UEI.
+    assert total['malformed_uei'] == {'prime': 1, 'sub': 1}
     assert total['blank_uei']['sub'] == 0
 
 
 def check_report_outside_the_window(bundle):
-    # 2023-09-30 is in fiscal year 2023 and 2026-10-01 in fiscal year 2027.
+    # 2023-09-30 is in fiscal year 2023 and 2026-10-01 in fiscal year 2027. Three more reports
+    # are outside their file's fiscal year but inside the window.
     assert bundle.report['reports']['total']['by_status']['outside_window'] == 2
-    assert bundle.report['reports']['total']['outside_file_year'] == 2
+    assert bundle.report['reports']['total']['outside_file_year'] == 5
     # 2023-10-01 and 2026-09-30 are the window's first and last days.
     assert bundle.pairs[(V12_PRIME_A, V12_SUB_A)]['n_fy2024'] == 1
     assert bundle.pairs[(V12_PRIME_A, V12_SUB_C)]['n_fy2026'] == 1
@@ -219,7 +235,7 @@ def check_duplicate_row(bundle):
 
 
 def check_diagonal_cell(bundle):
-    assert bundle.report['diagonal'] == {'cells': 1, 'pairs': 1, 'share_of_pairs': 1 / 7}
+    assert bundle.report['diagonal'] == {'cells': 1, 'pairs': 1, 'share_of_pairs': 1 / 9}
     row = cell(bundle, '541511', '541511')
     assert (row['s_suppliers'], row['b_buyers'], row['l_pairs']) == (1, 1, 1)
     diagonal = bundle.targets.filter(pl.col('unit_a') == pl.col('unit_b'))
@@ -248,38 +264,38 @@ def check_prime_with_several_subcontractors_in_one_industry(bundle):
 
 
 def check_report_in_each_fiscal_year(bundle):
-    assert bundle.report['usable_by_fiscal_year'] == {'2024': 4, '2025': 9, '2026': 6}
-    assert [bundle.pair_table[f'n_fy{year}'].sum() for year in (2024, 2025, 2026)] == [4, 9, 6]
-    assert bundle.pair_table['n_reports'].sum() == 19
+    assert bundle.report['usable_by_fiscal_year'] == {'2024': 7, '2025': 14, '2026': 9}
+    assert [bundle.pair_table[f'n_fy{year}'].sum() for year in (2024, 2025, 2026)] == [7, 14, 9]
+    assert bundle.pair_table['n_reports'].sum() == 30
 
 
 def check_every_status_and_the_headline_counts(bundle):
     report = bundle.report
-    assert report['firms']['all'] == {'not_in_sam': 1, 'dnb_era_record': 1, 'naics_missing': 1,
-                                      'naics_conflict': 1, 'naics_not_2022': 1, 'eligible': 9}
+    assert report['firms']['all'] == {'not_in_sam': 1, 'dnb_era_record': 4, 'naics_missing': 1,
+                                      'naics_conflict': 1, 'naics_not_2022': 1, 'eligible': 15}
     assert set(report['firms']['all']) == set(FIRM_STATUSES)
     assert report['firms']['prime'] == {'not_in_sam': 0, 'dnb_era_record': 1, 'naics_missing': 0,
-                                        'naics_conflict': 0, 'naics_not_2022': 0, 'eligible': 5}
+                                        'naics_conflict': 0, 'naics_not_2022': 0, 'eligible': 6}
     assert report['firms']['subcontractor'] == {
-        'not_in_sam': 1, 'dnb_era_record': 0, 'naics_missing': 1, 'naics_conflict': 1,
-        'naics_not_2022': 1, 'eligible': 6}
-    assert report['pairs'] == {'self_link': 1, 'intra_group': 3, 'prime_ineligible': 1,
-                               'sub_ineligible': 4, 'eligible': 7, 'total': 16}
+        'not_in_sam': 1, 'dnb_era_record': 3, 'naics_missing': 1, 'naics_conflict': 1,
+        'naics_not_2022': 1, 'eligible': 11}
+    assert report['pairs'] == {'self_link': 1, 'intra_group': 3, 'prime_ineligible': 4,
+                               'sub_ineligible': 7, 'eligible': 9, 'total': 24}
     assert set(report['pairs']) == {*PAIR_STATUSES, 'total'}
-    assert report['join_coverage']['prime'] == {'eligible': 5, 'total': 6, 'share': 5 / 6}
-    assert report['join_coverage']['subcontractor'] == {'eligible': 6, 'total': 10,
-                                                        'share': 0.6}
+    assert report['join_coverage']['prime'] == {'eligible': 6, 'total': 7, 'share': 6 / 7}
+    assert report['join_coverage']['subcontractor'] == {'eligible': 11, 'total': 18,
+                                                        'share': 11 / 18}
 
 
 def check_intra_group_sensitivity(bundle):
     report = bundle.report
-    assert report['n_pairs'] == {'eligible': 7, 'including_intra_group': 10}
-    assert report['n_buyers'] == {'eligible': 3, 'including_intra_group': 4}
-    assert report['n_suppliers'] == {'eligible': 5, 'including_intra_group': 5}
+    assert report['n_pairs'] == {'eligible': 9, 'including_intra_group': 12}
+    assert report['n_buyers'] == {'eligible': 4, 'including_intra_group': 5}
+    assert report['n_suppliers'] == {'eligible': 7, 'including_intra_group': 7}
     # Two cells hold intra-group pairs only. The third group pair widens a cell of P.
     assert report['cells_only_intra_group'] == 2
-    assert len(bundle.support) == 6
-    assert len(bundle.targets) == 12
+    assert len(bundle.support) == 7
+    assert len(bundle.targets) == 14
     widened = cell(bundle, '541512', '236220')
     assert (widened['s_suppliers'], widened['s_including_intra_group']) == (1, 2)
     assert (widened['b_buyers'], widened['b_including_intra_group']) == (1, 1)
@@ -294,6 +310,88 @@ def check_production_registries_map_both_parent_fields(bundle):
     assert bundle.report['missing_fields'] == {
         'subawards': {str(year): ['subaward_naics'] for year in (2024, 2025, 2026)},
         'extract': []}
+
+
+# ---- one check for each real-data case beyond the spec's list
+
+def check_report_counts_under_its_own_fiscal_year(bundle):
+    # Three usable reports sit in a file of another fiscal year, inside the window: two in the
+    # 2025 file dated in fiscal year 2026, and one in the 2026 file dated in fiscal year 2025.
+    reports = bundle.report['reports']
+    assert {year: section['by_status']['usable']
+            for year, section in reports['by_file_year'].items()} == {
+                '2024': 7, '2025': 15, '2026': 8}
+    assert bundle.report['usable_by_fiscal_year'] == {'2024': 7, '2025': 14, '2026': 9}
+    row = bundle.pairs[(V12_PRIME_A, V12_SUB_B)]
+    assert (row['n_reports'], row['n_fy2024'], row['n_fy2025'], row['n_fy2026']) == (2, 1, 0, 1)
+    row = bundle.pairs[(V12_PRIME_B, V12_SUB_B)]
+    assert (row['n_reports'], row['n_fy2024'], row['n_fy2025'], row['n_fy2026']) == (3, 0, 2, 1)
+
+
+def check_blank_and_unparsable_last_update(bundle):
+    # Decision D2: a blank or unparsable last update date makes a D&B-era record.
+    for sub in (V12_BLANK_DATE, V12_BAD_DATE):
+        row = bundle.pairs[(V12_PRIME_A, sub)]
+        assert row['sub_status'] == 'dnb_era_record'
+        assert row['sub_node_id'] is None
+        assert row['prime_status'] == 'eligible'
+        assert row['pair_status'] == 'sub_ineligible'
+    # Two extract rows and two firms.
+    assert bundle.report['extract']['last_update_by_year']['invalid'] == 2
+    assert bundle.report['firms']['last_update_invalid'] == 2
+
+
+def check_evs_source_of_dnb(bundle):
+    # The row's last update date is after the cutoff, so only the EVS rule makes the firm a
+    # D&B-era record.
+    row = bundle.pairs[(V12_PRIME_A, V12_EVS_DNB)]
+    assert row['sub_status'] == 'dnb_era_record'
+    assert row['sub_node_id'] is None
+    assert row['pair_status'] == 'sub_ineligible'
+    assert bundle.report['extract']['evs_source'] == {'D&B': 1, 'SAM': 25}
+
+
+def check_several_extract_rows_for_one_uei(bundle):
+    # Two rows that agree on the code give one firm with that code.
+    agree = bundle.pairs[(V12_PRIME_OLD, V12_TWO_ROWS)]
+    assert agree['sub_status'] == 'eligible'
+    assert agree['sub_node_id'] == node('541512')
+    # A blank row is absence: the firm keeps the code of its other row.
+    mixed = bundle.pairs[(V12_PRIME_OLD, V12_MIXED)]
+    assert mixed['sub_status'] == 'eligible'
+    assert mixed['sub_node_id'] == node('541511')
+    assert bundle.report['firms']['mixed_blank'] == 1
+    assert bundle.report['extract']['rows_per_uei'] == {'1': 20, '2': 3, '3+': 0}
+    # The agreeing firm's second row is an expired registration, used like an active one.
+    assert bundle.report['extract']['by_registration_status'] == {'A': 25, 'E': 1}
+
+
+def check_padded_uei_is_usable_and_lowercase_is_not(bundle):
+    # Both UEIs of the padded report strip to valid UEIs and join their extract rows.
+    row = bundle.pairs[(V12_PRIME_OLD, V12_PADDED)]
+    assert row['n_reports'] == 1
+    assert row['prime_status'] == 'dnb_era_record'
+    assert row['sub_status'] == 'eligible'
+    assert row['sub_node_id'] == node('541511')
+    assert row['pair_status'] == 'prime_ineligible'
+    # The lowercase spelling of a real prime UEI is unusable. It makes no pair and adds no
+    # report to the pair of the real prime.
+    assert V12_PRIME_A.lower() not in {prime for prime, _ in bundle.pairs}
+    assert bundle.pairs[(V12_PRIME_A, V12_SUB_A)]['n_reports'] == 1
+    assert bundle.report['reports']['total']['by_status']['uei_unusable'] == 3
+
+
+def check_malformed_and_blank_parents_form_no_group(bundle):
+    # The first pair's two parent UEIs are equal and malformed (lowercase), and the second
+    # pair's two parent UEIs are blank after stripping.
+    for sub in (V12_SUB_D1, V12_SUB_D2):
+        row = bundle.pairs[(V12_PRIME_E, sub)]
+        assert row['pair_status'] == 'eligible'
+        assert row['flag_intra_group'] is False
+        assert row['prime_status'] == row['sub_status'] == 'eligible'
+    row = cell(bundle, '722513', '722511')
+    assert (row['s_suppliers'], row['b_buyers'], row['l_pairs']) == (2, 1, 2)
+    assert row['s_including_intra_group'] == 2
 
 
 REQUIRED_CASES = (
@@ -317,6 +415,12 @@ REQUIRED_CASES = (
     check_every_status_and_the_headline_counts,
     check_intra_group_sensitivity,
     check_production_registries_map_both_parent_fields,
+    check_report_counts_under_its_own_fiscal_year,
+    check_blank_and_unparsable_last_update,
+    check_evs_source_of_dnb,
+    check_several_extract_rows_for_one_uei,
+    check_padded_uei_is_usable_and_lowercase_is_not,
+    check_malformed_and_blank_parents_form_no_group,
 )
 
 
@@ -388,6 +492,10 @@ def test_v12_replay_registries_and_guards(tmp_path, monkeypatch):
             [*FILES, 'outputs.json'])
         assert result[name + '_verification']['rows'] == {
             table: len(pl.read_parquet(directory / f'{table}.parquet')) for table in TABLES}
+    # Nothing but the two bundles is left: no `.part` directory, no scratch and no other file.
+    root = result['data_dir'] / 'derived' / 'usaspending' / 'vendor-links'
+    assert sorted(path.relative_to(root).as_posix() for path in root.rglob('*')) == sorted(
+        [*V12_RUNS, *(f'{run}/{name}' for run in V12_RUNS for name in [*FILES, 'outputs.json'])])
     # The guards are still in force.
     with pytest.raises(AssertionError):
         socket.create_connection(('127.0.0.1', 9))
@@ -403,6 +511,28 @@ def test_v12_replay_registries_and_guards(tmp_path, monkeypatch):
     assert (inputs['snapshot'], inputs['sam_month']) == (V12_SNAPSHOT.isoformat(), V12_MONTH)
 
 
+def test_v12_chain_runs_in_the_spec_order(tmp_path, monkeypatch):
+    # Spec: build, verify, a second build, verify, then compare-runs.
+    calls = []
+
+    def spy(name, label, describe):
+        original = getattr(vendor_link_bundle, name)
+
+        def wrapper(*args, **kwargs):
+            calls.append((label, describe(*args)))
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(vendor_link_bundle, name, wrapper)
+
+    spy('build', 'build', lambda data_dir, run_id: run_id)
+    spy('verify_bundle', 'verify', lambda directory, data_dir: directory.name)
+    spy('compare_runs', 'compare', lambda first, second: (first.name, second.name))
+    run_vendor_link_v12(tmp_path, monkeypatch)
+    first, second = V12_RUNS
+    assert calls == [('build', first), ('verify', first), ('build', second),
+                     ('verify', second), ('compare', (first, second))]
+
+
 def test_v12_sentinel_is_in_the_raw_files_and_in_no_decoded_cell(tmp_path, monkeypatch):
     result = run_vendor_link_v12(tmp_path, monkeypatch)
     data_dir = result['data_dir']
@@ -413,7 +543,7 @@ def test_v12_sentinel_is_in_the_raw_files_and_in_no_decoded_cell(tmp_path, monke
     with zipfile.ZipFile(extract_file) as archive:
         (member,) = archive.namelist()
         lines = archive.read(member).decode(layout.encoding).split('\r\n')[1:-1]
-    assert len(lines) == 15
+    assert len(lines) == 26
     for line in lines:
         fields = line.split(layout.delimiter)
         assert len(fields) == layout.field_count

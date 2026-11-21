@@ -393,6 +393,15 @@ V12_NO_CODE = 'V12NOCODE006'
 V12_CONFLICT = 'V12CONFLT007'
 V12_NOT_2022 = 'V12NOTN22008'
 V12_BAD_CODE = 'V12BADCODE09'
+V12_BLANK_DATE = 'V12BLANKDT01'
+V12_BAD_DATE = 'V12BADDATE02'
+V12_EVS_DNB = 'V12EVSDNB003'
+V12_TWO_ROWS = 'V12TWOROWS04'
+V12_MIXED = 'V12MIXEDBL05'
+V12_PADDED = 'V12PADDED006'
+V12_PRIME_E = 'V12PRIMEE007'
+V12_SUB_D1 = 'V12SUBAWD001'
+V12_SUB_D2 = 'V12SUBAWE002'
 _V12_GROUP_X = 'V12GROUPX001'
 _V12_GROUP_Y = 'V12GROUPY002'
 _V12_GROUP_Z = 'V12GROUPZ003'
@@ -401,11 +410,17 @@ _V12_UPDATE = '20250115'
 _V12_TEXT_CELLS = ('prime_awardee_name', 'prime_awardee_parent_name', 'subawardee_name',
                    'subawardee_parent_name', 'prime_awardee_address_line_1',
                    'subawardee_address_line_1')
-# The extract rows as `(UEI, primary code, last update date)`. Industries: prime A 541511,
-# B 236220, C 336411, D 238220; the old record, the self-linking firm and subcontractors A and
-# B 541512; subcontractor C 541511; the edge firm 336411. The old record was last updated the
-# day before the D&B cutoff and the edge firm on the cutoff day. The conflicting firm has two
-# rows. 517311 is a NAICS 2017 code and 54151A is malformed. The not-in-SAM firm has no row.
+_V12_LOWER_GROUP = _V12_GROUP_X.lower()
+# The extract rows as `(UEI, primary code, last update date)`, and optionally a dict of other
+# fields of the line (`dnb_evs` stands for the layout's own D&B EVS value). Industries: prime A
+# 541511, B 236220, C 336411, D 238220, E 722511; the old record, the self-linking firm and
+# subcontractors A and B 541512; subcontractor C 541511; the edge firm 336411; subcontractors
+# D1 and D2 722513. The old record was last updated the day before the D&B cutoff and the edge
+# firm on the cutoff day. The conflicting firm has two rows. 517311 is a NAICS 2017 code and
+# 54151A is malformed. The not-in-SAM firm has no row. Three firms are D&B-era records for the
+# other reasons: no last update date, a last update date that is no date, and a D&B EVS source
+# with a recent date. One firm has two rows that agree on the code (the second one an expired
+# registration), and one has a blank row and a coded row. The padded firm has one row.
 _V12_FIRMS = (
     (V12_PRIME_A, '541511', _V12_UPDATE),
     (V12_PRIME_B, '236220', _V12_UPDATE),
@@ -422,6 +437,17 @@ _V12_FIRMS = (
     (V12_CONFLICT, '541330', _V12_UPDATE),
     (V12_NOT_2022, '517311', _V12_UPDATE),
     (V12_BAD_CODE, '54151A', _V12_UPDATE),
+    (V12_BLANK_DATE, '541511', ''),
+    (V12_BAD_DATE, '541511', '20251332'),
+    (V12_EVS_DNB, '541511', _V12_UPDATE, {'dnb_evs': True}),
+    (V12_TWO_ROWS, '541512', _V12_UPDATE),
+    (V12_TWO_ROWS, '541512', _V12_UPDATE, {'registration_status': 'E'}),
+    (V12_MIXED, '', _V12_UPDATE),
+    (V12_MIXED, '541511', _V12_UPDATE),
+    (V12_PADDED, '541511', _V12_UPDATE),
+    (V12_PRIME_E, '722511', _V12_UPDATE),
+    (V12_SUB_D1, '722513', _V12_UPDATE),
+    (V12_SUB_D2, '722513', _V12_UPDATE),
 )
 
 
@@ -429,7 +455,7 @@ def _v12_report(prime, sub, action, amount, **fields):
     return dict(prime_uei=prime, sub_uei=sub, action_date=action, amount=amount, **fields)
 
 
-# The reports by file year: 24 rows, 19 of them usable. Every amount differs, so the one row
+# The reports by file year: 36 rows, 30 of them usable. Every amount differs, so the one row
 # that `copies=2` writes twice is the only duplicate. `v12_inputs` adds a report ID to each row.
 _V12_REPORTS = {
     2024: [
@@ -445,6 +471,11 @@ _V12_REPORTS = {
         # is reached by no usable report. Then a date that does not exist.
         _v12_report(V12_PRIME_A, V12_BAD_CODE, '2023-09-30', '13.00'),
         _v12_report(V12_PRIME_A, V12_SUB_A, '2024-02-30', '14.00'),
+        # Subcontractors that are D&B-era records for the other reasons, and a firm with two
+        # extract rows that agree on the code (reported by a D&B-era prime).
+        _v12_report(V12_PRIME_A, V12_BLANK_DATE, '2024-07-01', '51.00'),
+        _v12_report(V12_PRIME_OLD, V12_TWO_ROWS, '2024-08-01', '52.00'),
+        _v12_report(V12_PRIME_A, V12_EVS_DNB, '2024-09-01', '53.00'),
     ],
     2025: [
         # The duplicate row.
@@ -458,6 +489,18 @@ _V12_REPORTS = {
         _v12_report(V12_PRIME_A, V12_NO_CODE, '2025-07-01', '26.00'),
         # Prime B is a subcontractor here, so it is a firm in both roles.
         _v12_report(V12_PRIME_A, V12_PRIME_B, '2025-08-01', '27.00'),
+        # Reports in the 2025 file that count under their own fiscal year, 2026.
+        _v12_report(V12_PRIME_A, V12_SUB_B, '2025-11-10', '41.00'),
+        _v12_report(V12_PRIME_B, V12_SUB_B, '2025-12-12', '43.00'),
+        _v12_report(V12_PRIME_A, V12_BAD_DATE, '2025-09-20', '54.00'),
+        _v12_report(V12_PRIME_OLD, V12_MIXED, '2025-09-05', '55.00'),
+        # Both UEIs are padded with ASCII whitespace and join their extract rows.
+        _v12_report(f' {V12_PRIME_OLD}\t', f'\t{V12_PADDED} ', '2025-07-15', '56.00'),
+        # The lowercase spelling of a real UEI is unusable.
+        _v12_report(V12_PRIME_A.lower(), V12_SUB_A, '2025-06-15', '57.00'),
+        # Two parent UEIs that are equal and malformed are no group.
+        _v12_report(V12_PRIME_E, V12_SUB_D1, '2025-08-20', '58.00',
+                    prime_parent_uei=_V12_LOWER_GROUP, sub_parent_uei=_V12_LOWER_GROUP),
     ],
     2026: [
         # Group condition 2: the prime's parent UEI is the subcontractor.
@@ -473,6 +516,11 @@ _V12_REPORTS = {
         # Fiscal year 2027, and the last day of fiscal year 2026.
         _v12_report(V12_PRIME_C, V12_SUB_EDGE, '2026-10-01', '36.00'),
         _v12_report(V12_PRIME_A, V12_SUB_C, '2026-09-30', '37.00'),
+        # A report in the 2026 file that counts under its own fiscal year, 2025.
+        _v12_report(V12_PRIME_B, V12_SUB_B, '2025-09-15', '42.00'),
+        # Two parent UEIs that are blank after stripping are no group.
+        _v12_report(V12_PRIME_E, V12_SUB_D2, '2026-06-01', '59.00',
+                    prime_parent_uei='   ', sub_parent_uei='\t'),
     ],
 }
 
@@ -498,10 +546,13 @@ def v12_inputs() -> tuple[dict[int, dict[str, list[list[str]]]], list[str]]:
                                      report_id=f'V12-{year}-{number:03d}', **fields, **text)
             records.extend(list(record) for _ in range(report.get('copies', 1)))
         subawards[year] = {V12_MEMBER: records}
-    lines = [extract_line(layout, uei=uei, registration_status='A', last_update_date=update,
-                          primary_naics=code, naics_code_string=f'{code}Y' if code else '',
-                          evs_source='SAM')
-             for uei, code, update in _V12_FIRMS]
+    lines = []
+    for uei, code, update, *other in _V12_FIRMS:
+        fields = {'registration_status': 'A', 'evs_source': 'SAM'} | (other[0] if other else {})
+        if fields.pop('dnb_evs', False):
+            fields['evs_source'] = sorted(layout.evs_dnb)[0]
+        lines.append(extract_line(layout, uei=uei, last_update_date=update, primary_naics=code,
+                                  naics_code_string=f'{code}Y' if code else '', **fields))
     return subawards, lines
 
 
@@ -514,9 +565,11 @@ def run_vendor_link_v12(tmp_path: Path, monkeypatch) -> dict:
     external access blocked.
 
     The guards go in first, so seeding, both builds, both verifications and the comparison run
-    under them. The data root is `tmp_path / 'data'`, and every command gets it explicitly. The
-    returned dict holds `data_dir`, the `first` and `second` bundle directories, their detached
-    pins (`first_pin`, `second_pin`), both verification results and the `comparison`.
+    under them, in the spec's order: build and verify the first run, build and verify the
+    second, then compare. The data root is `tmp_path / 'data'`, and every command gets it
+    explicitly. The returned dict holds `data_dir`, the `first` and `second` bundle directories,
+    their detached pins (`first_pin`, `second_pin`), both verification results and the
+    `comparison`.
     '''
     # Imported here so that every vendor-link test module does not load these modules.
     from target_fixtures import forbid_external_access
@@ -536,13 +589,11 @@ def run_vendor_link_v12(tmp_path: Path, monkeypatch) -> dict:
              month=V12_MONTH, subaward_layouts=vendor_link_layouts.load_subaward_layouts(),
              extract_layout=vendor_link_layouts.load_extract_layout(),
              extract_member=V12_EXTRACT_MEMBER)
-    published = {}
+    result = {'data_dir': data_dir}
     for name, run_id in zip(('first', 'second'), V12_RUNS, strict=True):
-        published[name] = vendor_link_bundle.build(
+        run = vendor_link_bundle.build(
             data_dir, run_id, codes_run=codes_run, codes_outputs_sha256=codes_pin,
             snapshot=V12_SNAPSHOT, sam_month=V12_MONTH)
-    result = {'data_dir': data_dir}
-    for name, run in published.items():
         directory = Path(run['directory'])
         result[name] = directory
         result[name + '_pin'] = run['outputs_sha256']
