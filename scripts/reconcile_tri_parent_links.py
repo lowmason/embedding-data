@@ -4,8 +4,8 @@ Written from the Stage 5 spec (`specs/tri-parent-links.md`), not from the build 
 importing none of them: only the standard library and Polars, which reads Parquet. It checks
 the detached `outputs.json` pin and the bundle inventory, the three raw TRI files that
 `inputs.json` cites, and the cited Stage 4 `naics_nodes.parquet`. It reads each CSV file with
-`csv.reader` and its own decoding: UTF-8 with a byte order mark dropped, and a Windows-1252
-fallback for a line that is not UTF-8. With plain sets and dicts it recomputes the
+`csv.reader` and its own decoding: UTF-8 with a byte order mark dropped, and Windows-1252
+for only the bytes of a line that UTF-8 rejects. With plain sets and dicts it recomputes the
 facility-year reduction, eligibility, n(a), J(a,b), the yearly j, N, both sensitivities, the
 partial owners and the O8 counts, and compares them exactly with the five bundle tables and
 with the report.
@@ -339,24 +339,37 @@ def select_nodes(data_dir: Path, inputs: dict) -> dict[str, str]:
 
 # Reading the raw files.
 
+def decoded_line(line: bytes) -> str:
+    '''One line as text: UTF-8, with only the bytes that UTF-8 rejects decoded as Windows-1252.
+
+    One line can hold both encodings. A rejected byte that Windows-1252 leaves undefined is
+    refused.
+    '''
+    parts = []
+    while True:
+        try:
+            parts.append(line.decode('utf-8'))
+            return ''.join(parts)
+        except UnicodeDecodeError as error:
+            parts.append(line[:error.start].decode('utf-8'))
+            try:
+                parts.append(line[error.start:error.end].decode('cp1252'))
+            except UnicodeDecodeError:
+                raise Refused('raw line is neither UTF-8 nor Windows-1252') from None
+            line = line[error.end:]
+
+
 def decoded_lines(stream: BinaryIO) -> Iterator[str]:
     '''Each line of a binary stream as text, with its line ending kept.
 
-    The UTF-8 byte order mark is dropped from the start of the first line. A line that is not
-    valid UTF-8 is decoded as Windows-1252. A line that is neither is refused.
+    The UTF-8 byte order mark is dropped from the start of the first line only.
     '''
     first = True
     for line in stream:
         if first:
             line = line.removeprefix(BYTE_ORDER_MARK)
             first = False
-        try:
-            yield line.decode('utf-8')
-        except UnicodeDecodeError:
-            try:
-                yield line.decode('cp1252')
-            except UnicodeDecodeError:
-                raise Refused('raw line is neither UTF-8 nor Windows-1252') from None
+        yield decoded_line(line)
 
 
 @dataclass(frozen=True, slots=True)
@@ -440,10 +453,11 @@ class FacilityYear:
 def add_form(item: FacilityYear, form: Form, values: dict[str, list[str]]) -> None:
     '''Fold one form into its facility-year.
 
-    Primary codes and standardized names are stripped of surrounding whitespace. A blank or a
-    registered "no parent" string is no name. The other delivered values are kept as
-    delivered, and a blank cell is no value. A D&B number is usable when, stripped, it is not
-    blank and not a registered "no D&B number" string.
+    Primary and other NAICS codes and standardized names are stripped of surrounding
+    whitespace. A blank code is no code. A blank or a registered "no parent" string is no name.
+    The state and federal cells are kept exactly as delivered, a blank cell included. A D&B
+    number is usable when, stripped, it is not blank and not a registered "no D&B number"
+    string.
     '''
     item.forms += 1
     form_type = form.form_type.strip()
@@ -453,7 +467,7 @@ def add_form(item: FacilityYear, form: Form, values: dict[str, list[str]]) -> No
         item.form_a += 1
     if code := form.primary_naics.strip():
         item.primary.add(code)
-    item.other.update(value for value in form.other_naics if value.strip())
+    item.other.update(code for value in form.other_naics if (code := value.strip()))
     name = form.standardized_parent.strip()
     if name and name not in values['no_parent']:
         item.parents.add(name)
@@ -463,12 +477,10 @@ def add_form(item: FacilityYear, form: Form, values: dict[str, list[str]]) -> No
         foreign = form.standardized_foreign_parent.strip()
         if foreign and foreign not in values['no_parent']:
             item.foreign.add(foreign)
-    if form.federal.strip():
-        item.federal_values.add(form.federal)
+    item.federal_values.add(form.federal)
     if form.federal.strip() in values['federal_yes']:
         item.federal = True
-    if form.state.strip():
-        item.states.add(form.state)
+    item.states.add(form.state)
     number = form.parent_dnb.strip()
     if number and number not in values['no_dnb']:
         item.dnb.add(number)
@@ -510,15 +522,15 @@ def dnb_key(trifd: str, item: FacilityYear) -> str:
     return 'facility:' + trifd
 
 
-def excluded_owners(trifd: str, item: FacilityYear, reason: str) -> list[str]:
-    '''The owner keys that an excluded facility-year belongs to, for the partial owners.
+def excluded_owners(trifd: str, item: FacilityYear) -> list[str]:
+    '''The owner keys that a facility-year excluded for a partial reason belongs to.
 
-    A `parent_conflict` facility-year belongs to each named parent. Any other belongs to the
-    key it would have had: its one standardized parent name, else `facility:<TRIFD>`.
+    It belongs to each standardized parent name it lists, and to `facility:<TRIFD>` when it
+    lists none. The exclusion reason does not change who it belongs to.
     '''
-    if reason == 'parent_conflict':
+    if item.parents:
         return ['parent:' + name for name in item.parents]
-    return [headline_key(trifd, item)]
+    return ['facility:' + trifd]
 
 
 # The counts (spec "Parent-link target (O7)" and "Parent industry table (O8)").
@@ -621,7 +633,7 @@ def recompute(files: dict[int, Path], nodes: dict[str, str], processed_as_of: st
         elif reason == 'federal':
             with_federal[headline_key(trifd, item)][year].add(node)
         elif reason in PARTIAL_REASONS:
-            excluded.update((key, year) for key in excluded_owners(trifd, item, reason))
+            excluded.update((key, year) for key in excluded_owners(trifd, item))
         reasons[year][reason or 'eligible'] += 1
         by_year[year]['rows'] += item.forms
         by_year[year]['form_r'] += item.form_r

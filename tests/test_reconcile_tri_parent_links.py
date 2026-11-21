@@ -802,6 +802,14 @@ def undecodable_raw_line(chain, tmp_path):
     return data_dir, bundle.name, pin, 'raw line is neither UTF-8 nor Windows-1252'
 
 
+@refusal
+def undefined_byte_beside_utf8(chain, tmp_path):
+    data_dir, bundle = data_copy(chain, tmp_path)
+    pin = recite(data_dir, bundle, 2024,
+                 lambda body: body + b'2024,T' + 'ë'.encode() + b'\x9d\n')
+    return data_dir, bundle.name, pin, 'raw line is neither UTF-8 nor Windows-1252'
+
+
 @pytest.mark.parametrize('name', sorted(REFUSALS))
 def test_each_untrusted_input_is_refused(chain, tmp_path, name):
     data_dir, run_id, pin, reason = REFUSALS[name](chain, tmp_path)
@@ -860,6 +868,91 @@ def test_reconciler_agrees_with_a_build_from_bom_crlf_and_windows_1252_files(
     assert {'Birch Café', 'Holly’s Co', 'Cédar Inc'} <= set(names['parent_name'])
 
 
+def build_and_reconcile(tmp_path, monkeypatch, extra, change=None):
+    '''Build a bundle from the V12 rows plus `extra` with the build, then reconcile it.
+
+    `change(year, body)` may rewrite the bytes of a raw file before it is imported.
+    '''
+    from target_fixtures import forbid_external_access
+
+    forbid_external_access(monkeypatch)
+    data_dir = tmp_path / 'data'
+    codes_run, codes_pin = seed_codes_bundle(data_dir, tmp_path / 'codes-originals')
+    rows = v12_rows()
+    for year, more in extra.items():
+        rows[year].extend(more)
+    originals = tmp_path / 'originals'
+    originals.mkdir()
+    for year in (2022, 2023, 2024):
+        file = originals / tri_raw.file_name(year)
+        write_tri_csv(file, year, rows[year])
+        if change is not None:
+            file.write_bytes(change(year, file.read_bytes()))
+        tri_raw.import_file(data_dir, year, file, processed_as_of=V12_DATE)
+    published = tri_bundle.build(data_dir, 'extra', codes_run=codes_run,
+                                 codes_outputs_sha256=codes_pin, processed_as_of=V12_DATE)
+    status, line = run({'data_dir': data_dir}, 'extra', published['outputs_sha256'], data_dir)
+    return Path(published['directory']), status, line
+
+
+def bundle_counts(directory: Path) -> tuple[int, dict[str, int]]:
+    '''The partial owners of a bundle report and `n_owners_partial` by NAICS code.'''
+    report = json.loads((directory / 'report.json').read_text())
+    marginals = pl.read_parquet(directory / 'tri_parent_link_marginals.parquet')
+    return report['partial_owners'], {
+        row['node_id'].removeprefix(NODE): row['n_owners_partial']
+        for row in marginals.iter_rows(named=True)}
+
+
+def test_reconciler_agrees_with_a_build_from_a_line_in_both_encodings(tmp_path, monkeypatch):
+    # One parent-name cell holds UTF-8 ë and Windows-1252 é. The same build has a padded
+    # other-NAICS cell and a blank state cell.
+    mixed = 'ë'.encode() + 'é'.encode('cp1252')
+    directory, status, line = build_and_reconcile(
+        tmp_path, monkeypatch,
+        {2023: [owned(2023, 'T201', '325110', 'Zinnia MIXED Co', state='TX'),
+                owned(2023, 'T202', '325120', 'Zinnia MIXED Co', naics_2=' 325199 ')]},
+        lambda year, body: body.replace(b'MIXED', mixed) if year == 2023 else body)
+    assert status == 0, line
+    assert line['equal'] is True
+    names = pl.read_parquet(directory / 'tri_parent_industries.parquet')
+    assert 'Zinnia ëé Co' in set(names['parent_name'])
+    years = pl.read_parquet(directory / 'tri_facility_years.parquet').filter(
+        pl.col('trifd') == 'T202').row(0, named=True)
+    assert (years['other_naics_values'], years['state_values']) == (['325199'], [''])
+
+
+def test_reconciler_agrees_with_a_build_on_a_naics_conflict_with_two_parents(
+        chain, tmp_path, monkeypatch):
+    # T203's forms give two codes and two parents. Each parent owns an eligible facility-year
+    # in 2023, so the naics_conflict facility-year makes both of them partial.
+    directory, status, line = build_and_reconcile(tmp_path, monkeypatch, {2023: [
+        owned(2023, 'T201', '325110', 'Kale Corp'), owned(2023, 'T202', '325120', 'Lark Corp'),
+        owned(2023, 'T203', '325110', 'Kale Corp'), owned(2023, 'T203', '325211', 'Lark Corp'),
+    ]})
+    assert status == 0, line
+    assert line['equal'] is True
+    partial_owners, partial = bundle_counts(directory)
+    v12_owners, v12 = bundle_counts(chain['first'])
+    assert partial_owners == v12_owners + 2
+    assert (partial['325110'], partial['325120']) == (v12['325110'] + 1, v12['325120'] + 1)
+
+
+def test_reconciler_agrees_with_a_build_on_a_naics_missing_with_two_parents(
+        chain, tmp_path, monkeypatch):
+    # T203's forms give no code and two parents, each with an eligible 2023 facility-year.
+    directory, status, line = build_and_reconcile(tmp_path, monkeypatch, {2023: [
+        owned(2023, 'T201', '325110', 'Kale Corp'), owned(2023, 'T202', '325120', 'Lark Corp'),
+        owned(2023, 'T203', '', 'Kale Corp'), owned(2023, 'T203', '', 'Lark Corp'),
+    ]})
+    assert status == 0, line
+    assert line['equal'] is True
+    partial_owners, partial = bundle_counts(directory)
+    v12_owners, v12 = bundle_counts(chain['first'])
+    assert partial_owners == v12_owners + 2
+    assert (partial['325110'], partial['325120']) == (v12['325110'] + 1, v12['325120'] + 1)
+
+
 # Reading the raw files.
 
 def test_decoded_lines_drop_a_byte_order_mark_at_the_start_only():
@@ -867,9 +960,24 @@ def test_decoded_lines_drop_a_byte_order_mark_at_the_start_only():
     assert list(reconcile.decoded_lines(stream)) == ['a\r\n', '﻿b\n']
 
 
-def test_decoded_lines_fall_back_to_windows_1252_line_by_line():
+def test_decoded_lines_decode_each_line_in_either_encoding():
     stream = io.BytesIO('Café\n'.encode() + 'Café\n'.encode('cp1252') + b'x\x93y\x94\n')
     assert list(reconcile.decoded_lines(stream)) == ['Café\n', 'Café\n', 'x“y”\n']
+
+
+def test_decoded_lines_decode_only_the_bytes_utf8_rejects_as_windows_1252():
+    # UTF-8 ë, then Windows-1252 é, then UTF-8 Á (C3 81, whose 81 is valid inside UTF-8),
+    # then Windows-1252 “ and a UTF-8 sequence cut short (E2 80) before the line ending.
+    line = (b'A' + 'ë'.encode() + 'é'.encode('cp1252') + b'B' + 'Á'.encode() + b'\x93'
+            + b'\xe2\x80\n')
+    assert list(reconcile.decoded_lines(io.BytesIO(line))) == ['AëéBÁ“â€\n']
+
+
+@pytest.mark.parametrize('before', [b'', 'ë'.encode()], ids=['alone', 'beside_utf8'])
+@pytest.mark.parametrize('byte', [b'\x81', b'\x8d', b'\x8f', b'\x90', b'\x9d'])
+def test_decoded_lines_refuse_a_byte_that_windows_1252_leaves_undefined(byte, before):
+    with pytest.raises(reconcile.Refused, match='neither UTF-8 nor Windows-1252'):
+        list(reconcile.decoded_lines(io.BytesIO(b'a\n' + before + byte + b'\n')))
 
 
 def test_decoded_lines_strip_the_mark_before_decoding_and_return_to_utf8():
@@ -953,13 +1061,14 @@ def owned(year, trifd, code, parent, **fields):
 def test_forms_reduce_to_one_facility_year_with_counts_by_form_type(tmp_path):
     result = recomputed(tmp_path, {2022: [
         owned(2022, 'T1', ' 325110', 'P', state='TX', naics_2='325120'),
-        owned(2022, 'T1', '325110 ', 'P', state='LA', naics_2=' 331110', naics_3='', form='A'),
-        owned(2022, 'T1', '325110', 'P', state='TX'),
+        owned(2022, 'T1', '325110 ', 'P', state='LA', naics_2=' 331110', naics_3='  ', form='A'),
+        owned(2022, 'T1', '325110', 'P', state='TX', naics_2='331110'),
     ]})
     item = facility_years(result)[(2022, 'T1')]
     assert (item['n_forms'], item['n_form_r'], item['n_form_a']) == (3, 2, 1)
     assert item['primary_naics_values'] == ('325110',)
-    assert item['other_naics_values'] == (' 331110', '325120')
+    # Other codes are stripped like the primary code: a padded and a plain 331110 are one.
+    assert item['other_naics_values'] == ('325120', '331110')
     assert item['state_values'] == ('LA', 'TX')
     assert item['federal_values'] == ('NO',)
     assert (item['naics_2022_node_id'], item['owner_key'], item['exclusion_reason']) == (
@@ -1012,14 +1121,19 @@ def test_any_federal_form_makes_the_facility_year_federal(tmp_path):
         owned(2022, 'T1', '325110', 'P', federal=True),
         owned(2022, 'T2', '325110', 'P', federal=False),
         owned(2022, 'T3', '325110', 'P', federal=True),
-        owned(2022, 'T3', '325110', 'P', federal=False)]})
+        owned(2022, 'T3', '325110', 'P', federal=False),
+        owned(2022, 'T4', '325110', 'P', federal=''),
+        owned(2022, 'T4', '325110', 'P', federal=False)]})
     years = facility_years(result)
+    # A blank federal cell is the delivered value '' and does not make a form federal.
+    assert years[(2022, 'T4')]['federal_values'] == ('', 'NO')
+    assert years[(2022, 'T4')]['exclusion_reason'] is None
     assert years[(2022, 'T1')]['exclusion_reason'] == 'federal'
     assert years[(2022, 'T1')]['federal_values'] == ('NO', 'YES')
     assert years[(2022, 'T2')]['exclusion_reason'] is None
     assert years[(2022, 'T3')]['exclusion_reason'] == 'federal'
-    # A blank state cell is no state value.
-    assert years[(2022, 'T2')]['state_values'] == ()
+    # A blank state cell is the delivered value ''.
+    assert years[(2022, 'T2')]['state_values'] == ('',)
 
 
 def test_standardized_names_are_stripped_and_no_parent_strings_and_blanks_are_absent(tmp_path):
@@ -1192,10 +1306,12 @@ def test_partial_owners_need_a_non_federal_exclusion_in_the_same_year(tmp_path):
     assert years[(2023, 'T8')]['exclusion_reason'] == 'parent_conflict'
     assert years[(2023, 'T10')]['exclusion_reason'] == 'naics_conflict'
     partial = {code: row['n_owners_partial'] for code, row in marginals(result).items()}
-    # P is partial in two industries and still counts once among the partial owners.
+    # P is partial in two industries and still counts once among the partial owners. V is
+    # partial through the naics_conflict T10, which belongs to both of its parents. W has no
+    # eligible facility-year, so it is not an owner at all.
     assert partial == {'324110': 1, '325110': 1, '325120': 0, '325199': 1, '325211': 2,
-                       '331110': 0}
-    assert result.report['partial_owners'] == 4
+                       '331110': 1}
+    assert result.report['partial_owners'] == 5
 
 
 def test_the_parent_industry_table_covers_parent_keyed_eligible_facility_years(tmp_path):
