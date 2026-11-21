@@ -89,7 +89,15 @@ INDUSTRY_SCHEMA = {
     'parent_name': TEXT, 'node_id': TEXT, 'n_facilities': COUNT, 'n_facility_years': COUNT,
     'f_2022': COUNT, 'f_2023': COUNT, 'f_2024': COUNT,
 }
-TARGET_KEY = ('unit_a', 'unit_b')
+# The target rows: R7.4's columns in their physical order, with the `targets-v1` types
+# (specs/completed/target-contract-ita-area-mix.md, "Shared target contract").
+TARGET_SCHEMA = {
+    'source': TEXT, 'family': TEXT, 'unit_a_type': TEXT, 'unit_a': TEXT, 'unit_b_type': TEXT,
+    'unit_b': TEXT, 'measure': TEXT, 'value': 'Float64', 'se': 'Float64', 'se_method': TEXT,
+    'n_unweighted': COUNT, 'n_weighted': 'Float64', 'sample_set': TEXT, 'vintage': TEXT,
+    'universe': TEXT, 'flags': TEXTS,
+}
+TARGET_KEY = (list(TARGET_SCHEMA).index('unit_a'), list(TARGET_SCHEMA).index('unit_b'))
 TARGET_VALUES = ('source', 'family', 'unit_a_type', 'unit_b_type', 'measure', 'value', 'se',
                  'se_method', 'n_unweighted', 'n_weighted', 'sample_set', 'vintage', 'universe',
                  'flags')
@@ -745,20 +753,26 @@ def ordered_differing(expected: list[tuple], actual: list[tuple] | None) -> int:
                for first, second in zip_longest(expected, actual, fillvalue=MISSING))
 
 
-def keyed_differing(expected: dict, actual: list[tuple] | None) -> int:
-    '''The keys whose rows differ or that one side lacks, plus repeated keys on the bundle side.
+def target_rows(targets: dict) -> list[tuple]:
+    '''The recomputed target rows in `TARGET_SCHEMA` column order, sorted by `(unit_a, unit_b)`.
 
-    Each actual row is a key tuple of two columns followed by the value columns.
+    The shared writer sorts by every column except `value`, `se`, the counts and `flags`. All of
+    them except `unit_a` and `unit_b` are constants here.
     '''
+    rows = []
+    for (a, b), values in sorted(targets.items()):
+        row = dict(zip(TARGET_VALUES, values, strict=True), unit_a=a, unit_b=b)
+        rows.append(tuple(row[name] for name in TARGET_SCHEMA))
+    return rows
+
+
+def target_differing(expected: dict, actual: list[tuple] | None) -> int:
+    '''The positions at which the target rows differ, plus repeated keys on the bundle side.'''
+    differing = ordered_differing(target_rows(expected), actual)
     if actual is None:
-        return max(len(expected), 1)
-    rows, repeated = {}, 0
-    for row in actual:
-        key = row[:2]
-        repeated += key in rows
-        rows[key] = row[2:]
-    return repeated + sum(not same(expected.get(key, MISSING), rows.get(key, MISSING))
-                          for key in expected.keys() | rows.keys())
+        return differing
+    keys = [tuple(row[index] for index in TARGET_KEY) for row in actual]
+    return differing + len(keys) - len(set(keys))
 
 
 def schema_equal(frame: pl.DataFrame, schema: dict[str, str]) -> bool:
@@ -801,12 +815,13 @@ def compare(expected: Recomputed, directory: Path, report: dict) -> dict:
         'parent_industries': ordered_differing(
             expected.parent_industries, table_rows(frames['parent_industries'],
                                                    INDUSTRY_SCHEMA)),
-        'targets': keyed_differing(expected.targets,
-                                   table_rows(frames['targets'], TARGET_KEY + TARGET_VALUES)),
+        'targets': target_differing(expected.targets,
+                                    table_rows(frames['targets'], TARGET_SCHEMA)),
     }
     schemas = {
         'facility_years': FACILITY_SCHEMA, 'marginals': MARGINAL_SCHEMA,
         'support': SUPPORT_SCHEMA, 'parent_industries': INDUSTRY_SCHEMA,
+        'targets': TARGET_SCHEMA,
     }
     checks = {name: count == 0 for name, count in differing.items()}
     for name, schema in schemas.items():

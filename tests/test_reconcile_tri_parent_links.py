@@ -350,6 +350,16 @@ TAMPERED = {
         pl.col('n_facilities').cast(pl.Int64))), {'parent_industries'}),
     'targets_missing_row': (whole(TARGETS, lambda f: f.head(-1)), {'targets'}),
     'targets_repeated_row': (whole(TARGETS, lambda f: pl.concat([f, f.head(1)])), {'targets'}),
+    'targets_order': (whole(TARGETS, lambda f: f.reverse()), {'targets'}),
+    # Each of these reads back the same Python values: only the schema check sees it.
+    'targets_schema': (whole(TARGETS, lambda f: f.with_columns(
+        pl.col('n_unweighted').cast(pl.Int64))), {'targets'}),
+    'targets_dtype': (whole(TARGETS, lambda f: f.with_columns(pl.col('se').cast(pl.String))),
+                      {'targets'}),
+    'targets_extra_column': (whole(TARGETS, lambda f: f.with_columns(
+        pl.lit('x').alias('extra'))), {'targets'}),
+    'targets_column_order': (whole(TARGETS, lambda f: f.select(reversed(f.columns))),
+                             {'targets'}),
     # The target rows.
     'targets_value': (cell(TARGETS, 'value', lambda v: v / 2), {'targets'}),
     'targets_value_last_bit': (cell(TARGETS, 'value', lambda v: math.nextafter(v, 2.0)),
@@ -429,16 +439,19 @@ def test_differing_counts_name_the_rows_that_differ(chain):
     status, line = run(chain, run_id, pin)
     assert status == 1
     assert (line['facility_years_differing'], line['eligibility_differing']) == (1, 0)
+    # Two extra rows at the end differ by position, and their keys are repeated.
     run_id, pin = repinned_copy(chain, 'counted_targets',
                                 whole(TARGETS, lambda f: pl.concat([f, f.head(2)])))
-    assert run(chain, run_id, pin)[1]['targets_differing'] == 2
+    assert run(chain, run_id, pin)[1]['targets_differing'] == 4
 
 
-def test_target_rows_are_compared_by_cell_not_by_position(chain):
+def test_target_rows_are_compared_in_key_order(chain):
+    # The shared writer sorts the rows by (unit_a, unit_b), so a reversed table differs.
     run_id, pin = repinned_copy(chain, 'targets_reordered', whole(TARGETS, lambda f: f.reverse()))
     status, line = run(chain, run_id, pin)
-    assert status == 0
-    assert line['equal'] is True
+    assert status == 1
+    assert unequal_checks(line) == {'targets'}
+    assert line['targets_differing'] == 8
 
 
 # Refusals.
@@ -956,6 +969,44 @@ def test_reconciler_agrees_with_a_build_on_a_naics_missing_with_two_parents(
     assert (partial['325110'], partial['325120']) == (v12['325110'] + 1, v12['325120'] + 1)
 
 
+def bundle_facility_years(directory: Path, *trifds: str) -> dict:
+    frame = pl.read_parquet(directory / 'tri_facility_years.parquet')
+    return {row['trifd']: row for row in frame.filter(pl.col('trifd').is_in(trifds))
+            .iter_rows(named=True)}
+
+
+def test_reconciler_agrees_with_a_build_on_a_reported_parent_with_a_blank_standardized_name(
+        chain, tmp_path, monkeypatch):
+    # Owner-key case (b): two facilities report one parent and leave the standardized name blank.
+    directory, status, line = build_and_reconcile(tmp_path, monkeypatch, {2023: [
+        owned(2023, 'T201', '325110', '', parent_name='Alder Holdings LLC'),
+        owned(2023, 'T202', '325120', '', parent_name='Alder Holdings LLC')]})
+    assert status == 0, line
+    assert line['equal'] is True
+    years = bundle_facility_years(directory, 'T201', 'T202')
+    assert (years['T201']['owner_key'], years['T202']['owner_key']) == (
+        'facility:T201', 'facility:T202')
+    report = json.loads((directory / 'report.json').read_text())
+    v12 = json.loads((chain['first'] / 'report.json').read_text())
+    assert report['n_owners']['headline'] == v12['n_owners']['headline'] + 2
+
+
+def test_reconciler_agrees_with_a_build_on_names_that_differ_in_case_or_inner_spaces(
+        tmp_path, monkeypatch):
+    directory, status, line = build_and_reconcile(tmp_path, monkeypatch, {2023: [
+        owned(2023, 'T201', '325110', 'Zelkova Holdings'),
+        owned(2023, 'T201', '325110', 'Zelkova  Holdings'),
+        owned(2023, 'T202', '325120', 'Zelkova Holdings'),
+        owned(2023, 'T202', '325120', 'ZELKOVA HOLDINGS')]})
+    assert status == 0, line
+    assert line['equal'] is True
+    years = bundle_facility_years(directory, 'T201', 'T202')
+    assert [(years[trifd]['parent_names'], years[trifd]['exclusion_reason'])
+            for trifd in ('T201', 'T202')] == [
+        (['Zelkova  Holdings', 'Zelkova Holdings'], 'parent_conflict'),
+        (['ZELKOVA HOLDINGS', 'Zelkova Holdings'], 'parent_conflict')]
+
+
 # Reading the raw files.
 
 def test_decoded_lines_drop_a_byte_order_mark_at_the_start_only():
@@ -1159,6 +1210,32 @@ def test_standardized_names_are_stripped_and_no_parent_strings_and_blanks_are_ab
         (('Alder',), True, 'parent:Alder'), ((), False, 'facility:T2'),
         (('Birch',), True, 'parent:Birch'), (('Cedar',), False, 'parent:Cedar')]
     assert result.report['year_counts']['2023']['mixed_blank'] == 2
+
+
+def test_a_reported_parent_beside_a_blank_standardized_name_is_self_owned(tmp_path):
+    # Owner-key case (b): EPA's standardized name alone decides "no parent".
+    result = recomputed(tmp_path, {2023: [
+        owned(2023, 'T1', '325110', '', parent_name='Alder Holdings LLC'),
+        owned(2023, 'T2', '325120', '', parent_name='Alder Holdings LLC')]})
+    years = facility_years(result)
+    assert (years[(2023, 'T1')]['owner_key'], years[(2023, 'T2')]['owner_key']) == (
+        'facility:T1', 'facility:T2')
+    assert (years[(2023, 'T1')]['parent_names'], years[(2023, 'T2')]['parent_names']) == ((), ())
+    assert result.targets == {}
+    assert result.report['n_owners']['headline'] == 2
+
+
+def test_parent_names_are_compared_without_case_folding_or_space_collapsing(tmp_path):
+    result = recomputed(tmp_path, {2023: [
+        owned(2023, 'T1', '325110', 'Alder Holdings'),
+        owned(2023, 'T1', '325110', 'Alder  Holdings'),
+        owned(2023, 'T2', '325120', 'Alder Holdings'),
+        owned(2023, 'T2', '325120', 'ALDER HOLDINGS')]})
+    years = facility_years(result)
+    assert [(years[(2023, trifd)]['parent_names'], years[(2023, trifd)]['exclusion_reason'])
+            for trifd in ('T1', 'T2')] == [
+        (('Alder  Holdings', 'Alder Holdings'), 'parent_conflict'),
+        (('ALDER HOLDINGS', 'Alder Holdings'), 'parent_conflict')]
 
 
 def test_foreign_parent_names_are_read_from_2023_only(tmp_path):
