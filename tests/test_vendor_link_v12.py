@@ -343,34 +343,6 @@ def test_v12_chain_is_offline_verified_and_replay_equal(tmp_path, monkeypatch):
     result = run_vendor_link_v12(tmp_path, monkeypatch)
     assert result['comparison']['equal'] is True
     assert result['first_verification']['outputs_sha256'] == result['first_pin']
-    # plus: the second run, the replay's shape, the data root and the blocked access.
-    assert result['second_verification']['outputs_sha256'] == result['second_pin']
-    assert result['comparison']['trust_established'] is False
-    assert result['comparison']['report_equal'] is True
-    assert {name: (table['schema_equal'], table['values_equal'])
-            for name, table in result['comparison']['tables'].items()} == {
-                name: (True, True) for name in TABLES}
-    assert [result['first'].name, result['second'].name] == list(V12_RUNS)
-    assert result['data_dir'] == tmp_path / 'data'
-    for name in ('first', 'second'):
-        directory = result[name]
-        assert directory == run_directory(result['data_dir'], directory.name)
-        assert sorted(path.name for path in directory.iterdir()) == sorted(
-            [*FILES, 'outputs.json'])
-        assert result[name + '_verification']['rows'] == {
-            table: len(pl.read_parquet(directory / f'{table}.parquet')) for table in TABLES}
-    with pytest.raises(AssertionError):
-        socket.create_connection(('127.0.0.1', 9))
-    with pytest.raises(AssertionError):
-        httpx.Client()
-    # The chain ran on the committed production registries.
-    inputs = json.loads((result['first'] / 'inputs.json').read_text())
-    assert inputs['registries'] == {
-        'subaward_headers': vendor_link_layouts.subaward_layouts_json(
-            vendor_link_layouts.load_subaward_layouts()),
-        'extract_layout': vendor_link_layouts.extract_layout_json(
-            vendor_link_layouts.load_extract_layout())}
-    assert (inputs['snapshot'], inputs['sam_month']) == (V12_SNAPSHOT.isoformat(), V12_MONTH)
 
 
 def test_v12_fixture_holds_every_required_case(tmp_path, monkeypatch):
@@ -387,19 +359,58 @@ def test_v12_fixture_holds_every_required_case(tmp_path, monkeypatch):
     bundle = load(result['first'])
     for check in REQUIRED_CASES:
         check(bundle)
-    # The replay holds the same cases.
-    assert load(result['second']).report == bundle.report
 
 
 def test_no_name_or_address_value_in_any_bundle_byte(tmp_path, monkeypatch):
     result = run_vendor_link_v12(tmp_path, monkeypatch)
     for file in result['first'].iterdir():
         assert DNB_SENTINEL.encode() not in file.read_bytes()
-    # plus: the sentinel is in the raw files, the replay is clean, and no table cell or JSON
-    # text holds the sentinel or any part of it.
+
+
+# ---- strengthening tests: each runs its own chain
+
+def test_v12_replay_registries_and_guards(tmp_path, monkeypatch):
+    result = run_vendor_link_v12(tmp_path, monkeypatch)
+    assert result['second_verification']['outputs_sha256'] == result['second_pin']
+    assert result['comparison']['trust_established'] is False
+    assert result['comparison']['report_equal'] is True
+    assert {name: (table['schema_equal'], table['values_equal'])
+            for name, table in result['comparison']['tables'].items()} == {
+                name: (True, True) for name in TABLES}
+    # The replay holds the same cases.
+    assert load(result['second']).report == load(result['first']).report
+    assert [result['first'].name, result['second'].name] == list(V12_RUNS)
+    assert result['data_dir'] == tmp_path / 'data'
+    for name in ('first', 'second'):
+        directory = result[name]
+        assert directory == run_directory(result['data_dir'], directory.name)
+        assert sorted(path.name for path in directory.iterdir()) == sorted(
+            [*FILES, 'outputs.json'])
+        assert result[name + '_verification']['rows'] == {
+            table: len(pl.read_parquet(directory / f'{table}.parquet')) for table in TABLES}
+    # The guards are still in force.
+    with pytest.raises(AssertionError):
+        socket.create_connection(('127.0.0.1', 9))
+    with pytest.raises(AssertionError):
+        httpx.Client()
+    # The chain ran on the committed production registries.
+    inputs = json.loads((result['first'] / 'inputs.json').read_text())
+    assert inputs['registries'] == {
+        'subaward_headers': vendor_link_layouts.subaward_layouts_json(
+            vendor_link_layouts.load_subaward_layouts()),
+        'extract_layout': vendor_link_layouts.extract_layout_json(
+            vendor_link_layouts.load_extract_layout())}
+    assert (inputs['snapshot'], inputs['sam_month']) == (V12_SNAPSHOT.isoformat(), V12_MONTH)
+
+
+def test_v12_sentinel_is_in_the_raw_files_and_in_no_decoded_cell(tmp_path, monkeypatch):
+    result = run_vendor_link_v12(tmp_path, monkeypatch)
     data_dir = result['data_dir']
     layout = vendor_link_layouts.load_extract_layout()
-    with zipfile.ZipFile(sam_raw.select_extract(data_dir, V12_MONTH)) as archive:
+    extract_file = sam_raw.select_extract(data_dir, V12_MONTH)
+    assert extract_file.name == 'SAM_PUBLIC_UTF-8_MONTHLY_V2_20261102.ZIP'
+    # The raw files are deflated, so the sentinel is read from the decoded members.
+    with zipfile.ZipFile(extract_file) as archive:
         (member,) = archive.namelist()
         lines = archive.read(member).decode(layout.encoding).split('\r\n')[1:-1]
     assert len(lines) == 15
