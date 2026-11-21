@@ -206,6 +206,8 @@ def test_output_is_one_sorted_json_line_with_no_uei(tmp_path, monkeypatch):
         assert status == expected
         assert line == json.dumps(result, sort_keys=True)
         assert 'V12' not in line
+        # The raw files hold a D&B Open Data stand-in at every restricted position.
+        assert 'SENTINEL' not in line
     assert result['status'] == 'refused'
 
 
@@ -597,6 +599,12 @@ def test_refuses_an_unsafe_or_absent_run(tmp_path, monkeypatch):
     assert refused(data_dir, pin, 'absent') == 'detached pin differs'
 
 
+def test_a_wrong_pin_is_checked_before_the_inventory_is_read(tmp_path, monkeypatch):
+    data_dir = copy_v12(tmp_path)
+    (bundle(data_dir) / 'outputs.json').write_text('{')
+    assert refused(data_dir, TEMPLATE['first_pin']) == 'detached pin differs'
+
+
 @pytest.mark.parametrize('name', [
     'vendor_links.parquet', 'vendor_link_pairs.parquet', 'inputs.json', 'report.json'])
 def test_refuses_a_bundle_file_that_differs_from_its_inventory(tmp_path, name):
@@ -658,6 +666,8 @@ MALFORMED_INPUTS = [
     pytest.param(put('raw', 'subawards', 0, 'path', value=subaward_path(2024, '2026-11-21')),
                  id='snapshots'),
     pytest.param(lambda inputs: inputs['raw']['subawards'].pop(), id='missing'),
+    pytest.param(lambda inputs: inputs['raw']['subawards'].append(
+        dict(inputs['raw']['subawards'][1])), id='four entries'),
     pytest.param(put('raw', 'extract', 'path', value='sam/entity-extract/x.ZIP'),
                  id='extract'),
     pytest.param(delete('raw', 'extract', 'sha256'), id='extract_hash'),
@@ -708,6 +718,48 @@ def test_national_industries_come_from_the_pinned_nodes(tmp_path, monkeypatch):
     assert '54151' not in nodes and '517311' not in nodes
 
 
+def test_national_industries_filter_on_system_vintage_and_level(tmp_path):
+    directory = tmp_path / 'derived' / 'codes' / 'codes_run'
+    directory.mkdir(parents=True)
+    nodes = directory / 'naics_nodes.parquet'
+    pl.DataFrame({
+        'node_id': ['naics:2022:national_industry:541511', 'naics:2017:national_industry:517311',
+                    'naics:2022:industry:54151', 'soc:2022:national_industry:111111'],
+        'system': ['naics', 'naics', 'naics', 'soc'],
+        'vintage': [2022, 2017, 2022, 2022],
+        'level': ['national_industry', 'national_industry', 'industry', 'national_industry'],
+        'code': ['541511', '517311', '54151', '111111'],
+        'title': ['a', 'b', 'c', 'd'],
+    }).write_parquet(nodes)
+    record = {'sha256': sha256(nodes), 'size': nodes.stat().st_size}
+    outputs = directory / 'outputs.json'
+    outputs.write_text(json.dumps({'naics_nodes.parquet': record}))
+    inputs = {'codes': {'run_id': 'codes_run', 'outputs_sha256': sha256(outputs),
+                        'outputs': {'naics_nodes.parquet': record}}}
+    assert reconcile.national_industries(tmp_path, inputs) == {
+        '541511': 'naics:2022:national_industry:541511'}
+
+
+def test_a_malformed_code_on_a_read_firm_is_flagged(tmp_path, monkeypatch):
+    # The build fails on such a firm, so a bundle beside such an extract cannot be equal.
+    data_dir = copy_v12(tmp_path)
+
+    def edit(text):
+        lines = text.split('\r\n')
+        for number, line in enumerate(lines):
+            fields = line.split('|')
+            if fields[0] == 'V12SUBAWC003':
+                fields[32] = '54151X'
+                lines[number] = '|'.join(fields)
+        return '\r\n'.join(lines)
+
+    pin = reseal_extract(data_dir, edit)
+    status, result, _line = run_main(data_dir, pin)
+    assert status == 1
+    assert 'firms.no_malformed_read_code' in false_checks(result)
+    assert result['counts']['malformed_read_codes'] == 1
+
+
 # ---- direct tests: the value rules on small typed inputs
 
 GOOD = 'ABCDEFGH1234'
@@ -731,6 +783,7 @@ OUTSIDE = ('outside_window', None, None, None)
     (GOOD[:11] + '١', OTHER, '2024-01-15', UNUSABLE),
     ('', OTHER, 'not a date', UNUSABLE),
     (f' \t\n{GOOD}\r\x0b\x0c', f'\t{OTHER} ', '2024-01-15', ('usable', GOOD, OTHER, 2024)),
+    ('0012345678AB', OTHER, '2024-01-15', ('usable', '0012345678AB', OTHER, 2024)),
     (GOOD, OTHER, '', INVALID),
     (GOOD, OTHER, '   ', INVALID),
     (GOOD, OTHER, '2024-02-30', INVALID),
@@ -831,6 +884,14 @@ def test_reports_are_tallied_by_pair_and_counted_by_status():
     assert set(result.pairs) == {(GOOD, OTHER), (OTHER, GOOD)}
 
 
+def test_amounts_sum_exactly():
+    # Two amounts of 36 digits and two decimals, beyond the default 28-digit context.
+    big = '9' * 36 + '.99'
+    pair = tally(report(amount=big), report(amount=big), report(amount='0.01')).pairs[
+        (GOOD, OTHER)]
+    assert pair.amount == Decimal('1' + '9' * 36 + '.99')
+
+
 def test_a_pair_whose_amounts_all_fail_sums_to_zero():
     pair = tally(report(amount=''), report(amount='1.234')).pairs[(GOOD, OTHER)]
     assert (pair.n_reports, pair.amount) == (2, Decimal(0))
@@ -919,6 +980,10 @@ def test_quoted_values_and_a_long_field_are_read(tmp_path):
                  'raw member is unexpected', id='member case'),
     pytest.param({'x' + MEMBER: csv_bytes([report()])},
                  'raw member is unexpected', id='member prefix'),
+    pytest.param({MEMBER + '.bak': csv_bytes([report()])},
+                 'raw member is unexpected', id='member suffix'),
+    pytest.param({MEMBER: csv_bytes([report()], header=[HEADER[1], HEADER[0], *HEADER[2:]])},
+                 'subaward header differs', id='reordered header'),
     pytest.param({MEMBER: csv_bytes([report()], header=[*HEADER[:-1], 'renamed'])},
                  'subaward header differs', id='header'),
     pytest.param({MEMBER: csv_bytes([report()], header=HEADER[:-1])},
@@ -960,12 +1025,12 @@ NODES = {'541511': 'naics:2022:national_industry:541511',
 
 
 def extract_line(uei=GOOD, code='541511', update='20250115', evs='SAM', count=None,
-                 end='!end') -> str:
+                 end='!end', registration='A') -> str:
     '''A data line with its CRLF: the given fields at their registered positions.'''
     values = [''] * (LAYOUT['field_count'] if count is None else count)
     values[-1] = end
     for field, value in (('uei', uei), ('primary_naics', code), ('last_update_date', update),
-                         ('evs_source', evs)):
+                         ('evs_source', evs), ('registration_status', registration)):
         index = LAYOUT['positions'][field] - 1
         if index < len(values):
             values[index] = value
@@ -1043,6 +1108,8 @@ def test_only_crlf_ends_an_extract_line(tmp_path):
                  'raw member is unexpected', id='two members'),
     pytest.param({'SAM_PUBLIC_UTF-8_MONTHLY_V2_20261102.dat': (BOF + EOF).encode()},
                  'raw member is unexpected', id='name'),
+    pytest.param({V12_EXTRACT_MEMBER + '.bak': (BOF + EOF).encode()},
+                 'raw member is unexpected', id='member suffix'),
     pytest.param({V12_EXTRACT_MEMBER: (BOF + 'a\xffb\r\n').encode('latin-1') + EOF.encode()},
                  'extract line is unreadable', id='not UTF-8'),
 ])
@@ -1068,6 +1135,10 @@ def test_unreadable_extract_members_are_refused(tmp_path, members, reason):
     pytest.param([extract_line(evs='d&b')], ('eligible', NODES['541511']), id='EVS case'),
     pytest.param([extract_line(), extract_line(update='20200101')], ('dnb_era_record', None),
                  id='one old row'),
+    pytest.param([extract_line(update='20200101'), extract_line()], ('dnb_era_record', None),
+                 id='old row first'),
+    pytest.param([extract_line(registration='E')], ('eligible', NODES['541511']),
+                 id='expired only'),
     pytest.param([extract_line(), extract_line(evs='D&B')], ('dnb_era_record', None),
                  id='one D&B row'),
     pytest.param([extract_line(code='')], ('naics_missing', None), id='blank code'),
@@ -1086,6 +1157,8 @@ def test_unreadable_extract_members_are_refused(tmp_path, members, reason):
     pytest.param([extract_line(code='54151A')], ('malformed_code', None), id='malformed'),
     pytest.param([extract_line(code='5415111')], ('malformed_code', None), id='seven digits'),
     pytest.param([extract_line(code='54151')], ('malformed_code', None), id='five digits'),
+    pytest.param([extract_line(code='٥٤١٥١١')],
+                 ('malformed_code', None), id='Arabic-Indic digits'),
     pytest.param([extract_line(code='54151A'), extract_line(code='')],
                  ('malformed_code', None), id='malformed beside blank'),
     pytest.param([extract_line(code='54151A', update='20200101')], ('dnb_era_record', None),
@@ -1107,6 +1180,8 @@ def test_invalid_dates_are_counted_on_every_readable_row():
     result = read_extract(extract_line(update=''), extract_line('NOTWANTED001', update='2025'),
                           extract_line(OTHER), extract_line('NOTWANTED002', count=3, update=''))
     assert result.invalid_date_rows == 2
+    # Pass 2 keeps rows only for the wanted UEIs.
+    assert set(result.firms) == {GOOD, OTHER}
     assert result.firms[GOOD].date_invalid is True
     assert result.firms[OTHER].date_invalid is False
 
