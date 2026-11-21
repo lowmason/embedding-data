@@ -968,9 +968,13 @@ def test_quoted_values_and_a_long_field_are_read(tmp_path):
     row = report()
     row[HEADER.index('subaward_description')] = 'a, "quoted"\r\nline ' + 'x' * 200_000
     file = write_zip(tmp_path / 'a.zip', {MEMBER: csv_bytes([row])})
-    limit = csv.field_size_limit()
-    assert records_of(file) == [row]
-    assert csv.field_size_limit() == limit
+    # A small limit shows that the reader raises the limit and then puts it back.
+    previous = csv.field_size_limit(1000)
+    try:
+        assert records_of(file) == [row]
+        assert csv.field_size_limit() == 1000
+    finally:
+        csv.field_size_limit(previous)
 
 
 @pytest.mark.parametrize(('members', 'reason'), [
@@ -1087,6 +1091,9 @@ def test_bad_framing_is_refused(lines):
 def test_framing_alone_is_an_empty_extract():
     assert list(reconcile.data_lines([BOF, EOF], LAYOUT)) == []
     assert list(reconcile.data_lines([BOF, 'a\r\n', EOF], LAYOUT)) == ['a']
+    # Only the CRLF line end is removed; a CR or LF before it stays in the last field.
+    assert list(reconcile.data_lines([BOF, 'a\r\r\n', 'b\n\r\n', EOF], LAYOUT)) == [
+        'a\r', 'b\n']
 
 
 @pytest.mark.parametrize('end', ['', '!END', '!end ', 'end'])
