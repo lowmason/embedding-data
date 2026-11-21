@@ -440,6 +440,120 @@ with the basis `adopted_v1_v3_finding`, and `compare-runs` finds them equal. The
 [Stage 10 finding](specs/findings/stage-10-ita-establishment-targets.md) records the exact
 commands, the counts, the cost and what is not claimed.
 
+## ACS wage microdata (Stage 17)
+
+Stage 17 builds one person-level analysis file from the selected Stage 8 core table. It is
+not a target family. Each row is a person in ACS 2023 or 2024 with `INCWAGE > 0`, in Stage 8
+source order. The file carries 120 Stage 8 columns and adds 10: `log_wage_2010`
+(the natural log of `INCWAGE_CPIU_2010`), `industry_node_code`,
+`industry_delivered_node_code`, `industry_node_level` and six flags. `industry_node_level` is
+the level of the join node in `industry_node_code`, not the level of the delivered node
+(owner, 2026-11-19). `flag_headline` marks the
+rows that a panel reads: no allocated value in the nine headline fields, full time and full
+year, a wage or salary employee, and no shared industry node. The file keeps the rows that are
+not headline, so a panel can report what each exclusion does. The [stage
+spec](specs/completed/acs-wage-microdata.md) defines every column and rule.
+
+The standalone module `embedding_data.acs_wage_microdata` has three commands. It is
+separate from the top-level `embedding-data` CLI. Every command requires an explicit
+`--data-dir` and runs offline. No command loads a `.env` file, reads a credential,
+constructs an HTTP client or runs an upstream builder. No command rewrites a Stage 8 or an
+earlier bundle.
+
+| Command | Purpose |
+| --- | --- |
+| `build RUN_ID --mapping-run ID --mapping-outputs-sha256 PIN --codes-run ID --codes-outputs-sha256 PIN` | Build one immutable bundle |
+| `verify RUN_ID --outputs-sha256 PIN` | Authenticate the detached pin, then recompute and compare the table |
+| `compare-runs FIRST SECOND` | Compare two bundles exactly, table by table and report by report |
+
+The production commands select the Stage 8 run `stage8_acs_mapping_20261018_r7` and the
+Stage 4 codes run `stage4_v11_20261013_r2`, each by its detached `outputs.json` pin. Replace
+`RUN_ID` and `REPLAY_ID` with fresh run IDs. Replace `RUN_PIN` and `REPLAY_PIN` with the
+`outputs_sha256` values that the two builds print:
+
+```bash
+uv run --offline --locked python -m embedding_data.acs_wage_microdata build RUN_ID --data-dir /Users/lowell/Projects/embedding-data/data --mapping-run stage8_acs_mapping_20261018_r7 --mapping-outputs-sha256 1ec9701092f576b122b01464cdb6fa3fbee49db030e4ad3df7b64e621b8e75f4 --codes-run stage4_v11_20261013_r2 --codes-outputs-sha256 15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a
+uv run --offline --locked python -m embedding_data.acs_wage_microdata verify RUN_ID --data-dir /Users/lowell/Projects/embedding-data/data --outputs-sha256 RUN_PIN
+uv run --offline --locked python -m embedding_data.acs_wage_microdata build REPLAY_ID --data-dir /Users/lowell/Projects/embedding-data/data --mapping-run stage8_acs_mapping_20261018_r7 --mapping-outputs-sha256 1ec9701092f576b122b01464cdb6fa3fbee49db030e4ad3df7b64e621b8e75f4 --codes-run stage4_v11_20261013_r2 --codes-outputs-sha256 15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a
+uv run --offline --locked python -m embedding_data.acs_wage_microdata verify REPLAY_ID --data-dir /Users/lowell/Projects/embedding-data/data --outputs-sha256 REPLAY_PIN
+uv run --offline --locked python -m embedding_data.acs_wage_microdata compare-runs RUN_ID REPLAY_ID --data-dir /Users/lowell/Projects/embedding-data/data
+```
+
+Success prints one JSON line with sorted keys and exits 0. `build` prints the run ID, the run
+directory and the detached `outputs_sha256`. Save that output outside the bundle. `verify`
+prints the run ID, both upstream run IDs, the row and headline-row counts and the pin.
+`compare-runs` prints `equal`, `report_equal`, a table block and `trust_established`. It
+exits 1 when the bundles differ. It shows exact replay only, so verify each run with its own
+pin. Any failure prints one fixed line to stderr and exits 2:
+
+```text
+ACS wage microdata <command> failed: <reason>; run <run_id>; path <path>
+```
+
+The reason is `validation`, `filesystem` or `unexpected`. For `compare-runs`, the line names
+both run IDs and both run directories, separated by a comma. The line never holds exception
+text, wage values or person rows. A wage that is zero, negative, not finite or null after
+the CPI adjustment, and an `INCWAGE` code of 999998 or 999999 on an earner row, fail the
+build with `validation` and publish nothing.
+
+Each run lives in `data/derived/acs/wage-microdata/<RUN_ID>/`. A bundle holds one Parquet
+table and three JSON files:
+
+| File | Contents |
+| --- | --- |
+| `acs_wage_persons.parquet` | The person-level table, 130 columns |
+| `inputs.json` | Selection, upstream pins, rules and software identity |
+| `report.json` | Aggregate counts only: the funnel, each category and year, the flags |
+| `outputs.json` | Detached inventory of the other three files |
+
+`outputs.json` excludes itself, so its checksum is the detached pin. `verify` requires the
+executing software to equal the recorded software. A change to any file in
+`acs_wage_inputs.SOFTWARE_FILES`, `pyproject.toml` or `uv.lock` makes `verify` refuse the
+run, and a new run needs a fresh run ID. `build` reads the Stage 8 core table in place,
+through a lazy scan, and stages into an exclusive `<RUN_ID>.part` directory. An existing
+final or `.part` name fails the run. A later run never reuses, overwrites or deletes it. A
+failed build removes only its own staging directory. A killed build can leave a
+`<RUN_ID>.part` directory. Choose a fresh run ID, and get the owner's go-ahead before you
+clean up any leftover staging.
+
+The independent script `scripts/reconcile_stage17.py` imports no `embedding_data` module.
+`reconcile --data-dir ROOT --run RUN_ID --outputs-sha256 PIN` joins every row to its Stage 8
+row through `source_row`, compares every carried column, recomputes the ten new columns and
+checks the node rule against the Stage 4 tables. `freeze --data-dir ROOT --control-dir DIR`
+and `preservation --data-dir ROOT --control-dir DIR --freeze-sha256 PIN --runs FIRST,REPLAY`
+show that the runs wrote nothing outside their own directories. The control directory is
+`derived/acs/wage-microdata-controls/<FIRST_RUN_ID>`.
+
+Three steps write to the production data root. Each one needs the owner's go-ahead first:
+
+1. The freeze and the first full-data build.
+2. The replay build.
+3. Any cleanup of a failed run's leftover staging.
+
+Each time, the owner confirms that no Stage 9 freeze window is open and that no other
+stage's acquisition or full-data build is running. Stage 17's own preservation window opens
+at the freeze and closes at the preservation check. Before each commit, full test run and
+full-data command, run `pgrep -fl 'embedding_data\.acs_targets|stage9_independent|reconcile_stage9'`.
+If it prints anything, stop. Code, tests and fixture runs use temporary data roots and need
+no go-ahead.
+
+The file is a person-level analysis file. Person rows never leave the machine that built it
+and never enter a repository. naics-embedder may read the file in place on that machine
+under its detached pin (R8.1). The reader's results for single persons are bound by the same
+rule. Only aggregate scores and decisions are shared. Under R8.4 the file only judges and
+never trains. The tests and the fixture chain show software readiness only. Fixture results
+are never benchmarks. No headline minimum count (O23) and no protocol section (O24) exist
+yet.
+
+The measured production runs are `stage17_acs_wage_microdata_20261119_r1` (the first run)
+and `stage17_acs_wage_microdata_20261119_r1_replay`. Their detached pins, which `verify`
+needs as `--outputs-sha256`, are
+`6cb253e2e5c2e48a5b31d2790a0378636d3b6ef9197cfb2d33cca2813ac201d1` and
+`f4e47d9c2e0d3274bc047372d440d73276df56b627d1d4c7c6da9a939a0658e8`. Both pass `verify`, and
+`compare-runs` finds them equal. The
+[Stage 17 finding](specs/naics-evaluation-data-stage-17-findings.md) records the exact
+commands, the counts, the cost and what is not claimed.
+
 ## Data sources
 
 | Source | Samples or coverage | Purpose |
