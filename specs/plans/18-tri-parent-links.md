@@ -130,6 +130,8 @@ The brief carries no decision. The owner's approval of Stage 18 (2026-11-22, "Ap
 in the roadmap's Choices made, bullet "Resume after Stages 5 and 17". The run-pin amendment
 (owner, 2026-11-22) is in the entry's Produces.
 
+- **D1** (owner, plan review, 2026-11-22): Approve plan 18 as committed at `f0a5a82`, with the seven Settled Defaults unchanged ("Approve plan 18"). Applied in: Settled Defaults.
+
 ## Settled Defaults (for owner review)
 
 1. **Spec field.** `specs/completed/tri-parent-links.md`, Stage 5's spec, as the header
