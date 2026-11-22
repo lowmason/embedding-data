@@ -41,6 +41,7 @@ Choices made:
 - Frozen code (owner, 2026-11-18): frozen modules stay frozen, and new families add modules only. A family that needs a new dependency builds as a nested project with its own `pyproject.toml` and `uv.lock`. The selected runs record the root `pyproject.toml`, the root `uv.lock` and every installed distribution. A throwaway project showed that `uv` keeps a nested project out of the root lock. That test has not run in this repository.
 - Protocol sections (owner, 2026-11-18): each new family needs its own section in `specs/evaluation-protocol.md` before it is scored. It is the last Ranked-list item of its track (O17 to O21, and O24) and is written after that track's first real build. Stage 16 frames its section like Section 1 of the protocol: evidence, assignment and the conditions this repository keeps. The scores may stay with naics-embedder, because the protocol lists them under "What this repository does not decide".
 - Track H (owner, 2026-11-18): the "Roadmap placement" section of `specs/completed/acs-wage-microdata.md`, approved on 2026-11-18, proposed the track. Track H reads Stage 8 in place and does not wait for Stage 9. Stage 17 goes to writing-plans against that spec, as its header says. Stage 17 keeps the replay check of the spec's Verification item 1, which the owner approved with the spec. Stages 1, 5, 14 and 15 left replay to a later stage or item.
+- Resume after Stages 5 and 17 (owner, 2026-11-22, "Approve"): Tracks B and H keep their rankings. O12 becomes Stage 18 and O23 becomes Stage 19. O12 goes first in Track B because a change to a file in `tri_bundle.SOFTWARE_FILES` (it includes `pyproject.toml`, `uv.lock` and the shared Stage 4 to 6 modules) makes `verify` refuse Stage 5's run, so the replay can no longer be compared with it (plan 13, Handoff). Both Stage 17 gate readings stand (Stage 19, Consumes).
 
 | # | Outcome | Track | Rank | Cost (estimate; basis) |
 |---|---|---|---|---|
@@ -98,7 +99,8 @@ ACS before the remaining ITA targets. The owner chose the ITA NAICS targets as t
 first answer. The owner approved this partition on 2026-11-16. Stage 5, the first
 promoted Track B item, follows Track A's Stages 3 and 4 (owner, 2026-11-16). From
 2026-11-18 the tracks run in parallel (see Choices made). Stage numbers name stages and
-do not set an order.
+do not set an order. Stages 18 and 19 were promoted from the Ranked lists of Tracks B and H
+on 2026-11-22 (see Choices made).
 
 - [x] Stage 1: ITA NAICS targets, first build
       Objective: Plan 11's bundle is built once on real ITA data and verified.
@@ -223,14 +225,34 @@ do not set an order.
 > Stage 17: COMPLETE (2026-11-19) — implemented by plan 14 (specs/plans/completed/14-acs-wage-microdata.md). Its Handoff section names what O23 and O24 consume.
 > Next: resume the roadmap.
 
+- [ ] Stage 18: TRI parent links, hardening
+      Objective: Stage 5's TRI bundle gets its exact replay check and a long-form acceptance finding.
+      Outcomes: O12
+      Track: B
+      Consumes: Stage 5's run `stage5_tri_parent_links_20261121_r1`, detached pin `65159b8374d36beec136ae6a7779a5763bf8ced9360e2a365b67b138e10b7f8b`, snapshot 2025-11-05, built at `786ebcc` with `dirty: false`, and its build arguments: codes run `stage4_v11_20261013_r2`, its Stage 4 pin and `--processed-as-of 2025-11-05` (plan 13, Handoff). A checkout in which every file of `tri_bundle.SOFTWARE_FILES` is byte-identical to the one that built Stage 5's run (Resolved at resume, 2026-11-22: owner; plan 13, Handoff). `specs/naics-evaluation-data-stage-5-findings.md` and the spec `specs/completed/tri-parent-links.md`. The owner's go-ahead for each production write under the Host rule of plan 13 (`specs/plans/completed/13-tri-parent-links.md`, Owner Checkpoints item 5). Recorded at resume, 2026-11-22, for the acceptance finding: the independent reconciler's "equal" does not cover the report fields that the findings file's Limits ("Reconciler coverage") names. The findings file's "Partial owners" limit (line 201) predates the owner's reading at spec lines 472–480 *(owner, plan 13, 2026-11-21)*. The docstring of `scripts/reconcile_tri_parent_links.py` (line 3) names the old spec path, and the script is not in `tri_bundle.SOFTWARE_FILES`
+      Produces: a replay bundle under a new run ID and its `compare-runs` result. A committed long-form acceptance finding under `specs/findings/`
+      Exit: O12: `verify` of Stage 5's run with its detached pin passes from Stage 18's checkout and venv. The replay bundle's `verify` with its own detached pin passes, and `compare-runs` against Stage 5's run reports equal. The acceptance finding is committed and records the replay run ID, its pin, and the wall time, maximum RSS and bundle size of the replay
+      Leaves out: the TRI headline minimum count → O13. The TRI protocol section → O17. The R8.4 training-role amendment → a separate owner decision after naics-embedder's spec (reset prompt, Leave alone)
+      ROUTING: writing-plans
+
+- [ ] Stage 19: Minimum headline earners for the ACS wage microdata
+      Objective: A minimum number of headline earners for each category is set from Stage 17's built counts.
+      Outcomes: O23
+      Track: H
+      Consumes: `report.json` of `stage17_acs_wage_microdata_20261119_r1` (detached pin `6cb253e2e5c2e48a5b31d2790a0378636d3b6ef9197cfb2d33cca2813ac201d1`), with its `categories`, `headline_categories`, `funnel`, `flags`, `node_levels` and `shared_nodes` keys, and `specs/naics-evaluation-data-stage-17-findings.md` (plan 14, Handoff). The O4 decision `specs/findings/v9-ita-naics-minimum-counts.md` as the model. Both Stage 17 gate readings stand: `industry_node_level` is the level of the join node, and spec item 8 reads "no file from `data/` and none added by this stage" (Resolved at resume, 2026-11-22: owner; `specs/history.md`, plan 14 Gate answer). Traps: the `INDNAICS` strings in `categories` are space-padded, the counts are unweighted rows, a category that shares a node is not headline, and headline rows join at mixed depths (plan 14, Handoff)
+      Produces: a committed minimum-count decision for the headline earners of the ACS wage microdata
+      Exit: O23: a committed decision sets the minimum number of headline earners for each category from the observed `headline_rows` counts of Stage 17's run. The minimum applies to each category, not to each node (plan 14, Handoff). The decision reports, for each year, how many categories meet it
+      Leaves out: the protocol section for the file → O24. The wage panel itself → naics-embedder's panel spec
+      ROUTING: brainstorming
+
 ## Ranked list — Track B
 
 Owner's order after Stage 2 (2026-11-16), with ranks restarted on 2026-11-18. O7 and O8
-left the list as Stage 5. O11 is uncovered and parked in `specs/deferred_items.md`.
+left the list as Stage 5, and O12 as Stage 18 (owner, 2026-11-22). O11 is uncovered and
+parked in `specs/deferred_items.md`.
 
-1. O12 — TRI hardening. One replay build plus `compare-runs`
-2. O13 — TRI minimum count. Small: one pass over its counts
-3. O17 — TRI protocol section. Design sessions only, after Stage 5's real build
+1. O13 — TRI minimum count. Small: one pass over its counts
+2. O17 — TRI protocol section. Design sessions only, after Stage 5's real build
 
 ## Ranked list — Track C
 
@@ -251,10 +273,9 @@ left the list as Stage 5. O11 is uncovered and parked in `specs/deferred_items.m
 ## Ranked list — Track H
 
 The order that `specs/completed/acs-wage-microdata.md` ("Roadmap placement") proposed, ranked by the
-owner on 2026-11-18.
+owner on 2026-11-18. O23 left the list as Stage 19 (owner, 2026-11-22).
 
-1. O23 — Minimum headline earners for each category. Small: one pass over Stage 17's counts
-2. O24 — ACS wage microdata protocol section. Design sessions only, after Stage 17's real build and O23
+1. O24 — ACS wage microdata protocol section. Design sessions only, after Stage 17's real build and O23
 
 Track E has no Ranked list. Its one outcome is Stage 16.
 
