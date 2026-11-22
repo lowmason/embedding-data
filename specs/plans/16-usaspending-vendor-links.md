@@ -112,9 +112,11 @@ or a command whose output decides the next step. No subagent is dispatched.
 
 ## Decisions
 
-None. The brief carries no decision. The owner's approval of Stage 20 and of keeping D2
+The brief carries no decision. The owner's approval of Stage 20 and of keeping D2
 (2026-11-22, "Approve as drafted") is in the roadmap's Choices made, bullet "Resume after
 Stage 14".
+
+- **D1** (owner, plan review, 2026-11-22): Approve plan 16 as committed at `0b30760`, with the five Settled Defaults unchanged ("Approve plan 16"). Applied in: Settled Defaults.
 
 ## Settled Defaults (for owner review)
 
