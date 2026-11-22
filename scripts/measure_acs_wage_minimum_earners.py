@@ -7,10 +7,19 @@ together with every higher band, taken as the larger of the two years.
 
 The rule and its constants are in `specs/acs-wage-minimum-earners.md` ("The rule"). This script
 imports only the standard library and Polars, and no `embedding_data` module.
+
+Before any SE, the script authenticates the pinned Stage 17 bundle and checks the report against
+the person rows. A failed check raises `Refused` with a fixed reason: no path, value or exception
+text goes into it.
 '''
 
+import hashlib
+import json
 import math
+import re
+from dataclasses import dataclass
 from fractions import Fraction
+from pathlib import Path
 
 import polars as pl
 
@@ -37,6 +46,24 @@ FEWER_THAN_TWO_ROWS = 'fewer_than_two_rows'
 CONSTANT_WAGE = 'constant_wage'
 DENOMINATOR_NOT_POSITIVE = 'replicate_denominator_not_positive'
 UNDEFINED = (FEWER_THAN_TWO_ROWS, CONSTANT_WAGE, DENOMINATOR_NOT_POSITIVE)
+
+BUNDLES = Path('derived/acs/wage-microdata')
+OUTPUTS = 'outputs.json'
+REPORT = 'report.json'
+PERSONS = 'acs_wage_persons.parquet'
+RUN_ID = re.compile(r'[A-Za-z0-9][A-Za-z0-9_-]*')
+PIN = re.compile(r'[0-9a-f]{64}')
+
+UNSAFE = 'unsafe run id or pin'
+PIN_DIFFERS = 'outputs pin differs'
+REPORT_DIFFERS = 'report differs from its inventory'
+PERSONS_DIFFER = 'person table differs from its inventory'
+MALFORMED = 'report is malformed'
+YEARS_DIFFER = 'report years differ from 2023 and 2024'
+COLUMNS_DIFFER = 'person table columns differ from the contract'
+RECOUNT_DIFFERS = 'headline recount differs from the report'
+COUNT_DIFFERS = 'headline category count differs from the report'
+BAD_ROW = 'headline row has a non-finite wage or a non-positive weight'
 
 
 def category_se(rows: pl.DataFrame) -> tuple[float | None, str | None]:
@@ -121,3 +148,142 @@ def overall_minimum(minimums: list[int | None]) -> int | None:
     if any(minimum is None for minimum in minimums):
         return None
     return max(minimums)
+
+
+class Refused(Exception):
+    '''An input that the pins do not authenticate, or a report that the rows do not match.
+
+    The message is a fixed reason.
+    '''
+
+
+@dataclass(frozen=True)
+class Inputs:
+    '''The two files of the pinned run that the script reads, with the hashes that matched.'''
+
+    report: Path
+    persons: Path
+    outputs_sha256: str
+    report_sha256: str
+    persons_sha256: str
+
+
+def sha256(file: Path) -> str:
+    with file.open('rb') as stream:
+        return hashlib.file_digest(stream, 'sha256').hexdigest()
+
+
+def inventory_of(content: bytes) -> dict:
+    '''The `outputs.json` object, or an empty one when the bytes are not a JSON object.
+
+    An empty inventory holds no record, so the check on the report record refuses it.
+    '''
+    try:
+        inventory = json.loads(content)
+    except ValueError:
+        return {}
+    return inventory if isinstance(inventory, dict) else {}
+
+
+def recorded_file(directory: Path, inventory: dict, name: str, reason: str) -> tuple[Path, str]:
+    '''One file of the run and its SHA-256, once both hash and size match the inventory.'''
+    file = directory / name
+    record = inventory.get(name)
+    if not isinstance(record, dict) or not file.is_file():
+        raise Refused(reason)
+    digest = sha256(file)
+    if digest != record.get('sha256') or file.stat().st_size != record.get('size'):
+        raise Refused(reason)
+    return file, digest
+
+
+def authenticate(data_dir: Path, run_id: str, pin: str) -> Inputs:
+    '''Check the detached pin, then the report and the person table against the inventory.'''
+    if not RUN_ID.fullmatch(run_id) or not PIN.fullmatch(pin):
+        raise Refused(UNSAFE)
+    directory = data_dir / BUNDLES / run_id
+    outputs = directory / OUTPUTS
+    if not outputs.is_file():
+        raise Refused(PIN_DIFFERS)
+    content = outputs.read_bytes()
+    if hashlib.sha256(content).hexdigest() != pin:
+        raise Refused(PIN_DIFFERS)
+    inventory = inventory_of(content)
+    report, report_sha256 = recorded_file(directory, inventory, REPORT, REPORT_DIFFERS)
+    persons, persons_sha256 = recorded_file(directory, inventory, PERSONS, PERSONS_DIFFER)
+    return Inputs(report, persons, pin, report_sha256, persons_sha256)
+
+
+def _is_integer(value: object) -> bool:
+    return type(value) is int
+
+
+def _is_entry(entry: object) -> bool:
+    return (isinstance(entry, dict) and isinstance(entry.get('INDNAICS'), str)
+            and _is_integer(entry.get('YEAR')) and _is_integer(entry.get('headline_rows'))
+            and entry['headline_rows'] >= 0)
+
+
+def load_report(file: Path) -> dict:
+    '''The report, once its shape and its years are right.
+
+    Shape: a list `categories` of entries with a string `INDNAICS`, an integer `YEAR` and a
+    non-negative integer `headline_rows`, no `(INDNAICS, YEAR)` key twice, and an object
+    `headline_categories` of integers. Years: `headline_categories` has exactly the keys of
+    `YEARS`, and no entry names another year.
+    '''
+    try:
+        report = json.loads(file.read_text(encoding='utf-8'))
+    except ValueError:
+        raise Refused(MALFORMED) from None
+    categories = report.get('categories') if isinstance(report, dict) else None
+    totals = report.get('headline_categories') if isinstance(report, dict) else None
+    if not isinstance(categories, list) or not isinstance(totals, dict):
+        raise Refused(MALFORMED)
+    if not all(_is_entry(entry) for entry in categories) or not all(
+            _is_integer(count) for count in totals.values()):
+        raise Refused(MALFORMED)
+    keys = {(entry['INDNAICS'], entry['YEAR']) for entry in categories}
+    if len(keys) != len(categories):
+        raise Refused(MALFORMED)
+    if set(totals) != {str(year) for year in YEARS} or any(
+            year not in YEARS for _, year in keys):
+        raise Refused(YEARS_DIFFER)
+    return report
+
+
+def headline_frame(persons: Path) -> pl.DataFrame:
+    '''The headline rows of the person table, read as the `READ_SCHEMA` columns only.
+
+    Each of those columns must be in the table with exactly its type. Other columns are ignored
+    and never read.
+    '''
+    table = pl.scan_parquet(persons)
+    schema = table.collect_schema()
+    if any(schema.get(name) != dtype for name, dtype in READ_SCHEMA.items()):
+        raise Refused(COLUMNS_DIFFER)
+    return table.select(list(READ_SCHEMA)).filter(pl.col('flag_headline')).collect()
+
+
+def self_check(report: dict, headline: pl.DataFrame) -> None:
+    '''Check the report against the headline rows, before any SE.
+
+    The recount of `(INDNAICS, YEAR, headline_rows)` must equal, as a set, the report entries
+    with headline rows. The categories with headline rows must number `headline_categories` in
+    each year. Every headline row needs a finite wage and a positive weight, and a null is
+    neither. Keys keep the delivered `INDNAICS` strings, with their space padding.
+    '''
+    counted = headline.group_by('INDNAICS', 'YEAR').agg(pl.len().alias('rows'))
+    recount = set(zip(counted['INDNAICS'], counted['YEAR'], counted['rows'], strict=True))
+    recorded = {(entry['INDNAICS'], entry['YEAR'], entry['headline_rows'])
+                for entry in report['categories'] if entry['headline_rows'] > 0}
+    if recount != recorded:
+        raise Refused(RECOUNT_DIFFERS)
+    for year in YEARS:
+        found = sum(1 for _, found_year, _ in recount if found_year == year)
+        if found != report['headline_categories'][str(year)]:
+            raise Refused(COUNT_DIFFERS)
+    usable = (pl.col('log_wage_2010').is_finite() & (pl.col('PERWT') > 0)
+              & pl.col('PERWT').is_not_nan()).fill_null(False)
+    if not headline.select(usable.all()).item():
+        raise Refused(BAD_ROW)

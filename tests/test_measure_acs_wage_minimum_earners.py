@@ -1,6 +1,8 @@
-'''The Stage 19 minimum-earners measurement script: the SE and band rule, on small typed rows.'''
+'''The Stage 19 minimum-earners measurement script: the SE and band rule on small typed rows, and
+the authentication of the pinned Stage 17 bundle on small hand-made bundles.'''
 
 import importlib.util
+import json
 import math
 import random
 from fractions import Fraction
@@ -8,10 +10,35 @@ from pathlib import Path
 
 import polars as pl
 import pytest
+from acs_wage_fixtures import core_row
+
+from embedding_data import manifest, target_io
+from embedding_data.acs_wage_bundle import FILES
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / 'scripts' / 'measure_acs_wage_minimum_earners.py'
 REPLICATE_NAMES = tuple(f'REPWTP{r}' for r in range(1, 81))
+PERSONS = 'acs_wage_persons.parquet'
+REPORT = 'report.json'
+OUTPUTS = 'outputs.json'
+READ_SCHEMA = {
+    'YEAR': pl.Int64,
+    'INDNAICS': pl.String,
+    'flag_headline': pl.Boolean,
+    'log_wage_2010': pl.Float64,
+    'PERWT': pl.Float64,
+    **{name: pl.Int64 for name in REPLICATE_NAMES},
+}
+UNSAFE = 'unsafe run id or pin'
+PIN_DIFFERS = 'outputs pin differs'
+REPORT_DIFFERS = 'report differs from its inventory'
+PERSONS_DIFFER = 'person table differs from its inventory'
+MALFORMED = 'report is malformed'
+YEARS_DIFFER = 'report years differ from 2023 and 2024'
+COLUMNS_DIFFER = 'person table columns differ from the contract'
+RECOUNT_DIFFERS = 'headline recount differs from the report'
+COUNT_DIFFERS = 'headline category count differs from the report'
+BAD_ROW = 'headline row has a non-finite wage or a non-positive weight'
 
 
 def load_script():
@@ -308,3 +335,255 @@ def test_overall_minimum_is_none_when_either_year_has_none(script):
     assert script.overall_minimum([None, 50]) is None
     assert script.overall_minimum([None, None]) is None
     assert script.overall_minimum([200, 1]) == 200
+
+
+# Small bundles. Every one lives under `tmp_path`, and none holds a real count.
+
+SMALL_CODES = ('6231  ', '6231', '1111', '2222', '3333', '4444', '5555', '7777', '8888')
+LARGE_CODE = '9999'
+LARGE_ROWS = 1600
+
+
+def person(INDNAICS, YEAR, log_wage_2010, *, headline=True, **weights):
+    '''One person row with the 85 read columns: `core_row` weights, overridden by `weights`.'''
+    row = core_row(YEAR=YEAR, INDNAICS=INDNAICS) | weights
+    row |= {'log_wage_2010': log_wage_2010, 'flag_headline': headline}
+    return {name: row[name] for name in READ_SCHEMA}
+
+
+def golden_people():
+    '''Per year, nine categories of two rows and one of 1,600, each with a non-headline row.
+
+    Equal default weights give every SE 0, so every category meets the target.
+    '''
+    people = []
+    for year in (2023, 2024):
+        for code in SMALL_CODES:
+            people += [person(code, year, 10.0), person(code, year, 11.0),
+                       person(code, year, 10.0, headline=False)]
+        people += [person(LARGE_CODE, year, 10.0 + index % 2) for index in range(LARGE_ROWS)]
+        people.append(person(LARGE_CODE, year, 10.0, headline=False))
+    return people
+
+
+def report_for(people):
+    '''The `report.json` that Stage 17 writes for `people`: category counts and per-year totals.'''
+    counts = {}
+    for row in people:
+        key = (row['INDNAICS'], row['YEAR'])
+        rows_, headline_rows = counts.get(key, (0, 0))
+        counts[key] = (rows_ + 1, headline_rows + row['flag_headline'])
+    categories = [{'INDNAICS': code, 'YEAR': year, 'rows': rows_, 'headline_rows': headline_rows}
+                  for (code, year), (rows_, headline_rows) in sorted(counts.items())]
+    years = sorted({year for _, year in counts})
+    return {'categories': categories,
+            'headline_categories': {
+                str(year): sum(1 for entry in categories
+                               if entry['YEAR'] == year and entry['headline_rows'] > 0)
+                for year in years}}
+
+
+def publish(root, people, report=None):
+    '''Write a bundle of `people` under `root/data`, with its inventory. Return its handles.'''
+    directory = root / 'data' / 'derived/acs/wage-microdata/fixture'
+    directory.mkdir(parents=True)
+    pl.from_dicts(people, schema=READ_SCHEMA).write_parquet(directory / PERSONS)
+    target_io.write_json(directory / REPORT, report_for(people) if report is None else report)
+    target_io.write_json(directory / 'inputs.json', {})
+    target_io.write_json(directory / OUTPUTS, target_io.inventory(directory, list(FILES)))
+    return {'data_dir': root / 'data', 'directory': directory, 'run': 'fixture',
+            'pin': manifest.sha256_file(directory / OUTPUTS)}
+
+
+def rehash(directory):
+    '''Rewrite a bundle's inventory after an edit, and return the new detached pin.'''
+    target_io.write_json(directory / OUTPUTS, target_io.inventory(directory, list(FILES)))
+    return manifest.sha256_file(directory / OUTPUTS)
+
+
+def forge_persons(bundle, change):
+    '''Rewrite the person table through `change`, then the inventory. Return the new pin.'''
+    file = bundle['directory'] / PERSONS
+    change(pl.read_parquet(file)).write_parquet(file)
+    return rehash(bundle['directory'])
+
+
+def forge_report(bundle, change):
+    '''Edit the report in place through `change`, then rewrite the inventory. Return the pin.'''
+    file = bundle['directory'] / REPORT
+    report = json.loads(file.read_text())
+    change(report)
+    target_io.write_json(file, report)
+    return rehash(bundle['directory'])
+
+
+def forge_report_text(bundle, content):
+    '''Replace the report's bytes, then rewrite the inventory. Return the new pin.'''
+    (bundle['directory'] / REPORT).write_bytes(content)
+    return rehash(bundle['directory'])
+
+
+def edit_outputs(bundle, change):
+    '''Edit `outputs.json` in place and leave the files alone. Return the edited file's pin.'''
+    outputs = bundle['directory'] / OUTPUTS
+    inventory = json.loads(outputs.read_text())
+    change(inventory)
+    target_io.write_json(outputs, inventory)
+    return manifest.sha256_file(outputs)
+
+
+def set_value(column, value, *, headline=True):
+    '''A change that sets `column` in the first row whose `flag_headline` is `headline`.'''
+    def change(frame):
+        position = frame['flag_headline'].to_list().index(headline)
+        values = frame[column].to_list()
+        values[position] = value
+        return frame.with_columns(pl.Series(column, values, dtype=frame.schema[column]))
+    return change
+
+
+def entry_for(report, code, year):
+    return next(entry for entry in report['categories']
+                if entry['INDNAICS'] == code and entry['YEAR'] == year)
+
+
+def append_byte(file):
+    file.write_bytes(file.read_bytes() + b'\0')
+
+
+def attempt(script, bundle, pin=None, run=None):
+    '''Run the four checks in the order of the command line. Return what they produce.'''
+    inputs = script.authenticate(bundle['data_dir'], bundle['run'] if run is None else run,
+                                 bundle['pin'] if pin is None else pin)
+    report = script.load_report(inputs.report)
+    headline = script.headline_frame(inputs.persons)
+    script.self_check(report, headline)
+    return inputs, report, headline
+
+
+def assert_refused(script, bundle, reason, pin=None, run=None):
+    with pytest.raises(script.Refused) as refusal:
+        attempt(script, bundle, pin=pin, run=run)
+    assert str(refusal.value) == reason
+
+
+@pytest.fixture
+def golden(tmp_path):
+    return publish(tmp_path, golden_people())
+
+
+def test_authenticate_returns_pinned_files(script, golden):
+    inputs = script.authenticate(golden['data_dir'], golden['run'], golden['pin'])
+    directory = golden['directory']
+    assert inputs.persons == directory / PERSONS
+    assert inputs.report == directory / REPORT
+    assert inputs.outputs_sha256 == golden['pin']
+    assert inputs.report_sha256 == manifest.sha256_file(directory / REPORT)
+    assert inputs.persons_sha256 == manifest.sha256_file(directory / PERSONS)
+
+
+def test_unsafe_run_id_refused(script, golden):
+    assert_refused(script, golden, UNSAFE, run='../fixture')
+
+
+def test_wrong_pin_refused(script, golden):
+    assert_refused(script, golden, PIN_DIFFERS, pin='0' * 64)
+
+
+def test_changed_report_refused(script, golden):
+    append_byte(golden['directory'] / REPORT)
+    assert_refused(script, golden, REPORT_DIFFERS)
+
+
+def test_changed_persons_refused(script, golden):
+    append_byte(golden['directory'] / PERSONS)
+    assert_refused(script, golden, PERSONS_DIFFER)
+
+
+def test_size_is_checked(script, golden):
+    pin = edit_outputs(golden, lambda inventory: inventory[REPORT].update(
+        size=inventory[REPORT]['size'] + 1))
+    assert_refused(script, golden, REPORT_DIFFERS, pin=pin)
+
+
+def test_pin_is_checked_before_files(script, golden):
+    append_byte(golden['directory'] / PERSONS)
+    assert_refused(script, golden, PIN_DIFFERS, pin='0' * 64)
+
+
+def drop_categories(report):
+    del report['categories']
+
+
+def string_headline_rows(report):
+    report['categories'][0]['headline_rows'] = '2'
+
+
+def repeat_entry(report):
+    report['categories'].append(dict(report['categories'][0]))
+
+
+@pytest.mark.parametrize('change', [drop_categories, string_headline_rows, repeat_entry],
+                         ids=['missing_categories', 'string_headline_rows', 'entry_twice'])
+def test_malformed_report_refused(script, golden, change):
+    assert_refused(script, golden, MALFORMED, pin=forge_report(golden, change))
+
+
+def drop_2024(report):
+    del report['headline_categories']['2024']
+    report['categories'] = [entry for entry in report['categories'] if entry['YEAR'] != 2024]
+
+
+def test_one_year_report_refused(script, golden):
+    assert_refused(script, golden, YEARS_DIFFER, pin=forge_report(golden, drop_2024))
+
+
+def test_retyped_column_refused(script, golden):
+    pin = forge_persons(
+        golden, lambda frame: frame.with_columns(pl.col('REPWTP5').cast(pl.Float64)))
+    assert_refused(script, golden, COLUMNS_DIFFER, pin=pin)
+
+
+def one_more(report):
+    entry_for(report, '1111', 2023)['headline_rows'] += 1
+
+
+def renamed(report):
+    entry_for(report, '6231  ', 2023)['INDNAICS'] = '6231 '
+
+
+def zeroed(report):
+    entry_for(report, '1111', 2023)['headline_rows'] = 0
+
+
+@pytest.mark.parametrize('change', [one_more, renamed, zeroed],
+                         ids=['plus_one', 'renamed_padding', 'zero_headline_rows'])
+def test_recount_differs_refused(script, golden, change):
+    assert_refused(script, golden, RECOUNT_DIFFERS, pin=forge_report(golden, change))
+
+
+def test_headline_category_count_refused(script, golden):
+    pin = forge_report(golden, lambda report: report['headline_categories'].update(
+        {'2023': report['headline_categories']['2023'] + 1}))
+    assert_refused(script, golden, COUNT_DIFFERS, pin=pin)
+
+
+@pytest.mark.parametrize('column, value', [('log_wage_2010', math.nan),
+                                           ('log_wage_2010', math.inf), ('PERWT', 0.0)],
+                         ids=['nan_wage', 'inf_wage', 'zero_weight'])
+def test_bad_wage_or_weight_refused(script, golden, column, value):
+    pin = forge_persons(golden, set_value(column, value))
+    assert_refused(script, golden, BAD_ROW, pin=pin)
+
+
+def test_non_headline_rows_are_not_checked(script, golden):
+    def change(frame):
+        frame = set_value('log_wage_2010', math.nan, headline=False)(frame)
+        return set_value('PERWT', 0.0, headline=False)(frame)
+    attempt(script, golden, pin=forge_persons(golden, change))
+
+
+def test_padded_strings_stay_distinct(script, golden):
+    _, _, headline = attempt(script, golden)
+    assert headline.select('INDNAICS', 'YEAR').unique().height == 20
+    assert {'6231', '6231  '} <= set(headline['INDNAICS'].to_list())
