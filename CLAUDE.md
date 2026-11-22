@@ -444,11 +444,14 @@ and the build drops one CR so that both read. A blank or invalid last update dat
 firm `dnb_era_record` (D2). A malformed code in a firm's other codes, or a malformed subaward
 NAICS, is not counted. `compare-runs` skips `inputs.json` (D3).
 
-The selected run is `stage14_vendor_links_20261121_r1`, with detached pin
-`c9d71dd95b717048a54a4701bf88a7cb670d59b1342adac0ce4a207267fe1610`, snapshot `2026-11-19` and
-extract month `2026-10`, built at commit `620f836` (`dirty: false`). `verify` exits 0, and the
+The selected run is `stage14_vendor_links_20261122_r2`, with detached pin
+`248943dc5603f8e035b0f1c49bf624a36ed702b70eb6b961a35b64ee97c7a2be`, snapshot `2026-11-19` and
+extract month `2026-10`, built at commit `1eddb3e` (`dirty: false`). `verify` exits 0, and the
 independent `scripts/reconcile_usaspending_vendor_links.py` (standard library and Polars, no
-`embedding_data` import) is equal on all 87 checks. The
+`embedding_data` import) is equal on all 87 checks. The first run, `r1`, is superseded: the
+wrapped-ZIP check in `sam_raw.py` changed a hashed file, so `verify` refuses `r1`. Its
+`report.json` equals that of `r2`. The registration status and EVS source tallies of the
+preflight script close to a domain (`A`, `E`, `A~E`; `D&B`, `E&Y`). The
 [Stage 14 findings](specs/naics-evaluation-data-stage-14-findings.md) record the commands,
 counts, cost and limits. `vendor_link_pairs.parquet` holds UEI pairs and stays on this
 machine. No output may feed embedder training, curriculum, hard-negative mining or model

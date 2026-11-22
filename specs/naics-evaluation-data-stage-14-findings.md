@@ -453,6 +453,17 @@ rule makes each of them `dnb_era_record`. No valid last update date is before 20
 `D&B` explains the other 46 firms. This costs about 13% of all firms their industry. The
 extract carries EVS source `D&B` on only 422 rows. The cost does not reach a trigger.
 
+**The cost of D2, measured on 2026-11-22.** The owner approved a read-only check that
+printed counts only. D2 alone makes 6,403 firms `dnb_era_record`. D2 alone means a blank or
+invalid last update date, no valid date before 2022-04-04 and no EVS source `D&B` on any
+row. Each of the 6,403 holds exactly one primary code, and that code is in the NAICS 2022
+list. Each is an active (`A`) registration. So without D2 these firms would be `eligible`,
+and the eligible firms would number 38,981 and not 32,578. The 1,272 expired firms all have
+valid last update dates. The owner kept D2 on 2026-11-22. The cost stays: 6,403 firms with
+one valid, current-looking code have no industry in this bundle. A later rule that counts a
+blank date on an active registration as after the cutoff would give them back. That rule
+needs the owner's decision and a new run.
+
 **Join coverage** (eligible firms over firms of the role):
 
 | Role | Pooled | FY2024 | FY2025 | FY2026 |
@@ -494,30 +505,49 @@ used, so `acquire-sam-extract` was not run.
 
 ## Full-data build
 
-The owner gave the go-ahead on 2026-11-21 and confirmed that no Stage 9 freeze window was
-open. The host-rule checks before the build printed nothing.
+The owner gave the go-ahead for the first build on 2026-11-21 and for the second on
+2026-11-22. Each time the owner confirmed that no Stage 9 freeze window was open. The
+host-rule checks before each build printed nothing.
+
+The selected run is the second build, `r2`. The first build, `r1`, is superseded. The final
+review found that `sam_raw.import_file` and `sam_raw.acquire` recorded any ZIP with a
+fitting file name. A browser download of the extract can be a ZIP around the real ZIP. The
+build refuses such a file, and a recorded raw file is never replaced, so the month would
+be used up for good. The fix checks the ZIP member before the file is recorded. It changes
+`sam_raw.py`, which is part of the bundle's recorded software, so `verify` now refuses `r1`
+(exit 2). The owner chose "Fix now, rebuild" on 2026-11-22. `r1` stays on disk, unchanged,
+and nothing cites it. The `report.json` of `r2` equals that of `r1` on every path. The
+`inputs.json` files differ only in `execution`, `run_id` and `software`. So every count in
+this document is the same for both runs.
+
+The same fix wave closed the preflight script (`scripts/preflight_usaspending_sam.py`).
+Its two extract tallies, the registration status and the EVS source, now count as coded
+only inside a closed domain: `A`, `E`, `A~E` and blank for the status, and `D&B`, `E&Y` and
+blank for the source. A layout that has drifted can no longer make the script print a name
+or a UEI. `A~E` is a status code that the real extract holds once (see "E5: extract and
+join"). The preflight is not part of the bundle's software.
 
 | Item | Value |
 |---|---|
-| Run ID | `stage14_vendor_links_20261121_r1` |
-| Detached pin (SHA-256 of `outputs.json`) | `c9d71dd95b717048a54a4701bf88a7cb670d59b1342adac0ce4a207267fe1610` |
+| Run ID | `stage14_vendor_links_20261122_r2` |
+| Detached pin (SHA-256 of `outputs.json`) | `248943dc5603f8e035b0f1c49bf624a36ed702b70eb6b961a35b64ee97c7a2be` |
 | Snapshot label, extract month | `2026-11-19`, `2026-10` |
 | Codes run and pin | `stage4_v11_20261013_r2`, `15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a` |
-| Built at | commit `620f836`, `dirty: false`, 2026-11-22 04:22 UTC |
-| Cost | `build` 21.9 s and 937 MB peak resident memory; `verify` 19.6 s and 947 MB; the bundle is 1,720 KB |
+| Built at | commit `1eddb3e`, `dirty: false`, 2026-11-22 19:43 UTC |
+| Cost | `build` 29.6 s and 961 MB peak resident memory; `verify` 28.8 s and 955 MB; the bundle is 1,720 KB |
 
 **Checks.** `verify` exited 0 with rows 689 (marginals), 107,994 (pairs), 8,307 (support)
-and 16,614 (targets). It exited 0 again after `main` was merged into the branch, because
-the merge changed no file in the bundle's recorded software. The independent reconciler
+and 16,614 (targets). The independent reconciler
 (`scripts/reconcile_usaspending_vendor_links.py`, commit `9fd0a5b`) exited 0 with
-`equal` true on all 87 checks, in 14.4 s and 377 MB. It reports 522,594 reports, 522,528
+`equal` true on all 87 checks, in 23.6 s and 375 MB. It reports 522,594 reports, 522,528
 usable, 48,989 firms, 107,994 pairs, 8,307 cells and 276 unreadable lines. Preservation
 passed: the manifest starts with the Task 9 baseline and holds exactly the four Stage 14
 entries after it; `embedding-data audit` exited 0 with 0 raw provenance discrepancies; the
 ITA summary has its recorded SHA-256 and size; and the Stage 4, Stage 6, Stage 10 and
-Stage 5 bundles each have their pin and pass `verify_inventory`.
+Stage 5 bundles each have their pin and pass `verify_inventory`. The same checks passed
+for `r1` before the fix. No replay of `r2` was built.
 
-**The first reconciler run refused.** The reconciler read the extract at CRLF only, as the
+**On `r1`, the first reconciler run refused.** The reconciler read the extract at CRLF only, as the
 layout note says. The delivered extract has 905,713 LF bytes, no CRLF and no CR. The
 reconciler saw one line and stopped with `extract framing differs`. The build already
 split at LF and dropped one CR, so it was right. The owner approved a fix on 2026-11-22.
@@ -555,8 +585,8 @@ keeps `size_gate_pending`. No headline minimum count (O18) and no protocol secti
 
 ## For the resume and O18
 
-- **Run for a replay.** Run `stage14_vendor_links_20261121_r1`, pin
-  `c9d71dd95b717048a54a4701bf88a7cb670d59b1342adac0ce4a207267fe1610`, snapshot `2026-11-19`,
+- **Run for a replay.** Run `stage14_vendor_links_20261122_r2`, pin
+  `248943dc5603f8e035b0f1c49bf624a36ed702b70eb6b961a35b64ee97c7a2be`, snapshot `2026-11-19`,
   extract month `2026-10`. The three subaward files and the extract in `data/raw/` are
   manifest-recorded, so a replay build can use the same bytes.
 - **Minimum count.** `n_unweighted` per cell has median 1 (buyer share) and 2 (supplier
