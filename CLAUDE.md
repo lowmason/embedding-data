@@ -462,4 +462,4 @@ preflight script close to a domain (`A`, `E`, `A~E`; `D&B`, `E&Y`). The
 counts, cost and limits. `vendor_link_pairs.parquet` holds UEI pairs and stays on this
 machine. No output may feed embedder training, curriculum, hard-negative mining or model
 selection (R8.4). Every target keeps `size_gate_pending`, and no headline minimum count
-(O18) exists yet.
+(O26) exists yet.

@@ -249,7 +249,7 @@
       next change to the script.
 
 ## 16-usaspending-vendor-links — 2026-11-22
-- [ ] Stale outcome number in CLAUDE.md (final review, declined to judge, outside
+- [x] Stale outcome number in CLAUDE.md (final review, declined to judge, outside
       the plan's Step 3 insert): the last sentence of the "USAspending vendor links
       (roadmap Stage 14)" section (`CLAUDE.md`, line 465) says "no headline minimum
       count (O18) exists yet". The roadmap's resume after Stage 14 (2026-11-22) made
