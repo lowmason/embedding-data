@@ -226,12 +226,12 @@ on 2026-11-22 (see Choices made).
 > Next: resume the roadmap.
 
 - [ ] Stage 18: TRI parent links, hardening
-      Objective: Stage 5's TRI bundle gets its exact replay check and a long-form acceptance finding.
+      Objective: Stage 5's TRI bundle gets its exact replay check, a long-form acceptance finding and README and CLAUDE.md run pins.
       Outcomes: O12
       Track: B
       Consumes: Stage 5's run `stage5_tri_parent_links_20261121_r1`, detached pin `65159b8374d36beec136ae6a7779a5763bf8ced9360e2a365b67b138e10b7f8b`, snapshot 2025-11-05, built at `786ebcc` with `dirty: false`, and its build arguments: codes run `stage4_v11_20261013_r2`, its Stage 4 pin and `--processed-as-of 2025-11-05` (plan 13, Handoff). A checkout in which every file of `tri_bundle.SOFTWARE_FILES` is byte-identical to the one that built Stage 5's run (Resolved at resume, 2026-11-22: owner; plan 13, Handoff). `specs/naics-evaluation-data-stage-5-findings.md` and the spec `specs/completed/tri-parent-links.md`. The owner's go-ahead for each production write under the Host rule of plan 13 (`specs/plans/completed/13-tri-parent-links.md`, Owner Checkpoints item 5). Recorded at resume, 2026-11-22, for the acceptance finding: the independent reconciler's "equal" does not cover the report fields that the findings file's Limits ("Reconciler coverage") names. The findings file's "Partial owners" limit (line 201) predates the owner's reading at spec lines 472–480 *(owner, plan 13, 2026-11-21)*. The docstring of `scripts/reconcile_tri_parent_links.py` (line 3) names the old spec path, and the script is not in `tri_bundle.SOFTWARE_FILES`
-      Produces: a replay bundle under a new run ID and its `compare-runs` result. A committed long-form acceptance finding under `specs/findings/`
-      Exit: O12: `verify` of Stage 5's run with its detached pin passes from Stage 18's checkout and venv. The replay bundle's `verify` with its own detached pin passes, and `compare-runs` against Stage 5's run reports equal. The acceptance finding is committed and records the replay run ID, its pin, and the wall time, maximum RSS and bundle size of the replay
+      Produces: a replay bundle under a new run ID and its `compare-runs` result. A committed long-form acceptance finding under `specs/findings/`. README and CLAUDE.md run pins (Resolved at resume, 2026-11-22: owner; `specs/completed/tri-parent-links.md:70-71` and `:755-756`)
+      Exit: O12: `verify` of Stage 5's run with its detached pin passes from Stage 18's checkout and venv. The replay bundle's `verify` with its own detached pin passes, and `compare-runs` against Stage 5's run reports equal. The acceptance finding is committed and records the replay run ID, its pin, and the wall time, maximum RSS and bundle size of the replay. README and CLAUDE.md name the selected TRI runs and their pins
       Leaves out: the TRI headline minimum count → O13. The TRI protocol section → O17. The R8.4 training-role amendment → a separate owner decision after naics-embedder's spec (reset prompt, Leave alone)
       ROUTING: writing-plans
 
