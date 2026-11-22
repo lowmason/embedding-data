@@ -20,7 +20,7 @@ Stage 4 codes bundle against the codes pin and the `naics_nodes.parquet` record 
 
 Memory. Pass 1 streams the subaward members and keeps one small tally for each distinct pair of
 usable reports. Pass 2 streams the extract member line by line and keeps firm facts only for the
-UEIs on usable reports: their codes, three flags and nothing else.
+UEIs on usable reports: their codes, five flags and nothing else.
 
 Readings that the spec text leaves open, as this script takes them:
 - An extract line ends only at CRLF. The first line must start with the BOF prefix and the last
@@ -37,6 +37,11 @@ Readings that the spec text leaves open, as this script takes them:
 - A malformed primary code on a firm whose codes the build reads makes the build fail, so a
   published bundle cannot hold one. Such a firm gets the status `malformed_code`, which is no spec
   status, and the check `firms.no_malformed_read_code` is false.
+- The firm counts of `report.json` (`firms`) cover the UEIs on usable reports, whatever their
+  status. `mixed_blank` counts those with a readable row whose primary code is blank and one
+  whose code is not. `code_not_in_string` counts those with a readable row whose well-formed
+  primary code is not an item of that same row's code string. An item is a stripped
+  `~`-separated part that is a 6-digit code and a `Y`, `N` or `E` flag (the E5 layout text).
 - `flag_intra_group` follows the three group conditions alone, for a self link too.
 - The intra-group sensitivity admits the `intra_group` pairs of two eligible firms.
 - A share with a zero denominator is null.
@@ -71,6 +76,9 @@ import polars as pl
 WHITESPACE = ' \t\n\r\x0b\x0c'
 UEI = re.compile('[A-Z0-9]{12}')
 CODE = re.compile('[0-9]{6}')
+# One item of the NAICS code string: a 6-digit code and a Y, N or E flag (findings, E5 layout).
+CODE_STRING_ITEM = re.compile('([0-9]{6})[YNE]')
+CODE_STRING_SEPARATOR = '~'
 AMOUNT = re.compile(r'-?[0-9]{1,36}(\.[0-9]{1,2})?')
 WINDOW = (2024, 2025, 2026)
 SUBAWARD_TYPE = 'sub-contract'
@@ -449,7 +457,7 @@ def read_subawards(files: dict[int, Path], registry: dict) -> Reports:
 class FirmRows:
     '''What the firm rules need from the extract rows of one UEI.'''
 
-    __slots__ = ('codes', 'blank', 'malformed', 'dnb', 'date_invalid')
+    __slots__ = ('codes', 'blank', 'malformed', 'dnb', 'date_invalid', 'code_not_in_string')
 
     def __init__(self):
         self.codes: set[str] = set()
@@ -457,6 +465,23 @@ class FirmRows:
         self.malformed = False
         self.dnb = False
         self.date_invalid = False
+        # A row's well-formed primary code is not an item of that row's code string.
+        self.code_not_in_string = False
+
+
+def mixed_blank(rows: FirmRows) -> bool:
+    '''True when the firm has a row with a blank primary code and a row with a non-blank one.'''
+    return rows.blank and bool(rows.codes or rows.malformed)
+
+
+def string_codes(value: str) -> set[str]:
+    '''The codes of the stripped `~`-separated items that are a code and a flag.'''
+    codes = set()
+    for item in value.split(CODE_STRING_SEPARATOR):
+        match = CODE_STRING_ITEM.fullmatch(strip(item))
+        if match is not None:
+            codes.add(match[1])
+    return codes
 
 
 class Extract:
@@ -499,6 +524,7 @@ def tally_extract(lines: Iterable[str], layout: dict, wanted: set[str]) -> Extra
     code_at = position(layout, 'primary_naics')
     update_at = position(layout, 'last_update_date')
     evs_at = position(layout, 'evs_source')
+    string_at = position(layout, 'naics_code_string')
     dnb_values = set(layout['evs_dnb'])
     record_end = layout['record_end']
     for line in data_lines(lines, layout):
@@ -524,6 +550,8 @@ def tally_extract(lines: Iterable[str], layout: dict, wanted: set[str]) -> Extra
             rows.blank = True
         elif CODE.fullmatch(code):
             rows.codes.add(code)
+            if string_at is not None and code not in string_codes(fields[string_at]):
+                rows.code_not_in_string = True
         else:
             rows.malformed = True
         if update is None:
@@ -731,10 +759,12 @@ def expected_report(reports: Reports, extract: Extract, firms: dict, rows: dict,
         checks[f'report.firms.{role}'] = (
             ('firms', role), status_counts((firms[uei][0] for uei in ueis), FIRM_STATUSES),
             'exact')
-    checks['report.firms.last_update_invalid'] = (
-        ('firms', 'last_update_invalid'),
-        sum(1 for uei in everyone if uei in extract.firms and extract.firms[uei].date_invalid),
-        'exact')
+    read = [extract.firms[uei] for uei in everyone if uei in extract.firms]
+    for name, count in (('last_update_invalid', sum(1 for rows in read if rows.date_invalid)),
+                        ('mixed_blank', sum(1 for rows in read if mixed_blank(rows))),
+                        ('code_not_in_string',
+                         sum(1 for rows in read if rows.code_not_in_string))):
+        checks[f'report.firms.{name}'] = (('firms', name), count, 'exact')
     checks['report.pairs'] = (
         ('pairs',), status_counts((row[P_STATUS] for row in rows.values()), PAIR_STATUSES)
         | {'total': len(rows)}, 'exact')

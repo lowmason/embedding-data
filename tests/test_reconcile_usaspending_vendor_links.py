@@ -415,6 +415,8 @@ REPORT_CASES = [
     ('report.firms.prime', bump('firms', 'prime', 'not_in_sam')),
     ('report.firms.subcontractor', bump('firms', 'subcontractor', 'naics_conflict')),
     ('report.firms.last_update_invalid', bump('firms', 'last_update_invalid')),
+    ('report.firms.mixed_blank', bump('firms', 'mixed_blank')),
+    ('report.firms.code_not_in_string', bump('firms', 'code_not_in_string')),
     ('report.pairs', bump('pairs', 'intra_group')),
     ('report.pairs', bump('pairs', 'total')),
     ('report.pairs', delete('pairs')),
@@ -578,6 +580,38 @@ def test_a_skipped_line_of_a_firm_on_no_usable_report(tmp_path, monkeypatch):
     pin = reseal_extract(data_dir, insert_line('V12UNREAD001|20250115'))
     status, result, _line = run_main(data_dir, pin)
     assert (status, false_checks(result)) == (1, ['report.extract.unreadable_lines'])
+
+
+def edit_lines(uei: str, edit):
+    '''An extract edit: `edit(line)` on each line of `uei`; a None result drops the line.'''
+    def change(text):
+        lines = [edit(line) if line.startswith(uei + '|') else line
+                 for line in text.split('\r\n')]
+        return '\r\n'.join(line for line in lines if line is not None)
+    return change
+
+
+def test_a_firm_that_loses_its_blank_row_is_no_longer_mixed_blank(tmp_path, monkeypatch):
+    # The fixture's mixed firm has a blank row and a coded row; it keeps its status without the
+    # blank row, so only the mixed-blank count moves.
+    data_dir = copy_v12(tmp_path)
+    blank = LAYOUT['positions']['primary_naics'] - 1
+
+    def drop_blank(line):
+        return None if line.split('|')[blank] == '' else line
+
+    pin = reseal_extract(data_dir, edit_lines('V12MIXEDBL05', drop_blank))
+    status, result, _line = run_main(data_dir, pin)
+    assert (status, false_checks(result)) == (1, ['report.firms.mixed_blank'])
+
+
+def test_a_primary_code_missing_from_its_code_string_is_counted(tmp_path, monkeypatch):
+    # The padded firm's code string lists another code; its status stays eligible.
+    data_dir = copy_v12(tmp_path)
+    pin = reseal_extract(data_dir, edit_lines(
+        'V12PADDED006', lambda line: line.replace('|541511Y|', '|541512Y|')))
+    status, result, _line = run_main(data_dir, pin)
+    assert (status, false_checks(result)) == (1, ['report.firms.code_not_in_string'])
 
 
 # ---- refusals: exit 2 with a fixed reason
@@ -1029,12 +1063,13 @@ NODES = {'541511': 'naics:2022:national_industry:541511',
 
 
 def extract_line(uei=GOOD, code='541511', update='20250115', evs='SAM', count=None,
-                 end='!end', registration='A') -> str:
+                 end='!end', registration='A', string='') -> str:
     '''A data line with its CRLF: the given fields at their registered positions.'''
     values = [''] * (LAYOUT['field_count'] if count is None else count)
     values[-1] = end
     for field, value in (('uei', uei), ('primary_naics', code), ('last_update_date', update),
-                         ('evs_source', evs), ('registration_status', registration)):
+                         ('evs_source', evs), ('registration_status', registration),
+                         ('naics_code_string', string)):
         index = LAYOUT['positions'][field] - 1
         if index < len(values):
             values[index] = value
@@ -1191,6 +1226,54 @@ def test_invalid_dates_are_counted_on_every_readable_row():
     assert set(result.firms) == {GOOD, OTHER}
     assert result.firms[GOOD].date_invalid is True
     assert result.firms[OTHER].date_invalid is False
+
+
+@pytest.mark.parametrize(('lines', 'expected'), [
+    pytest.param([extract_line(code=''), extract_line()], True, id='blank and coded'),
+    pytest.param([extract_line(), extract_line(code=' \t')], True, id='coded and spaces'),
+    pytest.param([extract_line(code=''), extract_line(code='54151A')], True,
+                 id='blank and malformed'),
+    pytest.param([extract_line(code=''), extract_line(update='20200101')], True,
+                 id='any status'),
+    pytest.param([extract_line(code=''), extract_line(code='')], False, id='blank only'),
+    pytest.param([extract_line(), extract_line(code='541512')], False, id='coded only'),
+    pytest.param([extract_line(code=''), extract_line(count=3)], False,
+                 id='a skipped line is no row'),
+])
+def test_mixed_blank_needs_a_blank_and_a_non_blank_row(lines, expected):
+    # Spec: the report counts firms that have both blank and non-blank rows.
+    assert reconcile.mixed_blank(read_extract(*lines).firms[GOOD]) is expected
+
+
+def test_code_strings_are_read_by_item():
+    # Findings, E5 layout: items separated by `~`, each a 6-digit code and a Y, N or E flag.
+    assert reconcile.string_codes('541511Y~541512N~236220E') == {'541511', '541512', '236220'}
+    assert reconcile.string_codes(' 541511Y \t~541512N') == {'541511', '541512'}
+    assert reconcile.string_codes('') == set()
+    assert reconcile.string_codes('541511~5415111Y~54151Y~541511X~541511YN') == set()
+
+
+@pytest.mark.parametrize(('lines', 'expected'), [
+    pytest.param([extract_line(string='541511Y')], False, id='listed'),
+    pytest.param([extract_line(string='236220Y~541511N')], False, id='listed second'),
+    pytest.param([extract_line(code=' 541511 ', string='541511E ')], False, id='padded'),
+    pytest.param([extract_line(string='')], True, id='empty string'),
+    pytest.param([extract_line(string='541512Y')], True, id='other code'),
+    pytest.param([extract_line(string='541511')], True, id='item without a flag'),
+    pytest.param([extract_line(string='541512Y'), extract_line(string='541511Y')], True,
+                 id='each row its own string'),
+    pytest.param([extract_line(update='20200101', string='541512Y')], True, id='any status'),
+    pytest.param([extract_line(code='', string='541512Y')], False, id='no primary code'),
+    pytest.param([extract_line(code='54151A', string='')], False, id='malformed code'),
+])
+def test_a_primary_code_missing_from_its_own_row_s_code_string(lines, expected):
+    assert read_extract(*lines).firms[GOOD].code_not_in_string is expected
+
+
+def test_the_code_string_rule_applies_only_when_the_layout_maps_the_field():
+    layout = copy.deepcopy(LAYOUT)
+    del layout['positions']['naics_code_string']
+    assert read_extract(extract_line(), layout=layout).firms[GOOD].code_not_in_string is False
 
 
 @pytest.mark.parametrize(('prime', 'sub', 'intra', 'statuses', 'expected'), [
