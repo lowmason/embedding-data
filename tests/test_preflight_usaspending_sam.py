@@ -798,6 +798,21 @@ def test_headers_replaces_an_extract_tally_of_many_or_long_values(field, side, r
     assert_values_withheld(report_)
 
 
+# A value that differs from a domain value only by padding or by case is outside the domain.
+NEAR_MISSES = [('registration_status', ' A'), ('registration_status', 'A '),
+               ('registration_status', 'a'), ('evs_source', ' D&B'), ('evs_source', 'E&Y '),
+               ('evs_source', 'd&b')]
+
+
+@pytest.mark.parametrize('field, value', NEAR_MISSES)
+def test_headers_replaces_an_extract_tally_with_a_near_miss_of_its_domain(
+        field, value, run, data_dir, tmp_path):
+    raw = seed(data_dir, tmp_path, firms=tally_firms(field, [value]))
+    report_ = run(['headers', *raw], code=1)
+    assert report_['extract']['tallies'][field] == {'too_many_values': 2}
+    assert report_['stops'] == [f'{field}_not_coded']
+
+
 def test_headers_stops_are_listed_by_rule_then_year(run, data_dir, tmp_path):
     # 2026: members whose names differ; 2024: a data row as the only header; and both
     # extract tallies hold a long value
@@ -1121,6 +1136,19 @@ def test_measure_replaces_a_tally_of_many_or_long_values(name, side, run, data_d
     assert measured_tally(report_, name) == {'too_many_values': len(values) + 1}
     assert (report_['stops'], report_['ok']) == ([f'{name}_not_coded'], False)
     assert_values_withheld(report_)
+
+
+# `measure` counts the stripped values, so only a difference of case is a near miss there.
+CASE_MISSES = {'by_registration_status': 'a', 'evs_source': 'd&b'}
+
+
+@pytest.mark.parametrize('name', list(CASE_MISSES))
+def test_measure_replaces_an_extract_tally_with_a_case_miss_of_its_domain(
+        name, run, data_dir, tmp_path, codes):
+    raw = seed_tally(data_dir, tmp_path, name, [CASE_MISSES[name]])
+    report_ = run(['measure', *measure_args(raw, write_registry(tmp_path), codes)], code=1)
+    assert measured_tally(report_, name) == {'too_many_values': 2}
+    assert report_['stops'] == [f'{name}_not_coded']
 
 
 # Each year's reports in `seed`, and a date in each year's format.
