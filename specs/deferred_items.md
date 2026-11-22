@@ -212,3 +212,36 @@
       again. The fix is a one-line docstring edit. Size: trivial. Done when: the
       docstring names the retired path, in the same commit as the next change
       that already requires a new rule commit and both real runs.
+
+## 15-usaspending-vendor-links — 2026-11-22
+- [ ] D2 cost in the vendor-links bundle (final review, owner kept D2 on
+      2026-11-22): a blank or invalid last update date makes a firm
+      `dnb_era_record`. A read-only count showed that 6,403 firms get no industry
+      from this rule alone. Each holds exactly one valid NAICS 2022 code and an
+      active registration. Without D2 the eligible firms would number 38,981, not
+      32,578. A rule that counts a blank date on an active registration as after
+      the cutoff would give them back. It needs the owner's decision and a new
+      run, because it changes `src/embedding_data/vendor_link_pairs.py`, which
+      `verify` hashes. See `specs/naics-evaluation-data-stage-14-findings.md`
+      ("The cost of D2") and `specs/plans/completed/15-usaspending-vendor-links.md`
+      (Handoff). Size: design. Done when: the owner's resume decision after Stage 14
+      keeps D2 or approves a changed rule, and an approved rule has a new run that
+      passes `verify`, the independent reconciler and the preservation checks.
+- [ ] Live `acquire-sam-extract` request never tried (final review, owner ruled
+      defer): the request form `date=MM%2FYYYY` and the response shape were never
+      tried against the real Entity Extracts API, because the owner used the
+      browser path. A first live use needs the owner's key and spends one of the
+      10 daily requests. See `src/embedding_data/sam_access.py` and
+      `specs/plans/completed/15-usaspending-vendor-links.md` (Task 3 ruling on the
+      wire URL). Size: quick-fix. Revisit if: the owner runs `acquire-sam-extract`
+      for a later extract month and the request is refused or the response differs
+      from what `sam_access.py` reads.
+- [ ] Stale spec path in the vendor-links reconciler: the docstring of
+      `scripts/reconcile_usaspending_vendor_links.py` (line 6) names
+      `specs/usaspending-vendor-links.md`, which moved to
+      `specs/completed/usaspending-vendor-links.md` when plan 15 retired. Carried
+      because the findings file names the script by its commit `9fd0a5b`, and a
+      docstring edit would leave the script that ran differing from the one in the
+      tree. The fix is a one-line docstring edit. Size: quick-fix.
+      Done when: the docstring names the retired path, in the same commit as the
+      next change to the script.

@@ -11,7 +11,7 @@ The deliverable map, as of 2026-11-19 at `8b25f4b`. Stage numbers refer to [the 
 | ACS wage microdata (person level) | Built and replayed (Stage 17). No count gate yet (O23) | No | No | **Yes.** It judges and never trains (R8.4). naics-embedder reads it in place on this machine under its pin (R8.1) | Its section in [the evaluation protocol](evaluation-protocol.md) (O24), its count gate (O23) and naics-embedder's wage panel spec |
 | CPS job-change flows | Not started. Roadmap Stage 11, ready | **Yes** | No | No | Stage 11: the 2026 meaning of `9890`, then its build. Its count gate is old Stage 13, deferred |
 | EPA TRI parent links | Not built. Roadmap Stage 5, ready | **Yes** | No | No | Stage 5. Its count gate is outcome O13, on the Ranked list |
-| USAspending subawards with SAM.gov NAICS | Not built. Roadmap Stage 14, not ready | **Yes** | No | No | An owner-created SAM.gov account and the E6 terms check, then Stage 14 |
+| USAspending subawards with SAM.gov NAICS | Built (Stage 14, 2026-11-22), run `stage14_vendor_links_20261122_r2`. Not replayed. No count gate yet | **Yes** | No | No | The resume after Stage 14 (replay check, acceptance finding, headline minimum count, the D2 rule). Its section in [the evaluation protocol](evaluation-protocol.md) (O18). R8.4, if it trains |
 | BEA input–output tables | Not built. Roadmap Stage 15, ready | **Yes, non-headline** | No | No | Stage 15 |
 | ACS commuting and migration flows, CPS state migration | ACS flows: on hold, in Stage 9's scope. CPS state migration: deferred (old Stage 12) | No (geography embedder only) | No | No | Not applicable |
 | NAICS 2022 node, edge and path tables | Built | Join key only | Join key only | No | Nothing |

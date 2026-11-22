@@ -1,5 +1,7 @@
 # USAspending vendor links
 
+**Status: COMPLETE (2026-11-22)** — implemented by [plan 15](../plans/completed/15-usaspending-vendor-links.md); the measured run is in the [Stage 14 findings](../naics-evaluation-data-stage-14-findings.md).
+
 > Next step: writing-plans in a fresh session against this file. Do not fetch
 > any USAspending or SAM.gov file, call either API or use a SAM.gov key, and do
 > not build, before the plan exists and the owner gives the go-ahead for each
@@ -8,7 +10,7 @@
 Status: the owner approved this committed spec on 2026-11-18 ("Approve the
 spec"), including every call marked "My call" and the proposals played back
 below. Stage 14 design session of
-[the roadmap](naics-evaluation-data-roadmap.md). The owner chose the four
+[the roadmap](../naics-evaluation-data-roadmap.md). The owner chose the four
 decisions below on 2026-11-18. Calls marked "My call" were made in the session
 or while writing this file. A builder check by a separate reviewer raised two
 questions on 2026-11-18. One became owner decision 4 (malformed codes). The
@@ -19,7 +21,7 @@ was called and no key was used for this design.
 ## Scope and governing contracts
 
 Stage 14 builds Source 2 of
-[the evidence-sources spec](uncovered-uses-evidence-sources.md) (the Stage 2
+[the evidence-sources spec](../uncovered-uses-evidence-sources.md) (the Stage 2
 spec) once on real data and verifies it. It serves one use:
 
 - **O6, KYB and anomaly detection.** "Comparing a company's self-reported NAICS
@@ -34,9 +36,9 @@ the industry level", and "firm graphs stay with the users who hold them"
 industry × industry. Firm-level rows are support only.
 
 The Stage 2 spec's "Rules for every new family" govern this stage. R5, R7.1,
-R7.4, R8 and R9 of [the source spec](embedding-evaluation-data-spec.md) govern
+R7.4, R8 and R9 of [the source spec](../embedding-evaluation-data-spec.md) govern
 codes, outputs, provenance, disclosure, leakage and offline operation. The
-Stage 10 spec ([completed](completed/ita-establishment-targets.md)) is the
+Stage 10 spec ([completed](ita-establishment-targets.md)) is the
 model for the measure. The Stage 5 spec ([TRI parent links](tri-parent-links.md))
 is the model for the bundle, the commands, the preflight and the host rule.
 
@@ -389,7 +391,10 @@ other window.
   records the member-name pattern. Any other member fails the build.
 - A second registry constant records the extract layout: the column positions
   of the fields the build reads, taken from GSA's layout document during E5. A
-  changed layout version or a row with the wrong field count fails the build.
+  changed layout version fails the build. An extract line with the wrong field
+  count is skipped and counted, and it never fails the build *(owner, 2026-11-19;
+  the real extract has 276 such lines)*. An extract line ends at LF, and the
+  build drops one CR before it, because the delivered file has no CRLF.
 - The build reads only the extract fields named in
   [Firm table](#firm-table). It never selects a name, address or other D&B
   Open Data field.
@@ -706,7 +711,7 @@ the frozen top-level CLI. The plan may split it into several new modules.
 | `import-sam-extract FILE --month YYYY-MM` | No | No | Register an owner-downloaded extract |
 | `build RUN_ID --codes-run ID --codes-outputs-sha256 PIN --snapshot DATE --sam-month YYYY-MM` | No | No | Build one immutable bundle |
 | `verify RUN_ID --outputs-sha256 PIN` | No | No | Authenticate the pin, then recompute and compare every table |
-| `compare-runs FIRST SECOND` | No | No | Exact logical comparison of two bundles, omitting run ID and time |
+| `compare-runs FIRST SECOND` | No | No | Exact logical comparison of the four Parquets and `report.json`, which omits run ID and time. It skips `inputs.json` *(owner, plan 15, 2026-11-18)* |
 
 Every command takes an explicit `--data-dir`. Every production command passes
 `--data-dir /Users/lowell/Projects/embedding-data/data`. Offline commands load
@@ -770,8 +775,9 @@ findings file records its detached checksum.
   publication. Any change fails the run.
 - Failure cleans only the run's own staging.
 - Expected data states are retained diagnostics, not failures: unusable
-  reports, ineligible firms, excluded pairs and duplicate rows.
-- Changed raw bytes, a changed header or layout, a wrong field count, a
+  reports, ineligible firms, excluded pairs, duplicate rows and extract lines
+  with the wrong field count.
+- Changed raw bytes, a changed header or layout, a
   subaward type other than `sub-contract`, a malformed primary code on a firm
   that the build reads, row loss or multiplication and
   invalid estimates are failures.
@@ -793,8 +799,9 @@ Write the failing tests first. Small typed frames cover:
 - The intra-group sensitivity and its support label.
 - Partial counterparty sets.
 - A malformed primary code on a firm that the build reads fails the build. The
-  same code on an unread extract row, in a firm's other codes or in the
-  subaward's NAICS field is only counted.
+  same code on an unread extract row is counted (`malformed_unread_rows`). The
+  same code in a firm's other codes or in the subaward's NAICS field is not
+  counted, and never fails the build *(plan 15)*.
 - Header and layout refusal, a sub-grant row, occupied run names, changed pins
   and changed software.
 - `compare-runs` equal and unequal.
@@ -902,7 +909,7 @@ No replay build runs in this stage.
 ## Source spec amendment
 
 The plan applies this amendment to
-[the source spec](embedding-evaluation-data-spec.md) and `CLAUDE.md` when the
+[the source spec](../embedding-evaluation-data-spec.md) and `CLAUDE.md` when the
 stage ships. It follows the Stage 2 spec's amendment list.
 
 **Always (Stage 14's own items).**
@@ -960,8 +967,11 @@ Item 5 (R7.5 published aggregates) belongs to Stage 15.
 
 Roadmap: specs/naics-evaluation-data-roadmap.md, Stage 14 — on plan completion, tick the stage and re-validate later stages against what shipped.
 
-- Software readiness (tests and the V12 fixture) comes before full-data
-  acceptance. Do not tick Stage 14 on design or planning completion.
+- The document checks, acquisition and the preflight's data checks (full-data
+  acceptance steps 1 to 3) come first, because the V12 fixture uses the header
+  layout that E4 records. Software readiness (tests and the V12 fixture) then
+  comes before the full-data build *(owner, plan 15, 2026-11-22)*. Do not tick
+  Stage 14 on design or planning completion.
 - The roadmap re-validation notes that Stage 14 did not consume the Stage 4
   concordance, and that the O6 cost note and `specs/deliverable-map.md` still
   say the account is missing (see

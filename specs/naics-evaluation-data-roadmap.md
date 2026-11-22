@@ -183,7 +183,7 @@ on 2026-11-22 (see Choices made).
       Leaves out: worker profiles and CPS cross-sections (old Stage 12), and the full build, size gate and comparators (old Stage 13) → deferred items, parked until Stages 9 and 11 tick. The CPS protocol section → O21
       ROUTING: brainstorming
 
-- [ ] Stage 14: USAspending subawards with SAM.gov NAICS, first build
+- [x] Stage 14: USAspending subawards with SAM.gov NAICS, first build
       Objective: USAspending subawards with SAM.gov entity NAICS are built once on real data as a new evidence family and verified.
       Outcomes: O6
       Track: C
@@ -192,6 +192,9 @@ on 2026-11-22 (see Choices made).
       Exit: Preflight: open checks E4–E6 are settled before any data is trusted. A failed check stops the stage for an owner decision (Stage 2 spec, Rules for every new family). O6: the bundle holds the evidence that Source 2 of the Stage 2 spec names, and `verify` with the detached pin passes. The stage adds amendment item 4 (R1.2 free account) and its rows under items 3 and 6. The findings file records the run ID, the pin, and the wall time, maximum RSS and bundle size of the real run
       Leaves out: replay check, long-form acceptance finding and headline minimum count → not staged. The owner decides at the resume after this stage reports, as for O12 and O13 in Track B. The USAspending protocol section → O18. The R8.4 training-role amendment → a separate owner decision after naics-embedder's spec (reset prompt, Leave alone)
       ROUTING: brainstorming
+
+> Stage 14: COMPLETE (2026-11-22) — implemented by plan 15 (specs/plans/completed/15-usaspending-vendor-links.md). Its Handoff section names what O18 and the resume after Stage 14 consume. Stage 14 read only `naics_nodes.parquet` of the Stage 4 bundle. It did not read the Stage 4 concordance that its Consumes line names. The O6 row in this roadmap still says that the family needs an owner-created account and that its size is unknown. The family is now built, E6 is closed and the browser path needed no key. The O6 row is not edited. The USAspending row of `specs/deliverable-map.md` was updated at the owner's request (2026-11-22).
+> Next: resume the roadmap.
 
 - [ ] Stage 15: BEA input–output tables, first build
       Objective: BEA benchmark input–output tables are built once on real data as a new non-headline evidence family and verified.

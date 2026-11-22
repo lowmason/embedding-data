@@ -1,5 +1,7 @@
 # USAspending Vendor Links Implementation Plan
 
+**Status: COMPLETE (2026-11-22)** — executed via subagent-driven-development; deferred items in specs/deferred_items.md, or specs/completed/deferred_items.md once archived
+
 > **For agentic workers:** REQUIRED SUB-SKILL: implement this plan task-by-task via subagent-driven-development (the default) — or executing-plans when your human partner chose inline execution at the handoff. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build one verified bundle that relates NAICS 2022 industries as supplier and buyer
@@ -402,7 +404,7 @@ Draft request body (FY2024), to confirm in Step 1:
  "file_format": "csv"}
 ```
 
-- [ ] **Step 1: USAspending API source (E4 filter read)**
+- [x] **Step 1: USAspending API source (E4 filter read)**
 
 Read the `fedspendingtransparency/usaspending-api` source at the current `master` commit,
 and record that commit. Fetch each file with
@@ -429,7 +431,7 @@ usaspending.gov page and never call the API. Record:
 Write the final request body as `REQUEST_BODY` text into the findings file. Task 2 copies
 it.
 
-- [ ] **Step 2: Entity Extracts API page**
+- [x] **Step 2: Entity Extracts API page**
 
 Read `https://open.gsa.gov/api/sam-entity-extracts-api/` with `curl -sS -o extracts.html`
 and read the HTML as data. Record: the `api_key` parameter; the exact request form for one
@@ -438,7 +440,7 @@ says about the response (file body, redirect or JSON); how many past monthly fil
 kept (E5); the rate limits (E5); the sentence on where the key comes from, and any expiry
 or rotation statement. Task 3 copies the request form into `sam_access.extract_url`.
 
-- [ ] **Step 3: Extract layout spreadsheet (E5 read; Owner Checkpoint 2)**
+- [x] **Step 3: Extract layout spreadsheet (E5 read; Owner Checkpoint 2)**
 
 Show the owner the spreadsheet's URL from the page and get the go-ahead. Download it with
 `curl` into the scratch directory. Read it with a short script kept in a second new scratch
@@ -455,7 +457,7 @@ directory, using only `zipfile` and `xml.etree.ElementTree`, run as
    country), as the layout or the terms mark it. Task 5 records these as
    `restricted_positions`.
 
-- [ ] **Step 4: Terms (E6 read; Owner Checkpoint 2 for usaspending.gov)**
+- [x] **Step 4: Terms (E6 read; Owner Checkpoint 2 for usaspending.gov)**
 
 Read and record:
 1. The live SAM.gov terms of use, and the key-rotation rule in them. The owner reads the
@@ -472,7 +474,9 @@ statement forbids the API access that the two acquisition commands use; whether 
 statement forbids downloading the public extract, which carries name and address fields,
 for this use.
 
-- [ ] **Step 5: Decide (Owner Checkpoint 3)**
+> Deviation: The owner waived the read of the live USAspending page, so E6 stayed open when Task 1 closed (commit `ec3118e`). The owner closed E6 on 2026-11-19, after pasting the SAM.gov terms of use and saying "Yes, close E6" (commit `b30502f`). This was before any download.
+
+- [x] **Step 5: Decide (Owner Checkpoint 3)**
 
 Stop the stage and report to the owner when:
 - E6 meets its stop condition. A failed terms check never becomes "build it but keep the
@@ -484,7 +488,7 @@ Stop the stage and report to the owner when:
 Ask the owner before going on when Step 1 item 2 shows that prime awards cannot be kept
 out of the ZIP, or when the request body differs from the draft in more than its values.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Write the findings file with a title, a one-line status ("Stage 14 in progress"), and a
 `## Document checks` section holding Steps 1–4. Commit it with the message
@@ -571,7 +575,7 @@ Write the findings file with a title, a one-line status ("Stage 14 in progress")
   other state raises `ValueError` (`'raw file is not recorded'`,
   `'missing or extra raw file'`, `'raw file changed'`).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 from vendor_link_fixtures import no_live_sam  # noqa: F401
@@ -632,19 +636,19 @@ def test_import_failure_prints_only_the_fixed_line(cli_runner, data_directory, t
                                      'validation; run -; path raw/usaspending/subcontracts')
 ```
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_usaspending_raw.py tests/test_usaspending_vendor_links_cli.py -q`
 Expected: FAIL, `ModuleNotFoundError: No module named 'embedding_data.usaspending_raw'`.
 
-- [ ] **Step 3: Implement `usaspending_raw`, the two commands and the fixture helpers**
+- [x] **Step 3: Implement `usaspending_raw`, the two commands and the fixture helpers**
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_usaspending_raw.py tests/test_usaspending_vendor_links_cli.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Message: `feat: acquire and import USAspending contract subaward downloads`.
 
@@ -726,7 +730,7 @@ name's `YYYY-MM` to equal `month`, and publishes `month_dir / name` with
 `import_file` and `select_extract` follow Task 2's rules, with `NAME` in place of
 `SAFE_NAME` and its month check.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `tests/test_sam_access.py` (all with `httpx.MockTransport`, `FAKE_KEY` and bodies sent
 with `stream=httpx.ByteStream(...)`):
@@ -790,19 +794,19 @@ def test_import_requires_the_utf8_name_and_month(data_directory, tmp_path):
 def test_month_selection_ignores_other_months(data_directory, tmp_path): ...
 ```
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_sam_access.py tests/test_sam_raw.py -q`
 Expected: FAIL, `ModuleNotFoundError: No module named 'embedding_data.sam_access'`.
 
-- [ ] **Step 3: Implement `sam_access`, `sam_raw` and the two commands**
+- [x] **Step 3: Implement `sam_access`, `sam_raw` and the two commands**
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_sam_access.py tests/test_sam_raw.py tests/test_usaspending_vendor_links_cli.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Message: `feat: acquire and import the SAM.gov public extract without exposing the key`.
 
@@ -846,7 +850,7 @@ Message: `feat: acquire and import the SAM.gov public extract without exposing t
 `system == 'naics'`, `vintage == 2022` and `level == 'national_industry'`. Each starts with
 `NODE_PREFIX`, and none repeats. No other file is read.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 @pytest.fixture(scope='module')
@@ -875,19 +879,19 @@ def test_select_nodes_refuses(codes, tmp_path, mutation): ...   # ValueError, on
 def test_verify_detects_a_later_change(codes, tmp_path): ...
 ```
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_vendor_link_codes.py -q`
 Expected: FAIL, `ModuleNotFoundError`.
 
-- [ ] **Step 3: Implement `vendor_link_codes` and `seed_codes_bundle`**
+- [x] **Step 3: Implement `vendor_link_codes` and `seed_codes_bundle`**
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_vendor_link_codes.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Message: `feat: select the pinned Stage 4 NAICS nodes for vendor links`.
 
@@ -955,7 +959,7 @@ in `restricted_positions`; `evs_dnb` is empty when `evs_source` is null; `bof_pr
 `eof_prefix` nonblank and different; `member_pattern` compiles; `date_format` round-trips.
 Each failure raises `ValueError`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `test_subaward_layout_json_round_trip`, `test_extract_layout_json_round_trip`,
 `test_parse_subaward_layouts_refuses` and `test_parse_extract_layout_refuses` (each
@@ -970,22 +974,22 @@ def test_production_extract_layout_keeps_clear_of_dnb_positions():
     assert layout.restricted_positions and not mapped & layout.restricted_positions
 ```
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_vendor_link_layouts.py -q`
 Expected: FAIL, `ModuleNotFoundError`.
 
-- [ ] **Step 3: Implement `vendor_link_layouts` and write `sam_extract_layout.json`**
+- [x] **Step 3: Implement `vendor_link_layouts` and write `sam_extract_layout.json`**
 
 Copy every value of the layout from the findings file's Task 1 Step 3 record. Do not
 guess a value that the record does not hold: stop and ask the owner instead.
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_vendor_link_layouts.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Message: `feat: add the vendor-link registry model and the SAM.gov extract layout`.
 
@@ -1052,7 +1056,7 @@ must start with `bof_prefix` and the last with `eof_prefix`, else
 it, else `ValueError('missing record end')`. Keep only the mapped positions (1-based), as
 delivered. An unmapped `evs_source` reads as `''`. Discard the split list line by line.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 def test_reads_the_mapped_columns_as_strings(tmp_path): ...
@@ -1090,19 +1094,19 @@ def test_extract_keeps_only_registered_positions(tmp_path):
 def test_extract_framing_and_field_count_failures(defect, tmp_path): ...
 ```
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_vendor_link_readers.py -q`
 Expected: FAIL, `ModuleNotFoundError`.
 
-- [ ] **Step 3: Implement `vendor_link_readers` and the fixture helpers**
+- [x] **Step 3: Implement `vendor_link_readers` and the fixture helpers**
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_vendor_link_readers.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Message: `feat: stream USAspending subaward and SAM.gov extract ZIP files`.
 
@@ -1199,7 +1203,7 @@ node IDs non-null exactly for eligible firms.
   `malformed_unread_rows`
 - `missing_fields`: `subawards` by year and `extract`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Unit tests use small typed frames built in `SUBAWARD_SCHEMA` and `EXTRACT_SCHEMA`, and a
 node set of real 2022 codes (`541511`, `541512`, `236220`, `336411`).
@@ -1257,19 +1261,21 @@ def test_validate_pairs_catches_lost_or_multiplied_reports(): ...
 def test_report_counts_partitions_sum_to_their_totals(): ...
 ```
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_vendor_link_pairs.py -q`
 Expected: FAIL, `ModuleNotFoundError`.
 
-- [ ] **Step 3: Implement `vendor_link_pairs`**
+- [x] **Step 3: Implement `vendor_link_pairs`**
 
-- [ ] **Step 4: Run the tests and see them pass**
+> Deviation: the `trigger` report key also holds `by_fiscal_year` beside its pooled keys (commit `2a60661`). The brief named the pooled keys only. Settled Default 14 and spec line 747 ask for the share by fiscal year (controller ruling, Task 7 review).
+
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_vendor_link_pairs.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Message: `feat: assign subaward report, firm and pair statuses`.
 
@@ -1321,7 +1327,7 @@ year with neither parent column (owner decides); `count_malformed(...)['read_row
 subcontractor coverage below 0.5; a year with no `subaward_type` or `amount` column; any
 delivered type other than `sub-contract`. Document checks are not in the script.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 The tests write and import synthetic ZIPs with `seed_raw`, `TEST_SUBAWARD_LAYOUTS` and
 `TEST_EXTRACT_LAYOUT`. The script takes
@@ -1354,19 +1360,19 @@ def test_preflight_writes_nothing_under_the_data_root(...): ...
 def test_preflight_refuses_an_unrecorded_file(...): ...   # exit 2
 ```
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_preflight_usaspending_sam.py -q`
 Expected: FAIL, the script does not exist.
 
-- [ ] **Step 3: Implement the script**
+- [x] **Step 3: Implement the script**
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_preflight_usaspending_sam.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Message: `feat: add the USAspending and SAM.gov preflight checks`.
 
@@ -1379,14 +1385,14 @@ Message: `feat: add the USAspending and SAM.gov preflight checks`.
 - Modify: `specs/naics-evaluation-data-stage-14-findings.md` (Preflight section)
 - Test: `tests/test_vendor_link_layouts.py` (one test added)
 
-- [ ] **Step 1: Preservation baseline**
+- [x] **Step 1: Preservation baseline**
 
 Copy `data/raw/manifest.jsonl` to a new scratch directory outside the data root, and record
 its SHA-256 and byte length. Run
 `uv run --locked embedding-data audit --data-dir /Users/lowell/Projects/embedding-data/data`.
 Expected: exit 0, no discrepancy.
 
-- [ ] **Step 2: Subaward files (Owner Checkpoint 4, host rule)**
+- [x] **Step 2: Subaward files (Owner Checkpoint 4, host rule)**
 
 Choose the snapshot label (`DATE`, ISO) with the owner. For each fiscal year, run the
 host-rule checks, get the go-ahead, then run:
@@ -1402,7 +1408,7 @@ Data page, with the Task 1 filters. Then run
 `import-subawards FY FILE --snapshot DATE --data-dir ...` with its own go-ahead. Record
 each file's path, size and SHA-256.
 
-- [ ] **Step 3: Extract (Owner Checkpoint 4, host rule)**
+- [x] **Step 3: Extract (Owner Checkpoint 4, host rule)**
 
 Ask the owner which path to use and which month (`YYYY-MM`, the latest available). For the
 API path, the owner confirms the key exists and is less than 90 days old. The key never
@@ -1418,7 +1424,9 @@ For the browser path, the owner downloads `SAM_PUBLIC_UTF-8_MONTHLY_V2_<YYYYMMDD
 SAM.gov Data Services, then run `import-sam-extract FILE --month YYYY-MM --data-dir ...`.
 Record the file's path, size and SHA-256.
 
-- [ ] **Step 4: Headers**
+> Deviation: The owner used the browser path. The browser download was a ZIP around the real extract ZIP, so the owner chose "Yes, import inner ZIP", and `import-sam-extract` recorded the inner ZIP with a proxy retrieval time (2026-11-19). The real member name carries a hex suffix, so the owner approved ("Approved for both") a change of the layout's member pattern (commits `b1f8095`, `634906b`). The owner then chose "Skip and count them" for 276 extract lines with the wrong field count. That overrides the spec rule that such a line fails the build (commits `5836d3c`, `f151645`, `0c9e52b`). Task 16 amended the spec text.
+
+- [x] **Step 4: Headers**
 
 Run `uv run --locked python scripts/preflight_usaspending_sam.py headers --data-dir /Users/lowell/Projects/embedding-data/data --snapshot DATE --sam-month YYYY-MM`
 in the background (Global Constraints, "Long-running commands").
@@ -1428,12 +1436,12 @@ field to one cell, and leave a field null when no cell holds it. Set `date_forma
 the shapes. Check the extract summary against the committed layout: every data line has
 `field_count` fields and the framing matches.
 
-- [ ] **Step 5: Measure**
+- [x] **Step 5: Measure**
 
 Run `measure` with the draft registry, the codes run and its pin, in the background. Keep
 the final JSON output.
 
-- [ ] **Step 6: Decide (Owner Checkpoint 5)**
+- [x] **Step 6: Decide (Owner Checkpoint 5)**
 
 If `measure` lists any stop, stop the stage. Report to the owner and do no further task.
 If `asks` is not empty, ask the owner before going on. Also stop and ask when: a ZIP holds
@@ -1442,7 +1450,7 @@ valid UTF-8; the extract differs from the committed layout (field count, framing
 positions); the action date or amount shapes show a format the registry cannot express. A
 missing optional field is recorded and does not stop.
 
-- [ ] **Step 7: Write the failing test**
+- [x] **Step 7: Write the failing test**
 
 ```python
 def test_production_subaward_registry_covers_the_window():
@@ -1455,7 +1463,7 @@ def test_production_subaward_registry_covers_the_window():
 Run: `uv run --locked pytest tests/test_vendor_link_layouts.py::test_production_subaward_registry_covers_the_window -q`
 Expected: FAIL, `production subaward header registry is not recorded`.
 
-- [ ] **Step 8: Commit the registry and the preflight**
+- [x] **Step 8: Commit the registry and the preflight**
 
 Save the final draft as `src/embedding_data/usaspending_subaward_headers.json` in
 `subaward_layouts_json` form, then run the test again. Expected: PASS. Add a `## Preflight`
@@ -1536,7 +1544,7 @@ shape).
 `s_suppliers` and `b_buyers` equal to the `n_unweighted` values; the marginal rows agree
 with the counts the pair table implies.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 def test_each_firm_counts_once_however_many_reports_or_years(): ...
@@ -1569,19 +1577,19 @@ def test_metadata_flags_and_universe():
 def test_validator_rejects(break_): ...
 ```
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_vendor_link_targets.py -q`
 Expected: FAIL, `ModuleNotFoundError`.
 
-- [ ] **Step 3: Implement the module**
+- [x] **Step 3: Implement the module**
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_vendor_link_targets.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Message: `feat: estimate vendor-link firm shares with companions`.
 
@@ -1656,7 +1664,7 @@ recorded software must equal `freeze_software()`. Recompute everything in
 Compare each table in order, then the report, then `inputs.json` with the recorded
 `execution`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Use a module fixture: `seed_codes_bundle`, then `seed_raw` with a small three-year window
 in the test registries.
@@ -1681,22 +1689,22 @@ def test_software_files_cover_the_bundle_import_closure():
     assert {module_file(m) for m in loaded} <= set(vendor_link_bundle.SOFTWARE_FILES)
 ```
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_vendor_link_bundle.py -q`
 Expected: FAIL, `ModuleNotFoundError`.
 
-- [ ] **Step 3: Implement `vendor_link_bundle`**
+- [x] **Step 3: Implement `vendor_link_bundle`**
 
 Get the closure with `uv run --locked python -c "import sys, embedding_data.vendor_link_bundle, embedding_data.usaspending_vendor_links; print(sorted(m for m in sys.modules if m.startswith('embedding_data')))"`.
 Write `SOFTWARE_FILES` as a sorted literal of those files plus the four named ones.
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_vendor_link_bundle.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Message: `feat: build, verify and compare vendor-link bundles`.
 
@@ -1722,7 +1730,7 @@ Message: `feat: build, verify and compare vendor-link bundles`.
   return `TEST_SUBAWARD_LAYOUTS` and `TEST_EXTRACT_LAYOUT`, and seeds data with `seed_raw`
   in those registries. The offline test does the same.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 def test_help_lists_exactly_seven_commands(cli_runner): ...
@@ -1750,19 +1758,19 @@ def test_software_files_equal_the_command_import_closure():
         'src/embedding_data/sam_extract_layout.json', 'pyproject.toml', 'uv.lock'}
 ```
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_usaspending_vendor_links_cli.py -q`
 Expected: FAIL, no `build` command.
 
-- [ ] **Step 3: Add the three commands**
+- [x] **Step 3: Add the three commands**
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_usaspending_vendor_links_cli.py tests/test_vendor_link_bundle.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Write the README section**
+- [x] **Step 5: Write the README section**
 
 Merge `main` into the branch first: plans 13 and 14 add sections in the same place. Place
 the section by its anchor (before `## Data sources`), not by line number. Heading
@@ -1781,7 +1789,7 @@ the section by its anchor (before `## Data sources`), not by line number. Headin
 7. The R8.4 exclusion, and that whether any table leaves the machine follows E6.
 8. That selected run pins wait for a hardening stage.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Message: `feat: add vendor-link build, verify and compare commands`.
 
@@ -1819,7 +1827,7 @@ each fiscal year. Use real 2022 codes such as `541511`, `541512`, `236220` and `
 When the production registry maps no prime parent field, include only the first group
 condition, and the test checks that the report lists the field as missing.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 def test_v12_chain_is_offline_verified_and_replay_equal(tmp_path, monkeypatch):
@@ -1842,20 +1850,20 @@ def test_no_name_or_address_value_in_any_bundle_byte(tmp_path, monkeypatch):
         assert DNB_SENTINEL.encode() not in file.read_bytes()
 ```
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_vendor_link_v12.py -q`
 Expected: FAIL, `ImportError: cannot import name 'run_vendor_link_v12'`.
 
-- [ ] **Step 3: Implement `v12_inputs` and `run_vendor_link_v12`**
+- [x] **Step 3: Implement `v12_inputs` and `run_vendor_link_v12`**
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_vendor_link_v12.py -q`
 Expected: all pass. If one test takes 60 s or more, report it to the owner: marking it
 `slow` means editing `tests/conftest.py`, which this plan does not do.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Message: `test: add the vendor-link V12 raw-to-replay fixture chain`.
 
@@ -1893,7 +1901,7 @@ It compares them exactly with the four tables (values within `1e-12`), and with
 `report['reports'][*]['by_status']`, `report['firms']`, `report['pairs']` and the counts
 in `report['join_coverage']`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 def test_reconciler_registries_equal_the_committed_json():
@@ -1909,27 +1917,29 @@ def test_reconciler_detects_a_changed_count(tmp_path, monkeypatch): ...
 def test_reconciler_refuses_a_wrong_pin(tmp_path, monkeypatch): ...   # exit 2
 ```
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_reconcile_usaspending_vendor_links.py -q`
 Expected: FAIL, the script does not exist.
 
-- [ ] **Step 3: Implement the script from the spec's text**
+- [x] **Step 3: Implement the script from the spec's text**
 
 Write it from the spec's sections, not from the build modules.
 
-- [ ] **Step 4: Run the tests and see them pass**
+> Deviation: the first real-data run of the reconciler (Task 15) refused, because it read the extract at CRLF only and the delivered extract has LF line ends. The owner approved a fix on 2026-11-22. The reconciler now ends a line at LF and drops one CR before it (commits `2fd4a1b`, `9fd0a5b`). That was the second fix round of Task 14. The first one followed its review (commit `620f836`).
+
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_reconcile_usaspending_vendor_links.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Full suite**
+- [x] **Step 5: Full suite**
 
 Run the Stage 9 `pgrep` check, then `uv run --locked behave` and
 `uv run --locked pre-commit run coverage-check-full --hook-stage pre-push --all-files`.
 Expected: every scenario and test passes (the `network` canary is deselected).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Message: `feat: add the independent vendor-link reconciler`.
 
@@ -1939,19 +1949,19 @@ Message: `feat: add the independent vendor-link reconciler`.
 
 **Files:** none changed. Results go to the findings file in Task 16.
 
-- [ ] **Step 1: Clean execution state**
+- [x] **Step 1: Clean execution state**
 
 The worktree holds every task's commit and `git status --porcelain` prints nothing, so
 `execution.dirty` is false. Use `uv run --locked` from this worktree's own `.venv` for
 every command in this task, with no overlay, and change nothing in the venv between Steps 3
 and 5.
 
-- [ ] **Step 2: Go-ahead (Owner Checkpoint 6, host rule)**
+- [x] **Step 2: Go-ahead (Owner Checkpoint 6, host rule)**
 
 Choose a fresh run ID `stage14_vendor_links_<YYYYMMDD>_r1` and confirm that neither it nor
 `<id>.part` exists under `data/derived/usaspending/vendor-links/`.
 
-- [ ] **Step 3: Build**
+- [x] **Step 3: Build**
 
 ```bash
 /usr/bin/time -l uv run --offline --locked python -m embedding_data.usaspending_vendor_links build RUN_ID --codes-run stage4_v11_20261013_r2 --codes-outputs-sha256 15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a --snapshot DATE --sam-month YYYY-MM --data-dir /Users/lowell/Projects/embedding-data/data
@@ -1961,7 +1971,9 @@ Run it in the background (Global Constraints, "Long-running commands"). Expected
 line with `outputs_sha256`. Record the wall time and the maximum resident set size. Record
 the bundle size with `du -sk`.
 
-- [ ] **Step 4: Verify**
+> Deviation: Steps 3 to 6 ran twice. The first build, `stage14_vendor_links_20261121_r1` (pin `c9d71dd95b717048a54a4701bf88a7cb670d59b1342adac0ce4a207267fe1610`, commit `620f836`), passed all four steps. The final whole-branch review then found that `sam_raw` would record a wrapped extract ZIP and use up its month. The owner chose "Fix now, rebuild" (2026-11-22). The fix changes `sam_raw.py`, which `verify` hashes, so `verify` now refuses `r1`. The second build, `stage14_vendor_links_20261122_r2` (pin `248943dc5603f8e035b0f1c49bf624a36ed702b70eb6b961a35b64ee97c7a2be`, commit `1eddb3e`), passed all four steps again, and its `report.json` equals that of `r1`. `r1` stays on disk as superseded.
+
+- [x] **Step 4: Verify**
 
 ```bash
 uv run --offline --locked python -m embedding_data.usaspending_vendor_links verify RUN_ID --outputs-sha256 RUN_PIN --data-dir /Users/lowell/Projects/embedding-data/data
@@ -1969,7 +1981,7 @@ uv run --offline --locked python -m embedding_data.usaspending_vendor_links veri
 
 Run it in the background. Expected: exit 0 and one JSON line.
 
-- [ ] **Step 5: Reconcile**
+- [x] **Step 5: Reconcile**
 
 ```bash
 uv run --offline --locked python scripts/reconcile_usaspending_vendor_links.py --data-dir /Users/lowell/Projects/embedding-data/data --run RUN_ID --outputs-sha256 RUN_PIN
@@ -1977,7 +1989,7 @@ uv run --offline --locked python scripts/reconcile_usaspending_vendor_links.py -
 
 Run it in the background. Expected: exit 0, with every comparison true.
 
-- [ ] **Step 6: Preservation**
+- [x] **Step 6: Preservation**
 
 1. The current `data/raw/manifest.jsonl` starts with the bytes of the Task 9 baseline
    copy, and the lines after them include the four Stage 14 entries. Other stages run in
@@ -2002,7 +2014,7 @@ Run it in the background. Expected: exit 0, with every comparison true.
 | `derived/osha/establishment-targets/stage10_ita_establishment_20261116_r1` | `e19b0d58f61f106c3994aa6fe51f4fb71244188145dd90f8cccaa8dc8a8b09df` |
 | `derived/osha/establishment-targets/stage10_ita_establishment_20261116_r1_replay` | `e38e820b6e999f751687918d8f578b0f9d69ce145bbcb672b966a19a78d536a4` |
 
-- [ ] **Step 7: On any failure**
+- [x] **Step 7: On any failure**
 
 Stop. Change no code. Report the failing step to the owner. Any cleanup of a failed run's
 staging needs its own go-ahead.
@@ -2021,7 +2033,7 @@ staging needs its own go-ahead.
 Merge `main` into the branch before Step 2: plans 13 and 14 edit the same lines. Place
 every edit by its quoted anchor text, not by line number. `<date>` is the execution date.
 
-- [ ] **Step 1: Finish the findings file (one screen)**
+- [x] **Step 1: Finish the findings file (one screen)**
 
 Add these sections:
 1. The run ID, the detached pin, the snapshot label, the extract month, and the wall time,
@@ -2037,13 +2049,15 @@ Add these sections:
 
 Fixture results are not benchmarks.
 
-- [ ] **Step 2: Check which shared amendment items are still open**
+> Deviation: the findings file is longer than one screen. It also records the measured cost of D2 (6,403 firms). A read-only, counts-only check that the owner approved on 2026-11-22 measured it, and the owner kept D2.
+
+- [x] **Step 2: Check which shared amendment items are still open**
 
 Run: `git fetch origin && git show origin/main:specs/embedding-evaluation-data-spec.md | grep -c "Evidence sources admitted by"`.
 If the count is 0, apply the shared items of Step 3 and Step 4 in full. Otherwise another
 stage applied them first: apply only Stage 14's own items.
 
-- [ ] **Step 3: Amend `specs/embedding-evaluation-data-spec.md`**
+- [x] **Step 3: Amend `specs/embedding-evaluation-data-spec.md`**
 
 Shared item 1 (introduction; only when Step 2 counted 0). Replace:
 
@@ -2106,7 +2120,7 @@ append:
 USAspending subaward data and the SAM.gov public entity extract are public. Tables derived from them may contain UEI pairs. They read no Dun & Bradstreet Open Data field, use no SAM.gov record last updated before 2022-04-04, and publish no name or address.
 ```
 
-- [ ] **Step 4: Amend `CLAUDE.md` (item 7)**
+- [x] **Step 4: Amend `CLAUDE.md` (item 7)**
 
 When Step 2 counted 0, replace:
 
@@ -2124,11 +2138,11 @@ Otherwise, in the sentence that starts `Evidence sources admitted by`, insert
 `, and USAspending vendor links (roadmap Stage 14, `python -m embedding_data.usaspending_vendor_links`)`
 before its final period (Settled Default 21).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Message: `docs(specs): record the Stage 14 findings and source spec amendment`.
 
-- [ ] **Step 6: Amend the stage spec's Rollout (Settled Default 1)**
+- [x] **Step 6: Amend the stage spec's Rollout (Settled Default 1)**
 
 In `specs/usaspending-vendor-links.md`, replace:
 
@@ -2150,7 +2164,7 @@ with:
 Leave the spec's Status line unchanged. Commit with
 `docs(specs): record the preflight-first order in the vendor-links spec`.
 
-- [ ] **Step 7: Plan Completion Protocol**
+- [x] **Step 7: Plan Completion Protocol**
 
 Run the writing-plans Plan Completion Protocol, including step 3a. The
 `## Handoff to later stages` section gives:
@@ -2166,6 +2180,54 @@ Run the writing-plans Plan Completion Protocol, including step 3a. The
 
 Retire the spec to `specs/completed/` and re-point its relative links.
 
-- [ ] **Step 8: Integrate**
+> Deviation: the final whole-branch review (two seats) ran before this step. It found the wrapped-ZIP import (fixed, see Task 15), the preflight tallies (fixed: the registration status and the EVS source count as coded only inside a closed domain) and D2 (kept, cost recorded). The fix wave is commits `012b3a9`, `fc35ae1`, `de92a71` and `1eddb3e`. At the gate the owner kept three declined-to-judge lines as built (the `SAM_API_KEY` order, skip-and-count and the two code-string readings), and the untested live `acquire-sam-extract` request is deferred → item: 15-usaspending-vendor-links — 2026-11-22.
+
+- [x] **Step 8: Integrate**
 
 Run the Stage 9 `pgrep` check, then open the PR and follow the owner's PR-lifecycle rule.
+
+---
+
+## Handoff to later stages
+
+Stage 14 feeds one Ranked-list item of Track C (O18) and the resume after Stage 14. The
+roadmap's Stage 14 entry leaves the resume to the owner. None is a staged stage yet, so none
+has a `Consumes` line. Three items were deferred (`specs/deferred_items.md`, section
+`15-usaspending-vendor-links`) → item: 15-usaspending-vendor-links — 2026-11-22.
+
+- **The resume after Stage 14 (replay check, acceptance finding, headline minimum count).**
+  It consumes run `stage14_vendor_links_20261122_r2`, pin
+  `248943dc5603f8e035b0f1c49bf624a36ed702b70eb6b961a35b64ee97c7a2be`, snapshot `2026-11-19`,
+  extract month `2026-10`, built at commit `1eddb3e` with `dirty: false`. The build took
+  29.6 s and 961 MB, so a replay costs little. Run `build` with a new run ID and the same
+  arguments (codes run `stage4_v11_20261013_r2`, its Stage 4 pin, `--snapshot 2026-11-19`,
+  `--sam-month 2026-10`), then `compare-runs`. The three subaward files and the extract in
+  `data/raw/` are manifest-recorded, so a replay reads the same bytes. Trap:
+  `vendor_link_bundle.SOFTWARE_FILES` lists 26 files, among them `sam_raw.py`,
+  `pyproject.toml` and `uv.lock`. A change to any of them makes `verify` refuse the run.
+  That is why the first run, `r1`, is superseded. Run the replay from a tree where those
+  files are byte-identical. The independent reconciler ran on `r2` only, and `compare-runs`
+  skips `inputs.json` (decision D3), so it does not compare the software record. For a
+  minimum count, `report.json` holds `n_unweighted_distribution`: median 1 (buyer share) and
+  2 (supplier share), 90th percentile 6 and 11, maximum 260 and 1,101. 4,810 of 8,307
+  buyer-share cells and 4,025 supplier-share cells have `n_unweighted` 1. Every row has
+  `size_gate_pending`, and no minimum is set. Deferred into the resume: the D2 rule and the
+  live `acquire-sam-extract` request (the section above).
+- **O18 (USAspending protocol section).** It reads `report.json`, the marginals and the
+  findings file: 48,989 firms (32,578 eligible), 107,994 pairs (67,524 eligible), 689
+  industries, 8,307 cells (16,614 rows), the intra-group label
+  (`numerator:intra_group_sensitivity:true`, 71 rows), the `universe` string, join coverage
+  (prime 0.810 and subcontractor 0.662, pooled), the diagonal (88 cells and 6,180 pairs,
+  9.2%) and the R8.4 exclusion. Traps: D2 gives 6,403 active registrations with one valid
+  NAICS 2022 code no industry (the findings file, "The cost of D2"). The extract is one month
+  and the subaward files are one snapshot. 276 extract lines are skipped and counted, and
+  they touch 16 firms, all `not_in_sam`. `vendor_link_pairs.parquet` holds UEI pairs and
+  stays on this machine. The release of any table is the owner's decision (E6). The extract
+  came by the browser path, so `acquire-sam-extract` and its key were never used against the
+  real API.
+- **Roadmap re-validation.** Stage 14 read only `naics_nodes.parquet` of the Stage 4 bundle.
+  It did not read the Stage 4 concordance that its `Consumes` line names. The O6 row in the
+  roadmap still says that the family needs an owner-created account and that its size is
+  unknown. The family is now built, E6 is closed and the browser path needed no key. The O6
+  row is not edited here. The USAspending row of `specs/deliverable-map.md` said "Not built"
+  and "not ready". The owner asked for it to be updated, and it was, on 2026-11-22.
