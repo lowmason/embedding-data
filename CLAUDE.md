@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-Builds aggregate evaluation targets for industry (NAICS), occupation (SOC), and geography embeddings from three core sources: OSHA ITA Form 300A summaries, ACS via IPUMS USA, and CPS via IPUMS CPS. Evidence sources admitted by `specs/uncovered-uses-evidence-sources.md` add further families, each adopted by its own roadmap stage, starting with EPA TRI parent links (roadmap Stage 5, `python -m embedding_data.tri_parent_links`). `specs/embedding-evaluation-data-spec.md` is the source of truth. So far the IPUMS extract scripts (define → submit → download → CSV-to-Parquet), the OSHA Form 300A summary acquisition with its stacked establishment-year table, and an OSHA case-detail download (download → CSV-to-Parquet) exist; every raw file is recorded in an append-only manifest (`data/raw/manifest.jsonl`); canonical NAICS/SOC graphs, NAICS concordances, ITA candidate mapping and filing-universe diagnostics are built. Geography reference bundles now supply the complete 2025 county inventory, July 2023 metropolitan/micropolitan membership and 2025Q4 HUD eligibility; the Stage 6 commands have measured full-data ITA assignment, a 2023 ITA area-mix target and exact cached replay through the shared target writer; the selected data acceptance is recorded in `specs/findings/stage-6-ita-area-mix-build.md`. Stage 7 now measures the five delivered IPUMS extracts with full-file parity, exact aggregate replay and frozen public references; its source-backed decisions and limits are in `specs/findings/stage-7-ipums-extract-verification.md`. Stage 8 ACS code parsing, population allocation, companion replay and full independent reconciliation are science-sealed in `specs/findings/stage-8-acs-codes-area-allocation.md`; repository completion is recorded in the [retired plan](specs/plans/completed/8-acs-codes-area-allocation.md) and [roadmap](specs/completed/embedding-evaluation-data-spec-roadmap.md). CPS mapping and other target families remain planned.
+Builds aggregate evaluation targets for industry (NAICS), occupation (SOC), and geography embeddings from three core sources: OSHA ITA Form 300A summaries, ACS via IPUMS USA, and CPS via IPUMS CPS. Evidence sources admitted by `specs/uncovered-uses-evidence-sources.md` add further families, each adopted by its own roadmap stage, starting with EPA TRI parent links (roadmap Stage 5, `python -m embedding_data.tri_parent_links`), and USAspending vendor links (roadmap Stage 14, `python -m embedding_data.usaspending_vendor_links`). `specs/embedding-evaluation-data-spec.md` is the source of truth. So far the IPUMS extract scripts (define → submit → download → CSV-to-Parquet), the OSHA Form 300A summary acquisition with its stacked establishment-year table, and an OSHA case-detail download (download → CSV-to-Parquet) exist; every raw file is recorded in an append-only manifest (`data/raw/manifest.jsonl`); canonical NAICS/SOC graphs, NAICS concordances, ITA candidate mapping and filing-universe diagnostics are built. Geography reference bundles now supply the complete 2025 county inventory, July 2023 metropolitan/micropolitan membership and 2025Q4 HUD eligibility; the Stage 6 commands have measured full-data ITA assignment, a 2023 ITA area-mix target and exact cached replay through the shared target writer; the selected data acceptance is recorded in `specs/findings/stage-6-ita-area-mix-build.md`. Stage 7 now measures the five delivered IPUMS extracts with full-file parity, exact aggregate replay and frozen public references; its source-backed decisions and limits are in `specs/findings/stage-7-ipums-extract-verification.md`. Stage 8 ACS code parsing, population allocation, companion replay and full independent reconciliation are science-sealed in `specs/findings/stage-8-acs-codes-area-allocation.md`; repository completion is recorded in the [retired plan](specs/plans/completed/8-acs-codes-area-allocation.md) and [roadmap](specs/completed/embedding-evaluation-data-spec-roadmap.md). CPS mapping and other target families remain planned.
 
 ## Commands
 
@@ -419,3 +419,38 @@ cleanup of a failed run's leftover staging. The
 [Stage 17 finding](specs/naics-evaluation-data-stage-17-findings.md) records the commands,
 counts, cost and what is not claimed. No headline minimum count (O23) and no protocol section
 (O24) exist yet, so no panel result is claimed.
+
+**USAspending vendor links (roadmap Stage 14).** `python -m
+embedding_data.usaspending_vendor_links` exposes seven commands, separate from the frozen
+top-level CLI: `acquire-subawards`, `acquire-sam-extract`, `import-subawards`,
+`import-sam-extract`, `build`, `verify` and `compare-runs`. Always pass an explicit
+`--data-dir`. Only the two `acquire-*` commands use the network, and only
+`acquire-sam-extract` reads a key. The other five load no `.env`, read no credential and
+construct no HTTP client. Failure prints only `USAspending vendor links <command> failed:
+<reason>; run <run_id>; path <path>` to stderr and exits 2. An unequal `compare-runs` exits 1.
+README gives the invocations. `build` takes the codes run `stage4_v11_20261013_r2` with its
+detached pin, the snapshot and the extract month, reads `naics_nodes.parquet` only, and writes
+`derived/usaspending/vendor-links/<RUN_ID>/` (four Parquets, `inputs.json`, `report.json` and
+the detached `outputs.json`). Raw files sit under `raw/usaspending/subcontracts/<snapshot>/`
+and `raw/sam/entity-extract/public-monthly-v2/<YYYY-MM>/`. Run one acquisition or one
+full-data build at a time, because the manifest append has no lock, and run the Stage 9
+`pgrep` check before each. A change to any file in `vendor_link_bundle.SOFTWARE_FILES` (this
+includes `pyproject.toml` and `uv.lock`) makes `verify` refuse the run.
+
+Readings fixed by the owner or by the real files: an extract line with the wrong field count
+is skipped and counted (owner, 2026-11-19, which overrides the spec's rule that it fails the
+build). Extract lines end at LF, so the layout note's CRLF is wrong for the delivered file,
+and the build drops one CR so that both read. A blank or invalid last update date makes a
+firm `dnb_era_record` (D2). A malformed code in a firm's other codes, or a malformed subaward
+NAICS, is not counted. `compare-runs` skips `inputs.json` (D3).
+
+The selected run is `stage14_vendor_links_20261121_r1`, with detached pin
+`c9d71dd95b717048a54a4701bf88a7cb670d59b1342adac0ce4a207267fe1610`, snapshot `2026-11-19` and
+extract month `2026-10`, built at commit `620f836` (`dirty: false`). `verify` exits 0, and the
+independent `scripts/reconcile_usaspending_vendor_links.py` (standard library and Polars, no
+`embedding_data` import) is equal on all 87 checks. The
+[Stage 14 findings](specs/naics-evaluation-data-stage-14-findings.md) record the commands,
+counts, cost and limits. `vendor_link_pairs.parquet` holds UEI pairs and stays on this
+machine. No output may feed embedder training, curriculum, hard-negative mining or model
+selection (R8.4). Every target keeps `size_gate_pending`, and no headline minimum count
+(O18) exists yet.

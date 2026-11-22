@@ -115,11 +115,13 @@ family (R7).
 | American Community Survey (ACS) PUMS, via IPUMS USA | Person (worker) | 2023–2024 core | Staffing patterns, area mixes, worker profiles, commuting and migration flows |
 | Current Population Survey (CPS), via IPUMS CPS | Person-month panel and ASEC | 2025 on | Job-change flows, last-year versus current job, job-related state migration |
 | EPA Toxics Release Inventory (TRI) basic data files | Facility-year | Reporting years 2022–2024 | Industries that one U.S. parent operates together, and each parent's industries |
+| USAspending.gov contract subawards, joined by UEI to the SAM.gov public entity extract | Prime–subcontractor firm pair | Fiscal years 2024–2026, one SAM.gov monthly snapshot | Industries linked as supplier and buyer through federal subcontracts |
 
 ITA supplies establishments; ACS and CPS supply the workers behind
 establishments' industries and occupations. *(chosen; D)*
 
-**R1.2** All three sources are free. ITA files are U.S. government works
+**R1.2** All sources are free. A free account or API key is allowed. Its key is handled
+like `IPUMS_API_KEY`. ITA files are U.S. government works
 published for public use. IPUMS requires an account registered for each
 collection and an API key, read from `IPUMS_API_KEY`; the key is never written
 to a file, a log, or a manifest. *(verified; ITA, USA — key handling added at
@@ -528,8 +530,9 @@ counts, and its source, sample set, code vintage, and universe. *(chosen; D)*
 | Text–code pairs | ITA | employer description → NAICS code path | NAICS |
 | Co-ownership | ITA | industry × industry within an employer (`ein`) | NAICS |
 | TRI parent links | EPA TRI | industry × industry within a U.S. parent, and parent × industry | NAICS |
+| Vendor links | USAspending subcontracts; SAM.gov entity NAICS | supplier industry → buyer industry, as firm shares | NAICS |
 
-The co-ownership family is *(added at synthesis)*; the TRI parent links family is *(owner, Stage 5 design, 2026-11-18; [stage spec](completed/tri-parent-links.md))*; the others are *(chosen; D)*.
+The co-ownership family is *(added at synthesis)*; the TRI parent links family is *(owner, Stage 5 design, 2026-11-18; [stage spec](completed/tri-parent-links.md))*; the vendor links family is *(owner, Stage 14 design, 2026-11-18; [stage spec](completed/usaspending-vendor-links.md))*; the others are *(chosen; D)*.
 
 The ACS wage microdata are a person-level analysis file, not a target family. The
 worker-profile family above is unchanged. *(owner, plan 14, 2026-11-19)*
@@ -570,7 +573,7 @@ shared. *(owner, plan 14, 2026-11-19)*
 **R8.2** Cite IPUMS USA and IPUMS CPS as their terms require. *(verified; USA)*
 
 **R8.3** ITA files are public, so ITA-derived tables may contain
-establishment-level rows. *(verified; ITA)* TRI files are EPA data, in the public domain by default under EPA's data license. TRI-derived tables may contain facility-year and parent rows. They publish no Dun & Bradstreet number.
+establishment-level rows. *(verified; ITA)* TRI files are EPA data, in the public domain by default under EPA's data license. TRI-derived tables may contain facility-year and parent rows. They publish no Dun & Bradstreet number. USAspending subaward data and the SAM.gov public entity extract are public. Tables derived from them may contain UEI pairs. They read no Dun & Bradstreet Open Data field, use no SAM.gov record last updated before 2022-04-04, and publish no name or address.
 
 **R8.4** **Benchmark tables are never training data.** No target and no ITA
 description enters training, curriculum construction, hard-negative mining, or

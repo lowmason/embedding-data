@@ -491,3 +491,88 @@ instructions"), and the controller chose the browser path.
 
 Not checked here: the retention and response form of the extract API. The browser path was
 used, so `acquire-sam-extract` was not run.
+
+## Full-data build
+
+The owner gave the go-ahead on 2026-11-21 and confirmed that no Stage 9 freeze window was
+open. The host-rule checks before the build printed nothing.
+
+| Item | Value |
+|---|---|
+| Run ID | `stage14_vendor_links_20261121_r1` |
+| Detached pin (SHA-256 of `outputs.json`) | `c9d71dd95b717048a54a4701bf88a7cb670d59b1342adac0ce4a207267fe1610` |
+| Snapshot label, extract month | `2026-11-19`, `2026-10` |
+| Codes run and pin | `stage4_v11_20261013_r2`, `15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a` |
+| Built at | commit `620f836`, `dirty: false`, 2026-11-22 04:22 UTC |
+| Cost | `build` 21.9 s and 937 MB peak resident memory; `verify` 19.6 s and 947 MB; the bundle is 1,720 KB |
+
+**Checks.** `verify` exited 0 with rows 689 (marginals), 107,994 (pairs), 8,307 (support)
+and 16,614 (targets). It exited 0 again after `main` was merged into the branch, because
+the merge changed no file in the bundle's recorded software. The independent reconciler
+(`scripts/reconcile_usaspending_vendor_links.py`, commit `9fd0a5b`) exited 0 with
+`equal` true on all 87 checks, in 14.4 s and 377 MB. It reports 522,594 reports, 522,528
+usable, 48,989 firms, 107,994 pairs, 8,307 cells and 276 unreadable lines. Preservation
+passed: the manifest starts with the Task 9 baseline and holds exactly the four Stage 14
+entries after it; `embedding-data audit` exited 0 with 0 raw provenance discrepancies; the
+ITA summary has its recorded SHA-256 and size; and the Stage 4, Stage 6, Stage 10 and
+Stage 5 bundles each have their pin and pass `verify_inventory`.
+
+**The first reconciler run refused.** The reconciler read the extract at CRLF only, as the
+layout note says. The delivered extract has 905,713 LF bytes, no CRLF and no CR. The
+reconciler saw one line and stopped with `extract framing differs`. The build already
+split at LF and dropped one CR, so it was right. The owner approved a fix on 2026-11-22.
+The reconciler now ends a line at LF and drops one CR before it. This cost one more fix
+round of Task 14 and no rebuild, because the reconciler is not part of the bundle's
+software.
+The layout note's `\r\n` is wrong for the delivered file.
+
+**Reports by status** (all 522,594 reports, by file year): `usable` 522,528 (FY2024
+227,218; FY2025 177,666; FY2026 117,644) and
+`uei_unusable` 66 (all blank prime UEIs in FY2024). No report is `action_date_invalid` or
+`outside_window`. There are no duplicate rows and no unparseable amounts.
+
+**Firms.** 48,989 distinct UEIs on usable reports. The firm status counts and join coverage
+are in "E5: extract and join" and did not change. `mixed_blank` and `code_not_in_string`
+are both 0 on the real data, so the real run does not test the reading of either rule. The
+code string has 3,181,441 entries. Each has six digits, and 38.5% (1,225,609) carry no flag
+letter. The layout note says each item has a flag, so the rule reads the flag as optional
+(the controller's ruling in Task 14).
+
+**Pairs.** 107,994 distinct pairs: `eligible` 67,524, `sub_ineligible` 22,569,
+`prime_ineligible` 17,722, `intra_group` 147 and `self_link` 32. The eligible pairs have
+28,410 suppliers and 2,215 buyers. The sensitivity that keeps intra-group pairs has 67,629
+pairs, 28,434 suppliers and 2,218 buyers.
+
+**Targets.** 8,307 cells in 689 industries, two measures each, so 16,614 target rows.
+7 cells exist only under the intra-group sensitivity. The diagonal (supplier and buyer in
+the same industry) holds 88 cells and 6,180 pairs, 9.2% of all pairs. Partial counts over
+the industries: 5,692 suppliers and 1,513 buyers also have a pair excluded as
+`prime_ineligible` or `sub_ineligible` respectively.
+
+**What is not claimed.** These are counts of reports and firms from one snapshot and one
+monthly extract. They are not benchmarks and not a frame of firms or trade. Every target
+keeps `size_gate_pending`. No headline minimum count (O18) and no protocol section exist yet.
+
+## For the resume and O18
+
+- **Run for a replay.** Run `stage14_vendor_links_20261121_r1`, pin
+  `c9d71dd95b717048a54a4701bf88a7cb670d59b1342adac0ce4a207267fe1610`, snapshot `2026-11-19`,
+  extract month `2026-10`. The three subaward files and the extract in `data/raw/` are
+  manifest-recorded, so a replay build can use the same bytes.
+- **Minimum count.** `n_unweighted` per cell has median 1 (buyer share) and 2 (supplier
+  share), p90 6 and 11, maximum 260 and 1,101. 4,810 of 8,307 buyer-share cells and 4,025
+  supplier-share cells have `n_unweighted` 1. `size_gate_pending` stays on every row.
+- **Counts for a null model.** Firm counts, pair counts and the marginals (689 industries
+  with `n_suppliers`, `n_buyers`, pair counts, partial counts and the intra-group
+  versions) are in `report.json` and `vendor_link_marginals.parquet`.
+- **Intra-group label.** 71 of the 16,614 rows carry `numerator:intra_group_sensitivity:true`.
+  These are the rows whose count under the sensitivity differs from `n_unweighted`. Every
+  row carries `size_gate_pending`. Intra-group pairs are excluded from the headline cells
+  and counted in the sensitivity.
+- **Universe.** The statement in `report.json` (`universe`) is the one the spec fixes.
+- **Join coverage.** Prime 0.810 and subcontractor 0.662 pooled. The loss is mostly
+  `not_in_sam` (8,671 firms) and `dnb_era_record` (6,457 firms).
+- **Diagonal.** 88 cells and 6,180 pairs (9.2%).
+- **R8.4.** No output of this stage may feed embedder training, curriculum, hard-negative
+  mining or model selection. `vendor_link_pairs.parquet` holds UEI pairs and stays on this
+  machine. The release of any table is the owner's decision (E6).
