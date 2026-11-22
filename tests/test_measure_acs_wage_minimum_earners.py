@@ -1,10 +1,12 @@
 '''The Stage 19 minimum-earners measurement script: the SE and band rule on small typed rows, and
 the authentication of the pinned Stage 17 bundle on small hand-made bundles.'''
 
+import dataclasses
 import importlib.util
 import json
 import math
 import random
+import shutil
 from fractions import Fraction
 from pathlib import Path
 
@@ -587,3 +589,373 @@ def test_padded_strings_stay_distinct(script, golden):
     _, _, headline = attempt(script, golden)
     assert headline.select('INDNAICS', 'YEAR').unique().height == 20
     assert {'6231', '6231  '} <= set(headline['INDNAICS'].to_list())
+
+
+# Input shapes beyond the plan's named tests, one test for each shape the rules' words cover.
+
+def test_inputs_are_frozen_and_the_reason_is_the_only_message(script, golden):
+    inputs = script.authenticate(golden['data_dir'], golden['run'], golden['pin'])
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        inputs.report = inputs.persons
+    with pytest.raises(script.Refused) as refusal:
+        attempt(script, golden, pin='0' * 64)
+    assert refusal.value.args == (PIN_DIFFERS,)
+
+
+def test_report_is_returned_as_written(script, golden):
+    _, report, headline = attempt(script, golden)
+    assert report == report_for(golden_people())
+    assert script.self_check(report, headline) is None
+
+
+@pytest.mark.parametrize('run', ['', '-fixture', '_fixture', 'fixture/', 'a/../fixture',
+                                 'fix ture', 'fixture\n', '.', '..'])
+def test_unsafe_run_id_shapes_refused(script, golden, run):
+    assert_refused(script, golden, UNSAFE, run=run)
+
+
+@pytest.mark.parametrize('shape', [str.upper, lambda pin: pin[:63], lambda pin: pin + 'a',
+                                   lambda pin: pin + '\n', lambda pin: '', lambda pin: 'g' * 64],
+                         ids=['upper_case', 'short', 'long', 'trailing_newline', 'empty',
+                              'not_hex'])
+def test_unsafe_pin_shapes_refused(script, golden, shape):
+    assert_refused(script, golden, UNSAFE, pin=shape(golden['pin']))
+
+
+def test_unsafe_run_id_is_refused_before_the_pin(script, golden):
+    assert_refused(script, golden, UNSAFE, pin='0' * 64, run='../fixture')
+
+
+def test_run_id_may_hold_underscores_and_dashes(script, golden):
+    copy = golden['data_dir'] / 'derived/acs/wage-microdata/stage-19_run-2'
+    shutil.copytree(golden['directory'], copy)
+    inputs = script.authenticate(golden['data_dir'], 'stage-19_run-2', golden['pin'])
+    assert inputs.persons == copy / PERSONS
+
+
+def test_missing_outputs_refused(script, golden):
+    (golden['directory'] / OUTPUTS).unlink()
+    assert_refused(script, golden, PIN_DIFFERS)
+
+
+def test_absent_run_refused(script, golden):
+    assert_refused(script, golden, PIN_DIFFERS, run='absent')
+
+
+@pytest.mark.parametrize('name, reason', [(REPORT, REPORT_DIFFERS), (PERSONS, PERSONS_DIFFER)])
+def test_same_size_change_is_refused(script, golden, name, reason):
+    file = golden['directory'] / name
+    content = bytearray(file.read_bytes())
+    content[len(content) // 2] ^= 1
+    file.write_bytes(bytes(content))
+    assert file.stat().st_size == len(content)
+    assert_refused(script, golden, reason)
+
+
+def test_persons_size_is_checked(script, golden):
+    pin = edit_outputs(golden, lambda inventory: inventory[PERSONS].update(
+        size=inventory[PERSONS]['size'] + 1))
+    assert_refused(script, golden, PERSONS_DIFFER, pin=pin)
+
+
+def test_report_is_checked_before_persons(script, golden):
+    append_byte(golden['directory'] / REPORT)
+    append_byte(golden['directory'] / PERSONS)
+    assert_refused(script, golden, REPORT_DIFFERS)
+
+
+@pytest.mark.parametrize('content', [b'\xff\xfe not json', b'not json', b'[]', b'"text"', b'{}',
+                                     b'{"report.json": "text"}'],
+                         ids=['not_utf8', 'not_json', 'array', 'string', 'empty_object',
+                              'record_not_an_object'])
+def test_malformed_outputs_refused_for_the_report_record(script, golden, content):
+    outputs = golden['directory'] / OUTPUTS
+    outputs.write_bytes(content)
+    assert_refused(script, golden, REPORT_DIFFERS, pin=manifest.sha256_file(outputs))
+
+
+def test_record_without_size_refused(script, golden):
+    pin = edit_outputs(golden, lambda inventory: inventory[REPORT].pop('size'))
+    assert_refused(script, golden, REPORT_DIFFERS, pin=pin)
+
+
+def test_record_without_hash_refused(script, golden):
+    pin = edit_outputs(golden, lambda inventory: inventory[REPORT].pop('sha256'))
+    assert_refused(script, golden, REPORT_DIFFERS, pin=pin)
+
+
+def test_missing_report_record_refused(script, golden):
+    pin = edit_outputs(golden, lambda inventory: inventory.pop(REPORT))
+    assert_refused(script, golden, REPORT_DIFFERS, pin=pin)
+
+
+def test_missing_persons_record_refused(script, golden):
+    pin = edit_outputs(golden, lambda inventory: inventory.pop(PERSONS))
+    assert_refused(script, golden, PERSONS_DIFFER, pin=pin)
+
+
+def test_missing_report_file_refused(script, golden):
+    (golden['directory'] / REPORT).unlink()
+    assert_refused(script, golden, REPORT_DIFFERS)
+
+
+def test_missing_persons_file_refused(script, golden):
+    (golden['directory'] / PERSONS).unlink()
+    assert_refused(script, golden, PERSONS_DIFFER)
+
+
+@pytest.mark.parametrize('state', ['corrupt', 'absent'])
+def test_no_other_file_of_the_run_is_read(script, golden, state):
+    other = golden['directory'] / 'inputs.json'
+    if state == 'corrupt':
+        other.write_text('not json at all')
+    else:
+        other.unlink()
+    attempt(script, golden)
+
+
+def drop_key(entry, key):
+    del entry[key]
+
+
+def replace_entry(position, value):
+    def change(report):
+        report['categories'][position] = value
+    return change
+
+
+def edit_first_entry(**values):
+    def change(report):
+        report['categories'][0].update(values)
+    return change
+
+
+MALFORMED_CHANGES = {
+    'categories_is_an_object': lambda report: report.update(categories={}),
+    'categories_is_null': lambda report: report.update(categories=None),
+    'entry_is_a_string': replace_entry(0, 'text'),
+    'indnaics_is_an_integer': edit_first_entry(INDNAICS=6231),
+    'indnaics_is_missing': lambda report: drop_key(report['categories'][0], 'INDNAICS'),
+    'year_is_a_string': edit_first_entry(YEAR='2023'),
+    'year_is_a_float': edit_first_entry(YEAR=2023.0),
+    'year_is_a_boolean': edit_first_entry(YEAR=True),
+    'year_is_missing': lambda report: drop_key(report['categories'][0], 'YEAR'),
+    'headline_rows_is_a_float': edit_first_entry(headline_rows=2.0),
+    'headline_rows_is_a_boolean': edit_first_entry(headline_rows=True),
+    'headline_rows_is_negative': edit_first_entry(headline_rows=-1),
+    'headline_rows_is_missing': lambda report: drop_key(report['categories'][0], 'headline_rows'),
+    'totals_are_missing': lambda report: drop_key(report, 'headline_categories'),
+    'totals_are_a_list': lambda report: report.update(headline_categories=[10, 10]),
+    'a_total_is_a_string': lambda report: report['headline_categories'].update({'2023': '10'}),
+    'a_total_is_a_boolean': lambda report: report['headline_categories'].update({'2023': True}),
+    'a_total_is_a_float': lambda report: report['headline_categories'].update({'2023': 10.0}),
+}
+
+
+@pytest.mark.parametrize('change', MALFORMED_CHANGES.values(), ids=MALFORMED_CHANGES.keys())
+def test_malformed_report_shapes_refused(script, golden, change):
+    assert_refused(script, golden, MALFORMED, pin=forge_report(golden, change))
+
+
+@pytest.mark.parametrize('content', [b'', b'not json', b'\xff', b'[]', b'null', b'7',
+                                     b'{"categories": []}'],
+                         ids=['empty', 'not_json', 'not_utf8', 'array', 'null', 'number',
+                              'one_key'])
+def test_unreadable_report_refused(script, golden, content):
+    pin = forge_report_text(golden, content)
+    assert_refused(script, golden, MALFORMED, pin=pin)
+
+
+def test_malformed_report_is_refused_without_the_json_error(script, golden):
+    pin = forge_report_text(golden, b'not json')
+    with pytest.raises(script.Refused) as refusal:
+        attempt(script, golden, pin=pin)
+    assert refusal.value.__suppress_context__ and refusal.value.__cause__ is None
+
+
+def test_malformed_comes_before_the_years(script, golden):
+    def change(report):
+        drop_2024(report)
+        string_headline_rows(report)
+    assert_refused(script, golden, MALFORMED, pin=forge_report(golden, change))
+
+
+YEAR_CHANGES = {
+    'extra_year_total': lambda report: report['headline_categories'].update({'2025': 0}),
+    'missing_2023_total': lambda report: report['headline_categories'].pop('2023'),
+    'entry_for_another_year': lambda report: report['categories'].append(
+        {'INDNAICS': '0000', 'YEAR': 2022, 'rows': 1, 'headline_rows': 0}),
+    'entry_for_a_later_year': lambda report: report['categories'].append(
+        {'INDNAICS': '0000', 'YEAR': 2025, 'rows': 1, 'headline_rows': 0}),
+    'empty_totals': lambda report: report.update(headline_categories={}),
+}
+
+
+@pytest.mark.parametrize('change', YEAR_CHANGES.values(), ids=YEAR_CHANGES.keys())
+def test_other_year_sets_refused(script, golden, change):
+    assert_refused(script, golden, YEARS_DIFFER, pin=forge_report(golden, change))
+
+
+def retype(column, dtype):
+    return lambda frame: frame.with_columns(pl.col(column).cast(dtype))
+
+
+COLUMN_CHANGES = {
+    'missing_perwt': lambda frame: frame.drop('PERWT'),
+    'missing_first_replicate': lambda frame: frame.drop('REPWTP1'),
+    'missing_last_replicate': lambda frame: frame.drop('REPWTP80'),
+    'missing_year': lambda frame: frame.drop('YEAR'),
+    'renamed_flag': lambda frame: frame.rename({'flag_headline': 'headline'}),
+    'year_int32': retype('YEAR', pl.Int32),
+    'flag_int8': retype('flag_headline', pl.Int8),
+    'wage_float32': retype('log_wage_2010', pl.Float32),
+    'perwt_int64': retype('PERWT', pl.Int64),
+    'code_categorical': retype('INDNAICS', pl.Categorical),
+    'last_replicate_float64': retype('REPWTP80', pl.Float64),
+}
+
+
+@pytest.mark.parametrize('change', COLUMN_CHANGES.values(), ids=COLUMN_CHANGES.keys())
+def test_column_shapes_refused(script, golden, change):
+    assert_refused(script, golden, COLUMNS_DIFFER, pin=forge_persons(golden, change))
+
+
+def test_extra_columns_are_ignored_and_not_read(script, golden):
+    def change(frame):
+        return frame.with_columns(pl.lit('x').alias('extra'), pl.col('YEAR').alias('YEAR_copy'))
+    pin = forge_persons(golden, change)
+    assert 'extra' in pl.read_parquet(golden['directory'] / PERSONS).columns
+    _, _, headline = attempt(script, golden, pin=pin)
+    assert headline.columns == list(READ_SCHEMA)
+
+
+def test_columns_come_back_in_contract_order_with_contract_types(script, golden):
+    pin = forge_persons(golden, lambda frame: frame.select(reversed(frame.columns)))
+    _, _, headline = attempt(script, golden, pin=pin)
+    assert headline.columns == list(READ_SCHEMA)
+    assert dict(headline.schema) == READ_SCHEMA
+
+
+def test_headline_frame_keeps_only_headline_rows(script, golden):
+    _, _, headline = attempt(script, golden)
+    assert headline.height == sum(row['flag_headline'] for row in golden_people())
+    assert headline['flag_headline'].all()
+
+
+def test_null_headline_flag_is_not_a_headline_row(script, golden):
+    pin = forge_persons(golden, set_value('flag_headline', None, headline=False))
+    _, _, headline = attempt(script, golden, pin=pin)
+    assert headline.height == sum(row['flag_headline'] for row in golden_people())
+
+
+def drop_entry(code, year):
+    def change(report):
+        report['categories'].remove(entry_for(report, code, year))
+    return change
+
+
+def lowered(report):
+    entry_for(report, '9999', 2024)['headline_rows'] -= 1
+
+
+def phantom(report):
+    report['categories'].append({'INDNAICS': 'ZZZZ', 'YEAR': 2023, 'rows': 5, 'headline_rows': 3})
+
+
+RECOUNT_CHANGES = {
+    'headline_key_has_no_entry': drop_entry('2222', 2024),
+    'entry_has_no_headline_rows_in_the_table': phantom,
+    'large_category_minus_one': lowered,
+    'padded_key_has_no_entry': drop_entry('6231  ', 2024),
+}
+
+
+@pytest.mark.parametrize('change', RECOUNT_CHANGES.values(), ids=RECOUNT_CHANGES.keys())
+def test_recount_set_differences_refused(script, golden, change):
+    assert_refused(script, golden, RECOUNT_DIFFERS, pin=forge_report(golden, change))
+
+
+def test_report_entry_without_headline_rows_is_not_counted(script, golden):
+    def shared_node(report):
+        report['categories'].append({'INDNAICS': '0000', 'YEAR': 2023, 'rows': 3,
+                                     'headline_rows': 0})
+    attempt(script, golden, pin=forge_report(golden, shared_node))
+
+
+def test_recount_ignores_the_order_of_entries(script, golden):
+    pin = forge_report(golden, lambda report: report['categories'].reverse())
+    attempt(script, golden, pin=pin)
+
+
+@pytest.mark.parametrize('year, delta', [('2023', -1), ('2024', 1), ('2024', -1)],
+                         ids=['2023_minus_one', '2024_plus_one', '2024_minus_one'])
+def test_headline_category_count_refused_in_each_year(script, golden, year, delta):
+    pin = forge_report(golden, lambda report: report['headline_categories'].update(
+        {year: report['headline_categories'][year] + delta}))
+    assert_refused(script, golden, COUNT_DIFFERS, pin=pin)
+
+
+def test_a_year_with_no_headline_rows_counts_zero(script, tmp_path):
+    people = [row for row in golden_people() if row['YEAR'] == 2023]
+    people += [person('1111', 2024, 10.0, headline=False)]
+    bundle = publish(tmp_path, people)
+    _, report, _ = attempt(script, bundle)
+    assert report['headline_categories'] == {'2023': 10, '2024': 0}
+
+
+@pytest.mark.parametrize('column, value', [('log_wage_2010', None), ('log_wage_2010', -math.inf),
+                                           ('PERWT', None), ('PERWT', -1.0),
+                                           ('PERWT', math.nan)],
+                         ids=['null_wage', 'minus_inf_wage', 'null_weight', 'negative_weight',
+                              'nan_weight'])
+def test_other_bad_wages_and_weights_refused(script, golden, column, value):
+    pin = forge_persons(golden, set_value(column, value))
+    assert_refused(script, golden, BAD_ROW, pin=pin)
+
+
+def test_the_last_headline_row_is_checked_too(script, golden):
+    def change(frame):
+        position = len(frame) - 1 - frame['flag_headline'].to_list()[::-1].index(True)
+        values = frame['PERWT'].to_list()
+        values[position] = 0.0
+        return frame.with_columns(pl.Series('PERWT', values, dtype=pl.Float64))
+    assert_refused(script, golden, BAD_ROW, pin=forge_persons(golden, change))
+
+
+def test_negative_wage_and_tiny_weight_pass(script, golden):
+    def change(frame):
+        frame = set_value('log_wage_2010', -3.5)(frame)
+        return set_value('PERWT', 1e-9)(frame)
+    attempt(script, golden, pin=forge_persons(golden, change))
+
+
+def test_the_recount_comes_before_the_row_check(script, golden):
+    forge_persons(golden, set_value('PERWT', 0.0))
+    pin = forge_report(golden, one_more)
+    assert_refused(script, golden, RECOUNT_DIFFERS, pin=pin)
+
+
+def test_the_category_count_comes_before_the_row_check(script, golden):
+    forge_persons(golden, set_value('PERWT', 0.0))
+    pin = forge_report(golden, lambda report: report['headline_categories'].update(
+        {'2023': report['headline_categories']['2023'] + 1}))
+    assert_refused(script, golden, COUNT_DIFFERS, pin=pin)
+
+
+def test_the_recount_comes_before_the_category_count(script, golden):
+    def change(report):
+        one_more(report)
+        report['headline_categories']['2023'] += 1
+    assert_refused(script, golden, RECOUNT_DIFFERS, pin=forge_report(golden, change))
+
+
+def test_padding_is_kept_on_both_sides_of_the_recount(script, golden):
+    _, report, headline = attempt(script, golden)
+    assert '6231  ' in {entry['INDNAICS'] for entry in report['categories']}
+    assert '6231  ' in headline['INDNAICS'].to_list()
+
+
+def test_columns_are_checked_before_the_rows(script, golden):
+    def change(frame):
+        return set_value('PERWT', 0.0)(frame).with_columns(pl.col('REPWTP5').cast(pl.Float64))
+    assert_refused(script, golden, COLUMNS_DIFFER, pin=forge_persons(golden, change))
