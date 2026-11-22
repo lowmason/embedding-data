@@ -749,7 +749,10 @@ def assert_values_withheld(report_):
 # The closed domain of each extract tally, beside the value that the window firms deliver.
 # The empty string is in each domain. A tally that holds a value outside it is not coded,
 # however few or short its values are.
-DOMAIN_VALUES = {'registration_status': ['E', ''], 'evs_source': ['D&B', '']}
+DOMAIN_VALUES = {'registration_status': ['E', 'A~E', ''], 'evs_source': ['D&B', '']}
+# The registration status codes that the real extract delivers (Stage 14 findings: `A`, `E`
+# and `A~E` once). Both commands must print this tally and stop for no reason.
+REAL_STATUS_CODES = ['E', 'A~E']
 # A layout that has drifted puts a short name, a UEI or a value with a space at the position.
 # Each made-up value holds DRIFT, which must reach no output.
 DRIFT_VALUES = {'short_name': 'DRIFTNAME', 'uei': 'DRIFTUEI0001', 'with_a_space': 'DRIFT VALUE'}
@@ -767,6 +770,14 @@ def test_headers_prints_an_extract_tally_of_every_value_of_its_domain(field, run
     report_ = run(['headers', *raw])
     assert report_['extract']['tallies'][field] == (
         {EXTRACT_TALLIES[field]: 4} | dict.fromkeys(values, 1))
+    assert report_['stops'] == []
+
+
+def test_headers_prints_the_registration_status_codes_of_the_real_extract(run, data_dir,
+                                                                         tmp_path):
+    raw = seed(data_dir, tmp_path, firms=tally_firms('registration_status', REAL_STATUS_CODES))
+    report_ = run(['headers', *raw])
+    assert report_['extract']['tallies']['registration_status'] == {'A': 4, 'E': 1, 'A~E': 1}
     assert report_['stops'] == []
 
 
@@ -1109,6 +1120,14 @@ def test_measure_prints_an_extract_tally_of_every_value_of_its_domain(name, run,
     report_ = run(['measure', *measure_args(raw, write_registry(tmp_path), codes)])
     delivered, count = MEASURED_TALLIES[name]
     assert measured_tally(report_, name) == {delivered: count} | dict.fromkeys(values, 1)
+    assert (report_['stops'], report_['ok']) == ([], True)
+
+
+def test_measure_prints_the_registration_status_codes_of_the_real_extract(run, data_dir,
+                                                                         tmp_path, codes):
+    raw = seed_tally(data_dir, tmp_path, 'by_registration_status', REAL_STATUS_CODES)
+    report_ = run(['measure', *measure_args(raw, write_registry(tmp_path), codes)])
+    assert measured_tally(report_, 'by_registration_status') == {'A': 4, 'E': 1, 'A~E': 1}
     assert (report_['stops'], report_['ok']) == ([], True)
 
 

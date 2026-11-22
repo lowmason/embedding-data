@@ -27,6 +27,7 @@ from vendor_link_fixtures import (  # noqa: F401
     no_live_sam,
     redirect_answer,
     sample_extract,
+    without_members,
     zip_bytes,
 )
 
@@ -462,6 +463,7 @@ NOT_THE_ONE_MEMBER_ZIP = {
         {member_name(): FRAMING, member_name('2026-10'): FRAMING}),
     'directory_entry_beside_the_member': zip_with_a_directory_entry,
     'directory_entry_alone': lambda: zip_bytes({member_name() + '/': b''}),
+    'zero_members': lambda: without_members(inner_extract()),
     'other_name': lambda: zip_bytes({'other.dat': FRAMING}),
     'name_without_the_hex_suffix': lambda: zip_bytes(
         {member_name().replace(f'_{MEMBER_HEX}', ''): FRAMING}),
@@ -498,6 +500,18 @@ def test_acquire_refuses_a_zip_that_is_not_the_one_member_extract(case, data_dir
     assert len(server.requests) == 1
     assert list(month_directory(data_directory).iterdir()) == []
     assert manifest_lines(data_directory) == []
+
+
+def test_the_zero_member_zip_passes_the_zip_checks_that_come_before_the_member_check(tmp_path):
+    # The premise of the `zero_members` case: the signature check of `fetch_extract` and
+    # `usaspending_raw.is_zip`, then `zipfile.is_zipfile`, all accept it, and it lists nothing.
+    body = NOT_THE_ONE_MEMBER_ZIP['zero_members']()
+    file = make_original(tmp_path, content=body)
+    assert body.startswith(usaspending_raw.ZIP_SIGNATURE)
+    assert zipfile.is_zipfile(file)
+    assert usaspending_raw.is_zip(file)
+    with zipfile.ZipFile(file) as archive:
+        assert archive.infolist() == []
 
 
 def test_a_refused_wrapped_import_leaves_the_month_free(data_directory, tmp_path):

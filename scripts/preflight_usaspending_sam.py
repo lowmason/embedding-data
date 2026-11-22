@@ -72,8 +72,9 @@ TALLY_VALUES = 25
 TALLY_LENGTH = 40
 # The closed domains of the two extract fields that the preflight tallies. A tally with a value
 # outside its domain is not coded, however few or short its values are, because a layout that
-# has drifted puts a name or a UEI at the position. The empty string is a blank cell.
-REGISTRATION_STATUSES = frozenset({'A', 'E', ''})
+# has drifted puts a name or a UEI at the position. The empty string is a blank cell. `A~E` is
+# a status code that the real extract delivers once (Stage 14 findings), not row text.
+REGISTRATION_STATUSES = frozenset({'A', 'E', 'A~E', ''})
 EVS_SOURCES = frozenset({'D&B', 'E&Y', ''})
 # By the name of the tally in the `headers` extract summary and in the `measure` E5 counts.
 EXTRACT_DOMAINS = {'registration_status': REGISTRATION_STATUSES,

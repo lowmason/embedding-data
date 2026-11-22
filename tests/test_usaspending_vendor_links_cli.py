@@ -42,6 +42,7 @@ from vendor_link_fixtures import (  # noqa: F401
     seed_raw,
     subaward_record,
     subprocess_modules,
+    without_members,
     zip_bytes,
 )
 
@@ -284,17 +285,26 @@ def test_sam_acquire_and_import_print_one_json_line(cli_runner, data_directory, 
          'manual-import')]
 
 
-def test_sam_commands_refuse_a_wrapped_extract_as_validation_and_record_nothing(
-        cli_runner, data_directory, tmp_path, monkeypatch):
-    # A ZIP around the extract ZIP, under the extract's own name, as a browser can save it.
-    install_sam(monkeypatch, FakeSam(extract_answer(
-        zip_bytes({EXTRACT_NAME: sample_extract()}))))
+# Each is a ZIP that the signature check and `zipfile.is_zipfile` accept, and that is not the
+# one-member extract: a ZIP around the extract ZIP under the extract's own name, as a browser
+# can save it, and a ZIP whose end record lists no member.
+NOT_THE_EXTRACT_ZIPS = {
+    'wrapped': lambda month: zip_bytes({extract_name(month): sample_extract(month)}),
+    'zero_members': lambda month: without_members(sample_extract(month)),
+}
+
+
+@pytest.mark.parametrize('kind', NOT_THE_EXTRACT_ZIPS)
+def test_sam_commands_refuse_a_zip_that_is_not_the_extract_as_validation_and_record_nothing(
+        kind, cli_runner, data_directory, tmp_path, monkeypatch):
+    make = NOT_THE_EXTRACT_ZIPS[kind]
+    install_sam(monkeypatch, FakeSam(extract_answer(make(MONTH))))
     monkeypatch.setenv('SAM_API_KEY', FAKE_KEY)
-    wrapped = tmp_path / 'downloads' / extract_name('2026-10')
-    wrapped.parent.mkdir()
-    wrapped.write_bytes(zip_bytes({wrapped.name: sample_extract('2026-10')}))
+    original = tmp_path / 'downloads' / extract_name('2026-10')
+    original.parent.mkdir()
+    original.write_bytes(make('2026-10'))
     for arguments in (sam_acquire_arguments(data_directory),
-                      sam_import_arguments(data_directory, wrapped, '2026-10')):
+                      sam_import_arguments(data_directory, original, '2026-10')):
         result = cli_runner.invoke(usaspending_vendor_links.app, arguments)
         assert result.exit_code == 2
         assert result.stdout == ''

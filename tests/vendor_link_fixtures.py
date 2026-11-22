@@ -10,6 +10,7 @@ import csv
 import io
 import json
 import logging
+import struct
 import subprocess
 import sys
 import zipfile
@@ -56,6 +57,17 @@ def zip_bytes(members: dict[str, bytes]) -> bytes:
             archive.writestr(zipfile.ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0)), content,
                              compress_type=zipfile.ZIP_DEFLATED)
     return buffer.getvalue()
+
+
+def without_members(archive: bytes) -> bytes:
+    '''`archive` with its end record replaced by one that lists no member.
+
+    The body still starts with a local file header, so the ZIP signature check accepts it, and
+    Python 3.14's `zipfile.is_zipfile` accepts it too. `zipfile.ZipFile` reads no member from it.
+    An empty ZIP from `zipfile` starts with the end record, which fails the signature check.
+    '''
+    end = archive.rindex(b'PK\x05\x06')
+    return archive[:end] + struct.pack('<4s4H2LH', b'PK\x05\x06', 0, 0, 0, 0, 0, 0, 0)
 
 
 def sample_zip() -> bytes:
