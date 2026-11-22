@@ -1,5 +1,7 @@
 # USAspending Vendor Links Hardening Implementation Plan
 
+**Status: COMPLETE (2026-11-22)** — executed via executing-plans; deferred items in specs/deferred_items.md
+
 > **For agentic workers:** REQUIRED SUB-SKILL: implement this plan task-by-task via subagent-driven-development (the default) — or executing-plans when your human partner chose inline execution at the handoff. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Give Stage 14's USAspending vendor-link bundle an exact replay check, a long-form
@@ -143,7 +145,9 @@ Stage 14".
 
 **Files:** none in the repository. Evidence goes to `E`.
 
-- [ ] **Step 1: Create the worktree and the venv**
+- [x] **Step 1: Create the worktree and the venv**
+
+> Deviation: `origin/main` was `3d0c63d` (the merge of PR 45, after this plan merged), so `W` and `REPLAY_COMMIT` are `3d0c63d`. Step 2 showed none of the 26 files changed. The ledger stayed in `E`, not in `W/.sdd/`, because `.sdd/` is not gitignored and would make the replay record `dirty: true`.
 
 ```bash
 git -C /Users/lowell/Projects/embedding-data fetch origin
@@ -156,13 +160,13 @@ From `W`, with `UV_PROJECT_ENVIRONMENT` unset, run once:
 `uv sync --locked --python /Users/lowell/.local/share/uv/python/cpython-3.14.0-macos-aarch64-none/bin/python3.14`.
 Expected: `W/.venv` exists, and `git status --porcelain` in `W` prints nothing.
 
-- [ ] **Step 2: Software files unchanged since `1eddb3e`**
+- [x] **Step 2: Software files unchanged since `1eddb3e`**
 
 From `W`, list the 26 entries of `SOFTWARE_FILES` from `src/embedding_data/vendor_link_bundle.py`
 and run `git diff --quiet 1eddb3e HEAD -- <those files>`.
 Expected: exit 0. Any other exit: stop and ask the owner.
 
-- [ ] **Step 3: Snapshot (read-only)**
+- [x] **Step 3: Snapshot (read-only)**
 
 Copy `ROOT/raw/manifest.jsonl` to `E/manifest-baseline.jsonl`. Write to `E/snapshot.json`:
 the SHA-256, byte size and line count of that copy, the
@@ -173,7 +177,7 @@ Expected: the `r2` hash is the selected pin, the codes hash is
 `stage14_vendor_links_20261121_r1` and `stage14_vendor_links_20261122_r2`. The replay ID and
 `<replay ID>.part` do not exist. Any difference: stop and ask.
 
-- [ ] **Step 4: Live identity equals `r2`'s record**
+- [x] **Step 4: Live identity equals `r2`'s record**
 
 From `W`, run `uv run --offline --locked python` with a script that prints one JSON line to
 `E/identity-1.json`:
@@ -196,12 +200,12 @@ Expected: `project_root` is `W`, `python_full` is
 The Exit needs this, because `compare-runs` does not check software identity. A failure
 here blocks the replay.
 
-- [ ] **Step 1: Host rule**
+- [x] **Step 1: Host rule**
 
 Run both `pgrep` checks (Global Constraints, "Host rule") and show the owner the first one's
 full output.
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
 
 From `W`, in the background:
 
@@ -220,18 +224,20 @@ the `.err` file.
 
 **Files:** none. Evidence goes to `E`. The bundle goes to `V/stage14_vendor_links_20261122_r2_replay/`.
 
-- [ ] **Step 1: Clean state and identity again**
+- [x] **Step 1: Clean state and identity again**
 
 In `W`, `git status --porcelain --untracked-files=normal` prints nothing. Repeat Task 1
 Steps 2 and 4, writing `E/identity-2.json`. Expected: as in Task 1.
 
-- [ ] **Step 2: Go-ahead**
+- [x] **Step 2: Go-ahead**
 
 Run both `pgrep` checks and show the owner the first one's full output. Confirm that neither
 `V/stage14_vendor_links_20261122_r2_replay` nor its `.part` exists. Ask the owner for the
 go-ahead and the confirmation that no Stage 9 freeze window is open. Wait for both.
 
-- [ ] **Step 3: Build**
+- [x] **Step 3: Build**
+
+> Deviation: another session's pre-commit hook (7 pytest-xdist workers on temporary data directories) was on the host. It is not an acquisition or a build, and the owner said "don't wait, start the build now". The finding marks every Stage 20 wall time as loaded.
 
 From `W`, in the background:
 
@@ -250,7 +256,7 @@ and of `r2`, and the byte total of the files in each.
 
 **Files:** none. Evidence goes to `E`.
 
-- [ ] **Step 1: Verify the replay**
+- [x] **Step 1: Verify the replay**
 
 Run both `pgrep` checks and show the owner the first one's output. Repeat Task 1 Steps 2
 and 4 (`E/identity-3.json`). Then, from `W`, in the background:
@@ -261,7 +267,7 @@ and 4 (`E/identity-3.json`). Then, from `W`, in the background:
 
 Expected: exit 0, and its `rows` equal Task 2's. Record wall time and maximum RSS.
 
-- [ ] **Step 2: Compare**
+- [x] **Step 2: Compare**
 
 Run both `pgrep` checks. Then, from `W`, in the background:
 
@@ -274,7 +280,7 @@ Expected: exit 0 and one JSON line with `"equal": true`, `"report_equal": true`,
 `values_equal` true with equal `first_rows` and `second_rows`. Exit 1 or any unequal table:
 stop and ask.
 
-- [ ] **Step 3: Compare the two `inputs.json` files**
+- [x] **Step 3: Compare the two `inputs.json` files**
 
 This covers what D3 skips. In `uv run --offline --locked python`, load both `inputs.json`
 files and write one JSON line to `E/inputs-compare.json`. It must hold:
@@ -288,7 +294,7 @@ files and write one JSON line to `E/inputs-compare.json`. It must hold:
 Also record the SHA-256 of `inputs.json` and `report.json` of both runs. The two
 `report.json` hashes are equal. Any other result: stop and ask.
 
-- [ ] **Step 4: Preservation**
+- [x] **Step 4: Preservation**
 
 1. `ROOT/raw/manifest.jsonl` has the Task 1 SHA-256 and line count. If other stages appended
    lines in the meantime, its first bytes equal `E/manifest-baseline.jsonl` byte for byte.
@@ -313,7 +319,7 @@ Now merge `origin/main` into the branch (Task 4 has ended). Place each edit by i
 anchor text, not by line number. Fill `REPLAY_PIN`, `REPLAY_COMMIT` and the measured values
 from `E`.
 
-- [ ] **Step 1: Write the finding**
+- [x] **Step 1: Write the finding**
 
 Model it on `specs/findings/stage-10-ita-establishment-targets.md`. Cite
 `specs/naics-evaluation-data-stage-14-findings.md` for the counts. Do not restate them.
@@ -339,6 +345,7 @@ Sections:
    (line 6) names `specs/usaspending-vendor-links.md`. The spec is at
    `specs/completed/usaspending-vendor-links.md`. Neither file is edited. The docstring fix
    is deferred (`specs/deferred_items.md`, section `15-usaspending-vendor-links`).
+   → item: 15-usaspending-vendor-links — 2026-11-22
 6. **Limits.** `compare-runs` skips `inputs.json` (D3), and Task 4 Step 3 covers it. The
    independent reconciler ran on `r2` only (Settled Default 5). `r1` is superseded, stays on
    disk and is not cited. D2 stays, with its cost in the Stage 14 findings ("The cost of
@@ -350,7 +357,7 @@ Sections:
 8. **Where the evidence lives.** The bundles under `V`, the logs in `E`, the Stage 14
    findings, plan 15 and this plan.
 
-- [ ] **Step 2: README pins**
+- [x] **Step 2: README pins**
 
 In `README.md`, replace:
 
@@ -372,7 +379,7 @@ commands, the cost and what is not claimed. The superseded `stage14_vendor_links
 stays on disk and is not cited.
 ```
 
-- [ ] **Step 3: CLAUDE.md pins**
+- [x] **Step 3: CLAUDE.md pins**
 
 In `CLAUDE.md`, after the sentence that ends `is equal on all 87 checks.`, insert:
 
@@ -385,7 +392,9 @@ run ID and the execution commit and time. The
 the cost and the limits.
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
+
+> Deviation: the merge of `origin/main` was a no-op. The final review found three claims in the finding that went past the evidence, and commit `91e3380` scoped them. It changes no value.
 
 Run the Stage 9 `pgrep` check. Then:
 
@@ -403,7 +412,7 @@ git commit -m "docs: record the Stage 20 replay of the USAspending vendor links"
   (ticking pass only), `specs/history.md`
 - Move: this plan to `specs/plans/completed/`
 
-- [ ] **Step 1: Plan Completion Protocol**
+- [x] **Step 1: Plan Completion Protocol**
 
 Run the writing-plans Plan Completion Protocol, including step 3a. The
 `## Handoff to later stages` section gives:
@@ -417,10 +426,32 @@ Run the writing-plans Plan Completion Protocol, including step 3a. The
 
 Leave the spec where it is: it is already in `specs/completed/`.
 
-- [ ] **Step 2: Integrate**
+- [x] **Step 2: Integrate**
 
 Run the Stage 9 `pgrep` check. Push the branch and open the PR under the owner's
 PR-lifecycle rule. No commit lands on the branch before the build, so `REPLAY_COMMIT` is
 the `origin/main` commit that Task 1 cut `W` from, and it stays reachable from `main`.
 Merge with a merge commit (`gh pr merge --merge`), as the repository's history does. Then
 run the post-merge cleanup for `W`.
+
+## Handoff to later stages
+
+- **O26 (USAspending headline minimum count).** It reads `report.json` of
+  `stage14_vendor_links_20261122_r2` (pin
+  `248943dc5603f8e035b0f1c49bf624a36ed702b70eb6b961a35b64ee97c7a2be`), whose bytes equal the
+  replay's (`stage14_vendor_links_20261122_r2_replay`, pin
+  `d08ed4cb396fae172ebde8be65fe6dfc492cb4c2731ad4308cfcf7cd55fd6055`, SHA-256 `040127fb…`
+  for both). Its `n_unweighted_distribution` is what plan 15's Handoff names. The CLAUDE.md
+  sentence that still calls the minimum count O18 is a deferred item
+  (`specs/deferred_items.md`, section `16-usaspending-vendor-links`).
+- **O18 (USAspending protocol section).** The selected runs and pins are above. The finding
+  is `specs/findings/stage-14-usaspending-vendor-links.md`. `compare-runs` skips
+  `inputs.json` (D3), so equality says nothing about software. The Task 4 Step 3 check
+  (the finding's Results, "The two `inputs.json` files") shows that only `run_id` and
+  `execution.commit`/`created_at` differ.
+- **Traps.** A change to any of the 26 files in `vendor_link_bundle.SOFTWARE_FILES`, the
+  Python build or the installed distributions makes `verify` refuse both runs. Only uv's
+  CPython 3.14.0 reproduces the record. `compare-runs` costs 0.76 s and 258 MB, not the
+  955 MB this plan assumed, so it is not a full-data command in cost.
+- **Still deferred.** The live `acquire-sam-extract` request and the reconciler docstring
+  (`specs/deferred_items.md`, section `15-usaspending-vendor-links`).

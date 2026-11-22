@@ -251,7 +251,7 @@ on 2026-11-22, and Stage 20 from Track C's later that day (see Choices made).
       Leaves out: the protocol section for the file → O24. The wage panel itself → naics-embedder's panel spec
       ROUTING: brainstorming
 
-- [ ] Stage 20: USAspending vendor links, hardening
+- [x] Stage 20: USAspending vendor links, hardening
       Objective: Stage 14's USAspending bundle gets its exact replay check, a long-form acceptance finding and README and CLAUDE.md run pins.
       Outcomes: O25
       Track: C
@@ -260,6 +260,9 @@ on 2026-11-22, and Stage 20 from Track C's later that day (see Choices made).
       Exit: O25: `verify` of Stage 14's run with its detached pin passes from Stage 20's checkout and venv, because `compare-runs` does not check software identity. The replay bundle's `verify` with its own detached pin passes, and `compare-runs` against Stage 14's run reports equal. The acceptance finding is committed and records the replay run ID, its pin, and the wall time, maximum RSS and bundle size of the replay. README and CLAUDE.md name the selected USAspending runs and their pins
       Leaves out: the USAspending headline minimum count → O26. The USAspending protocol section → O18. A changed D2 rule and the live `acquire-sam-extract` request → `specs/deferred_items.md`. The R8.4 training-role amendment → a separate owner decision after naics-embedder's spec (reset prompt, Leave alone)
       ROUTING: writing-plans
+
+> Stage 20: COMPLETE (2026-11-22) — implemented by plan 16 (specs/plans/completed/16-usaspending-vendor-links.md). Its Handoff section names what O26 and O18 consume.
+> Next: resume the roadmap.
 
 ## Ranked list — Track B
 

@@ -247,3 +247,14 @@
       tree. The fix is a one-line docstring edit. Size: quick-fix.
       Done when: the docstring names the retired path, in the same commit as the
       next change to the script.
+
+## 16-usaspending-vendor-links — 2026-11-22
+- [ ] Stale outcome number in CLAUDE.md (final review, declined to judge, outside
+      the plan's Step 3 insert): the last sentence of the "USAspending vendor links
+      (roadmap Stage 14)" section (`CLAUDE.md`, line 465) says "no headline minimum
+      count (O18) exists yet". The roadmap's resume after Stage 14 (2026-11-22) made
+      the USAspending headline minimum count O26, and O18 is the protocol section
+      (`specs/naics-evaluation-data-roadmap.md`, outcome rows O18 and O26). The
+      frozen Stage 14 findings (line 584) use the old label and stay unedited.
+      Size: quick-fix. Done when: that CLAUDE.md sentence names O26 for the minimum
+      count, in the commit that records O26's decision or in an earlier docs commit.
