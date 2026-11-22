@@ -626,10 +626,12 @@ def test_unsafe_run_id_is_refused_before_the_pin(script, golden):
     assert_refused(script, golden, UNSAFE, pin='0' * 64, run='../fixture')
 
 
-def test_run_id_may_hold_underscores_and_dashes(script, golden):
-    copy = golden['data_dir'] / 'derived/acs/wage-microdata/stage-19_run-2'
+@pytest.mark.parametrize('run', ['stage-19_run-2', 'a', '7'],
+                         ids=['underscore_and_dashes', 'one_letter', 'one_digit'])
+def test_safe_run_ids_are_accepted(script, golden, run):
+    copy = golden['data_dir'] / 'derived/acs/wage-microdata' / run
     shutil.copytree(golden['directory'], copy)
-    inputs = script.authenticate(golden['data_dir'], 'stage-19_run-2', golden['pin'])
+    inputs = script.authenticate(golden['data_dir'], run, golden['pin'])
     assert inputs.persons == copy / PERSONS
 
 
@@ -656,6 +658,13 @@ def test_persons_size_is_checked(script, golden):
     pin = edit_outputs(golden, lambda inventory: inventory[PERSONS].update(
         size=inventory[PERSONS]['size'] + 1))
     assert_refused(script, golden, PERSONS_DIFFER, pin=pin)
+
+
+@pytest.mark.parametrize('name, reason', [(REPORT, REPORT_DIFFERS), (PERSONS, PERSONS_DIFFER)])
+def test_size_below_the_record_is_refused(script, golden, name, reason):
+    pin = edit_outputs(golden, lambda inventory: inventory[name].update(
+        size=inventory[name]['size'] - 1))
+    assert_refused(script, golden, reason, pin=pin)
 
 
 def test_report_is_checked_before_persons(script, golden):
