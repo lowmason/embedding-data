@@ -106,3 +106,17 @@ Differences from the design:
 - Decision D1: Approve plan 16 as committed at `0b30760`, with the five Settled Defaults unchanged ("Approve plan 16"). Source: plan, `## Decisions`.
 - Owner gate (2026-11-22): "Go, window closed" for the replay build, then "don't wait, start the build now".
 - Deferred: 1 item. Source: specs/deferred_items.md, § 16-usaspending-vendor-links.
+
+## 18-tri-parent-links — 2026-11-22
+Plan: specs/plans/completed/18-tri-parent-links.md · Spec: specs/completed/tri-parent-links.md (retired) · Roadmap: specs/naics-evaluation-data-roadmap.md, Stage 18
+
+Differences from the design:
+- Ruling: ledger at E/progress.md, not <repo>/.sdd/ — plan Global Constraints "Clean tree" puts the ledger in E and says .sdd/ is not gitignored — if wrong, W records dirty:true
+- Ruling: test-driven-development loaded but not applicable — the plan changes no code; the Expected lines of each command are the gates — none
+- Ruling: finding cites spec lines 474-479 for the settled partial-owner reading (plan says 472-480) — the owner-marked text is lines 474-479; 472-473 and 480 are neighbouring sentences — none
+- Ruling (final review): dispatched one read-only code-reviewer (opus) and, with the owner's approval, one Codex run on fd43236..1db894f although the plan's Process line says no subagent is dispatched for a task — that line covers the tasks (each an owner gate or a command), and executing-plans makes one whole-branch review the floor; it found a claim past the evidence — if wrong, review tokens only; the reviewers were read-only
+- Deviation (Task 2): the first `pgrep` list (another session's pre-commit hook) reached the owner late, at the Task 3 gate, after the `verify` had run. Source: plan, Task 2.
+- Deviation (Task 3): the same hook was on the host at the gate. The owner chose "Go now (loaded)", so the build started without waiting. Source: plan, Task 3.
+- Deviation (Task 5): `origin/main` (`fd43236`, one docs file) went in by fast-forward. The final review found load claims in the finding that went past the saved `pgrep` lists, and commit `f34a1af` reworded them. It changes no value. Source: plan, Task 5.
+- Owner gates (2026-11-22): "Go now (loaded)" with the host check confirmed, for the replay build. "Run Codex", for the second review.
+- Deferred: 2 items. Source: specs/deferred_items.md, § 18-tri-parent-links.
