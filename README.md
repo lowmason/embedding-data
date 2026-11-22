@@ -821,8 +821,14 @@ Under R8.4, no table from this stage feeds embedder training, curriculum, hard-n
 mining or model selection. The tables only judge. `vendor_link_pairs.parquet` holds UEIs and
 amounts. Whether any table leaves the machine follows the E6 terms check of the stage spec.
 The tests and the fixture chain show software readiness only. Fixture results are never
-benchmarks. This section names no run pin. The selected run pins wait for a hardening stage,
-if the owner promotes one.
+benchmarks. The measured production runs are `stage14_vendor_links_20261122_r2` (the first
+run) and `stage14_vendor_links_20261122_r2_replay`. Their detached pins, which `verify` needs
+as `--outputs-sha256`, are
+`248943dc5603f8e035b0f1c49bf624a36ed702b70eb6b961a35b64ee97c7a2be` and `d08ed4cb396fae172ebde8be65fe6dfc492cb4c2731ad4308cfcf7cd55fd6055`. Both
+pass `verify`, and `compare-runs` finds them equal. The
+[Stage 14 finding](specs/findings/stage-14-usaspending-vendor-links.md) records the exact
+commands, the cost and what is not claimed. The superseded `stage14_vendor_links_20261121_r1`
+stays on disk and is not cited.
 
 ## Data sources
 
