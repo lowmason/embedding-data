@@ -43,6 +43,7 @@ Choices made:
 - Track H (owner, 2026-11-18): the "Roadmap placement" section of `specs/completed/acs-wage-microdata.md`, approved on 2026-11-18, proposed the track. Track H reads Stage 8 in place and does not wait for Stage 9. Stage 17 goes to writing-plans against that spec, as its header says. Stage 17 keeps the replay check of the spec's Verification item 1, which the owner approved with the spec. Stages 1, 5, 14 and 15 left replay to a later stage or item.
 - Resume after Stages 5 and 17 (owner, 2026-11-22, "Approve"): Tracks B and H keep their rankings. O12 becomes Stage 18 and O23 becomes Stage 19. O12 goes first in Track B because a change to a file in `tri_bundle.SOFTWARE_FILES` (it includes `pyproject.toml`, `uv.lock` and the shared Stage 4 to 6 modules) makes `verify` refuse Stage 5's run, so the replay can no longer be compared with it (plan 13, Handoff). Both Stage 17 gate readings stand (Stage 19, Consumes).
 - Resume after Stage 14 (owner, 2026-11-22, "Approve as drafted"): Stage 14's Leaves out becomes O25 (USAspending hardening) and O26 (USAspending headline minimum count). Track C ranks O25, O26, O18, as Track B does. O25 becomes Stage 20. It goes first for the reason O12 did: a change to a file in `vendor_link_bundle.SOFTWARE_FILES` (26 files, among them `pyproject.toml`, `uv.lock` and `sam_raw.py`) makes `verify` refuse Stage 14's run (plan 15, Handoff). D2 stays: a blank or invalid last update date makes a firm `dnb_era_record`, so 6,403 firms get no industry (`specs/naics-evaluation-data-stage-14-findings.md`, "The cost of D2"). The live `acquire-sam-extract` request stays deferred (`specs/deferred_items.md`, section `15-usaspending-vendor-links`).
+- Resume after Stage 20 (owner, 2026-11-22, "Approve"): Track C keeps its ranking, O26 then O18. O26 becomes Stage 21. Stage 20 found the replay equal to Stage 14's run, with both `verify` runs passing. Its replay build took 25.83 s and 966 MB (`specs/findings/stage-14-usaspending-vendor-links.md`, "Measured cost").
 
 | # | Outcome | Track | Rank | Cost (estimate; basis) |
 |---|---|---|---|---|
@@ -103,7 +104,7 @@ first answer. The owner approved this partition on 2026-11-16. Stage 5, the firs
 promoted Track B item, follows Track A's Stages 3 and 4 (owner, 2026-11-16). From
 2026-11-18 the tracks run in parallel (see Choices made). Stage numbers name stages and
 do not set an order. Stages 18 and 19 were promoted from the Ranked lists of Tracks B and H
-on 2026-11-22, and Stage 20 from Track C's later that day (see Choices made).
+on 2026-11-22, and Stages 20 and 21 from Track C's later that day (see Choices made).
 
 - [x] Stage 1: ITA NAICS targets, first build
       Objective: Plan 11's bundle is built once on real ITA data and verified.
@@ -264,6 +265,16 @@ on 2026-11-22, and Stage 20 from Track C's later that day (see Choices made).
 > Stage 20: COMPLETE (2026-11-22) — implemented by plan 16 (specs/plans/completed/16-usaspending-vendor-links.md). Its Handoff section names what O26 and O18 consume.
 > Next: resume the roadmap.
 
+- [ ] Stage 21: Headline minimum count for the USAspending family
+      Objective: A headline minimum count for the USAspending vendor-link targets is set from their observed counts.
+      Outcomes: O26
+      Track: C
+      Consumes: `report.json` of `stage14_vendor_links_20261122_r2` (detached pin `248943dc5603f8e035b0f1c49bf624a36ed702b70eb6b961a35b64ee97c7a2be`), whose bytes equal those of the replay `stage14_vendor_links_20261122_r2_replay` (detached pin `d08ed4cb396fae172ebde8be65fe6dfc492cb4c2731ad4308cfcf7cd55fd6055`), with its `n_unweighted_distribution` (plan 16, Handoff; plan 15, Handoff). The sections "Full-data build" and "For the resume and O18" of `specs/naics-evaluation-data-stage-14-findings.md`. The Stage 20 finding `specs/findings/stage-14-usaspending-vendor-links.md` holds no counts. The O4 decision `specs/findings/v9-ita-naics-minimum-counts.md` as the model, and "Rules for every new family" of the Stage 2 spec `specs/uncovered-uses-evidence-sources.md`. Trap: a change to any file in `vendor_link_bundle.SOFTWARE_FILES` makes `verify` refuse both runs (plan 16, Handoff)
+      Produces: a committed minimum-count decision for the USAspending family
+      Exit: O26: a committed decision sets the headline minimum count from the observed `n_unweighted` distributions of the family's buyer-share and supplier-share targets. It reports for each target how many cells meet it. The published bundles keep `size_gate_pending`
+      Leaves out: the USAspending protocol section → O18. A changed D2 rule and the live `acquire-sam-extract` request → `specs/deferred_items.md`. The R8.4 training-role amendment → a separate owner decision after naics-embedder's spec (reset prompt, Leave alone)
+      ROUTING: brainstorming
+
 ## Ranked list — Track B
 
 Owner's order after Stage 2 (2026-11-16), with ranks restarted on 2026-11-18. O7 and O8
@@ -275,10 +286,10 @@ parked in `specs/deferred_items.md`.
 
 ## Ranked list — Track C
 
-Owner's order at the resume after Stage 14 (2026-11-22). O25 left the list as Stage 20.
+Owner's order at the resume after Stage 14 (2026-11-22). O25 left the list as Stage 20, and O26
+as Stage 21 (owner, 2026-11-22).
 
-1. O26 — USAspending minimum count. Small: one pass over its counts
-2. O18 — USAspending protocol section. Design sessions only, after Stage 14's real build
+1. O18 — USAspending protocol section. Design sessions only, after Stage 14's real build
 
 ## Ranked list — Track D
 
