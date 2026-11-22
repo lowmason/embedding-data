@@ -9,7 +9,9 @@ is transformed into benchmark targets that measure how industries, occupations,
 and places relate in practice. It covers three sources — OSHA Injury Tracking
 Application establishment summaries, American Community Survey microdata through
 IPUMS USA, and Current Population Survey microdata through IPUMS CPS — plus the
-code harmonization, geography hierarchy, and output tables they share. The
+code harmonization, geography hierarchy, and output tables they share. Evidence
+sources admitted by [the evidence-sources spec](uncovered-uses-evidence-sources.md)
+add further families, each adopted by its own roadmap stage. The
 *evaluation protocol* that scores embeddings against these targets is
 deliberately excluded and belongs to a successor spec (see Out of scope), which
 is [evaluation-protocol.md](evaluation-protocol.md) *(owner, 2026-11-18)*. Every
@@ -89,7 +91,8 @@ in the way:
 ## Core principle
 
 **Relatedness is observed, never assumed.** Every benchmark target is computed
-from records in the three sources. No target is derived from the NAICS, SOC, or
+from records in the admitted sources (R1.1), or taken as published from an admitted
+published aggregate (R7.5). No target is derived from the NAICS, SOC, or
 geographic code structure, because that structure is what the embeddings are
 trained on; the formal trees enter only as node and edge tables, used by tasks
 that say they test hierarchy consistency. Values a source imputed — Census
@@ -104,13 +107,14 @@ family (R7).
 
 ### R1 — Sources and access
 
-**R1.1** The required path draws on exactly three sources:
+**R1.1** The required path draws on three core sources:
 
 | Source | Unit | Years | Role |
 | --- | --- | --- | --- |
 | OSHA Injury Tracking Application (ITA), Form 300A summaries | Establishment-year | 2016–2025 | Employment, hours, NAICS, address, and employer-written industry text |
 | American Community Survey (ACS) PUMS, via IPUMS USA | Person (worker) | 2023–2024 core | Staffing patterns, area mixes, worker profiles, commuting and migration flows |
 | Current Population Survey (CPS), via IPUMS CPS | Person-month panel and ASEC | 2025 on | Job-change flows, last-year versus current job, job-related state migration |
+| EPA Toxics Release Inventory (TRI) basic data files | Facility-year | Reporting years 2022–2024 | Industries that one U.S. parent operates together, and each parent's industries |
 
 ITA supplies establishments; ACS and CPS supply the workers behind
 establishments' industries and occupations. *(chosen; D)*
@@ -523,8 +527,9 @@ counts, and its source, sample set, code vintage, and universe. *(chosen; D)*
 | Migration flows | ACS; CPS ASEC | PUMA → PUMA; state → state, with a job-related subset | geography |
 | Text–code pairs | ITA | employer description → NAICS code path | NAICS |
 | Co-ownership | ITA | industry × industry within an employer (`ein`) | NAICS |
+| TRI parent links | EPA TRI | industry × industry within a U.S. parent, and parent × industry | NAICS |
 
-The co-ownership family is *(added at synthesis)*; the others are *(chosen; D)*.
+The co-ownership family is *(added at synthesis)*; the TRI parent links family is *(owner, Stage 5 design, 2026-11-18; [stage spec](completed/tri-parent-links.md))*; the others are *(chosen; D)*.
 
 The ACS wage microdata are a person-level analysis file, not a target family. The
 worker-profile family above is unchanged. *(owner, plan 14, 2026-11-19)*
@@ -565,7 +570,7 @@ shared. *(owner, plan 14, 2026-11-19)*
 **R8.2** Cite IPUMS USA and IPUMS CPS as their terms require. *(verified; USA)*
 
 **R8.3** ITA files are public, so ITA-derived tables may contain
-establishment-level rows. *(verified; ITA)*
+establishment-level rows. *(verified; ITA)* TRI files are EPA data, in the public domain by default under EPA's data license. TRI-derived tables may contain facility-year and parent rows. They publish no Dun & Bradstreet number.
 
 **R8.4** **Benchmark tables are never training data.** No target and no ITA
 description enters training, curriculum construction, hard-negative mining, or
