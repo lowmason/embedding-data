@@ -2,7 +2,7 @@
 
 > Next step: writing-plans, in a fresh session, against this file.
 
-Status: DRAFT (2026-11-22), awaiting the owner's approval.
+Status: APPROVED (2026-11-22, owner: "Approve"). Written 2026-11-22.
 
 Design spec for Stage 19 of `specs/naics-evaluation-data-roadmap.md` (outcome O23). It sets
 the minimum number of headline earners that a category of the ACS wage microdata needs before
