@@ -1,5 +1,7 @@
 # TRI Parent Links Implementation Plan
 
+**Status: COMPLETE (2026-11-21)** — executed via subagent-driven-development; nothing deferred
+
 > **For agentic workers:** REQUIRED SUB-SKILL: implement this plan task-by-task via subagent-driven-development (the default) — or executing-plans when your human partner chose inline execution at the handoff. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build one verified bundle that relates NAICS 2022 industries through shared EPA
@@ -354,7 +356,7 @@ because a dispatched subagent cannot ask the owner for a go-ahead.
   verifies. Any other state raises `ValueError` (`'raw file is not recorded'`,
   `'missing or extra raw file'`, `'raw file changed'`).
 
-- [ ] **Step 1: Read the EPA page (controller, Owner Checkpoint 2)**
+- [x] **Step 1: Read the EPA page (controller, Owner Checkpoint 2)**
 
 Make a new empty scratch directory outside the repository and the data root, with
 `mktemp -d /private/tmp/stage5-epa-page.XXXXXX`. Fetch the page HTML into it with
@@ -377,7 +379,7 @@ Stop and ask the owner if the static HTML gives no rule for a year's URL, or if 
 name can be fixed. Record all facts in the Task 1 commit message body. Task 4 copies them
 to the findings file.
 
-- [ ] **Step 2: Write the fixture page**
+- [x] **Step 2: Write the fixture page**
 
 E9 has not run yet, so the fixture is synthetic (Stage 2 spec, Licensing). Hand-write
 `tests/fixtures/epa_tri/basic_data_files.html` in the markup shape that Step 1 observed:
@@ -386,7 +388,7 @@ surrounding text. Give it a "processed as of" sentence, U.S. links for 2021–20
 URLs follow the discovered rule, and one non-U.S. link of 2024 if the page lists state
 files. Copy no EPA prose. Delete the scratch directory.
 
-- [ ] **Step 3: Write the failing tests**
+- [x] **Step 3: Write the failing tests**
 
 ```python
 PAGE = Path(__file__).parent / 'fixtures/epa_tri/basic_data_files.html'
@@ -453,24 +455,24 @@ def test_import_failure_prints_only_the_fixed_line(cli_runner, data_directory, t
         'TRI parent links import-file failed: validation; run -; path raw/epa_tri/basic')
 ```
 
-- [ ] **Step 4: Run the tests and see them fail**
+- [x] **Step 4: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_tri_raw.py tests/test_tri_cli.py -q`
 Expected: FAIL, `ModuleNotFoundError: No module named 'embedding_data.tri_raw'`.
 
-- [ ] **Step 5: Implement `tri_raw` and the two commands**
+- [x] **Step 5: Implement `tri_raw` and the two commands**
 
-- [ ] **Step 6: Run the tests and see them pass**
+- [x] **Step 6: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_tri_raw.py tests/test_tri_cli.py -q`
 Expected: all pass.
 
-- [ ] **Step 7: Confirm that nothing reads `through_date` across sources**
+- [x] **Step 7: Confirm that nothing reads `through_date` across sources**
 
 Run: `grep -rnE "\.through_date|\['through_date'\]|get\('through_date'\)" src scripts`
 Expected: no output. If a line appears, stop and ask the owner before committing.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 Files: the two modules, the fixture page and both tests. Message:
 `feat: acquire and import EPA TRI basic data files`, with the Step 1 facts in the body.
@@ -517,7 +519,7 @@ CODES_SCHEMA_VERSION` and `inputs.json` has `run_id == codes_run`;
 with `NODE_PREFIX`, and none repeats. No other file is read: no raw citation, source
 summary or canonical table.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 @pytest.fixture(scope='module')
@@ -548,19 +550,19 @@ def test_select_nodes_refuses(codes, tmp_path, mutation): ...   # ValueError, on
 def test_verify_detects_a_later_change(codes, tmp_path): ...
 ```
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_tri_codes.py -q`
 Expected: FAIL, `ModuleNotFoundError: No module named 'embedding_data.tri_codes'`.
 
-- [ ] **Step 3: Implement `tri_codes` and `seed_codes_bundle`**
+- [x] **Step 3: Implement `tri_codes` and `seed_codes_bundle`**
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_tri_codes.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Files: `tri_codes.py`, `tests/tri_fixtures.py`, `tests/test_tri_codes.py`. Message:
 `feat: select the pinned Stage 4 NAICS nodes for TRI`.
@@ -639,7 +641,7 @@ and a short `other_naics`.
 1% trigger (Settled Default 8) and a year with no `reporting_year`, `trifd`,
 `form_type` or `parent_dnb` column. Document checks are not in the script.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `tests/test_tri_layout.py`: `test_layout_json_round_trip`,
 `test_parse_layouts_refuses` (parametrized over every check above),
@@ -672,22 +674,22 @@ def test_measure_asks_above_one_percent_and_exits_0(...): ...
 def test_preflight_refuses_an_unrecorded_file(...): ...   # exit 2
 ```
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_tri_layout.py tests/test_preflight_tri.py -q`
 Expected: FAIL, `ModuleNotFoundError: No module named 'embedding_data.tri_layout'`.
 
-- [ ] **Step 3: Implement `tri_layout` and `scripts/preflight_tri.py`**
+- [x] **Step 3: Implement `tri_layout` and `scripts/preflight_tri.py`**
 
 The script imports `tri_raw`, `tri_codes`, `manifest` and `paths`, and reads the CSVs
 with Python's `csv` module through `osha_encoding.decode_line`.
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_tri_layout.py tests/test_preflight_tri.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Message: `feat: add the TRI header layout model and preflight checks`.
 
@@ -700,14 +702,14 @@ Message: `feat: add the TRI header layout model and preflight checks`.
 - Create: `specs/naics-evaluation-data-stage-5-findings.md` (Preflight section)
 - Test: `tests/test_tri_layout.py` (one test added)
 
-- [ ] **Step 1: Preservation baseline**
+- [x] **Step 1: Preservation baseline**
 
 Copy `data/raw/manifest.jsonl` to a new scratch directory outside the data root, and
 record its SHA-256 and byte length. Run
 `uv run --locked embedding-data audit --data-dir /Users/lowell/Projects/embedding-data/data`.
 Expected: exit 0, no discrepancy.
 
-- [ ] **Step 2: Acquire or import (Owner Checkpoint 3, host rule)**
+- [x] **Step 2: Acquire or import (Owner Checkpoint 3, host rule)**
 
 Run the host-rule checks and get the go-ahead for the fetch. Then run:
 
@@ -721,21 +723,23 @@ file in a browser from the complete-data page. Run `import-file YEAR FILE
 --processed-as-of DATE` for each one, with the page's date, a go-ahead per file and the
 host-rule checks. Record each file's path, size and SHA-256.
 
-- [ ] **Step 3: Headers**
+> Deviation: `acquire` refused, because EPA's endpoint sends no `Content-Length`. The owner downloaded the three files in a browser and `import-file` recorded each one, as this step allows. The owner chose EPA's own name `{year}_us.csv` (2026-11-19), which a small follow-up (Task 1a) put into `tri_raw`.
+
+- [x] **Step 3: Headers**
 
 Run `uv run --locked python scripts/preflight_tri.py headers --data-dir /Users/lowell/Projects/embedding-data/data --processed-as-of DATE`.
 Write a draft layout in the scratch directory from its output. Copy each header row
 exactly. Map each logical field to one cell, and leave a field null when no cell holds
 it.
 
-- [ ] **Step 4: Measure**
+- [x] **Step 4: Measure**
 
 Run `measure` with the draft layout, the codes run and its pin. Fill the six value sets
 from its value counts: the form-type strings for Form R and Form A, the federal
 yes and no strings, and the "no parent" and "no D&B" strings. Run `measure` again until
 every observed form-type and federal value falls in a set. Keep the final JSON output.
 
-- [ ] **Step 5: Document checks (read; Owner Checkpoint 3 for the PDF)**
+- [x] **Step 5: Document checks (read; Owner Checkpoint 3 for the PDF)**
 
 Read the EPA pages named in the spec. Get a go-ahead before reading the documentation
 PDF. Save no document under the data root and register none. For each check, record the
@@ -745,7 +749,7 @@ URL, the read date and a quote of fewer than 15 words:
 - E9: EPA's data license statement and its date, and any TRI-specific terms on the basic
   data files page or in the documentation.
 
-- [ ] **Step 6: Decide (Owner Checkpoint 4)**
+- [x] **Step 6: Decide (Owner Checkpoint 4)**
 
 If `measure` lists any stop, or a document check fails its stop condition, stop the
 stage. Report to the owner and do no further task. If `asks` is not empty, or a year has
@@ -754,7 +758,7 @@ no cell for a `REQUIRED_FIELDS` entry that is not a spec stop (`reporting_year`,
 time basis is recorded as a limit and does not stop. A missing diagnostic field is
 recorded and does not stop.
 
-- [ ] **Step 7: Write the failing test**
+- [x] **Step 7: Write the failing test**
 
 ```python
 def test_production_layout_covers_the_window():
@@ -766,7 +770,7 @@ def test_production_layout_covers_the_window():
 Run: `uv run --locked pytest tests/test_tri_layout.py::test_production_layout_covers_the_window -q`
 Expected: FAIL, `production header layout is not recorded`.
 
-- [ ] **Step 8: Commit the layout**
+- [x] **Step 8: Commit the layout**
 
 Save the final draft as `src/embedding_data/tri_layouts.json` in `layouts_json` form,
 then run the test again. Expected: PASS. Write the findings file's Preflight section:
@@ -820,7 +824,9 @@ equal the `csv.reader` record count, else `ValueError('row count differs')`. Eac
 `reporting_year`, stripped, must equal `str(year)`, else
 `ValueError('reporting year mismatch')`.
 
-- [ ] **Step 1: Write the failing tests**
+> Deviation: Polars 2.0.0 has no `missing_utf8_is_empty_string` keyword. The reader scans with `empty_string_is_null=False`, which gives the same empty strings and no nulls.
+
+- [x] **Step 1: Write the failing tests**
 
 ```python
 def test_reads_the_mapped_columns_as_strings(...):
@@ -839,22 +845,22 @@ def test_quoted_newline_keeps_one_record_and_ragged_row_fails(...): ...
 def test_transcoded_copies_stay_in_scratch(...): ...
 ```
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_tri_reader.py -q`
 Expected: FAIL, `ModuleNotFoundError: No module named 'embedding_data.tri_reader'`.
 
-- [ ] **Step 3: Implement `tri_reader` and the fixture helpers**
+- [x] **Step 3: Implement `tri_reader` and the fixture helpers**
 
 If `decode_line` cannot decode the fixture's Windows-1252 byte unchanged, stop and ask
 the owner (Owner Checkpoint 1).
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_tri_reader.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Message: `feat: read TRI basic data files by their recorded layout`.
 
@@ -927,7 +933,7 @@ empty and `parent_names` is. Case (c): exactly one usable D&B number and `parent
 empty. When `parent_name` is unmapped for the year, `case_a` and `case_b` are null, not
 zero, and when `state` is unmapped, `in_territories` is null.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 def test_form_r_and_form_a_rows_reduce_to_one_facility_year():
@@ -960,19 +966,21 @@ def test_validator_catches_lost_or_multiplied_rows(): ...
 def test_year_report_counts_cases_a_b_c_and_partitions(): ...
 ```
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_tri_facility_years.py -q`
 Expected: FAIL, `ModuleNotFoundError: No module named 'embedding_data.tri_facility_years'`.
 
-- [ ] **Step 3: Implement `tri_facility_years`**
+- [x] **Step 3: Implement `tri_facility_years`**
 
-- [ ] **Step 4: Run the tests and see them pass**
+> Deviation: the first build had five territory values and left out `UM` (Settled Default 13 lists six). The final review found it. Commit `786ebcc` added `UM` and its test before the full-data run.
+
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_tri_facility_years.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Message: `feat: reduce TRI forms to facility-years with owner keys`.
 
@@ -1036,7 +1044,7 @@ is in `node_ids`; `unit_a != unit_b`; each `(a,b)` has a `(b,a)` mirror with equ
 `j_owners == n_unweighted`; the marginal `n_owners` equals the `n(a)` that the values
 imply.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 def test_same_year_co_presence_counts_each_owner_once():
@@ -1069,19 +1077,19 @@ def test_metadata_flags_and_universe():
 def test_validator_rejects(break_): ...
 ```
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_tri_parent_link_targets.py -q`
 Expected: FAIL, `ModuleNotFoundError`.
 
-- [ ] **Step 3: Implement the module**
+- [x] **Step 3: Implement the module**
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_tri_parent_link_targets.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Message: `feat: estimate TRI parent-link shares with companions`.
 
@@ -1104,7 +1112,7 @@ Message: `feat: estimate TRI parent-link shares with companions`.
   - `parent_report(table: pl.DataFrame) -> dict`: the distributions of facilities and of
     industries per parent, in the shape of `n_unweighted_distribution`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 def test_one_row_per_parent_and_industry(): ...
@@ -1114,19 +1122,21 @@ def test_self_owned_and_excluded_facility_years_are_left_out(): ...
 def test_validator_rejects_counts_that_differ_from_the_facility_years(): ...
 ```
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_tri_parent_industries.py -q`
 Expected: FAIL, `ModuleNotFoundError`.
 
-- [ ] **Step 3: Implement the module**
+- [x] **Step 3: Implement the module**
 
-- [ ] **Step 4: Run the tests and see them pass**
+> Deviation: `parent_report(table, frame)` takes the facility-year frame as a second argument, so that it counts distinct facilities per parent. Spec line 587 asks for that, and the O8 table holds no TRIFD (controller ruling, Task 8 fix round 1). Task 9 calls it that way.
+
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_tri_parent_industries.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Message: `feat: list the NAICS 2022 industries of each TRI parent`.
 
@@ -1190,7 +1200,7 @@ layouts. The recorded software must equal `freeze_software()`. Recompute everyth
 `processed_as_of`. Compare each table in order, then the report, then `inputs.json` with
 the recorded `execution`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Use a module fixture: `seed_codes_bundle`, then `seed_tri_files` with a small three-year
 window.
@@ -1221,22 +1231,22 @@ Add two helpers to `tests/tri_fixtures.py`:
 - `module_file(module: str) -> str`: `embedding_data` maps to
   `src/embedding_data/__init__.py`, and `embedding_data.x` to `src/embedding_data/x.py`.
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_tri_bundle.py -q`
 Expected: FAIL, `ModuleNotFoundError`.
 
-- [ ] **Step 3: Implement `tri_bundle`**
+- [x] **Step 3: Implement `tri_bundle`**
 
 Get the closure with `uv run --locked python -c "import sys, embedding_data.tri_bundle, embedding_data.tri_parent_links; print(sorted(m for m in sys.modules if m.startswith('embedding_data')))"`.
 Write `SOFTWARE_FILES` as a sorted literal of those files plus the three named ones.
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_tri_bundle.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Message: `feat: build, verify and compare TRI parent-link bundles`.
 
@@ -1259,7 +1269,7 @@ Message: `feat: build, verify and compare TRI parent-link bundles`.
   `derived/epa_tri/parent-links/<run_id>` (Settled Default 20). `--processed-as-of` is
   parsed with `date.fromisoformat`. A bad date fails with `validation`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 def test_help_lists_exactly_five_commands(cli_runner): ...
@@ -1283,19 +1293,19 @@ def test_software_files_equal_the_command_import_closure():
         'src/embedding_data/tri_layouts.json', 'pyproject.toml', 'uv.lock'}
 ```
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_tri_cli.py -q`
 Expected: FAIL, no `build` command.
 
-- [ ] **Step 3: Add the three commands**
+- [x] **Step 3: Add the three commands**
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_tri_cli.py tests/test_tri_bundle.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Write the README section**
+- [x] **Step 5: Write the README section**
 
 Heading `## TRI parent links (roadmap Stage 5)`. Contents:
 1. What O7 and O8 measure, and a link to `specs/tri-parent-links.md`.
@@ -1308,7 +1318,7 @@ Heading `## TRI parent links (roadmap Stage 5)`. Contents:
 6. The R8.4 exclusion.
 7. That selected run pins wait for O12.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Message: `feat: add TRI build, verify and compare commands`.
 
@@ -1338,7 +1348,7 @@ code outside NAICS 2022; a D&B grouping that differs from the name grouping; a
 same-year co-owned pair; a cross-year non-pair; an RY2023 foreign parent. Use real 2022
 codes such as `325199`, `331110` and `562211`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 def test_v12_chain_is_offline_verified_and_replay_equal(tmp_path, monkeypatch):
@@ -1363,20 +1373,20 @@ def test_no_dnb_number_in_any_bundle_byte_or_failure_line(tmp_path, monkeypatch,
     # a build that fails on a changed header prints a line without any V12_DNB number
 ```
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_tri_v12.py -q`
 Expected: FAIL, `ImportError: cannot import name 'run_tri_v12'`.
 
-- [ ] **Step 3: Implement `v12_rows` and `run_tri_v12`**
+- [x] **Step 3: Implement `v12_rows` and `run_tri_v12`**
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_tri_v12.py -q`
 Expected: all pass. If one test takes 60 s or more, report it to the owner: marking it
 `slow` means editing `tests/conftest.py`, which this plan does not do.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Message: `test: add the TRI V12 raw-to-replay fixture chain`.
 
@@ -1414,7 +1424,7 @@ and dicts it recomputes:
 It compares them exactly with the bundle's five tables and with `report['n_owners']`,
 `report['by_year'][*]['rows_by_form_type']` and `['facility_years_by_reason']`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 def test_reconciler_layout_equals_the_committed_layout():
@@ -1429,27 +1439,27 @@ def test_reconciler_detects_a_changed_count(tmp_path, monkeypatch): ...
 def test_reconciler_refuses_a_wrong_pin(tmp_path, monkeypatch): ...   # exit 2
 ```
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `uv run --locked pytest tests/test_reconcile_tri_parent_links.py -q`
 Expected: FAIL, the script does not exist.
 
-- [ ] **Step 3: Implement the script from the spec's text**
+- [x] **Step 3: Implement the script from the spec's text**
 
 Write it from the spec's sections, not from the build modules.
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run --locked pytest tests/test_reconcile_tri_parent_links.py -q`
 Expected: all pass.
 
-- [ ] **Step 5: Full suite**
+- [x] **Step 5: Full suite**
 
 Run the Stage 9 `pgrep` check, then `uv run --locked behave` and
 `uv run --locked pre-commit run coverage-check-full --hook-stage pre-push --all-files`.
 Expected: every scenario and test passes (the `network` canary is deselected).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Message: `feat: add the independent TRI parent-link reconciler`.
 
@@ -1459,19 +1469,19 @@ Message: `feat: add the independent TRI parent-link reconciler`.
 
 **Files:** none changed. Results go to the findings file in Task 14.
 
-- [ ] **Step 1: Clean execution state**
+- [x] **Step 1: Clean execution state**
 
 The worktree holds every task's commit and `git status --porcelain` prints nothing, so
 `execution.dirty` is false. Use `uv run --locked` from this worktree's own `.venv` for
 every command in this task, with no overlay, and change nothing in the venv between
 Steps 3 and 5.
 
-- [ ] **Step 2: Go-ahead (Owner Checkpoint 5, host rule)**
+- [x] **Step 2: Go-ahead (Owner Checkpoint 5, host rule)**
 
 Choose a fresh run ID `stage5_tri_parent_links_<YYYYMMDD>_r1` and confirm that neither it
 nor `<id>.part` exists under `data/derived/epa_tri/parent-links/`.
 
-- [ ] **Step 3: Build**
+- [x] **Step 3: Build**
 
 ```bash
 /usr/bin/time -l uv run --offline --locked python -m embedding_data.tri_parent_links build RUN_ID --codes-run stage4_v11_20261013_r2 --codes-outputs-sha256 15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a --processed-as-of DATE --data-dir /Users/lowell/Projects/embedding-data/data
@@ -1480,7 +1490,7 @@ nor `<id>.part` exists under `data/derived/epa_tri/parent-links/`.
 Expected: one JSON line with `outputs_sha256`. Record the wall time and the maximum
 resident set size. Record the bundle size with `du -sk`.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 ```bash
 uv run --offline --locked python -m embedding_data.tri_parent_links verify RUN_ID --outputs-sha256 RUN_PIN --data-dir /Users/lowell/Projects/embedding-data/data
@@ -1488,7 +1498,7 @@ uv run --offline --locked python -m embedding_data.tri_parent_links verify RUN_I
 
 Expected: exit 0 and one JSON line.
 
-- [ ] **Step 5: Reconcile**
+- [x] **Step 5: Reconcile**
 
 ```bash
 uv run --offline --locked python scripts/reconcile_tri_parent_links.py --data-dir /Users/lowell/Projects/embedding-data/data --run RUN_ID --outputs-sha256 RUN_PIN
@@ -1496,7 +1506,9 @@ uv run --offline --locked python scripts/reconcile_tri_parent_links.py --data-di
 
 Expected: exit 0, with every comparison true.
 
-- [ ] **Step 6: Preservation**
+- [x] **Step 6: Preservation**
+
+> Deviation: the Task 4 baseline copy of the manifest in `/private/tmp` was gone. Check 1 hashed the first 1,549,274 bytes of the manifest and compared the hash with the baseline SHA-256 that the ledger recorded at Task 4. The manifest then held four lines of other stages after the three TRI lines.
 
 1. The current `data/raw/manifest.jsonl` starts with the bytes of the Task 4 baseline
    copy, and the lines after them include the three TRI entries. Other stages run in
@@ -1519,7 +1531,7 @@ Expected: exit 0, with every comparison true.
 | `derived/osha/establishment-targets/stage10_ita_establishment_20261116_r1` | `e19b0d58f61f106c3994aa6fe51f4fb71244188145dd90f8cccaa8dc8a8b09df` |
 | `derived/osha/establishment-targets/stage10_ita_establishment_20261116_r1_replay` | `e38e820b6e999f751687918d8f578b0f9d69ce145bbcb672b966a19a78d536a4` |
 
-- [ ] **Step 7: On any failure**
+- [x] **Step 7: On any failure**
 
 Stop. Change no code. Report the failing step to the owner. Any cleanup of a failed
 run's staging needs its own go-ahead.
@@ -1535,7 +1547,7 @@ run's staging needs its own go-ahead.
 - Modify at completion: `specs/naics-evaluation-data-roadmap.md`, `specs/deferred_items.md`,
   `specs/history.md`; move this plan and the spec to their `completed/` folders
 
-- [ ] **Step 1: Finish the findings file (one screen)**
+- [x] **Step 1: Finish the findings file (one screen)**
 
 Add these sections:
 1. The run ID, the detached pin, the snapshot date, and the wall time, maximum RSS and
@@ -1551,14 +1563,14 @@ Add these sections:
 
 Fixture results are not benchmarks.
 
-- [ ] **Step 2: Check which shared amendment items are still open**
+- [x] **Step 2: Check which shared amendment items are still open**
 
 Run: `git fetch origin && git show origin/main:specs/embedding-evaluation-data-spec.md | grep -c "Evidence sources admitted by"`.
 If the count is 0, apply Steps 3 and 4 in full. Otherwise another stage applied the
 shared items first: apply only the TRI rows of Step 3 (the R1.1 row, the R7.2 row and
 its sentence, and the R8.3 sentence), and skip Step 4.
 
-- [ ] **Step 3: Amend `specs/embedding-evaluation-data-spec.md`**
+- [x] **Step 3: Amend `specs/embedding-evaluation-data-spec.md`**
 
 Shared item 1 (introduction). Replace:
 
@@ -1612,7 +1624,7 @@ TRI R8.3 sentence (only if E9 passed in Task 4). Replace
 `establishment-level rows. *(verified; ITA)*` with
 `establishment-level rows. *(verified; ITA)* TRI files are EPA data, in the public domain by default under EPA's data license. TRI-derived tables may contain facility-year and parent rows. They publish no Dun & Bradstreet number.`
 
-- [ ] **Step 4: Amend `CLAUDE.md` (shared item 7, only when Step 2 counted 0)**
+- [x] **Step 4: Amend `CLAUDE.md` (shared item 7, only when Step 2 counted 0)**
 
 Replace:
 
@@ -1626,11 +1638,11 @@ with:
 embeddings from three core sources: OSHA ITA Form 300A summaries, ACS via IPUMS USA, and CPS via IPUMS CPS. Evidence sources admitted by `specs/uncovered-uses-evidence-sources.md` add further families, each adopted by its own roadmap stage, starting with EPA TRI parent links (roadmap Stage 5, `python -m embedding_data.tri_parent_links`).
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Message: `docs(specs): record the Stage 5 TRI findings and source spec amendment`.
 
-- [ ] **Step 5a: Amend the stage spec's Rollout (D1)**
+- [x] **Step 5a: Amend the stage spec's Rollout (D1)**
 
 In `specs/tri-parent-links.md`, replace:
 
@@ -1652,7 +1664,7 @@ with:
 Leave the spec's Status line unchanged. Commit with
 `docs(specs): record the preflight-first order in the TRI spec`.
 
-- [ ] **Step 6: Plan Completion Protocol**
+- [x] **Step 6: Plan Completion Protocol**
 
 Run the writing-plans Plan Completion Protocol, including step 3a. The `## Handoff to
 later stages` section gives:
@@ -1664,7 +1676,39 @@ The roadmap stamp notes that Stage 5 read only `naics_nodes.parquet` and not the
 concordance that its Consumes line names. Retire the spec to `specs/completed/` and
 re-point moved links.
 
-- [ ] **Step 7: Integrate**
+- [x] **Step 7: Integrate**
 
 Run the Stage 9 `pgrep` check, then open the PR and follow the owner's PR-lifecycle
 rule.
+
+---
+
+## Handoff to later stages
+
+Stage 5 feeds three Ranked-list items of Track B. None is a staged stage yet, so none has a
+`Consumes` line. Nothing was deferred, so the items have no `specs/deferred_items.md` section.
+
+- **O12 (TRI hardening).** It consumes run `stage5_tri_parent_links_20261121_r1`, pin
+  `65159b8374d36beec136ae6a7779a5763bf8ced9360e2a365b67b138e10b7f8b`, snapshot 2025-11-05,
+  built at commit `786ebcc` with `dirty: false`. The build took 3.5 s, so a replay costs little.
+  Run `build` with a new run ID and the same arguments (codes run `stage4_v11_20261013_r2`,
+  its Stage 4 pin, `--processed-as-of 2025-11-05`), then `compare-runs`. A replay never reuses
+  a run ID. Trap: `tri_bundle.SOFTWARE_FILES` includes `pyproject.toml`, `uv.lock` and the
+  shared Stage 4 to 6 modules. A change to any of them makes `verify` refuse the first run,
+  so run the replay from a tree where they are byte-identical. The independent reconciler ran
+  on the first run only. Its "equal" does not cover `case_a`, `case_b`, `case_c`,
+  `with_parent`, `with_usable_dnb`, the name-collision counts, `in_territories`,
+  `n_unweighted_distribution` and `parents.*` (findings file, Limits).
+- **O13 (headline minimum count).** It reads `n_unweighted_distribution` in `report.json`:
+  14,204 rows, minimum 1, median 1, 90th percentile 3, maximum 50, and 4,034, 1,652, 490 and
+  94 rows at 2, 3, 5 and 10 or more. Every target row has `size_gate_pending`. No minimum is
+  set, and none gates the bundle.
+- **O17 (protocol section).** It reads the findings file: the counts, the marginals, both
+  sensitivity labels (`numerator:dnb_key_sensitivity:true` and
+  `numerator:federal_sensitivity:true`), the `universe` string, the E8 time basis and the R8.4
+  exclusion. Traps: EPA's standardized parent names the current owner, not the owner at year
+  end. About 10% of facility-years report "no parent" but carry a standardized name (case
+  (a)), and the headline key groups them under that name. The partial-owner reading is in
+  stage spec line 472 *(owner, plan 13, 2026-11-21)*. The RY2022 foreign-parent columns hold
+  data but stay unmapped. EPA names no NAICS edition for RY2023 or RY2024. `acquire` cannot
+  fetch from EPA's endpoint, so a later snapshot enters through `import-file` and a new run.
