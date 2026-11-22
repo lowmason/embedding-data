@@ -463,3 +463,28 @@ counts, cost and limits. `vendor_link_pairs.parquet` holds UEI pairs and stays o
 machine. No output may feed embedder training, curriculum, hard-negative mining or model
 selection (R8.4). Every target keeps `size_gate_pending`, and no headline minimum count
 (O26) exists yet.
+
+**TRI parent links (roadmap Stage 5).** `python -m embedding_data.tri_parent_links` exposes
+`acquire`, `import-file`, `build`, `verify` and `compare-runs`, separate from the frozen
+top-level CLI. Always pass an explicit `--data-dir`. Only `acquire` uses the network, and it
+refuses every EPA file because EPA's endpoint sends no `Content-Length`: the owner downloads
+in a browser and `import-file` records the exact bytes. The other four load no `.env`, read
+no credential and construct no HTTP client. Failure prints only `TRI parent links <command>
+failed: <reason>; run <run_id>; path <path>` and exits 2. An unequal `compare-runs` exits 1.
+A bundle lives in `derived/epa_tri/parent-links/<RUN_ID>/` (five Parquets, `inputs.json`,
+`report.json` and the detached `outputs.json`). Build scratch in `<RUN_ID>.part/.scratch/`
+holds transcoded raw copies with D&B numbers, and the outputs publish none. The selected runs
+are `stage5_tri_parent_links_20261121_r1` and `stage5_tri_parent_links_20261121_r1_replay`,
+with detached pins `65159b8374d36beec136ae6a7779a5763bf8ced9360e2a365b67b138e10b7f8b` and
+`555f6b58099da43c054d828d27048f31a9e992ee32719c7e1462c59b30919cfc`, built from snapshot
+`2025-11-05` and codes run `stage4_v11_20261013_r2` (pin
+`15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a`) at commits `786ebcc` and
+`0f517d7` (both `dirty: false`). Both pass `verify`, and `compare-runs` finds them
+equal. A change to any file in `tri_bundle.SOFTWARE_FILES` (24 files, including
+`pyproject.toml`, `uv.lock` and the shared Stage 4 to 6 modules), the Python build or the
+installed distributions makes `verify` refuse both runs. Each production write needs the
+owner's go-ahead under README's host rule. The
+[Stage 5 finding](specs/findings/stage-5-tri-parent-links.md) records the commands, the cost
+and the limits. No output may feed embedder training, curriculum, hard-negative mining or
+model selection (R8.4). Every target keeps `size_gate_pending`, and no headline minimum count
+(O13) exists yet.
