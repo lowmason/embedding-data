@@ -214,7 +214,7 @@
       that already requires a new rule commit and both real runs.
 
 ## 15-usaspending-vendor-links — 2026-11-22
-- [ ] D2 cost in the vendor-links bundle (final review, owner kept D2 on
+- [x] D2 cost in the vendor-links bundle (final review, owner kept D2 on
       2026-11-22): a blank or invalid last update date makes a firm
       `dnb_era_record`. A read-only count showed that 6,403 firms get no industry
       from this rule alone. Each holds exactly one valid NAICS 2022 code and an
@@ -227,6 +227,8 @@
       (Handoff). Size: design. Done when: the owner's resume decision after Stage 14
       keeps D2 or approves a changed rule, and an approved rule has a new run that
       passes `verify`, the independent reconciler and the preservation checks.
+      → done at the resume after Stage 14 (owner, 2026-11-22, "Approve as drafted"):
+      D2 stays, so no new run is needed. See the roadmap, Choices made.
 - [ ] Live `acquire-sam-extract` request never tried (final review, owner ruled
       defer): the request form `date=MM%2FYYYY` and the response shape were never
       tried against the real Entity Extracts API, because the owner used the
