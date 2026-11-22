@@ -127,3 +127,108 @@ scripts`) found no code that reads the field from an entry. Only `ita_catalog` a
 `ita_summary` parse a through-date, and they parse file names. Several modules copy whole
 entries and carry the field unread. `target_io.verify_raw` compares whole entries, so the
 field is part of citation equality there. It is not a read.
+
+## Full-data build (Task 13, 2026-11-21)
+
+The build, `verify`, the independent reconciler and the preservation checks ran once on the
+real files. Every check passed. Fixture results show software readiness. They are not
+benchmarks.
+
+| Item | Value |
+|---|---|
+| Run ID | `stage5_tri_parent_links_20261121_r1` |
+| Detached pin (SHA-256 of `outputs.json`) | `65159b8374d36beec136ae6a7779a5763bf8ced9360e2a365b67b138e10b7f8b` |
+| Snapshot date (EPA "processed as of") | 2025-11-05 |
+| Codes run and pin | `stage4_v11_20261013_r2`, `15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a` |
+| Executing source | commit `786ebcc`, `dirty: false` |
+| Wall time | 3.52 s (6.25 s user, 1.17 s system) |
+| Maximum resident set size | 1,589,870,592 bytes |
+| Bundle size | 1,308 KB (`du -sk`) |
+
+The host also ran a commit hook of another session and other jobs during the build, so the
+time and the memory figure are upper bounds for a quiet host.
+
+### Verification
+
+- `verify` exited 0. Rows: `tri_facility_years` 65,464, `tri_parent_industries` 7,777,
+  `tri_parent_link_marginals` 405, `tri_parent_link_support` 14,204, `tri_parent_links` 14,204.
+- `scripts/reconcile_tri_parent_links.py` exited 0 with `equal` true. It recomputed the
+  facility-years, the eligibility, the owner counts, the marginals, the support, the targets,
+  both sensitivities, the partial owners and the O8 table from the raw files and compared
+  them exactly with the bundle.
+- `embedding-data audit` exited 0 (0 raw provenance discrepancies). The ITA summary keeps
+  SHA-256 `6335cda7…36a8` and 139,930,636 bytes. The six Stage 4, 6 and 10 bundles of the
+  plan's preservation table pass `verify_inventory`, and each `outputs.json` has its pin.
+- The first 1,549,274 bytes of `raw/manifest.jsonl` hash to the Task 4 baseline value
+  (`0c610ce1…bb71`). The baseline copy in `/private/tmp` was gone by then, so the check used
+  the hash from the ledger. Seven lines follow: the three TRI lines of Task 4 and four lines
+  that other stages wrote (one SAM entity extract and three USAspending subcontract files).
+
+### Counts
+
+| Facility-years | 2022 | 2023 | 2024 |
+|---|---:|---:|---:|
+| eligible | 21,534 | 21,324 | 20,974 |
+| `federal` | 448 | 449 | 438 |
+| `naics_conflict` | 108 | 87 | 61 |
+| `naics_not_2022` | 22 | 10 | 9 |
+| `naics_missing`, `parent_conflict` | 0 | 0 | 0 |
+| total | 22,112 | 21,870 | 21,482 |
+
+The totals and the `naics_*` rows equal the E7 measures of the preflight.
+
+- **Owners `N`.** Headline 8,684 (8,080, 7,952 and 7,818 by year). D&B key 12,850 (11,937,
+  11,799, 11,569). Federal facilities in 8,700 (8,095, 7,968, 7,833). Owner-key changes 0.
+  Parent-name collisions 0 (keys and names).
+- **Parents.** 4,566 U.S. parents. The median parent has 2 facilities and 1 industry. The
+  most facilities for one parent is 477 and the most industries is 63. `facilities_per_parent`
+  counts each TRIFD once.
+- **Targets.** 14,204 rows. The marginals cover 405 industries. 264 cells exist only under
+  the D&B key and 298 only with federal facilities in. 102 owners are partial, that is, an
+  excluded facility-year of theirs might add an industry that the target cannot see.
+- **`n_unweighted`.** Minimum 1, median 1, 75th percentile 2, 90th percentile 3, maximum 50.
+  4,034 rows have 2 or more, 1,652 have 3 or more, 490 have 5 or more and 94 have 10 or more.
+  Every row has `size_gate_pending`. No minimum count is applied. The headline minimum for
+  this family is not set here.
+
+### Limits
+
+- **E8 time basis.** EPA's standardized parent reflects the current owner, not the owner at
+  the end of each reporting year (documentation field 17, quoted above). Pooled years show
+  ownership at the snapshot date. The D&B sensitivity count shows how much the grouping
+  matters: it has 12,850 owners against 8,684.
+- **`through_date`.** See the departure above. No code reads the field.
+- **Partial owners.** The spec's Owner keys text (spec 470–474) can be read two ways for a
+  facility-year that has a `naics_*` reason and names several parents. The build and the
+  reconciler read it so that every excluded facility-year belongs to each standardized parent
+  name that it lists, and to `facility:<TRIFD>` when it lists none. The `federal` reason
+  stays out. The ledger records this as a ruling marked unclear, and the final reviewer
+  agreed. The two readings differ only for a `naics_*` facility-year that names more than one
+  parent. This run did not measure how many exist. No facility-year has the reason
+  `parent_conflict`.
+- **RY2022 foreign-parent columns.** They hold data but stay unmapped, as the preflight
+  section says. The build reads no foreign parent name for RY2022.
+- **Reconciler coverage.** The independent reconciler does not recompute the report fields
+  `case_a`, `case_b`, `case_c`, `with_parent`, `with_usable_dnb`, the name-collision counts,
+  `in_territories`, `n_unweighted_distribution` and `parents.*`. Its "equal" does not cover
+  them. They come from the build and from the unit tests.
+- **Territories.** The territory set is `AS`, `GU`, `MP`, `PR`, `UM` and `VI`, as plan
+  default 13 says. The final review found `UM` missing, and commit `786ebcc` added it before
+  the run. The three files hold no `UM` row.
+- **`acquire`.** EPA's endpoint sends no `Content-Length`, so `acquire` refuses every file
+  (see Page facts). `import-file` is the path that works now.
+- **Basis.** TRI is a program-selected population. The `universe` string in `report.json`
+  and in every target row says so. Coverage does not validate accuracy.
+
+### For O12, O13 and O17
+
+- **O12.** Run `stage5_tri_parent_links_20261121_r1`, pin
+  `65159b8374d36beec136ae6a7779a5763bf8ced9360e2a365b67b138e10b7f8b`, snapshot 2025-11-05.
+- **O13.** The `n_unweighted` distribution above (`report.json`, `n_unweighted_distribution`)
+  and `size_gate_pending` on every row.
+- **O17.** The counts and the marginals above. Both sensitivity labels
+  (`numerator:dnb_key_sensitivity:true` and `numerator:federal_sensitivity:true`). The
+  `universe` statement. The E8 time basis. The R8.4 exclusion: no TRI table feeds embedder
+  training, curriculum, hard-negative mining or model selection.
+- The stage read only `naics_nodes.parquet` of the Stage 4 bundle. It did not read the
+  Stage 4 concordance that the roadmap's Consumes line names.
