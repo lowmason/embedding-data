@@ -103,11 +103,11 @@ The completion protocol ticks the stage and stamps it.
 
 ## Decisions
 
-None.
+- **D1** (owner, plan review, 2026-11-22): Approve plan 17 as committed at `0e4aa28`, with the OC1 defaults, the 85-column reading and the refusals that the spec does not list unchanged ("Approve plan 17"). Applied in: Owner Checkpoints (OC1), Global Constraints, Task 2.
 
 ## Owner Checkpoints
 
-- **OC1 (plan review).** The defaults this plan sets where the spec leaves a choice: an SE
+- **OC1 (plan review, settled by D1).** The defaults this plan sets where the spec leaves a choice: an SE
   that is undefined for two reasons counts once, under the first reason in the spec's order.
   Kept shares divide by that year's headline categories and headline rows. Categories with no
   headline rows are counted apart as `shared_node_categories`. Sums use `math.fsum`.
