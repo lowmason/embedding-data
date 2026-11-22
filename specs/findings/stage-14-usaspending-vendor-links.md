@@ -65,8 +65,9 @@ build.
 Both runs record CPython 3.14.0 (`3.14.0 (main, Oct 14 2025, 21:10:22) [Clang 20.1.4 ]`),
 63 installed distributions, the 26 files of `vendor_link_bundle.SOFTWARE_FILES` and the
 `uv.lock` SHA-256 `f57c3280a7c8286711bf6804ca4c02f0a19619c9db52f33941b9c5b996cba8e5`.
-`git diff --quiet 1eddb3e HEAD` over those 26 files exited 0 before each command, and each
-file exists at both commits.
+`git diff --quiet 1eddb3e HEAD` over those 26 files exited 0 before the first run's
+re-verification (Task 1), before the build (Task 3) and before the replay's `verify`
+(Task 4). Each file exists at both commits.
 
 Stage 20 built the replay from a new worktree venv (`uv sync --locked` on the uv-managed
 CPython 3.14.0, run once). The first run's recorded `software` equalled the live
@@ -81,8 +82,11 @@ differ, and in `execution` only `commit` and `created_at` differ (see Results).
 
 ## Measured cost
 
-The host has 36 GiB of memory. `/usr/bin/time -l` measured each command. One MB here is
-10^6 bytes.
+The host has 36 GiB of memory. `/usr/bin/time -l` measured each Stage 20 command, and the
+MB beside each Stage 20 byte count is 10^6 bytes. The Stage 14 values come from the Stage 14
+findings ("Full-data build"), which do not record their byte counts or whether their MB is
+10^6 or 2^20 bytes. So a difference of a few percent between the two stages is not
+measured.
 
 | Stage | Command | Wall time | Maximum RSS |
 | --- | --- | ---: | ---: |
@@ -96,11 +100,19 @@ The host has 36 GiB of memory. `/usr/bin/time -l` measured each command. One MB 
 
 `du -sk` gives 1,720 KB for each bundle, the size Stage 14 recorded for the first run.
 
-Another session's pre-commit hook ran on the host during the replay build, its `verify`
-and `compare-runs`. It was a fixture test run with 7 pytest-xdist workers, in another
-worktree and on temporary data directories. It was not an acquisition or a build, so the
-host rule did not stop the run. The owner chose to start the build without waiting for it
-to end. The Stage 20 wall times carry that load.
+Other sessions' fixture test runs were on the host during every Stage 20 command. The
+host-rule check (`pgrep -fl 'embedding_data|embedding-data'`) before each command showed
+them:
+- Before the first run's `verify` (Task 2): one pytest run (`-m 'not network and not slow'`)
+  in a Stage 19 worktree.
+- Before the build, the replay's `verify`, `compare-runs` and `audit`: a pre-commit hook in
+  another worktree, running pytest with 7 pytest-xdist workers on temporary data
+  directories. The list before the build is saved as `pgrep-build.txt`. The other lists are
+  in the ledger.
+
+None of these was an acquisition or a build, so the host rule did not stop the run. The
+owner chose to start the build without waiting for the hook to end. All Stage 20 wall
+times carry that load, so they are not an unloaded baseline.
 
 ## Results
 
@@ -152,8 +164,9 @@ The checks before the first `verify` and before the build printed the same line.
   replay, and no `.part` directory.
 - The whole-tree audit (`embedding-data audit`) exits 0 with 0 raw provenance
   discrepancies.
-- The Stage 20 worktree stayed clean (`git status --porcelain --untracked-files=normal`
-  printed nothing) through the replay's `verify`.
+- `git status --porcelain --untracked-files=normal` in the Stage 20 worktree printed
+  nothing before the build (Task 3), right after the build and after the audit. The
+  replay's `inputs.json` records `dirty: false`.
 
 ## Corrections to earlier text
 
@@ -181,7 +194,7 @@ Two earlier texts are out of date. Neither file is edited.
   in the Stage 14 findings ("The cost of D2").
 - The family rests on one subaward snapshot (`2026-11-19`) and one monthly SAM extract
   (`2026-10`).
-- The Stage 20 wall times ran beside another session's test run (see "Measured cost").
+- Every Stage 20 wall time ran beside another session's test run (see "Measured cost").
 
 ## Not claimed
 
