@@ -166,7 +166,7 @@ def window_reports(**changes):
     return [report(**row) for row in rows]
 
 
-def firm(uei, code, *, status='A', update='20250115', evs='SAM', layout=TEST_EXTRACT_LAYOUT):
+def firm(uei, code, *, status='A', update='20250115', evs='E&Y', layout=TEST_EXTRACT_LAYOUT):
     fields = {'uei': uei, 'registration_status': status, 'last_update_date': update,
               'primary_naics': code, 'naics_code_string': f'{code}Y'}
     if layout.positions['evs_source'] is not None:
@@ -417,9 +417,9 @@ def test_headers_prints_each_year_and_the_extract_exactly(run, seeded, tmp_path)
             'primary_naics': [{'count': 3, 'shape': '999999'}, {'count': 1, 'shape': '9999A9'}],
             'naics_code_string': [{'count': 3, 'shape': '999999A'},
                                   {'count': 1, 'shape': '9999A9A'}],
-            'evs_source': [{'count': 4, 'shape': 'AAA'}],
+            'evs_source': [{'count': 4, 'shape': 'A&A'}],
         },
-        'tallies': {'registration_status': {'A': 4}, 'evs_source': {'SAM': 4}},
+        'tallies': {'registration_status': {'A': 4}, 'evs_source': {'E&Y': 4}},
     }
 
 
@@ -665,7 +665,7 @@ def test_a_year_of_one_empty_member_has_no_header_and_no_hints(run, data_dir, tm
 def shape_lines(**columns):
     '''One extract line for each position of the value lists, with made-up UEIs.'''
     defaults = {'registration_status': 'A', 'last_update_date': '20250115',
-                'primary_naics': '541511', 'naics_code_string': '541511Y', 'evs_source': 'SAM'}
+                'primary_naics': '541511', 'naics_code_string': '541511Y', 'evs_source': 'E&Y'}
     count = len(next(iter(columns.values())))
     return [extract_line(TEST_EXTRACT_LAYOUT, uei=f'SHAPE{index:07d}',
                          **(defaults | {field: values[index]
@@ -686,21 +686,22 @@ def test_extract_shapes_keep_the_ten_most_frequent_by_count_then_shape(run, data
         {'count': 1, 'shape': 'A9'}]
 
 
-def test_shapes_map_letters_and_digits_and_tallies_keep_delivered_values(run, data_dir,
-                                                                         tmp_path):
+def test_shapes_map_letters_and_digits_and_tallies_replace_values_outside_the_domain(
+        run, data_dir, tmp_path):
     raw = seed(data_dir, tmp_path, firms=shape_lines(
         registration_status=['A', 'A', ' A', 'É', 'x-1', '٣'],
         evs_source=['SAM', 'D&B', '', 'SAM', ' SAM', 'SAM']))
-    extract = run(['headers', *raw])['extract']
+    report_ = run(['headers', *raw], code=1)
+    extract = report_['extract']
     assert extract['shapes']['registration_status'] == [
         {'count': 3, 'shape': 'A'}, {'count': 1, 'shape': ' A'}, {'count': 1, 'shape': '9'},
         {'count': 1, 'shape': 'A-9'}]
     assert extract['shapes']['evs_source'] == [
         {'count': 3, 'shape': 'AAA'}, {'count': 1, 'shape': ''}, {'count': 1, 'shape': ' AAA'},
         {'count': 1, 'shape': 'A&A'}]
-    assert extract['tallies'] == {
-        'registration_status': {'A': 2, ' A': 1, 'É': 1, 'x-1': 1, '٣': 1},
-        'evs_source': {'SAM': 3, 'D&B': 1, '': 1, ' SAM': 1}}
+    assert extract['tallies'] == {'registration_status': {'too_many_values': 5},
+                                  'evs_source': {'too_many_values': 4}}
+    assert report_['stops'] == ['registration_status_not_coded', 'evs_source_not_coded']
 
 
 def test_an_unmapped_evs_source_has_no_shapes_and_no_tally(run, data_dir, tmp_path,
@@ -724,7 +725,7 @@ TALLY_SIDES = {'25 values': (25, 12), '26 values': (26, 12), '40 characters': (2
 PRINTED_SIDES = ['25 values', '40 characters']
 REPLACED_SIDES = ['26 values', '41 characters']
 # The delivered value of each extract tally on the four window firms.
-EXTRACT_TALLIES = {'registration_status': 'A', 'evs_source': 'SAM'}
+EXTRACT_TALLIES = {'registration_status': 'A', 'evs_source': 'E&Y'}
 
 
 def made_up(side):
@@ -745,16 +746,41 @@ def assert_values_withheld(report_):
     assert 'TALLYVALU' not in json.dumps(report_)
 
 
-@pytest.mark.parametrize('side', PRINTED_SIDES)
+# The closed domain of each extract tally, beside the value that the window firms deliver.
+# The empty string is in each domain. A tally that holds a value outside it is not coded,
+# however few or short its values are.
+DOMAIN_VALUES = {'registration_status': ['E', ''], 'evs_source': ['D&B', '']}
+# A layout that has drifted puts a short name, a UEI or a value with a space at the position.
+# Each made-up value holds DRIFT, which must reach no output.
+DRIFT_VALUES = {'short_name': 'DRIFTNAME', 'uei': 'DRIFTUEI0001', 'with_a_space': 'DRIFT VALUE'}
+
+
+def assert_drift_withheld(report_):
+    assert 'DRIFT' not in json.dumps(report_)
+
+
 @pytest.mark.parametrize('field', list(EXTRACT_TALLIES))
-def test_headers_prints_an_extract_tally_of_few_short_values(field, side, run, data_dir,
-                                                             tmp_path):
-    values = made_up(side)
+def test_headers_prints_an_extract_tally_of_every_value_of_its_domain(field, run, data_dir,
+                                                                      tmp_path):
+    values = DOMAIN_VALUES[field]
     raw = seed(data_dir, tmp_path, firms=tally_firms(field, values))
     report_ = run(['headers', *raw])
     assert report_['extract']['tallies'][field] == (
         {EXTRACT_TALLIES[field]: 4} | dict.fromkeys(values, 1))
     assert report_['stops'] == []
+
+
+@pytest.mark.parametrize('value', DRIFT_VALUES.values(), ids=list(DRIFT_VALUES))
+@pytest.mark.parametrize('field', list(EXTRACT_TALLIES))
+def test_headers_replaces_an_extract_tally_with_a_value_outside_its_domain(
+        field, value, run, data_dir, tmp_path):
+    raw = seed(data_dir, tmp_path, firms=tally_firms(field, [value]))
+    report_ = run(['headers', *raw], code=1)
+    other = next(name for name in EXTRACT_TALLIES if name != field)
+    assert report_['extract']['tallies'] == {
+        field: {'too_many_values': 2}, other: {EXTRACT_TALLIES[other]: 5}}
+    assert report_['stops'] == [f'{field}_not_coded']
+    assert_drift_withheld(report_)
 
 
 @pytest.mark.parametrize('side', REPLACED_SIDES)
@@ -858,7 +884,7 @@ WINDOW_SHAPES = {
     'last_update_date': [{'count': 4, 'shape': '99999999'}],
     'primary_naics': [{'count': 3, 'shape': '999999'}, {'count': 1, 'shape': '9999A9'}],
     'naics_code_string': [{'count': 3, 'shape': '999999A'}, {'count': 1, 'shape': '9999A9A'}],
-    'evs_source': [{'count': 4, 'shape': 'AAA'}],
+    'evs_source': [{'count': 4, 'shape': 'A&A'}],
 }
 
 
@@ -871,7 +897,7 @@ def test_headers_counts_skipped_lines_and_shows_only_readable_values(run, data_d
         'data_lines': 8, 'field_counts': {'40': 4, '41': 1, '39': 1, '43': 1, '38': 1},
         'unreadable_lines': 4, 'record_end_matches': 8}
     assert extract['shapes'] == WINDOW_SHAPES
-    assert extract['tallies'] == {'registration_status': {'A': 4}, 'evs_source': {'SAM': 4}}
+    assert extract['tallies'] == {'registration_status': {'A': 4}, 'evs_source': {'E&Y': 4}}
     assert report_['stops'] == []
 
 
@@ -1027,7 +1053,11 @@ def test_measure_asks_about_an_unmapped_amount_column(run, seeded, tmp_path, cod
 # The delivered value of each `measure` tally and its count in the seeded window: FY2024
 # types in E4, and the extract tallies in E5.
 MEASURED_TALLIES = {'subaward_types': ('sub-contract', 5), 'by_registration_status': ('A', 4),
-                    'evs_source': ('SAM', 4)}
+                    'evs_source': ('E&Y', 4)}
+
+
+# The two `measure` tallies of delivered extract values.
+EXTRACT_MEASURED = ('by_registration_status', 'evs_source')
 
 
 def measured_tally(report_, name):
@@ -1045,15 +1075,40 @@ def seed_tally(data_dir, tmp_path, name, values):
 
 
 @pytest.mark.parametrize('side', PRINTED_SIDES)
-@pytest.mark.parametrize('name', list(MEASURED_TALLIES))
-def test_measure_prints_a_tally_of_few_short_values(name, side, run, data_dir, tmp_path,
-                                                    codes):
+def test_measure_prints_a_subaward_type_tally_of_few_short_values(side, run, data_dir, tmp_path,
+                                                                  codes):
     values = made_up(side)
+    raw = seed_tally(data_dir, tmp_path, 'subaward_types', values)
+    report_ = run(['measure', *measure_args(raw, write_registry(tmp_path), codes)])
+    delivered, count = MEASURED_TALLIES['subaward_types']
+    assert measured_tally(report_, 'subaward_types') == (
+        {delivered: count} | dict.fromkeys(values, 1))
+    assert (report_['stops'], report_['ok']) == ([], True)
+
+
+@pytest.mark.parametrize('name', list(EXTRACT_MEASURED))
+def test_measure_prints_an_extract_tally_of_every_value_of_its_domain(name, run, data_dir,
+                                                                      tmp_path, codes):
+    values = DOMAIN_VALUES[name.removeprefix('by_')]
     raw = seed_tally(data_dir, tmp_path, name, values)
     report_ = run(['measure', *measure_args(raw, write_registry(tmp_path), codes)])
     delivered, count = MEASURED_TALLIES[name]
     assert measured_tally(report_, name) == {delivered: count} | dict.fromkeys(values, 1)
     assert (report_['stops'], report_['ok']) == ([], True)
+
+
+@pytest.mark.parametrize('value', DRIFT_VALUES.values(), ids=list(DRIFT_VALUES))
+@pytest.mark.parametrize('name', list(EXTRACT_MEASURED))
+def test_measure_replaces_an_extract_tally_with_a_value_outside_its_domain(
+        name, value, run, data_dir, tmp_path, codes):
+    raw = seed_tally(data_dir, tmp_path, name, [value])
+    report_ = run(['measure', *measure_args(raw, write_registry(tmp_path), codes)], code=1)
+    other = next(key for key in EXTRACT_MEASURED if key != name)
+    delivered, count = MEASURED_TALLIES[other]
+    assert measured_tally(report_, name) == {'too_many_values': 2}
+    assert measured_tally(report_, other) == {delivered: count + 1}
+    assert (report_['stops'], report_['ok']) == ([f'{name}_not_coded'], False)
+    assert_drift_withheld(report_)
 
 
 @pytest.mark.parametrize('side', REPLACED_SIDES)

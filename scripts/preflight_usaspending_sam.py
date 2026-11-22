@@ -12,7 +12,9 @@ does and 2 on a refusal. Output holds counts, shares, header cells, value shapes
 of coded values, never a UEI, a name, an address, an amount or any other row value. Two
 guards hold this structurally: `headers` prints a year's header cells only when each is a
 name (a letter, then letters, digits, `_` or `-`), and a tally whose values do not look
-coded is replaced by its number of distinct values. Either withholding is a stop. An extract
+coded is replaced by its number of distinct values. The registration status and the EVS
+source of the extract look coded only inside a closed domain, so a layout that has drifted
+never prints the text at those positions. Either withholding is a stop. An extract
 line that the build skips for its field count appears only in counts, and its values reach
 no shape or tally. A refusal prints a fixed reason and never
 exception text. The script loads no `.env`, reads no key, opens no HTTP client and runs no
@@ -68,6 +70,15 @@ HEADER_NAME = re.compile(r'[A-Za-z][A-Za-z0-9_-]*')
 # A tally of a coded field has few distinct values, and each is short.
 TALLY_VALUES = 25
 TALLY_LENGTH = 40
+# The closed domains of the two extract fields that the preflight tallies. A tally with a value
+# outside its domain is not coded, however few or short its values are, because a layout that
+# has drifted puts a name or a UEI at the position. The empty string is a blank cell.
+REGISTRATION_STATUSES = frozenset({'A', 'E', ''})
+EVS_SOURCES = frozenset({'D&B', 'E&Y', ''})
+# By the name of the tally in the `headers` extract summary and in the `measure` E5 counts.
+EXTRACT_DOMAINS = {'registration_status': REGISTRATION_STATUSES,
+                   'by_registration_status': REGISTRATION_STATUSES,
+                   'evs_source': EVS_SOURCES}
 # The fixed messages of the raw-file selectors and the readers. A refusal prints one of
 # these or the fixed reason of the step that failed, never other exception text.
 MESSAGES = frozenset({
@@ -113,19 +124,24 @@ def tally(frame: pl.DataFrame, column: str) -> dict[str, int]:
     return {value: int(count) for value, count in counts.iter_rows()}
 
 
-def coded(counts: dict[str, int]) -> bool:
+def coded(counts: dict[str, int], domain: frozenset[str] | None = None) -> bool:
     '''Whether a tally looks like one of a coded field: at most `TALLY_VALUES` distinct
-    values, each at most `TALLY_LENGTH` characters long.'''
+    values, each at most `TALLY_LENGTH` characters long, and all inside `domain` when it is
+    given.'''
+    if domain is not None and not set(counts) <= domain:
+        return False
     return len(counts) <= TALLY_VALUES and all(len(value) <= TALLY_LENGTH for value in counts)
 
 
-def guard(tallies: dict | None, keys: Iterable[str], name: str) -> list[str]:
+def guard(tallies: dict | None, keys: Iterable[str], name: str,
+          domains: dict[str, frozenset[str]] | None = None) -> list[str]:
     '''Replace each tally of `tallies` under `keys` that does not look coded by its number of
-    distinct values, and return the stop `<name>_not_coded` when one was replaced.'''
+    distinct values, and return the stop `<name>_not_coded` when one was replaced. A key of
+    `domains` also closes its tally to that domain.'''
     replaced = False
     for key in keys if tallies is not None else ():
         counts = tallies[key]
-        if counts is not None and not coded(counts):
+        if counts is not None and not coded(counts, (domains or {}).get(key)):
             tallies[key] = {'too_many_values': len(counts)}
             replaced = True
     return [f'{name}_not_coded'] if replaced else []
@@ -205,7 +221,7 @@ def headers(options: argparse.Namespace) -> dict:
     stops += [f'headers_not_names_{year}' for year, described in subawards.items()
               if described['header_not_names']]
     for field in TALLIED_FIELDS:
-        stops += guard(extract['tallies'], [field], field)
+        stops += guard(extract['tallies'], [field], field, EXTRACT_DOMAINS)
     return {'subawards': subawards, 'extract': extract, 'stops': stops}
 
 
@@ -295,7 +311,7 @@ def evaluate(read: vendor_link_readers.SubawardRead, extract: pl.DataFrame,
     # One stop for the types of all years: each year's tally shows where it holds.
     stops += guard(e4['subaward_types'], [str(year) for year in WINDOW], 'subaward_types')
     for key in EXTRACT_TALLIES:
-        stops += guard(e5['extract'], [key], key)
+        stops += guard(e5['extract'], [key], key, EXTRACT_DOMAINS)
     return {'e4': e4, 'e5': e5, 'stops': stops,
             'asks': measure_asks(layouts, e5, other_types), 'ok': not stops}
 
