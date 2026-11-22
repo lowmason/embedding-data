@@ -755,8 +755,11 @@ Stages 14 and 15.
 
 Roadmap: specs/naics-evaluation-data-roadmap.md, Stage 5 — on plan completion, tick the stage and re-validate later stages against what shipped.
 
-- Software readiness (tests and the V12 fixture) comes before full-data
-  acceptance. Do not tick Stage 5 on design or planning completion.
+- Acquisition and the preflight (full-data acceptance steps 1 and 2) come first,
+  because the V12 fixture uses the header layout that E7 records. Software
+  readiness (tests and the V12 fixture) then comes before the full-data build
+  *(owner, plan 13, 2026-11-18)*. Do not tick Stage 5 on design or
+  planning completion.
 - The roadmap re-validation notes that Stage 5 did not consume the Stage 4
   concordance (see [What the design session found](#what-the-design-session-found)).
 - The shipped handoff gives:
