@@ -60,11 +60,14 @@ or a command whose output decides the next step. No subagent is dispatched.
   overlay, after Task 1.
 - **Clean tree.** `inputs.json` records `dirty` from `git status --porcelain
   --untracked-files=normal` in `W`. Every log, time file and JSON line goes to `E`, never
-  into `W`.
+  into `W`. Until Task 4 ends, edit no tracked file in `W` and tick no box in this plan.
+  Track progress in the session's task list. Run each check script from a heredoc
+  (`uv run --offline --locked python - <<'EOF'`) or keep it in `E`. `.gitignore` already
+  ignores `__pycache__/`.
 - **Host rule** (`specs/plans/completed/15-usaspending-vendor-links.md:134-148`). Run one
   full-data command at a time on this host. `verify` and `compare-runs` count as
   full-data commands here, because each recomputes or rescans the bundle at about 955 MB.
-  Before each of them and before the build:
+  `audit` reads the whole raw tree. Before each of them and before the build:
   1. Run `pgrep -fl 'embedding_data|embedding-data'` and show the owner its full,
      unfiltered output. Stop if it shows another acquisition or build, for example a
      Stage 18 TRI build.
@@ -80,8 +83,9 @@ or a command whose output decides the next step. No subagent is dispatched.
   2 to 10 minutes, and a killed `build` leaves a `.part` that blocks the run ID.
 - **Order.** Do not merge or rebase `origin/main` into the branch before Task 4 ends. A
   merge between the build and the replay's `verify` can pull in a software change.
-- **Commits.** Before every commit, run the Stage 9 `pgrep` check (step 2 above). Stop if
-  it prints anything. Never skip a hook. Never amend or rebase the commit that the replay
+- **Commits.** Before every commit, merge and push, run the Stage 9 `pgrep` check (step 2
+  above). Stop if it prints anything. The merge in Task 5 and the push in Task 6 can run
+  the full-suite hook `coverage-check-full`. Never skip a hook. Never amend or rebase the commit that the replay
   records as `execution.commit`. The finding cites it.
 - **On any failure.** Stop. Change no code. Report the failing step and its output to the
   owner. Never rerun a failed build under the same run ID.
@@ -158,7 +162,8 @@ Expected: exit 0. Any other exit: stop and ask the owner.
 
 - [ ] **Step 3: Snapshot (read-only)**
 
-Write to `E/snapshot.json`: the SHA-256 and line count of `ROOT/raw/manifest.jsonl`, the
+Copy `ROOT/raw/manifest.jsonl` to `E/manifest-baseline.jsonl`. Write to `E/snapshot.json`:
+the SHA-256, byte size and line count of that copy, the
 SHA-256 of `outputs.json` of `r1`, `r2` and `ROOT/derived/codes/stage4_v11_20261013_r2`, and
 the sorted entry names of `V`.
 Expected: the `r2` hash is the selected pin, the codes hash is
@@ -284,11 +289,12 @@ Also record the SHA-256 of `inputs.json` and `report.json` of both runs. The two
 - [ ] **Step 4: Preservation**
 
 1. `ROOT/raw/manifest.jsonl` has the Task 1 SHA-256 and line count. If other stages appended
-   lines in the meantime, its first bytes equal the snapshot's file and the owner accounts
-   for every line after them. `build`, `verify` and `compare-runs` append nothing.
+   lines in the meantime, its first bytes equal `E/manifest-baseline.jsonl` byte for byte.
+   Show the owner every line after them, for the owner to account for. `build`, `verify`
+   and `compare-runs` append nothing.
 2. The `outputs.json` SHA-256 of `r1`, `r2` and the codes bundle equal the snapshot.
 3. `V` holds exactly `r1`, `r2` and the replay, and no `.part`.
-4. In the background:
+4. Run both `pgrep` checks. Then, in the background:
    `uv run --offline --locked embedding-data audit --data-dir /Users/lowell/Projects/embedding-data/data`.
    Expected: exit 0 with zero raw provenance discrepancies.
 
@@ -321,8 +327,10 @@ Sections:
 3. **Measured cost.** Wall time and maximum RSS of the Task 2 `verify`, the replay build, the
    replay `verify` and `compare-runs`, beside Stage 14's build (29.6 s, 961 MB) and `verify`
    (28.8 s, 955 MB). `du -sk` of both bundles (Stage 14 recorded 1,720 KB for `r2`).
-4. **Results.** The `rows` of both `verify` runs, the `compare-runs` line and the
-   preservation outcomes.
+4. **Results.** The `rows` of both `verify` runs and the preservation outcomes. Quote
+   verbatim the `compare-runs` JSON line, the `E/inputs-compare.json` line and the
+   `E/identity-3.json` line, so that the evidence does not depend on `E`, a cache
+   directory, surviving.
 5. **Corrections to earlier text.** The findings file's Status line (line 3) says "Stage 14
    in progress". Stage 14 completed on 2026-11-22 (the roadmap's Stage 14 stamp, and the
    spec's Status line). The docstring of `scripts/reconcile_usaspending_vendor_links.py`
