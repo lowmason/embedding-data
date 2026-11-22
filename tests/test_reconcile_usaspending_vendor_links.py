@@ -624,12 +624,42 @@ def test_a_d_and_b_era_firm_counts_as_mixed_blank(tmp_path, monkeypatch):
     assert (status, false_checks(result)) == (1, ['report.firms.mixed_blank'])
 
 
-def test_a_d_and_b_era_firm_counts_for_the_code_string(tmp_path, monkeypatch):
+def test_d_and_b_era_and_conflict_firms_are_not_counted_for_the_code_string(tmp_path,
+                                                                            monkeypatch):
+    # Controller ruling (spec 497-499, 521-523): only a firm with one read primary code counts,
+    # so a D&B-era firm and a firm with conflicting codes do not, whatever their strings hold.
     data_dir = copy_v12(tmp_path)
-    pin = reseal_extract(data_dir, edit_lines(
-        'V12BLANKDT01', lambda line: line.replace('|541511Y|', '|541512Y|')))
+
+    def other_code(line):
+        return line.replace('|541511Y|', '|236220Y|').replace('|541330Y|', '|236220Y|')
+
+    pin = reseal_extract(data_dir, edit_lines('V12BLANKDT01', other_code))
+    pin = reseal_extract(data_dir, edit_lines('V12CONFLT007', other_code))
     status, result, _line = run_main(data_dir, pin)
-    assert (status, false_checks(result)) == (1, ['report.firms.code_not_in_string'])
+    assert (status, false_checks(result)) == (0, [])
+
+
+def expired_row(edit):
+    '''An extract-line edit that changes only the expired-registration row.'''
+    at = LAYOUT['positions']['registration_status'] - 1
+    return lambda line: edit(line) if line.split('|')[at] == 'E' else line
+
+
+@pytest.mark.parametrize(('rows', 'flags'), [
+    pytest.param('one', [], id='the other row holds it'),
+    pytest.param('both', ['report.firms.code_not_in_string'], id='no row holds it'),
+])
+def test_the_code_is_looked_up_in_the_strings_of_all_the_firm_s_rows(tmp_path, rows, flags):
+    # The firm with two rows lists its code in both; one string or both lose it.
+    data_dir = copy_v12(tmp_path)
+
+    def other_code(line):
+        return line.replace('|541512Y|', '|236220Y|')
+
+    edit = expired_row(other_code) if rows == 'one' else other_code
+    pin = reseal_extract(data_dir, edit_lines('V12TWOROWS04', edit))
+    status, result, _line = run_main(data_dir, pin)
+    assert (status, false_checks(result)) == (1 if flags else 0, flags)
 
 
 # ---- refusals: exit 2 with a fixed reason
@@ -1062,6 +1092,19 @@ def test_unreadable_subaward_members_are_refused(tmp_path, members, reason):
         records_of(file)
 
 
+@pytest.mark.parametrize('header', [
+    pytest.param([*HEADER[:-1], 'renamed'], id='renamed cell'),
+    pytest.param([HEADER[1], HEADER[0], *HEADER[2:]], id='swapped cells'),
+])
+def test_the_header_of_every_member_is_checked(tmp_path, header):
+    # Spec 387-389: every CSV member of the ZIP is read, each with the recorded header.
+    second = MEMBER.replace('_1.csv', '_2.csv')
+    file = write_zip(tmp_path / 'a.zip', {MEMBER: csv_bytes([report()]),
+                                          second: csv_bytes([report()], header=header)})
+    with pytest.raises(reconcile.Refused, match='^subaward header differs$'):
+        records_of(file)
+
+
 def test_a_file_that_is_no_zip_is_refused(tmp_path):
     file = tmp_path / 'a.zip'
     file.write_bytes(b'not a zip')
@@ -1264,34 +1307,52 @@ def test_mixed_blank_needs_a_blank_and_a_non_blank_row(lines, expected):
 
 
 def test_code_strings_are_read_by_item():
-    # Findings, E5 layout: items separated by `~`, each a 6-digit code and a Y, N or E flag.
+    # Controller ruling (spec 521-523, "with any small-business flags"): an item holds a code
+    # when it is six ASCII digits and zero or more ASCII letters. The flag is optional.
     assert reconcile.string_codes('541511Y~541512N~236220E') == {'541511', '541512', '236220'}
-    assert reconcile.string_codes(' 541511Y \t~541512N') == {'541511', '541512'}
+    assert reconcile.string_codes(' 541511Y \t~541512') == {'541511', '541512'}
+    assert reconcile.string_codes('541511~541512YN~236220abc') == {'541511', '541512', '236220'}
     assert reconcile.string_codes('') == set()
-    assert reconcile.string_codes('541511~5415111Y~54151Y~541511X~541511YN') == set()
+    # An item of any other shape holds no code.
+    assert reconcile.string_codes('5415111Y~54151Y~541511-Y~541511é~Y541511~541511Y1') == set()
+    assert reconcile.string_codes('541511Y,541512Y') == set()
+
+
+def string_miss(*lines) -> bool:
+    '''Whether the firm GOOD counts in `firms.code_not_in_string`.'''
+    rows = read_extract(*lines).firms.get(GOOD)
+    status, _node = reconcile.classify_firm(rows, NODES)
+    return reconcile.code_not_in_string(status, rows)
 
 
 @pytest.mark.parametrize(('lines', 'expected'), [
     pytest.param([extract_line(string='541511Y')], False, id='listed'),
     pytest.param([extract_line(string='236220Y~541511N')], False, id='listed second'),
     pytest.param([extract_line(code=' 541511 ', string='541511E ')], False, id='padded'),
+    pytest.param([extract_line(string='541511')], False, id='item without a flag'),
     pytest.param([extract_line(string='')], True, id='empty string'),
     pytest.param([extract_line(string='541512Y')], True, id='other code'),
-    pytest.param([extract_line(string='541511')], True, id='item without a flag'),
-    pytest.param([extract_line(string='541512Y'), extract_line(string='541511Y')], True,
-                 id='each row its own string'),
-    pytest.param([extract_line(update='20200101', string='541512Y')], True, id='any status'),
-    pytest.param([extract_line(code='', string='541512Y')], False, id='no primary code'),
+    pytest.param([extract_line(string='541511Y'), extract_line(string='541512Y')], False,
+                 id='first row holds it'),
+    pytest.param([extract_line(string='541512Y'), extract_line(string='541511Y')], False,
+                 id='last row holds it'),
+    pytest.param([extract_line(string='541512Y'), extract_line(string='236220Y')], True,
+                 id='no row holds it'),
+    pytest.param([extract_line(code='', string='541511Y'), extract_line(string='')], False,
+                 id='a blank row holds it'),
+    pytest.param([extract_line(code='517311', string='541511Y')], True, id='not 2022'),
+    pytest.param([extract_line(code='517311', string='517311Y')], False, id='not 2022 listed'),
+    pytest.param([extract_line(string=''), extract_line(code='541512', string='')], False,
+                 id='conflict'),
+    pytest.param([extract_line(update='20200101', string='')], False, id='D&B-era'),
+    pytest.param([extract_line(code='', string='')], False, id='no code'),
     pytest.param([extract_line(code='54151A', string='')], False, id='malformed code'),
+    pytest.param([extract_line(OTHER, string='')], False, id='not in SAM'),
 ])
-def test_a_primary_code_missing_from_its_own_row_s_code_string(lines, expected):
-    assert read_extract(*lines).firms[GOOD].code_not_in_string is expected
-
-
-def test_the_code_string_rule_applies_only_when_the_layout_maps_the_field():
-    layout = copy.deepcopy(LAYOUT)
-    del layout['positions']['naics_code_string']
-    assert read_extract(extract_line(), layout=layout).firms[GOOD].code_not_in_string is False
+def test_only_a_one_code_firm_whose_code_no_row_s_string_holds_counts(lines, expected):
+    # Controller ruling (spec 497-499, 521-523): the firms of status naics_not_2022 or
+    # eligible, each with one read code, looked up in the union of all its rows' code strings.
+    assert string_miss(*lines) is expected
 
 
 @pytest.mark.parametrize(('prime', 'sub', 'intra', 'statuses', 'expected'), [

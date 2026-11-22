@@ -20,7 +20,8 @@ Stage 4 codes bundle against the codes pin and the `naics_nodes.parquet` record 
 
 Memory. Pass 1 streams the subaward members and keeps one small tally for each distinct pair of
 usable reports. Pass 2 streams the extract member line by line and keeps firm facts only for the
-UEIs on usable reports: their codes, five flags and nothing else.
+UEIs on usable reports: their primary codes, the codes of their code strings, four flags and
+nothing else.
 
 Readings that the spec text leaves open, as this script takes them:
 - An extract line ends only at CRLF. The first line must start with the BOF prefix and the last
@@ -37,11 +38,13 @@ Readings that the spec text leaves open, as this script takes them:
 - A malformed primary code on a firm whose codes the build reads makes the build fail, so a
   published bundle cannot hold one. Such a firm gets the status `malformed_code`, which is no spec
   status, and the check `firms.no_malformed_read_code` is false.
-- The firm counts of `report.json` (`firms`) cover the UEIs on usable reports, whatever their
-  status. `mixed_blank` counts those with a readable row whose primary code is blank and one
-  whose code is not. `code_not_in_string` counts those with a readable row whose well-formed
-  primary code is not an item of that same row's code string. An item is a stripped
-  `~`-separated part that is a 6-digit code and a `Y`, `N` or `E` flag (the E5 layout text).
+- The firm counts of `report.json` (`firms`) cover the UEIs on usable reports. `mixed_blank`
+  counts those of any status with a readable row whose primary code is blank and one whose
+  code is not. `code_not_in_string` counts only the firms of status `naics_not_2022` or
+  `eligible`, which have one read primary code, when no code string of any of their readable
+  rows holds that code (controller ruling). An item of a code string is a stripped
+  `~`-separated part. It holds a code when it is six ASCII digits and zero or more ASCII
+  letters, because the small-business flag is optional on the real file (same ruling).
 - `flag_intra_group` follows the three group conditions alone, for a self link too.
 - The intra-group sensitivity admits the `intra_group` pairs of two eligible firms.
 - A share with a zero denominator is null.
@@ -76,8 +79,9 @@ import polars as pl
 WHITESPACE = ' \t\n\r\x0b\x0c'
 UEI = re.compile('[A-Z0-9]{12}')
 CODE = re.compile('[0-9]{6}')
-# One item of the NAICS code string: a 6-digit code and a Y, N or E flag (findings, E5 layout).
-CODE_STRING_ITEM = re.compile('([0-9]{6})[YNE]')
+# One item of the NAICS code string that holds a code: six ASCII digits and zero or more ASCII
+# letters, the small-business flags (controller ruling: the flag is optional on the real file).
+CODE_STRING_ITEM = re.compile('([0-9]{6})[A-Za-z]*')
 CODE_STRING_SEPARATOR = '~'
 AMOUNT = re.compile(r'-?[0-9]{1,36}(\.[0-9]{1,2})?')
 WINDOW = (2024, 2025, 2026)
@@ -90,6 +94,8 @@ PAIR_STATUSES = ('self_link', 'intra_group', 'prime_ineligible', 'sub_ineligible
 # The firm status of a read firm with a malformed primary code. The build fails on such a firm.
 MALFORMED_CODE = 'malformed_code'
 CODED = frozenset({'naics_conflict', 'naics_not_2022', 'eligible'})
+# The firm statuses with one read primary code.
+ONE_CODE = frozenset({'naics_not_2022', 'eligible'})
 TOLERANCE = 1e-12
 # Sums of amounts are exact: 80 digits hold any sum of Decimal(38, 2) values.
 AMOUNTS = Context(prec=80)
@@ -457,7 +463,7 @@ def read_subawards(files: dict[int, Path], registry: dict) -> Reports:
 class FirmRows:
     '''What the firm rules need from the extract rows of one UEI.'''
 
-    __slots__ = ('codes', 'blank', 'malformed', 'dnb', 'date_invalid', 'code_not_in_string')
+    __slots__ = ('codes', 'blank', 'malformed', 'dnb', 'date_invalid', 'string_codes')
 
     def __init__(self):
         self.codes: set[str] = set()
@@ -465,13 +471,20 @@ class FirmRows:
         self.malformed = False
         self.dnb = False
         self.date_invalid = False
-        # A row's well-formed primary code is not an item of that row's code string.
-        self.code_not_in_string = False
+        # The codes of the code strings of all the rows.
+        self.string_codes: set[str] = set()
 
 
 def mixed_blank(rows: FirmRows) -> bool:
     '''True when the firm has a row with a blank primary code and a row with a non-blank one.'''
     return rows.blank and bool(rows.codes or rows.malformed)
+
+
+def code_not_in_string(status: str, rows: FirmRows | None) -> bool:
+    '''True for a firm with one read primary code that no code string of its rows holds.'''
+    if status not in ONE_CODE:
+        return False
+    return any(code not in rows.string_codes for code in rows.codes)
 
 
 def string_codes(value: str) -> set[str]:
@@ -550,10 +563,9 @@ def tally_extract(lines: Iterable[str], layout: dict, wanted: set[str]) -> Extra
             rows.blank = True
         elif CODE.fullmatch(code):
             rows.codes.add(code)
-            if string_at is not None and code not in string_codes(fields[string_at]):
-                rows.code_not_in_string = True
         else:
             rows.malformed = True
+        rows.string_codes |= string_codes(fields[string_at])
         if update is None:
             rows.date_invalid = True
             rows.dnb = True
@@ -763,7 +775,8 @@ def expected_report(reports: Reports, extract: Extract, firms: dict, rows: dict,
     for name, count in (('last_update_invalid', sum(1 for rows in read if rows.date_invalid)),
                         ('mixed_blank', sum(1 for rows in read if mixed_blank(rows))),
                         ('code_not_in_string',
-                         sum(1 for rows in read if rows.code_not_in_string))):
+                         sum(1 for uei in everyone
+                             if code_not_in_string(firms[uei][0], extract.firms.get(uei))))):
         checks[f'report.firms.{name}'] = (('firms', name), count, 'exact')
     checks['report.pairs'] = (
         ('pairs',), status_counts((row[P_STATUS] for row in rows.values()), PAIR_STATUSES)
