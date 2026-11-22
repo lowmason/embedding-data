@@ -296,6 +296,14 @@ def test_year_minimum_of_a_single_band(script):
     assert script.year_minimum([band(1, False)]) is None
 
 
+def test_zero_replicate_weight_with_positive_denominator_is_defined(script):
+    frame = rows([10.0, 11.0], [1.0, 1.0], weights([1, 1], replicate=7, values=(5, 0)))
+    se, reason = script.category_se(frame)
+    # Only replicate 7 moves: (5 * 10 + 0 * 11) / 5 = 10.0 against theta 10.5.
+    assert reason is None
+    assert se == pytest.approx(math.sqrt(0.05 * 0.5 ** 2))
+
+
 def test_overall_minimum_is_none_when_either_year_has_none(script):
     assert script.overall_minimum([None, 50]) is None
     assert script.overall_minimum([None, None]) is None
