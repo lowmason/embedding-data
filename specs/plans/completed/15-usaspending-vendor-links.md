@@ -2228,6 +2228,6 @@ has a `Consumes` line. Three items were deferred (`specs/deferred_items.md`, sec
 - **Roadmap re-validation.** Stage 14 read only `naics_nodes.parquet` of the Stage 4 bundle.
   It did not read the Stage 4 concordance that its `Consumes` line names. The O6 row in the
   roadmap still says that the family needs an owner-created account and that its size is
-  unknown. The USAspending row of `specs/deliverable-map.md` still says "Not built" and "not
-  ready", and names the account and the E6 check as prerequisites. The family is now built,
-  E6 is closed and the browser path needed no key. These two texts are not edited here.
+  unknown. The family is now built, E6 is closed and the browser path needed no key. The O6
+  row is not edited here. The USAspending row of `specs/deliverable-map.md` said "Not built"
+  and "not ready". The owner asked for it to be updated, and it was, on 2026-11-22.
