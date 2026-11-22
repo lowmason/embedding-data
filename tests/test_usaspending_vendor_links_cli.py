@@ -42,6 +42,7 @@ from vendor_link_fixtures import (  # noqa: F401
     seed_raw,
     subaward_record,
     subprocess_modules,
+    zip_bytes,
 )
 
 from embedding_data import (
@@ -251,10 +252,12 @@ def sam_import_arguments(data_directory, file, month=MONTH):
     return ['import-sam-extract', str(file), '--month', month, '--data-dir', str(data_directory)]
 
 
-def extract_original(tmp_path, month='2026-10'):
+def extract_original(tmp_path, month='2026-10', *, committed=False):
+    '''An extract download. Its member fits the invented test layout, which every test of
+    this module installs, or with `committed` the committed layout, for a fresh process.'''
     file = tmp_path / 'downloads' / extract_name(month)
     file.parent.mkdir(parents=True, exist_ok=True)
-    file.write_bytes(sample_extract(month))
+    file.write_bytes(sample_extract(month, committed=committed))
     return file
 
 
@@ -279,6 +282,24 @@ def test_sam_acquire_and_import_print_one_json_line(cli_runner, data_directory, 
         (f'sam/entity-extract/public-monthly-v2/2026-11/{EXTRACT_NAME}', 'httpx'),
         (f'sam/entity-extract/public-monthly-v2/2026-10/{extract_name("2026-10")}',
          'manual-import')]
+
+
+def test_sam_commands_refuse_a_wrapped_extract_as_validation_and_record_nothing(
+        cli_runner, data_directory, tmp_path, monkeypatch):
+    # A ZIP around the extract ZIP, under the extract's own name, as a browser can save it.
+    install_sam(monkeypatch, FakeSam(extract_answer(
+        zip_bytes({EXTRACT_NAME: sample_extract()}))))
+    monkeypatch.setenv('SAM_API_KEY', FAKE_KEY)
+    wrapped = tmp_path / 'downloads' / extract_name('2026-10')
+    wrapped.parent.mkdir()
+    wrapped.write_bytes(zip_bytes({wrapped.name: sample_extract('2026-10')}))
+    for arguments in (sam_acquire_arguments(data_directory),
+                      sam_import_arguments(data_directory, wrapped, '2026-10')):
+        result = cli_runner.invoke(usaspending_vendor_links.app, arguments)
+        assert result.exit_code == 2
+        assert result.stdout == ''
+        assert result.stderr == sam_failure_line(arguments[0], 'validation') + '\n'
+    assert [file for file in data_directory.rglob('*') if file.is_file()] == []
 
 
 SAM_FAILURES = [
@@ -458,7 +479,8 @@ def test_import_commands_load_no_environment_file(data_directory, tmp_path):
                    if name not in ('SAM_API_KEY', 'IPUMS_API_KEY')}
     result = subprocess.run(
         [sys.executable, '-c', OFFLINE_IMPORTS, str(data_directory),
-         str(extract_original(tmp_path, MONTH)), MONTH, str(original_file(tmp_path))],
+         str(extract_original(tmp_path, MONTH, committed=True)), MONTH,
+         str(original_file(tmp_path))],
         capture_output=True, text=True, cwd=tmp_path, env=environment, check=False)
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout) == {'codes': [0, 0], 'dotenv_imports': [],

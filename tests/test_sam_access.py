@@ -260,7 +260,9 @@ def test_key_is_sent_only_in_the_first_wire_url(tmp_path, monkeypatch):
 def test_key_reaches_no_file_log_line_or_error(cli_runner, data_directory, caplog,
                                                monkeypatch):
     caplog.set_level(logging.DEBUG)
-    server = install_sam(monkeypatch, FakeSam(redirect_answer(), extract_answer()))
+    # The command records the extract, so its member must fit the committed layout.
+    server = install_sam(monkeypatch, FakeSam(
+        redirect_answer(), extract_answer(sample_extract(committed=True))))
     monkeypatch.setenv('SAM_API_KEY', FAKE_KEY)
     result = cli_runner.invoke(usaspending_vendor_links.app, acquire_arguments(data_directory))
     assert result.exit_code == 0, result.output

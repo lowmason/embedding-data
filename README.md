@@ -795,6 +795,8 @@ uv run --offline --locked python -m embedding_data.usaspending_vendor_links comp
 `acquire-sam-extract` also takes `--env-file PATH` in place of `--prompt`. Raw subaward files
 go to `raw/usaspending/subcontracts/<snapshot>/FY<YYYY>/`. The raw extract goes to
 `raw/sam/entity-extract/public-monthly-v2/<YYYY-MM>/`. Each raw file gets one manifest entry.
+When a browser download is a ZIP around the extract ZIP, import the inner ZIP, because
+`import-sam-extract` refuses the wrapped form.
 A bundle goes to `derived/usaspending/vendor-links/<RUN_ID>/`. An existing run or `.part`
 directory fails the run. A later run never reuses, overwrites or deletes it. A killed download
 leaves a `.part` directory that blocks every retry. Its removal needs the owner's go-ahead.

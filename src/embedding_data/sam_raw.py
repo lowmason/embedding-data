@@ -1,18 +1,20 @@
 '''Acquire and register SAM.gov public monthly V2 UTF-8 entity extracts (Stage 14).
 
 `acquire` requests one month's extract through the Entity Extracts API with the owner's key.
-`import_file` registers an extract that the owner downloaded in a browser. Both publish the
-ZIP as delivered under `raw/sam/entity-extract/public-monthly-v2/<YYYY-MM>/` and append one
-manifest entry, whose `source_url` never holds the key. Raw files are never replaced.
+`import_file` registers an extract that the owner downloaded in a browser. Both refuse a ZIP
+that is not the one-member extract, then publish the ZIP as delivered under
+`raw/sam/entity-extract/public-monthly-v2/<YYYY-MM>/` and append one manifest entry, whose
+`source_url` never holds the key. Raw files are never replaced.
 `select_extract` returns the one verified extract of a month.
 '''
 
 import re
 import shutil
+import zipfile
 from importlib.metadata import version
 from pathlib import Path
 
-from embedding_data import manifest, paths, sam_access, usaspending_raw
+from embedding_data import manifest, paths, sam_access, usaspending_raw, vendor_link_layouts
 from embedding_data.geography_references import safe_path
 
 SOURCE = 'sam'
@@ -38,6 +40,23 @@ def is_extract_of(name: str, month: str) -> bool:
     return match is not None and f'{match[1]}-{match[2]}' == month
 
 
+def require_extract_zip(file: Path) -> None:
+    '''Refuse a ZIP that the build would refuse, before it is recorded.
+
+    A recorded raw file is never replaced or removed, so a wrapped download, such as a ZIP
+    around the extract ZIP, would use up its month. The extract ZIP holds exactly one member,
+    and the member name fully matches the layout's pattern. The message holds no name.
+    '''
+    layout = vendor_link_layouts.load_extract_layout()
+    try:
+        with zipfile.ZipFile(file) as archive:
+            members = archive.infolist()
+    except zipfile.BadZipFile:
+        raise ValueError('original is not a ZIP file') from None
+    if len(members) != 1 or not re.fullmatch(layout.member_pattern, members[0].filename):
+        raise ValueError('original is not the one-member extract ZIP')
+
+
 def acquire(data_dir: Path, month: str, *, credential: str) -> Path:
     '''Request, download and record the extract of `month`.
 
@@ -55,6 +74,7 @@ def acquire(data_dir: Path, month: str, *, credential: str) -> Path:
     try:
         if not is_extract_of(name, month):
             raise ValueError('delivered extract is of another month')
+        require_extract_zip(partial)
         return usaspending_raw.publish_partial(
             data_dir,
             partial,
@@ -82,6 +102,7 @@ def import_file(data_dir: Path, original: Path, *, month: str) -> Path:
         raise ValueError('original is not a ZIP file')
     directory = month_dir(data_dir, month)
     usaspending_raw.require_free_directory(data_dir, directory)
+    require_extract_zip(original)
     destination = directory / original.name
     partial = usaspending_raw.part_of(destination)
     expected = manifest.sha256_file(original)

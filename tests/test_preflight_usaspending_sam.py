@@ -1338,6 +1338,9 @@ def no_bof(data_dir, tmp_path, monkeypatch, script):
 
 
 def other_extract_member(data_dir, tmp_path, monkeypatch, script):
+    # The import refuses this ZIP now, so the test places it past that check, to reach the
+    # reader's own refusal of a recorded extract whose member is wrong.
+    monkeypatch.setattr(sam_raw, 'require_extract_zip', lambda file: None)
     member = 'SAM_PUBLIC_UTF-8_MONTHLY_V2_20261102.txt'
     return seed(data_dir, tmp_path, extract_member=member), None, None
 

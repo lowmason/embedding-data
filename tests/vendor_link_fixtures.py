@@ -15,6 +15,7 @@ import sys
 import zipfile
 from datetime import date
 from pathlib import Path
+from unittest.mock import patch
 
 import httpx
 import pytest
@@ -140,11 +141,23 @@ def extract_name(month=MONTH, day='02'):
     return f'SAM_PUBLIC_UTF-8_MONTHLY_V2_{month.replace("-", "")}{day}.ZIP'
 
 
-def sample_extract(month=MONTH) -> bytes:
-    '''A synthetic extract ZIP: one member with framing lines and no entity record.'''
+# The real extract's member name ends in 32 hex characters, which the invented test layout's
+# member pattern does not allow.
+COMMITTED_MEMBER_HEX = '0123456789abcdef' * 2
+EXTRACT_FRAMING = (b'BOF PUBLIC V2 00000000 20261102 0000000 0000000\r\n'
+                   b'EOF PUBLIC V2 00000000 20261102 0000000 0000000')
+
+
+def extract_member_name(month=MONTH, *, committed=False) -> str:
+    '''The member name of the extract of `month`: the one that the invented test layout
+    accepts, or with `committed` the one that the committed layout accepts.'''
     stem = extract_name(month).removesuffix('.ZIP')
-    return zip_bytes({f'{stem}.dat': b'BOF PUBLIC V2 00000000 20261102 0000000 0000000\r\n'
-                                     b'EOF PUBLIC V2 00000000 20261102 0000000 0000000'})
+    return f'{stem}_{COMMITTED_MEMBER_HEX}.dat' if committed else f'{stem}.dat'
+
+
+def sample_extract(month=MONTH, *, committed=False) -> bytes:
+    '''A synthetic extract ZIP: one member with framing lines and no entity record.'''
+    return zip_bytes({extract_member_name(month, committed=committed): EXTRACT_FRAMING})
 
 
 def extract_answer(body=None, *, name=EXTRACT_NAME, headers=None):
@@ -337,7 +350,8 @@ def seed_raw(data_dir: Path, directory: Path, subawards: dict[int, dict[str, lis
     and import them into `data_dir` under `snapshot` and `month`.
 
     Each year's ZIP is `FY<year>_Contracts_Subawards_fixture.zip` and holds its members, each
-    with that year's layout header. The extract is `extract_name(month)` with one member.
+    with that year's layout header. The extract is `extract_name(month)` with one member. The
+    import checks that member against `extract_layout`, the layout that the extract is for.
     '''
     directory.mkdir(parents=True, exist_ok=True)
     for year, members in subawards.items():
@@ -346,7 +360,8 @@ def seed_raw(data_dir: Path, directory: Path, subawards: dict[int, dict[str, lis
         usaspending_raw.import_file(data_dir, year, file, snapshot=snapshot)
     extract = directory / extract_name(month)
     write_extract_zip(extract, extract_layout, extract_lines, member=extract_member)
-    sam_raw.import_file(data_dir, extract, month=month)
+    with patch.object(vendor_link_layouts, 'load_extract_layout', lambda: extract_layout):
+        sam_raw.import_file(data_dir, extract, month=month)
 
 
 def subprocess_modules(name: str, *, prefix: str | None = 'embedding_data') -> set[str]:

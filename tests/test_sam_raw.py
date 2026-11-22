@@ -2,21 +2,26 @@
 selection.'''
 
 import hashlib
+import io
 import json
 import shutil
 import subprocess
 import sys
+import zipfile
 from dataclasses import replace
 from datetime import UTC, datetime
 from importlib.metadata import version
 
 import pytest
 from vendor_link_fixtures import (  # noqa: F401
+    COMMITTED_MEMBER_HEX,
+    EXTRACT_FRAMING,
     EXTRACT_NAME,
     FAKE_KEY,
     MONTH,
     FakeSam,
     extract_answer,
+    extract_member_name,
     extract_name,
     install_sam,
     no_live_sam,
@@ -25,11 +30,33 @@ from vendor_link_fixtures import (  # noqa: F401
     zip_bytes,
 )
 
-from embedding_data import manifest, paths, sam_access, sam_raw, usaspending_raw
+from embedding_data import (
+    manifest,
+    paths,
+    sam_access,
+    sam_raw,
+    usaspending_raw,
+    vendor_link_layouts,
+)
 
 EXTRACTS = 'raw/sam/entity-extract/public-monthly-v2'
 NOT_A_ZIP = b'PK\x03\x04garbage that is not an archive'
 FAILED = 'SAM.gov extract request failed; details suppressed'
+NOT_THE_EXTRACT = 'original is not the one-member extract ZIP'
+MEMBER_HEX = COMMITTED_MEMBER_HEX
+FRAMING = EXTRACT_FRAMING
+
+
+# These tests run under the committed extract layout, so their extracts carry the member name
+# that it accepts and not the invented test layout's.
+def member_name(month=MONTH):
+    return extract_member_name(month, committed=True)
+
+
+def inner_extract(month=MONTH) -> bytes:
+    '''The extract ZIP of `month`: one member, no entity record, and a different member for
+    each month.'''
+    return sample_extract(month, committed=True)
 
 
 def month_directory(data_directory, month=MONTH):
@@ -89,7 +116,7 @@ def test_the_two_sam_modules_import_in_either_order(first, tmp_path):
 
 
 def test_acquire_records_the_key_free_url(data_directory, monkeypatch):
-    install_sam(monkeypatch, FakeSam(extract_answer()))
+    install_sam(monkeypatch, FakeSam(extract_answer(inner_extract())))
     path = sam_raw.acquire(data_directory, '2026-11', credential=FAKE_KEY)
     entry = manifest.entry_for(paths.manifest_path(data_directory), path)
     assert entry.source_url == sam_access.extract_url('2026-11')
@@ -98,17 +125,18 @@ def test_acquire_records_the_key_free_url(data_directory, monkeypatch):
 
 def test_acquire_publishes_the_delivered_bytes_under_the_delivered_name(data_directory,
                                                                         monkeypatch):
-    server = install_sam(monkeypatch, FakeSam(redirect_answer(), extract_answer()))
+    server = install_sam(monkeypatch,
+                         FakeSam(redirect_answer(), extract_answer(inner_extract())))
     before = datetime.now(UTC).replace(microsecond=0)
     path = sam_raw.acquire(data_directory, MONTH, credential=FAKE_KEY)
     assert path == month_directory(data_directory) / EXTRACT_NAME
-    assert path.read_bytes() == sample_extract()
+    assert path.read_bytes() == inner_extract()
     assert sorted(file.name for file in path.parent.iterdir()) == [EXTRACT_NAME]
     (line,) = manifest_lines(data_directory)
     recorded = json.loads(line)
     assert recorded['path'] == f'sam/entity-extract/public-monthly-v2/2026-11/{EXTRACT_NAME}'
-    assert recorded['sha256'] == hashlib.sha256(sample_extract()).hexdigest()
-    assert recorded['size'] == len(sample_extract())
+    assert recorded['sha256'] == hashlib.sha256(inner_extract()).hexdigest()
+    assert recorded['size'] == len(inner_extract())
     assert (recorded['client'], recorded['client_version'], recorded['source_url'],
             recorded['proxies'], recorded['through_date']) == (
         'httpx', version('httpx'), sam_access.extract_url(MONTH), [], None)
@@ -119,20 +147,20 @@ def test_acquire_publishes_the_delivered_bytes_under_the_delivered_name(data_dir
 @pytest.mark.parametrize('month', ['2027-01', '2026-12'])
 def test_acquire_requests_and_files_the_month_it_is_given(month, data_directory, monkeypatch):
     server = install_sam(monkeypatch, FakeSam(
-        extract_answer(sample_extract(month), name=extract_name(month))))
+        extract_answer(inner_extract(month), name=extract_name(month))))
     path = sam_raw.acquire(data_directory, month, credential=FAKE_KEY)
     assert server.requests[0].url.params['date'] == f'{month[5:]}/{month[:4]}'
     assert path == month_directory(data_directory, month) / extract_name(month)
 
 
 def test_acquire_sends_the_credential_it_is_given(data_directory, monkeypatch):
-    server = install_sam(monkeypatch, FakeSam(extract_answer()))
+    server = install_sam(monkeypatch, FakeSam(extract_answer(inner_extract())))
     sam_raw.acquire(data_directory, MONTH, credential='OTHERfake0123456789key')
     assert server.requests[0].url.params['api_key'] == 'OTHERfake0123456789key'
 
 
 def test_acquire_accepts_an_existing_empty_month_directory(data_directory, monkeypatch):
-    install_sam(monkeypatch, FakeSam(extract_answer()))
+    install_sam(monkeypatch, FakeSam(extract_answer(inner_extract())))
     month_directory(data_directory).mkdir(parents=True)
     assert sam_raw.acquire(data_directory, MONTH, credential=FAKE_KEY).is_file()
 
@@ -140,7 +168,7 @@ def test_acquire_accepts_an_existing_empty_month_directory(data_directory, monke
 def occupy_with_file(data_directory):
     directory = month_directory(data_directory)
     directory.mkdir(parents=True)
-    (directory / extract_name(MONTH, '09')).write_bytes(sample_extract())
+    (directory / extract_name(MONTH, '09')).write_bytes(inner_extract())
 
 
 def occupy_with_part(data_directory):
@@ -156,7 +184,7 @@ def occupy_with_directory(data_directory):
 def occupy_with_a_file_in_place_of_the_directory(data_directory):
     directory = month_directory(data_directory)
     directory.parent.mkdir(parents=True)
-    directory.write_bytes(sample_extract())
+    directory.write_bytes(inner_extract())
 
 
 def occupy_with_a_symlinked_directory(data_directory):
@@ -195,7 +223,7 @@ OCCUPATIONS = {
 @pytest.mark.parametrize('occupy', OCCUPATIONS, ids=lambda function: function.__name__)
 def test_acquire_refuses_an_occupied_month_before_any_request(occupy, data_directory,
                                                               monkeypatch):
-    server = install_sam(monkeypatch, FakeSam(extract_answer()))
+    server = install_sam(monkeypatch, FakeSam(extract_answer(inner_extract())))
     occupy(data_directory)
     with pytest.raises(ValueError, match=OCCUPATIONS[occupy]):
         sam_raw.acquire(data_directory, MONTH, credential=FAKE_KEY)
@@ -205,7 +233,7 @@ def test_acquire_refuses_an_occupied_month_before_any_request(occupy, data_direc
 
 @pytest.mark.parametrize('month', ['2026-13', '2026-1', '../x'])
 def test_acquire_refuses_a_bad_month_before_any_request(month, data_directory, monkeypatch):
-    server = install_sam(monkeypatch, FakeSam(extract_answer()))
+    server = install_sam(monkeypatch, FakeSam(extract_answer(inner_extract())))
     with pytest.raises(ValueError, match='YYYY-MM'):
         sam_raw.acquire(data_directory, month, credential=FAKE_KEY)
     assert server.requests == []
@@ -215,7 +243,8 @@ def test_acquire_refuses_a_bad_month_before_any_request(month, data_directory, m
 @pytest.mark.parametrize('delivered', ['2026-10', '2025-11', '2026-12'])
 def test_acquire_refuses_a_delivered_name_of_another_month(delivered, data_directory,
                                                            monkeypatch):
-    server = install_sam(monkeypatch, FakeSam(extract_answer(name=extract_name(delivered))))
+    server = install_sam(monkeypatch, FakeSam(
+        extract_answer(inner_extract(), name=extract_name(delivered))))
     with pytest.raises(ValueError, match='month'):
         sam_raw.acquire(data_directory, MONTH, credential=FAKE_KEY)
     assert len(server.requests) == 1
@@ -233,7 +262,7 @@ def test_acquire_refused_answer_leaves_an_empty_month_directory(data_directory, 
 
 def test_acquire_never_removes_a_part_it_did_not_create(data_directory, monkeypatch):
     # The occupancy check normally stops this first, so switch it off to reach the open.
-    install_sam(monkeypatch, FakeSam(extract_answer()))
+    install_sam(monkeypatch, FakeSam(extract_answer(inner_extract())))
     monkeypatch.setattr(usaspending_raw, 'require_free_directory', lambda *arguments: None)
     directory = month_directory(data_directory)
     directory.mkdir(parents=True)
@@ -257,7 +286,7 @@ def record_without_a_file(data_directory, tmp_path, name=EXTRACT_NAME, month=MON
 
 
 def test_acquire_removes_its_part_when_publishing_fails(data_directory, tmp_path, monkeypatch):
-    install_sam(monkeypatch, FakeSam(extract_answer()))
+    install_sam(monkeypatch, FakeSam(extract_answer(inner_extract())))
     before = record_without_a_file(data_directory, tmp_path)
     with pytest.raises(ValueError, match='already recorded'):
         sam_raw.acquire(data_directory, MONTH, credential=FAKE_KEY)
@@ -271,7 +300,7 @@ def test_acquire_removes_its_part_when_publishing_fails(data_directory, tmp_path
 def make_original(tmp_path, name=EXTRACT_NAME, content=None, folder='downloads'):
     original = tmp_path / folder / name
     original.parent.mkdir(parents=True, exist_ok=True)
-    original.write_bytes(sample_extract() if content is None else content)
+    original.write_bytes(inner_extract() if content is None else content)
     return original
 
 
@@ -320,7 +349,7 @@ IMPORT_REFUSALS = {
     'not_a_zip': (MONTH, lambda tmp_path: make_original(tmp_path, content=NOT_A_ZIP),
                   'not a ZIP file'),
     'prefixed_zip': (MONTH, lambda tmp_path: make_original(
-        tmp_path, content=b'XXXX' + sample_extract()), 'not a ZIP file'),
+        tmp_path, content=b'XXXX' + inner_extract()), 'not a ZIP file'),
     'ascii_name': (MONTH, lambda tmp_path: make_original(
         tmp_path, 'SAM_PUBLIC_MONTHLY_V2_20261102.ZIP'), 'month'),
     'lowercase_name': (MONTH, lambda tmp_path: make_original(tmp_path, EXTRACT_NAME.lower()),
@@ -408,11 +437,130 @@ def test_import_refuses_a_copy_whose_hash_differs_and_leaves_nothing(data_direct
     assert_nothing_written(data_directory)
 
 
+# --- the member of the extract ZIP
+
+
+def wrapped_zip():
+    '''A ZIP around the extract ZIP, under the extract's own name, as a browser can save it.'''
+    return zip_bytes({EXTRACT_NAME: inner_extract()})
+
+
+def zip_with_a_directory_entry():
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, 'w') as archive:
+        archive.writestr(member_name(), FRAMING)
+        archive.writestr('inner/', b'')
+    return buffer.getvalue()
+
+
+NOT_THE_ONE_MEMBER_ZIP = {
+    'wrapped_zip': wrapped_zip,
+    'member_is_a_zip_named_as_one': lambda: zip_bytes(
+        {member_name().replace('.dat', '.zip'): inner_extract()}),
+    'second_file': lambda: zip_bytes({member_name(): FRAMING, 'readme.txt': b'x'}),
+    'two_extract_members': lambda: zip_bytes(
+        {member_name(): FRAMING, member_name('2026-10'): FRAMING}),
+    'directory_entry_beside_the_member': zip_with_a_directory_entry,
+    'directory_entry_alone': lambda: zip_bytes({member_name() + '/': b''}),
+    'other_name': lambda: zip_bytes({'other.dat': FRAMING}),
+    'name_without_the_hex_suffix': lambda: zip_bytes(
+        {member_name().replace(f'_{MEMBER_HEX}', ''): FRAMING}),
+    'name_with_a_short_suffix': lambda: zip_bytes(
+        {member_name().replace('f.dat', '.dat'): FRAMING}),
+    'name_with_an_upper_case_suffix': lambda: zip_bytes(
+        {member_name().replace(MEMBER_HEX, MEMBER_HEX.upper()): FRAMING}),
+    'name_in_a_folder': lambda: zip_bytes({f'inner/{member_name()}': FRAMING}),
+    'name_with_a_prefix': lambda: zip_bytes({f'x{member_name()}': FRAMING}),
+    'name_with_a_suffix': lambda: zip_bytes({f'{member_name()}.bak': FRAMING}),
+}
+
+
+@pytest.mark.parametrize('case', NOT_THE_ONE_MEMBER_ZIP)
+def test_import_refuses_a_zip_that_is_not_the_one_member_extract(case, data_directory,
+                                                                 tmp_path):
+    body = NOT_THE_ONE_MEMBER_ZIP[case]()
+    original = make_original(tmp_path, content=body)
+    with pytest.raises(ValueError) as refusal:
+        sam_raw.import_file(data_directory, original, month=MONTH)
+    assert str(refusal.value) == NOT_THE_EXTRACT
+    assert not data_directory.exists()
+    assert original.read_bytes() == body
+
+
+@pytest.mark.parametrize('case', NOT_THE_ONE_MEMBER_ZIP)
+def test_acquire_refuses_a_zip_that_is_not_the_one_member_extract(case, data_directory,
+                                                                  monkeypatch):
+    body = NOT_THE_ONE_MEMBER_ZIP[case]()
+    server = install_sam(monkeypatch, FakeSam(extract_answer(body)))
+    with pytest.raises(ValueError) as refusal:
+        sam_raw.acquire(data_directory, MONTH, credential=FAKE_KEY)
+    assert str(refusal.value) == NOT_THE_EXTRACT
+    assert len(server.requests) == 1
+    assert list(month_directory(data_directory).iterdir()) == []
+    assert manifest_lines(data_directory) == []
+
+
+def test_a_refused_wrapped_import_leaves_the_month_free(data_directory, tmp_path):
+    wrapped = make_original(tmp_path, content=wrapped_zip(), folder='wrapped')
+    with pytest.raises(ValueError, match=NOT_THE_EXTRACT):
+        sam_raw.import_file(data_directory, wrapped, month=MONTH)
+    inner = make_original(tmp_path, content=inner_extract(), folder='inner')
+    path = sam_raw.import_file(data_directory, inner, month=MONTH)
+    assert path.read_bytes() == inner_extract()
+    assert sam_raw.select_extract(data_directory, MONTH) == path
+    assert len(manifest_lines(data_directory)) == 1
+
+
+def test_a_refused_wrapped_acquire_leaves_the_month_free(data_directory, monkeypatch):
+    install_sam(monkeypatch, FakeSam(extract_answer(wrapped_zip()),
+                                     extract_answer(inner_extract())))
+    with pytest.raises(ValueError, match=NOT_THE_EXTRACT):
+        sam_raw.acquire(data_directory, MONTH, credential=FAKE_KEY)
+    path = sam_raw.acquire(data_directory, MONTH, credential=FAKE_KEY)
+    assert path.read_bytes() == inner_extract()
+    assert sam_raw.select_extract(data_directory, MONTH) == path
+    assert len(manifest_lines(data_directory)) == 1
+
+
+def corrupt_central_directory():
+    '''A ZIP that `zipfile.is_zipfile` accepts and `zipfile.ZipFile` cannot read: the second
+    entry of its directory has a wrong signature.'''
+    body = zip_bytes({member_name(): FRAMING, 'readme.txt': b'x'})
+    second = body.index(b'PK\x01\x02', body.index(b'PK\x01\x02') + 1)
+    return body[:second] + b'PK\x01\x03' + body[second + 4:]
+
+
+def test_import_refuses_a_zip_whose_directory_cannot_be_read(data_directory, tmp_path):
+    original = make_original(tmp_path, content=corrupt_central_directory())
+    with pytest.raises(ValueError) as refusal:
+        sam_raw.import_file(data_directory, original, month=MONTH)
+    assert str(refusal.value) == 'original is not a ZIP file'
+    assert not data_directory.exists()
+
+
+def test_acquire_refuses_a_zip_whose_directory_cannot_be_read(data_directory, monkeypatch):
+    install_sam(monkeypatch, FakeSam(extract_answer(corrupt_central_directory())))
+    with pytest.raises(ValueError, match='original is not a ZIP file'):
+        sam_raw.acquire(data_directory, MONTH, credential=FAKE_KEY)
+    assert list(month_directory(data_directory).iterdir()) == []
+    assert manifest_lines(data_directory) == []
+
+
+def test_the_member_name_comes_from_the_extract_layout(data_directory, tmp_path, monkeypatch):
+    layout = replace(vendor_link_layouts.load_extract_layout(), member_pattern=r'other\.dat')
+    monkeypatch.setattr(vendor_link_layouts, 'load_extract_layout', lambda: layout)
+    refused = make_original(tmp_path, content=inner_extract(), folder='refused')
+    with pytest.raises(ValueError, match=NOT_THE_EXTRACT):
+        sam_raw.import_file(data_directory, refused, month=MONTH)
+    accepted = make_original(tmp_path, content=zip_bytes({'other.dat': FRAMING}), folder='ok')
+    assert sam_raw.import_file(data_directory, accepted, month=MONTH).is_file()
+
+
 # --- month selection
 
 
 def import_month(data_directory, tmp_path, month):
-    original = make_original(tmp_path, extract_name(month), sample_extract(month), month)
+    original = make_original(tmp_path, extract_name(month), inner_extract(month), month)
     return sam_raw.import_file(data_directory, original, month=month)
 
 
@@ -425,7 +573,7 @@ def test_month_selection_ignores_other_months(data_directory, tmp_path):
 
 
 def add_a_file(file):
-    (file.parent / extract_name(MONTH, '09')).write_bytes(sample_extract())
+    (file.parent / extract_name(MONTH, '09')).write_bytes(inner_extract())
 
 
 def add_a_part(file):
@@ -504,7 +652,7 @@ def test_month_selection_refuses_any_other_state(case, data_directory, tmp_path)
 def test_month_selection_refuses_a_file_the_manifest_does_not_record(data_directory):
     directory = month_directory(data_directory)
     directory.mkdir(parents=True)
-    (directory / EXTRACT_NAME).write_bytes(sample_extract())
+    (directory / EXTRACT_NAME).write_bytes(inner_extract())
     with pytest.raises(ValueError, match='raw file is not recorded'):
         sam_raw.select_extract(data_directory, MONTH)
 
