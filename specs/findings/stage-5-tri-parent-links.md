@@ -103,25 +103,32 @@ beside each byte count is 10^6 bytes. The Stage 5 values come from the Stage 5 f
 
 `du -sk` gives 1,308 KB for each bundle, the size Stage 5 recorded for the first run.
 
-Other sessions' test runs were on the host during four of the five Stage 18 commands. The
-host-rule check (`pgrep -fl 'embedding_data|embedding-data'`) before each command showed them:
+The host-rule check (`pgrep -fl 'embedding_data|embedding-data'`) ran just before each
+command. It listed another session's test run before four of the five commands:
 - Before the first run's `verify` (Task 2) and before the build: a pre-commit hook of another
   session, running pytest (`-m 'not network and not slow'`) with 7 pytest-xdist workers on
-  temporary data directories. It was about 4 minutes old at the build gate. The list before the
-  build is saved as `pgrep-build.txt`, and the list just before launch as
-  `pgrep-build-prelaunch.txt`. The Task 2 list is in the ledger. It reached the owner late, at
-  the build gate, after that `verify` had run.
-- Before the replay's `verify`: only the `pgrep` command's own `tee`. The host was idle when
-  that command started.
-- Before `compare-runs` and before `audit`: a Stage 19 session's pytest run of one test file
-  (`tests/test_measure_acs_wage_minimum_earners.py`), a few seconds old each time.
+  temporary data directories. The list at the build gate is saved as `pgrep-build.txt`
+  (23:14:44 UTC), and the list just before launch as `pgrep-build-prelaunch.txt` (23:16:34
+  UTC). The ledger summarizes the Task 2 list (process IDs and command). It reached the owner
+  late, at the build gate, after that `verify` had run.
+- Before the replay's `verify`: only the `pgrep` command's own `tee` (23:17:17 UTC). The host
+  was idle when that check ran.
+- Before `compare-runs` (23:17:32 UTC) and before `audit` (23:17:49 UTC): a Stage 19 session's
+  pytest run. A `ps` call in the session showed that it ran one test file
+  (`tests/test_measure_acs_wage_minimum_earners.py`) and was a few seconds old. The saved
+  `pgrep` lines are cut to a fixed width and do not hold the file name or the process age.
 
 None of these was an acquisition or a build, so the host rule did not stop the run. The owner
 chose to start the build without waiting for the hook to end ("Go now (loaded)") and confirmed
 that no other stage's acquisition or build was running and that no Stage 9 freeze window was
-open. The wall times of Task 2, Task 3, `compare-runs` and `audit` carry that load. The
-replay's `verify` started on an idle host. No Stage 18 wall time is a controlled, unloaded
-baseline.
+open.
+
+The saved lists show an overlap with the command itself for the Task 2 `verify` only. The hook
+was listed before it started and again at 23:14:44 UTC, after it ended at 23:14:31 UTC. For the
+build, `compare-runs` and `audit`, no list was taken after the command ended. So the saved
+evidence does not show whether the other job was still running, and those three wall times may
+carry load. The replay's `verify` started on an idle host. No Stage 18 wall time is a
+controlled, unloaded baseline.
 
 ## Results
 
@@ -208,8 +215,8 @@ Two earlier texts are out of date. Neither file is edited.
 - The family rests on one EPA snapshot (2025-11-05). `acquire` refuses every EPA file, because
   EPA's endpoint sends no `Content-Length`. A later snapshot enters through `import-file` and a
   new run.
-- Four of five Stage 18 wall times ran beside another session's test run (see "Measured
-  cost").
+- Another session's test run was on the host before four of the five Stage 18 commands. The
+  saved evidence shows an overlap for the Task 2 `verify` only (see "Measured cost").
 
 ## Not claimed
 
