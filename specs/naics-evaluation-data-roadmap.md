@@ -42,6 +42,7 @@ Choices made:
 - Protocol sections (owner, 2026-11-18): each new family needs its own section in `specs/evaluation-protocol.md` before it is scored. It is the last Ranked-list item of its track (O17 to O21, and O24) and is written after that track's first real build. Stage 16 frames its section like Section 1 of the protocol: evidence, assignment and the conditions this repository keeps. The scores may stay with naics-embedder, because the protocol lists them under "What this repository does not decide".
 - Track H (owner, 2026-11-18): the "Roadmap placement" section of `specs/completed/acs-wage-microdata.md`, approved on 2026-11-18, proposed the track. Track H reads Stage 8 in place and does not wait for Stage 9. Stage 17 goes to writing-plans against that spec, as its header says. Stage 17 keeps the replay check of the spec's Verification item 1, which the owner approved with the spec. Stages 1, 5, 14 and 15 left replay to a later stage or item.
 - Resume after Stages 5 and 17 (owner, 2026-11-22, "Approve"): Tracks B and H keep their rankings. O12 becomes Stage 18 and O23 becomes Stage 19. O12 goes first in Track B because a change to a file in `tri_bundle.SOFTWARE_FILES` (it includes `pyproject.toml`, `uv.lock` and the shared Stage 4 to 6 modules) makes `verify` refuse Stage 5's run, so the replay can no longer be compared with it (plan 13, Handoff). Both Stage 17 gate readings stand (Stage 19, Consumes).
+- Resume after Stage 14 (owner, 2026-11-22, "Approve as drafted"): Stage 14's Leaves out becomes O25 (USAspending hardening) and O26 (USAspending headline minimum count). Track C ranks O25, O26, O18, as Track B does. O25 becomes Stage 20. It goes first for the reason O12 did: a change to a file in `vendor_link_bundle.SOFTWARE_FILES` (26 files, among them `pyproject.toml`, `uv.lock` and `sam_raw.py`) makes `verify` refuse Stage 14's run (plan 15, Handoff). D2 stays: a blank or invalid last update date makes a firm `dnb_era_record`, so 6,403 firms get no industry (`specs/naics-evaluation-data-stage-14-findings.md`, "The cost of D2"). The live `acquire-sam-extract` request stays deferred (`specs/deferred_items.md`, section `15-usaspending-vendor-links`).
 
 | # | Outcome | Track | Rank | Cost (estimate; basis) |
 |---|---|---|---|---|
@@ -62,13 +63,15 @@ Choices made:
 | O15 | ACS targets on real data: staffing patterns, workplace area mix, and commuting and migration flows in the shared schema (owner, 2026-11-18) | F | 1 | Unknown. Three full builds failed and their cause is unproven. Peak memory is the open question (`specs/findings/stage-9-acs-targets.md`). Measured by Stage 9 |
 | O16 | CPS job-change flows on real data: linked person-months with CPS codes mapped to NAICS and SOC, then industry and occupation flows (owner, 2026-11-18) | G | 1 | Unknown: not started. The `9890` question comes first. Measured by Stage 11 |
 | O17 | A protocol section for the TRI parent links (owner, 2026-11-18) | B | 6 | Design sessions only, after Stage 5's real build |
-| O18 | A protocol section for the USAspending family (owner, 2026-11-18) | C | 2 | Design sessions only, after Stage 14's real build |
+| O18 | A protocol section for the USAspending family (owner, 2026-11-18) | C | 4 | Design sessions only, after Stage 14's real build |
 | O19 | A protocol section for the BEA family (owner, 2026-11-18) | D | 3 | Design sessions only, after Stage 15's real build |
 | O20 | A protocol section for the ACS targets (owner, 2026-11-18) | F | 2 | Design sessions only, after Stage 9's real build |
 | O21 | A protocol section for the CPS job-change flows (owner, 2026-11-18) | G | 2 | Design sessions only, after Stage 11's real build |
 | O22 | A person-level file of ACS 2023–2024 wage earners for naics-embedder's wage panel: the wage outcome, person covariates, survey weights, each person's NAICS node, flags and a headline column (owner, 2026-11-18) | H | 1 | Moderate (estimate): a lazy scan of 3,035,086 rows and about 120 of the 261 columns of the 910 MB Stage 8 core table, run twice for the replay. Stage 8's `verify_bundle` took about 6 minutes for each run in Stage 9. Peak memory measured by Stage 17 |
 | O23 | A minimum number of headline earners for each category, set from the built counts, as O4 did for the ITA targets (owner, 2026-11-18) | H | 2 | Small: one pass over Stage 17's counts, like O4 |
 | O24 | A protocol section for the ACS wage microdata (owner, 2026-11-18) | H | 3 | Design sessions only, after Stage 17's real build and O23 |
+| O25 | USAspending hardening: Stage 14's bundle gets an exact replay check, a long-form acceptance finding and README and CLAUDE.md run pins (owner, 2026-11-22) | C | 2 | Small: one replay build plus `compare-runs`. Stage 14's build took 29.6 s and 961 MB (plan 15, Handoff) |
+| O26 | A headline minimum count for the USAspending family, set from its observed counts (owner, 2026-11-22) | C | 3 | Small: one pass over the family's `n_unweighted` counts, like O4 and O13 |
 
 Tracks: A — ITA NAICS targets (known progression, complete). B — EPA TRI parent
 links (research). C — USAspending subawards with SAM.gov (research). D — BEA
@@ -100,7 +103,7 @@ first answer. The owner approved this partition on 2026-11-16. Stage 5, the firs
 promoted Track B item, follows Track A's Stages 3 and 4 (owner, 2026-11-16). From
 2026-11-18 the tracks run in parallel (see Choices made). Stage numbers name stages and
 do not set an order. Stages 18 and 19 were promoted from the Ranked lists of Tracks B and H
-on 2026-11-22 (see Choices made).
+on 2026-11-22, and Stage 20 from Track C's later that day (see Choices made).
 
 - [x] Stage 1: ITA NAICS targets, first build
       Objective: Plan 11's bundle is built once on real ITA data and verified.
@@ -248,6 +251,16 @@ on 2026-11-22 (see Choices made).
       Leaves out: the protocol section for the file → O24. The wage panel itself → naics-embedder's panel spec
       ROUTING: brainstorming
 
+- [ ] Stage 20: USAspending vendor links, hardening
+      Objective: Stage 14's USAspending bundle gets its exact replay check, a long-form acceptance finding and README and CLAUDE.md run pins.
+      Outcomes: O25
+      Track: C
+      Consumes: Stage 14's run `stage14_vendor_links_20261122_r2`, detached pin `248943dc5603f8e035b0f1c49bf624a36ed702b70eb6b961a35b64ee97c7a2be`, snapshot `2026-11-19`, extract month `2026-10`, built at `1eddb3e` with `dirty: false`, and its build arguments: codes run `stage4_v11_20261013_r2`, its Stage 4 pin, `--snapshot 2026-11-19` and `--sam-month 2026-10` (plan 15, Handoff). A checkout in which every file of `vendor_link_bundle.SOFTWARE_FILES` is byte-identical to the one that built Stage 14's run (plan 15, Handoff). D2 stays (Resolved at resume, 2026-11-22: owner). `specs/naics-evaluation-data-stage-14-findings.md` and the spec `specs/completed/usaspending-vendor-links.md`. The owner's go-ahead for each production write and the owner's confirmation that no Stage 9 freeze window is open. Recorded at resume, 2026-11-22, for the acceptance finding: `compare-runs` skips `inputs.json` (D3), so it does not compare the software record. The independent reconciler ran on `r2` only. `r1` is superseded and stays on disk, and nothing cites it. The findings file's Status line (line 3) still says "Stage 14 in progress". The docstring of `scripts/reconcile_usaspending_vendor_links.py` (line 6) names the old spec path. Its fix rides with the next change to the script (`specs/deferred_items.md`, section `15-usaspending-vendor-links`)
+      Produces: a replay bundle under a new run ID and its `compare-runs` result. A committed long-form acceptance finding under `specs/findings/`. README and CLAUDE.md run pins. README has no Stage 14 pin yet, and CLAUDE.md names `r2` only
+      Exit: O25: `verify` of Stage 14's run with its detached pin passes from Stage 20's checkout and venv, because `compare-runs` does not check software identity. The replay bundle's `verify` with its own detached pin passes, and `compare-runs` against Stage 14's run reports equal. The acceptance finding is committed and records the replay run ID, its pin, and the wall time, maximum RSS and bundle size of the replay. README and CLAUDE.md name the selected USAspending runs and their pins
+      Leaves out: the USAspending headline minimum count → O26. The USAspending protocol section → O18. A changed D2 rule and the live `acquire-sam-extract` request → `specs/deferred_items.md`. The R8.4 training-role amendment → a separate owner decision after naics-embedder's spec (reset prompt, Leave alone)
+      ROUTING: writing-plans
+
 ## Ranked list — Track B
 
 Owner's order after Stage 2 (2026-11-16), with ranks restarted on 2026-11-18. O7 and O8
@@ -259,7 +272,10 @@ parked in `specs/deferred_items.md`.
 
 ## Ranked list — Track C
 
-1. O18 — USAspending protocol section. Design sessions only, after Stage 14's real build
+Owner's order at the resume after Stage 14 (2026-11-22). O25 left the list as Stage 20.
+
+1. O26 — USAspending minimum count. Small: one pass over its counts
+2. O18 — USAspending protocol section. Design sessions only, after Stage 14's real build
 
 ## Ranked list — Track D
 
@@ -297,7 +313,7 @@ completion ticks Stage 4.
 ## Completion
 
 Retire this roadmap only after a conformance audit of the accumulated system: re-run
-the gap rubric over every outcome O1–O24, with evidence for each verdict (implementing
+the gap rubric over every outcome O1–O26, with evidence for each verdict (implementing
 stage and plan, `> Deviation:` notes, `specs/deferred_items.md` entries). Ranked-list
 items that the owner never promoted park as deferred items. Each unmet outcome either
 becomes a new stage, keeping this roadmap live, or is deferred consciously with a
