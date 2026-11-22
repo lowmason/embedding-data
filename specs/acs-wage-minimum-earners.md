@@ -231,7 +231,10 @@ but meet `SE_TARGET`.
      categories with their share of categories and of headline rows. It also holds the
      minimum and, for each category and year, `INDNAICS`, `YEAR`, `headline_rows`, `SE` and
      whether it meets `SE_TARGET`. It holds no mean wage and no person value.
-   - It writes nothing under `data/`.
+   - It writes nothing under `data/`. Its JSON output never enters git. The decision record cites
+     only the output's SHA-256, as Stage 3 did. **My call:** a category's SE times the square
+     root of its count gives about its wage spread, which is close to the worker-profile
+     family's wage signal. So the per-category SEs stay on this machine.
 2. **Two real runs.** The plan runs the script twice on the pinned input. The two outputs must
    be byte-identical. The decision record gives their SHA-256, the command, and the wall time
    and maximum RSS of one run (`/usr/bin/time -l`).
@@ -239,7 +242,8 @@ but meet `SE_TARGET`.
    beside the Stage 3 record). It gives the rule and constants with the commit that fixed them
    before the first run, the inputs and pins, the bands for each year, the minimum, the kept
    counts for each year, both disagreement tallies, the categories that miss the gate in each
-   year, the design-time disclosure above and the limits below.
+   year, the design-time disclosure above and the limits below. It gives no SE for a single
+   category.
 4. **Spec amendments** in `specs/embedding-evaluation-data-spec.md`:
    - R7.3: the ACS wage microdata are not a target family. Their minimum number of headline
      earners for each category is set by the decision record.
@@ -299,6 +303,13 @@ but meet `SE_TARGET`.
 
 The plan executes in a fresh session. The decision record, the spec amendments and the
 stale-line changes land in one branch with the script.
+
+Stage 19's Consumes line names only `report.json` and the Stage 17 finding, and its cost
+estimate is "one pass over Stage 17's counts". Under D1 the measurement also reads
+`acs_wage_persons.parquet`, which costs more. So the plan records a `> Deviation:` note
+against the Stage 19 Consumes line and cost (owner, D1, 2026-11-22), and the stamp cites that
+note. The Exit still holds as written, because the minimum and its bands are counted in
+`headline_rows`.
 
 > Roadmap: specs/naics-evaluation-data-roadmap.md, Stage 19 — on plan
 > completion, tick the stage and re-validate later stages against what shipped.
