@@ -208,15 +208,16 @@ Theta is 0.5, `θ_r` alternates between 1/3 and 2/3, and `SE = sqrt(4/80 · 80/3
 - `test_one_row_is_undefined`: one row gives `(None, 'fewer_than_two_rows')`.
 - `test_equal_wages_are_undefined`: three rows with `x` 10.5 give
   `(None, 'constant_wage')`.
-- `test_nonpositive_replicate_denominator_is_undefined`: two rows whose `REPWTP7` weights are
-  `3` and `-3` give `(None, 'replicate_denominator_not_positive')`. Two rows whose `REPWTP7`
+- `test_nonpositive_replicate_denominator_is_undefined`: two rows with wages 10.0 and 11.0,
+  whose `REPWTP7` weights are `3` and `-3`, give `(None, 'replicate_denominator_not_positive')`. Two rows whose `REPWTP7`
   are both 0 give the same.
 - `test_first_undefined_reason_wins`: one row with a negative `REPWTP1` gives
   `'fewer_than_two_rows'`.
-- `test_negative_replicate_weight_with_positive_denominator_is_defined`: two rows, `REPWTP7`
-  weights `5` and `-1`, give a finite SE and reason None.
-- `test_equal_weights_give_zero_se`: three rows with different `x` and the same weights in
-  every replicate give `(0.0, None)`, and `meets_target(0.0)` is true.
+- `test_negative_replicate_weight_with_positive_denominator_is_defined`: two rows with wages
+  10.0 and 11.0 and `REPWTP7` weights `5` and `-1` give a finite SE and reason None.
+- `test_equal_weights_give_zero_se`: three rows with wages 10.0, 10.5 and 11.25 (exact in
+  binary) and integer weights equal across rows in every replicate give `(0.0, None)`, and
+  `meets_target(0.0)` is true.
 - `test_meets_target_boundary`: `meets_target(0.05)` is true, `meets_target(0.0500001)` and
   `meets_target(None)` are false.
 - `test_bands_merge_short_bands_upward`: counts `[3]*12 + [60]*4 + [150]*9 + [300]*2 +
