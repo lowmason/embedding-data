@@ -448,7 +448,13 @@ The selected run is `stage14_vendor_links_20261122_r2`, with detached pin
 `248943dc5603f8e035b0f1c49bf624a36ed702b70eb6b961a35b64ee97c7a2be`, snapshot `2026-11-19` and
 extract month `2026-10`, built at commit `1eddb3e` (`dirty: false`). `verify` exits 0, and the
 independent `scripts/reconcile_usaspending_vendor_links.py` (standard library and Polars, no
-`embedding_data` import) is equal on all 87 checks. The first run, `r1`, is superseded: the
+`embedding_data` import) is equal on all 87 checks.
+The replay `stage14_vendor_links_20261122_r2_replay`, with detached pin `d08ed4cb396fae172ebde8be65fe6dfc492cb4c2731ad4308cfcf7cd55fd6055`, was
+built at commit `3d0c63d` (`dirty: false`) with the same arguments. Both runs pass
+`verify`, `compare-runs` finds them equal, and their `inputs.json` files differ only in the
+run ID and the execution commit and time. The
+[Stage 14 finding](specs/findings/stage-14-usaspending-vendor-links.md) records the commands,
+the cost and the limits. The first run, `r1`, is superseded: the
 wrapped-ZIP check in `sam_raw.py` changed a hashed file, so `verify` refuses `r1`. Its
 `report.json` equals that of `r2`. The registration status and EVS source tallies of the
 preflight script close to a domain (`A`, `E`, `A~E`; `D&B`, `E&Y`). The
