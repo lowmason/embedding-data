@@ -582,6 +582,21 @@ def test_a_skipped_line_of_a_firm_on_no_usable_report(tmp_path, monkeypatch):
     assert (status, false_checks(result)) == (1, ['report.extract.unreadable_lines'])
 
 
+def test_an_lf_extract_reconciles_like_the_crlf_one(tmp_path, monkeypatch):
+    # The real extract ends its lines at LF. The V12 extract with LF line ends gives the same
+    # result as with the CRLF ends that the build read.
+    data_dir = copy_v12(tmp_path)
+
+    def to_lf(text):
+        assert '\r\n' in text and '\r' not in text.replace('\r\n', '')
+        return text.replace('\r\n', '\n')
+
+    pin = reseal_extract(data_dir, to_lf)
+    status, result, _line = run_main(data_dir, pin)
+    assert (status, false_checks(result)) == (0, [])
+    assert result['counts']['firms'] == 23
+
+
 def edit_lines(uei: str, edit):
     '''An extract edit: `edit(line)` on each line of `uei`; a None result drops the line.'''
     def change(text):
@@ -1187,9 +1202,23 @@ def test_bad_framing_is_refused(lines):
 def test_framing_alone_is_an_empty_extract():
     assert list(reconcile.data_lines([BOF, EOF], LAYOUT)) == []
     assert list(reconcile.data_lines([BOF, 'a\r\n', EOF], LAYOUT)) == ['a']
-    # Only the CRLF line end is removed; a CR or LF before it stays in the last field.
-    assert list(reconcile.data_lines([BOF, 'a\r\r\n', 'b\n\r\n', EOF], LAYOUT)) == [
-        'a\r', 'b\n']
+    assert list(reconcile.data_lines([BOF_LF, 'a\n', EOF], LAYOUT)) == ['a']
+
+
+def lf(line: str) -> str:
+    '''The same line with an LF line end in place of its CRLF.'''
+    return line.removesuffix('\r\n') + '\n'
+
+
+BOF_LF = lf(BOF)
+
+
+def test_a_line_ends_at_lf_and_only_one_cr_before_it_is_removed():
+    # Ruling, 2026-11-22: a line ends at LF. One CR directly before the LF is removed, so a
+    # CRLF file reads the same; a CR anywhere else stays in the field.
+    assert list(reconcile.data_lines(
+        [BOF_LF, 'a\n', 'b\r\n', 'c\r\r\n', 'd\re\n', '\r\n', EOF], LAYOUT)) == [
+        'a', 'b', 'c\r', 'd\re', '']
 
 
 @pytest.mark.parametrize('end', ['', '!END', '!end ', 'end'])
@@ -1198,12 +1227,49 @@ def test_a_line_with_the_right_count_but_no_record_end_is_refused(end):
         read_extract(extract_line(end=end))
 
 
-def test_only_crlf_ends_an_extract_line(tmp_path):
-    line = extract_line().replace('SAM', 'S\nA\rM')
-    file = write_zip(tmp_path / 'e.zip', {V12_EXTRACT_MEMBER: (BOF + line + EOF).encode()})
-    lines = list(reconcile.extract_text(file, LAYOUT))
-    assert lines == [BOF, line, EOF]
-    assert reconcile.tally_extract(lines, LAYOUT, {GOOD}).unreadable_lines == 0
+def extract_member(tmp_path: Path, name: str, *lines: str) -> Path:
+    '''A raw extract ZIP whose one member holds `lines` and then the EOF line, unterminated.'''
+    return write_zip(tmp_path / f'{name}.zip',
+                     {V12_EXTRACT_MEMBER: (''.join(lines) + EOF).encode()})
+
+
+def test_an_lf_member_reads_like_a_crlf_member(tmp_path):
+    # The real extract ends its lines at LF, holds no CR, and has no terminator after EOF.
+    crlf = [BOF, extract_line(), extract_line(OTHER, code='541512')]
+    for name, lines in (('crlf', crlf), ('lf', [lf(line) for line in crlf])):
+        read = list(reconcile.extract_text(extract_member(tmp_path, name, *lines), LAYOUT))
+        assert read == [*lines, EOF]
+        result = reconcile.tally_extract(read, LAYOUT, {GOOD, OTHER})
+        assert result.unreadable_lines == 0
+        assert {uei: rows.codes for uei, rows in result.firms.items()} == {
+            GOOD: {'541511'}, OTHER: {'541512'}}
+
+
+def test_the_last_data_line_may_end_at_lf_alone(tmp_path):
+    file = extract_member(tmp_path, 'mixed', BOF, extract_line(), lf(extract_line(OTHER)))
+    result = reconcile.tally_extract(reconcile.extract_text(file, LAYOUT), LAYOUT, {GOOD, OTHER})
+    assert (set(result.firms), result.unreadable_lines) == ({GOOD, OTHER}, 0)
+
+
+def test_a_lone_cr_stays_in_its_field(tmp_path):
+    line = lf(extract_line(code='5415\r11'))
+    lines = list(reconcile.extract_text(extract_member(tmp_path, 'cr', BOF_LF, line), LAYOUT))
+    assert lines == [BOF_LF, line, EOF]
+    result = reconcile.tally_extract(lines, LAYOUT, {GOOD})
+    # The line is read whole, and the CR inside the code makes the code malformed.
+    assert result.unreadable_lines == 0
+    assert result.firms[GOOD].malformed is True
+
+
+@pytest.mark.parametrize('end', [pytest.param(lambda line: line, id='crlf'),
+                                 pytest.param(lf, id='lf')])
+def test_a_bare_lf_inside_a_field_splits_the_line(tmp_path, end):
+    line = end(extract_line().replace('SAM', 'S\nAM'))
+    lines = list(reconcile.extract_text(extract_member(tmp_path, 'split', BOF, line), LAYOUT))
+    assert len(lines) == 4
+    result = reconcile.tally_extract(lines, LAYOUT, {GOOD})
+    # Both halves have the wrong field count, so both are skipped and counted.
+    assert (result.unreadable_lines, result.unreadable_ueis, result.firms) == (2, {GOOD}, {})
 
 
 @pytest.mark.parametrize(('members', 'reason'), [

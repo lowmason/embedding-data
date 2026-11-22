@@ -24,8 +24,11 @@ UEIs on usable reports: their primary codes, the codes of their code strings, fo
 nothing else.
 
 Readings that the spec text leaves open, as this script takes them:
-- An extract line ends only at CRLF. The first line must start with the BOF prefix and the last
-  with the EOF prefix. Their counts are not record counts and are not read.
+- An extract line ends at LF, because the real extract has LF line ends and no CR (owner
+  ruling, 2026-11-22). One CR directly before the LF is removed, so a CRLF file reads the same.
+  A CR anywhere else stays in its field, and an LF inside a field splits the line. The last
+  line, the EOF line, has no terminator. The first line must start with the BOF prefix and the
+  last with the EOF prefix. Their counts are not record counts and are not read.
 - An extract data line with the wrong field count is skipped and counted (owner, 2026-11-19). Its
   UEI, the stripped field at the UEI position, counts as an unreadable firm when it is on a usable
   report. A line with the right field count whose last field is not the record end is refused.
@@ -509,8 +512,13 @@ class Extract:
         self.invalid_date_rows = 0
 
 
+def line_body(line: str) -> str:
+    '''The line without its LF and one CR directly before the LF. A line with no LF is whole.'''
+    return line[:-1].removesuffix('\r') if line.endswith('\n') else line
+
+
 def data_lines(lines: Iterable[str], layout: dict) -> Iterator[str]:
-    '''The data lines between the BOF and the EOF line, without their CRLF line ends.'''
+    '''The data lines between the BOF and the EOF line, without their line ends.'''
     iterator = iter(lines)
     first = next(iterator, None)
     if first is None or not first.startswith(layout['bof_prefix']):
@@ -519,7 +527,7 @@ def data_lines(lines: Iterable[str], layout: dict) -> Iterator[str]:
     for line in iterator:
         if pending is not None:
             yield pending
-        pending = line.removesuffix('\r\n')
+        pending = line_body(line)
     if pending is None or not pending.startswith(layout['eof_prefix']):
         raise Refused('extract framing differs')
 
@@ -577,7 +585,7 @@ def tally_extract(lines: Iterable[str], layout: dict, wanted: set[str]) -> Extra
 
 
 def extract_text(file: Path, layout: dict) -> Iterator[str]:
-    '''The lines of the one extract member, each with its CRLF. Only CRLF ends a line.'''
+    '''The lines of the one extract member, each with its line end. Only LF ends a line.'''
     try:
         with zipfile.ZipFile(file) as archive:
             members = archive.infolist()
@@ -585,7 +593,7 @@ def extract_text(file: Path, layout: dict) -> Iterator[str]:
                                                       members[0].filename):
                 raise Refused('raw member is unexpected')
             with archive.open(members[0]) as raw, io.TextIOWrapper(
-                    raw, encoding=layout['encoding'], newline='\r\n') as text:
+                    raw, encoding=layout['encoding'], newline='\n') as text:
                 yield from text
     except (UnicodeDecodeError, zipfile.BadZipFile):
         raise Refused('extract line is unreadable') from None
