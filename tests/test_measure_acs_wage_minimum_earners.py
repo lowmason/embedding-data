@@ -758,6 +758,8 @@ MALFORMED_CHANGES = {
     'a_total_is_a_string': lambda report: report['headline_categories'].update({'2023': '10'}),
     'a_total_is_a_boolean': lambda report: report['headline_categories'].update({'2023': True}),
     'a_total_is_a_float': lambda report: report['headline_categories'].update({'2023': 10.0}),
+    'key_twice_with_other_counts': lambda report: report['categories'].append(
+        {'INDNAICS': '1111', 'YEAR': 2023, 'rows': 3, 'headline_rows': 0}),
 }
 
 
@@ -968,3 +970,39 @@ def test_columns_are_checked_before_the_rows(script, golden):
     def change(frame):
         return set_value('PERWT', 0.0)(frame).with_columns(pl.col('REPWTP5').cast(pl.Float64))
     assert_refused(script, golden, COLUMNS_DIFFER, pin=forge_persons(golden, change))
+
+
+def test_category_totals_that_shift_both_years_are_refused(script, golden):
+    assert report_for(golden_people())['headline_categories'] == {'2023': 10, '2024': 10}
+    pin = forge_report(golden, lambda report: report['headline_categories'].update(
+        {'2023': 11, '2024': 9}))
+    assert_refused(script, golden, COUNT_DIFFERS, pin=pin)
+
+
+def weighted_people():
+    '''Headline rows whose weights differ by row and by replicate, as delivered.
+
+    `PERWT` has a fraction, one replicate weight is 0 and one is negative, so that a scaling,
+    a rounding or a cast shows in the values or in the types.
+    '''
+    people = []
+    for year in (2023, 2024):
+        for index in range(3):
+            weights = {name: 1000 * (index + 1) + 7 * number + year % 5
+                       for number, name in enumerate(REPLICATE_NAMES, start=1)}
+            weights['PERWT'] = 37.625 + 11.5 * index + (year - 2023) / 8
+            people.append(person('1111', year, 10.0 + index, **weights))
+        people[-3]['REPWTP1'] = 0
+        people[-2]['REPWTP80'] = -5
+        people.append(person('1111', year, 10.0, headline=False))
+    return people
+
+
+def test_headline_frame_returns_the_delivered_weights(script, tmp_path):
+    people = weighted_people()
+    delivered = [row for row in people if row['flag_headline']]
+    assert len({row['PERWT'] for row in delivered}) == len(delivered)
+    _, _, headline = attempt(script, publish(tmp_path, people))
+    for column in ('PERWT', *REPLICATE_NAMES):
+        assert headline[column].to_list() == [row[column] for row in delivered]
+        assert headline.schema[column] == READ_SCHEMA[column]
