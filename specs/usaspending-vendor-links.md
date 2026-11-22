@@ -389,7 +389,10 @@ other window.
   records the member-name pattern. Any other member fails the build.
 - A second registry constant records the extract layout: the column positions
   of the fields the build reads, taken from GSA's layout document during E5. A
-  changed layout version or a row with the wrong field count fails the build.
+  changed layout version fails the build. An extract line with the wrong field
+  count is skipped and counted, and it never fails the build *(owner, 2026-11-19;
+  the real extract has 276 such lines)*. An extract line ends at LF, and the
+  build drops one CR before it, because the delivered file has no CRLF.
 - The build reads only the extract fields named in
   [Firm table](#firm-table). It never selects a name, address or other D&B
   Open Data field.
@@ -706,7 +709,7 @@ the frozen top-level CLI. The plan may split it into several new modules.
 | `import-sam-extract FILE --month YYYY-MM` | No | No | Register an owner-downloaded extract |
 | `build RUN_ID --codes-run ID --codes-outputs-sha256 PIN --snapshot DATE --sam-month YYYY-MM` | No | No | Build one immutable bundle |
 | `verify RUN_ID --outputs-sha256 PIN` | No | No | Authenticate the pin, then recompute and compare every table |
-| `compare-runs FIRST SECOND` | No | No | Exact logical comparison of two bundles, omitting run ID and time |
+| `compare-runs FIRST SECOND` | No | No | Exact logical comparison of the four Parquets and `report.json`, which omits run ID and time. It skips `inputs.json` *(owner, plan 15, 2026-11-18)* |
 
 Every command takes an explicit `--data-dir`. Every production command passes
 `--data-dir /Users/lowell/Projects/embedding-data/data`. Offline commands load
@@ -770,8 +773,9 @@ findings file records its detached checksum.
   publication. Any change fails the run.
 - Failure cleans only the run's own staging.
 - Expected data states are retained diagnostics, not failures: unusable
-  reports, ineligible firms, excluded pairs and duplicate rows.
-- Changed raw bytes, a changed header or layout, a wrong field count, a
+  reports, ineligible firms, excluded pairs, duplicate rows and extract lines
+  with the wrong field count.
+- Changed raw bytes, a changed header or layout, a
   subaward type other than `sub-contract`, a malformed primary code on a firm
   that the build reads, row loss or multiplication and
   invalid estimates are failures.
@@ -793,8 +797,9 @@ Write the failing tests first. Small typed frames cover:
 - The intra-group sensitivity and its support label.
 - Partial counterparty sets.
 - A malformed primary code on a firm that the build reads fails the build. The
-  same code on an unread extract row, in a firm's other codes or in the
-  subaward's NAICS field is only counted.
+  same code on an unread extract row is counted (`malformed_unread_rows`). The
+  same code in a firm's other codes or in the subaward's NAICS field is not
+  counted, and never fails the build *(plan 15)*.
 - Header and layout refusal, a sub-grant row, occupied run names, changed pins
   and changed software.
 - `compare-runs` equal and unequal.
@@ -960,8 +965,11 @@ Item 5 (R7.5 published aggregates) belongs to Stage 15.
 
 Roadmap: specs/naics-evaluation-data-roadmap.md, Stage 14 — on plan completion, tick the stage and re-validate later stages against what shipped.
 
-- Software readiness (tests and the V12 fixture) comes before full-data
-  acceptance. Do not tick Stage 14 on design or planning completion.
+- The document checks, acquisition and the preflight's data checks (full-data
+  acceptance steps 1 to 3) come first, because the V12 fixture uses the header
+  layout that E4 records. Software readiness (tests and the V12 fixture) then
+  comes before the full-data build *(owner, plan 15, 2026-11-22)*. Do not tick
+  Stage 14 on design or planning completion.
 - The roadmap re-validation notes that Stage 14 did not consume the Stage 4
   concordance, and that the O6 cost note and `specs/deliverable-map.md` still
   say the account is missing (see
