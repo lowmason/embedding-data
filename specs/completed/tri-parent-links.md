@@ -1,12 +1,14 @@
 # TRI parent links
 
+**Status: COMPLETE (2026-11-21)** — implemented by [plan 13](../plans/completed/13-tri-parent-links.md); the measured run is in the [Stage 5 findings](../naics-evaluation-data-stage-5-findings.md).
+
 > Next step: writing-plans in a fresh session against this file. Do not fetch
 > any TRI file, and do not build, before the plan exists and the owner gives
 > the go-ahead for each write.
 
 Status: the owner approved this committed spec on 2026-11-18 ("Approve the
 spec"), including every call marked "My call". Stage 5 design session of
-[the roadmap](naics-evaluation-data-roadmap.md). On 2026-11-18 the owner chose
+[the roadmap](../naics-evaluation-data-roadmap.md). On 2026-11-18 the owner chose
 all five decisions below ("Accept all picks"), with the calls listed under
 Accepted proposals. Calls marked "My call" elsewhere in this file were made
 while writing it. A
@@ -18,7 +20,7 @@ are answered in place. No TRI file was fetched for this design.
 ## Scope and governing contracts
 
 Stage 5 builds Source 3 of
-[the evidence-sources spec](uncovered-uses-evidence-sources.md) (the Stage 2
+[the evidence-sources spec](../uncovered-uses-evidence-sources.md) (the Stage 2
 spec) once on real data and verifies it. It serves two uses from one evidence
 family:
 
@@ -29,9 +31,9 @@ family:
   industries of its facilities.
 
 The Stage 2 spec's "Rules for every new family" govern this stage. R5, R7.1,
-R7.4, R8 and R9 of [the source spec](embedding-evaluation-data-spec.md) govern
+R7.4, R8 and R9 of [the source spec](../embedding-evaluation-data-spec.md) govern
 codes, outputs, provenance, disclosure, leakage and offline operation. The
-Stage 10 spec ([completed](completed/ita-establishment-targets.md)) is the
+Stage 10 spec ([completed](ita-establishment-targets.md)) is the
 model for the measure, the bundle and the commands.
 
 ### Owner decisions (2026-11-18)
@@ -470,8 +472,12 @@ cannot see. It can only be missing from some `J(a,b)`. It can never inflate
 one. So no per-cell label is derived from it. An excluded facility-year belongs
 to the owner key it would have had: its one standardized parent name, else
 `facility:<TRIFD>`. **My call:** a `parent_conflict` facility-year belongs to
-each of its named parents. Facility-years excluded as `federal` are not counted
-here, because the federal sensitivity covers them.
+each of its named parents. So does a facility-year that is excluded for another
+partial reason (`naics_missing`, `naics_conflict` or `naics_not_2022`) and names
+several parents: it belongs to each standardized parent name that it lists, else
+to `facility:<TRIFD>`. The reason order only classifies the facility-year. It does
+not change who owns it *(owner, plan 13, 2026-11-21)*. Facility-years excluded as
+`federal` are not counted here, because the federal sensitivity covers them.
 
 `tri_parent_link_support.parquet`, one row per target cell, sorted by
 `unit_a`, `unit_b`:
@@ -703,7 +709,7 @@ No replay build runs in this stage (O12).
 ## Source spec amendment
 
 The plan applies this amendment to
-[the source spec](embedding-evaluation-data-spec.md) and `CLAUDE.md` when the
+[the source spec](../embedding-evaluation-data-spec.md) and `CLAUDE.md` when the
 stage ships. It follows the Stage 2 spec's amendment list.
 
 **Always (TRI's own rows).**

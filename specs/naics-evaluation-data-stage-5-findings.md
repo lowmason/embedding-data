@@ -2,8 +2,8 @@
 
 Stage 5 of `specs/naics-evaluation-data-roadmap.md` builds O7 and O8 from EPA's Toxics
 Release Inventory (TRI) parent data. O7 is the parent-link target. O8 is the holding-company
-table. The spec is `specs/tri-parent-links.md`. The plan is
-`specs/plans/13-tri-parent-links.md`.
+table. The spec is `specs/completed/tri-parent-links.md`. The plan is
+`specs/plans/completed/13-tri-parent-links.md`.
 
 This file records the preflight first. Later tasks add the run results.
 

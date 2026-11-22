@@ -456,7 +456,7 @@ Federal facilities stay out of the headline cells.
 - **O8** is the use "holding-company classification". It reads the parent-industry
   table. That table lists the NAICS 2022 industries of each parent's facilities.
 
-The [stage spec](specs/tri-parent-links.md) defines both tables.
+The [stage spec](specs/completed/tri-parent-links.md) defines both tables.
 
 The standalone module `embedding_data.tri_parent_links` has five commands. It is
 separate from the top-level `embedding-data` CLI. Every command requires an explicit
@@ -476,6 +476,11 @@ earlier bundle. `DATE` is the "processed as of" date that EPA states for its fil
 `DATE` in ISO form, `YYYY-MM-DD`, for example `2025-11-05`. Each raw file lives in
 `raw/epa_tri/basic/<RY>/<DATE>/`, where `<RY>` is the reporting year. So a later EPA
 snapshot lands beside the earlier one. `YEAR` is 2022, 2023 or 2024.
+
+EPA's current endpoint sends no `Content-Length` header, so `acquire` refuses every EPA
+file. Download each file in a browser and register it with `import-file`. A refused
+`acquire` can leave an empty `raw/epa_tri/basic/<RY>/<DATE>/` directory. `import-file`
+fills it.
 
 Success prints one JSON line with sorted keys and exits 0. `acquire` prints the
 data-relative paths of the raw files. `import-file` prints the data-relative path of one

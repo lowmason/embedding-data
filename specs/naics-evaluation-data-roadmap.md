@@ -148,7 +148,7 @@ do not set an order.
 > Stage 4: COMPLETE (2026-11-18) — implemented by plan 11 (specs/plans/completed/11-ita-establishment-targets.md).
 > Next: resume the roadmap.
 
-- [ ] Stage 5: TRI parent links, first build
+- [x] Stage 5: TRI parent links, first build
       Objective: EPA TRI facility parent links are built once on real data as a new evidence family and verified.
       Outcomes: O7, O8
       Track: B
@@ -157,6 +157,9 @@ do not set an order.
       Exit: Preflight: open checks E7–E9 are settled before any data is trusted. A failed check stops the stage for an owner decision (Stage 2 spec, Rules for every new family). O7: the bundle relates two NAICS 2022 industries through facilities that report one parent, grouped by a parent identifier or EPA's standardized parent name and never by a name match of this project's own, and `verify` with the detached pin passes. O8: for each parent, the bundle lists its facilities' NAICS 2022 industries. Stage 5 adds its own rows under the Stage 2 spec's amendment items 3 (R1.1 "three core sources" and the TRI row) and 6 (the TRI R7.2 row). If Stage 5 merges first of Stages 5, 14 and 15, it also applies items 1 (introduction), 2 (Core principle) and 7 (`CLAUDE.md`) and the wording change in item 3 (Resolved at resume, 2026-11-18: owner). Items 4 (R1.2 free account) and 5 (R7.5 published aggregates) wait for Stages 14 and 15. The findings file records the run ID, the pin, and the wall time, maximum RSS and bundle size of the real run
       Leaves out: TRI hardening (replay check, long-form acceptance finding) → O12. Headline minimum count for the TRI family → O13. The R8.4 training-role amendment → a separate owner decision after naics-embedder's spec (reset prompt, Leave alone)
       ROUTING: brainstorming
+
+> Stage 5: COMPLETE (2026-11-21) — implemented by plan 13 (specs/plans/completed/13-tri-parent-links.md). Its Handoff section names what O12, O13 and O17 consume. Stage 5 read only `naics_nodes.parquet` of the Stage 4 bundle. It did not read the Stage 4 concordance that its Consumes line names.
+> Next: resume the roadmap.
 
 - [ ] Stage 9: ACS targets, first full build
       Objective: One ACS target bundle is built on real data and verified, after the cause of the three failed full builds is written down.
