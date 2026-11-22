@@ -2,9 +2,9 @@
 
 > Next step: writing-plans, in a fresh session, against this file.
 
-Status: DRAFT for owner review. Written 2026-11-22. The owner's approval of this spec
-approves every constant and rule in it, the designer's calls included. So the plan needs no
-owner stop between the rule commit and the first real run.
+Status: APPROVED (2026-11-22, owner: "Approve"). Written 2026-11-22. The owner's approval of
+this spec approves every constant and rule in it, the designer's calls included. So the plan
+needs no owner stop between the rule commit and the first real run.
 
 Design spec for Stage 21 of `specs/naics-evaluation-data-roadmap.md` (outcome O26). It sets
 the headline minimum count for the two targets of the USAspending vendor-link family,
