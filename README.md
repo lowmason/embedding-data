@@ -721,7 +721,7 @@ It relates NAICS 2022 industries as supplier and buyer through federal contract 
 A federal prime contractor reports each subcontract that it awards. USAspending.gov publishes
 those reports. The build joins each firm to its SAM.gov registration by the UEI, the
 12-character Unique Entity ID of a registrant. The firm's primary NAICS 2022 code in SAM.gov
-gives its industry. The [stage spec](specs/usaspending-vendor-links.md) defines every rule.
+gives its industry. The [stage spec](specs/completed/usaspending-vendor-links.md) defines every rule.
 
 The one `targets-v1` family is `vendor_links`. Each cell is a supplier industry and a buyer
 industry. `supplier_share` is the share of subcontractor firms in the supplier industry that

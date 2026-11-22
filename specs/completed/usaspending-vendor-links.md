@@ -1,5 +1,7 @@
 # USAspending vendor links
 
+**Status: COMPLETE (2026-11-22)** — implemented by [plan 15](../plans/completed/15-usaspending-vendor-links.md); the measured run is in the [Stage 14 findings](../naics-evaluation-data-stage-14-findings.md).
+
 > Next step: writing-plans in a fresh session against this file. Do not fetch
 > any USAspending or SAM.gov file, call either API or use a SAM.gov key, and do
 > not build, before the plan exists and the owner gives the go-ahead for each
@@ -8,7 +10,7 @@
 Status: the owner approved this committed spec on 2026-11-18 ("Approve the
 spec"), including every call marked "My call" and the proposals played back
 below. Stage 14 design session of
-[the roadmap](naics-evaluation-data-roadmap.md). The owner chose the four
+[the roadmap](../naics-evaluation-data-roadmap.md). The owner chose the four
 decisions below on 2026-11-18. Calls marked "My call" were made in the session
 or while writing this file. A builder check by a separate reviewer raised two
 questions on 2026-11-18. One became owner decision 4 (malformed codes). The
@@ -19,7 +21,7 @@ was called and no key was used for this design.
 ## Scope and governing contracts
 
 Stage 14 builds Source 2 of
-[the evidence-sources spec](uncovered-uses-evidence-sources.md) (the Stage 2
+[the evidence-sources spec](../uncovered-uses-evidence-sources.md) (the Stage 2
 spec) once on real data and verifies it. It serves one use:
 
 - **O6, KYB and anomaly detection.** "Comparing a company's self-reported NAICS
@@ -34,9 +36,9 @@ the industry level", and "firm graphs stay with the users who hold them"
 industry × industry. Firm-level rows are support only.
 
 The Stage 2 spec's "Rules for every new family" govern this stage. R5, R7.1,
-R7.4, R8 and R9 of [the source spec](embedding-evaluation-data-spec.md) govern
+R7.4, R8 and R9 of [the source spec](../embedding-evaluation-data-spec.md) govern
 codes, outputs, provenance, disclosure, leakage and offline operation. The
-Stage 10 spec ([completed](completed/ita-establishment-targets.md)) is the
+Stage 10 spec ([completed](ita-establishment-targets.md)) is the
 model for the measure. The Stage 5 spec ([TRI parent links](tri-parent-links.md))
 is the model for the bundle, the commands, the preflight and the host rule.
 
@@ -907,7 +909,7 @@ No replay build runs in this stage.
 ## Source spec amendment
 
 The plan applies this amendment to
-[the source spec](embedding-evaluation-data-spec.md) and `CLAUDE.md` when the
+[the source spec](../embedding-evaluation-data-spec.md) and `CLAUDE.md` when the
 stage ships. It follows the Stage 2 spec's amendment list.
 
 **Always (Stage 14's own items).**

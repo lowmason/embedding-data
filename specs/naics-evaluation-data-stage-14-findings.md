@@ -5,7 +5,7 @@ Status: Stage 14 in progress. Task 1 (document checks) is recorded below, read o
 preflight) is recorded in "Preflight", run on 2026-11-19.
 
 Stage 14 of `specs/naics-evaluation-data-roadmap.md` builds O6 from
-`specs/usaspending-vendor-links.md` under `specs/plans/15-usaspending-vendor-links.md`.
+`specs/completed/usaspending-vendor-links.md` under `specs/plans/completed/15-usaspending-vendor-links.md`.
 
 ## Document checks
 
@@ -25,7 +25,7 @@ enum values, code lines, counts and hashes. They hold no row value from any real
 | `https://open.gsa.gov/api/entity-api/` | `curl` | 2026-11-18 |
 | Layout spreadsheet `SAM Master Extract Mapping v6.0 Public File V2 Layout.xlsx`, 42,368 bytes, SHA-256 `b09d694eefbd621c63f64ec58062acde23271cc05874f5964283429f6883ec0d` | `curl` after the owner's go-ahead; read with `zipfile` and `xml.etree.ElementTree` under `python3 -I` | 2026-11-18 |
 | Sample file `SAM_PUBLIC_MONTHLY_V2_20200414.ZIP`, 10,202,817 bytes, SHA-256 `db7a5edb06347fed79b8cbd6c95a425f4bc4c0fd5b7d23771662d62bc36bc8c6`, from `.../v1/sample-files/` | `curl` after the owner's go-ahead (not in the plan's list); read under `python3 -I`, with no row value printed | 2026-11-18 |
-| The owner's print of the SAM.gov terms, as the spec summarizes it (`specs/usaspending-vendor-links.md`, "The owner's print of the SAM.gov terms") | The owner said on 2026-11-18 that this print counts as the live read | 2026-11-18 |
+| The owner's print of the SAM.gov terms, as the spec summarizes it (`specs/completed/usaspending-vendor-links.md`, "The owner's print of the SAM.gov terms") | The owner said on 2026-11-18 that this print counts as the live read | 2026-11-18 |
 
 ### Step 1: USAspending API source
 
