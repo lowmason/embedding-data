@@ -64,7 +64,7 @@ def test_contract_exclusions_and_schemas_are_the_documented_ones():
     assert CONTRACT == 'tri-facility-years-v1'
     assert EXCLUSIONS == ('naics_missing', 'naics_conflict', 'naics_not_2022', 'parent_conflict',
                           'federal')
-    assert TERRITORIES == ('AS', 'GU', 'MP', 'PR', 'VI')
+    assert TERRITORIES == ('AS', 'GU', 'MP', 'PR', 'UM', 'VI')
     assert list(TABLE_SCHEMA.items()) == [
         ('reporting_year', pl.Int64), ('trifd', pl.String), ('n_forms', pl.UInt64),
         ('n_form_r', pl.UInt64), ('n_form_a', pl.UInt64),
@@ -705,9 +705,9 @@ def test_year_report_counts_are_null_when_the_year_leaves_the_field_unmapped(unm
 
 
 def test_year_report_in_territories_counts_each_territory_but_not_dc():
-    states = ['AS', 'GU', 'MP', 'PR', 'VI', 'DC', 'TX', 'XX']
+    states = ['AS', 'GU', 'MP', 'PR', 'UM', 'VI', 'DC', 'TX', 'XX']
     records = [form(f'T{n}', state=state) for n, state in enumerate(states)]
-    assert report_for(records)['2023']['in_territories'] == 5
+    assert report_for(records)['2023']['in_territories'] == 6
     assert report_for([form('T1', state='DC'), form('T1', state='TX'),
                        form('T2', state='PR'), form('T2', state='TX')])['2023'][
                            'in_territories'] == 1

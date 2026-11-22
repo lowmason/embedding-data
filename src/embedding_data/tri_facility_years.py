@@ -21,7 +21,7 @@ from embedding_data.tri_reader import NAICS_FIELDS
 
 CONTRACT = 'tri-facility-years-v1'
 EXCLUSIONS = ('naics_missing', 'naics_conflict', 'naics_not_2022', 'parent_conflict', 'federal')
-TERRITORIES = ('AS', 'GU', 'MP', 'PR', 'VI')
+TERRITORIES = ('AS', 'GU', 'MP', 'PR', 'UM', 'VI')
 TABLE_SCHEMA = {
     'reporting_year': pl.Int64,
     'trifd': pl.String,
