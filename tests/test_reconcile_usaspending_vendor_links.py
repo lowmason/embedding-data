@@ -614,6 +614,24 @@ def test_a_primary_code_missing_from_its_code_string_is_counted(tmp_path, monkey
     assert (status, false_checks(result)) == (1, ['report.firms.code_not_in_string'])
 
 
+def test_a_d_and_b_era_firm_counts_as_mixed_blank(tmp_path, monkeypatch):
+    # The firm with a blank last update date stays D&B-era; a second row with a blank code makes
+    # it mixed blank, because the spec's count has no status condition.
+    data_dir = copy_v12(tmp_path)
+    line = extract_line('V12BLANKDT01', code='').removesuffix('\r\n')
+    pin = reseal_extract(data_dir, insert_line(line))
+    status, result, _line = run_main(data_dir, pin)
+    assert (status, false_checks(result)) == (1, ['report.firms.mixed_blank'])
+
+
+def test_a_d_and_b_era_firm_counts_for_the_code_string(tmp_path, monkeypatch):
+    data_dir = copy_v12(tmp_path)
+    pin = reseal_extract(data_dir, edit_lines(
+        'V12BLANKDT01', lambda line: line.replace('|541511Y|', '|541512Y|')))
+    status, result, _line = run_main(data_dir, pin)
+    assert (status, false_checks(result)) == (1, ['report.firms.code_not_in_string'])
+
+
 # ---- refusals: exit 2 with a fixed reason
 
 def refused(data_dir: Path, pin: str, run: str = RUN) -> str:
