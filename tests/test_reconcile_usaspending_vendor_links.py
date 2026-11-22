@@ -1219,6 +1219,9 @@ def test_a_line_ends_at_lf_and_only_one_cr_before_it_is_removed():
     assert list(reconcile.data_lines(
         [BOF_LF, 'a\n', 'b\r\n', 'c\r\r\n', 'd\re\n', '\r\n', EOF], LAYOUT)) == [
         'a', 'b', 'c\r', 'd\re', '']
+    # The EOF line has no terminator, so nothing is removed from it, even when it is exactly
+    # the EOF prefix.
+    assert list(reconcile.data_lines([BOF_LF, 'a\n', LAYOUT['eof_prefix']], LAYOUT)) == ['a']
 
 
 @pytest.mark.parametrize('end', ['', '!END', '!end ', 'end'])
