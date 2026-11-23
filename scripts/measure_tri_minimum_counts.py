@@ -8,11 +8,18 @@ whose recurrence rate reaches `LEVEL`, as the spec section "From curves to a min
 downward merge and the total check run after `bands`, in `merge_thin_top` and `curve`.
 '''
 
+import hashlib
+import json
 import math
+import re
+from dataclasses import dataclass
+from pathlib import Path
 
 import polars as pl
 
-from embedding_data.tri_parent_link_targets import YEARS
+from embedding_data.target_contract import TARGET_SCHEMA
+from embedding_data.tri_facility_years import TABLE_SCHEMA
+from embedding_data.tri_parent_link_targets import METADATA, SUPPORT_SCHEMA, YEARS, distribution
 
 LEVEL = 0.90
 TOP_BAND = 10
@@ -20,6 +27,23 @@ MIN_BAND_CELLS = 50
 WILSON_Z = 1.959963984540054
 YEAR_PAIRS = tuple(zip(YEARS, YEARS[1:]))
 COUNTS = ('base_cells', 'testable_cells', 'recurring_cells')
+CELL = ['unit_a', 'unit_b']
+COUNT_COLUMNS = ['j_owners', *(f'j_{year}' for year in YEARS)]
+
+SAFE_RUN_ID = re.compile('[A-Za-z0-9][A-Za-z0-9_-]*')
+SAFE_PIN = re.compile('[0-9a-f]{64}')
+RUN_ROOT = Path('derived/epa_tri/parent-links')
+# Each Parquet file that the script reads, in the order of the checks, with the columns read
+# and the frozen type of each.
+PARQUETS = {
+    'tri_facility_years.parquet': {name: TABLE_SCHEMA[name] for name in (
+        'reporting_year', 'trifd', 'naics_2022_node_id', 'owner_key', 'exclusion_reason')},
+    'tri_parent_link_support.parquet': {name: SUPPORT_SCHEMA[name] for name in (
+        *CELL, *COUNT_COLUMNS)},
+    'tri_parent_links.parquet': {name: TARGET_SCHEMA[name] for name in (
+        'measure', *CELL, 'n_unweighted', 'flags')},
+}
+READ_FILES = ('report.json', *PARQUETS)
 
 
 def wilson(recurring: int, testable: int) -> tuple[float, float] | None:
@@ -200,3 +224,161 @@ def year_cells(eligible: pl.DataFrame, counts: pl.DataFrame, base: int) -> pl.Da
     return base_cells.join(testable, on=['unit_a', 'unit_b'], how='left').select(
         'unit_a', 'unit_b', 'base_count', pl.col('testable').fill_null(False), 'recurs',
     ).sort('unit_a', 'unit_b')
+
+
+class Refused(Exception):
+    '''A bundle that its pin or its own files do not support. The message is a fixed reason.'''
+
+
+@dataclass(frozen=True)
+class Inputs:
+    '''The authenticated bundle: its directory, its pin and the SHA-256 of each file read.'''
+
+    directory: Path
+    outputs_sha256: str
+    files: dict[str, str]
+
+
+@dataclass(frozen=True)
+class Checked:
+    '''What the self-checks leave for the curves: the eligible facility-years, their recount,
+    the target columns read and the report's distribution entry.'''
+
+    eligible: pl.DataFrame
+    counts: pl.DataFrame
+    targets: pl.DataFrame
+    distribution: dict
+
+
+def require(holds: bool, reason: str) -> None:
+    if not holds:
+        raise Refused(reason)
+
+
+def sha256(file: Path) -> str:
+    with file.open('rb') as stream:
+        return hashlib.file_digest(stream, 'sha256').hexdigest()
+
+
+def read_object(file: Path) -> dict | None:
+    '''The JSON object in the file, or None for any other content.'''
+    try:
+        value = json.loads(file.read_text(encoding='utf-8'))
+    except ValueError:
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def recorded_digest(directory: Path, name: str, record: object) -> str:
+    '''The SHA-256 of a file whose size and hash both equal its `outputs.json` record.'''
+    file = directory / name
+    if (isinstance(record, dict) and file.is_file()
+            and file.stat().st_size == record.get('size')):
+        digest = sha256(file)
+        if digest == record.get('sha256'):
+            return digest
+    raise Refused(f'{name} differs from its inventory')
+
+
+def authenticate(data_dir: Path, run_id: str, pin: str) -> Inputs:
+    '''The pinned bundle, once its `outputs.json` and the four files read match.
+
+    The checks run in order: a safe run ID and pin, the detached pin of `outputs.json`, then
+    each file in `READ_FILES` against its record. Only those four files are hashed.
+    '''
+    if not (SAFE_RUN_ID.fullmatch(run_id) and SAFE_PIN.fullmatch(pin)):
+        raise Refused('unsafe run id or pin')
+    directory = data_dir / RUN_ROOT / run_id
+    outputs = directory / 'outputs.json'
+    if not outputs.is_file() or sha256(outputs) != pin:
+        raise Refused('outputs pin differs')
+    records = read_object(outputs) or {}
+    files = {name: recorded_digest(directory, name, records.get(name)) for name in READ_FILES}
+    return Inputs(directory, pin, files)
+
+
+def read_parquet(inputs: Inputs, name: str) -> pl.DataFrame:
+    '''The columns read of one Parquet file, once each holds its frozen type.'''
+    columns = PARQUETS[name]
+    try:
+        scan = pl.scan_parquet(inputs.directory / name)
+        schema = scan.collect_schema()
+        if all(schema.get(column) == dtype for column, dtype in columns.items()):
+            return scan.select(list(columns)).collect()
+    except pl.exceptions.PolarsError:
+        pass
+    raise Refused(f'{name} columns differ from the contract')
+
+
+def is_count(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def has_headline(value: object) -> bool:
+    return isinstance(value, dict) and is_count(value.get('headline'))
+
+
+def read_report(file: Path) -> dict:
+    '''The report, once it has each key that the script reads, with its type.'''
+    report = read_object(file)
+    if report is not None:
+        by_year = report.get('owners_by_year')
+        if (isinstance(report.get('n_unweighted_distribution'), dict)
+                and is_count(report.get('owner_key_changes'))
+                and has_headline(report.get('n_owners'))
+                and isinstance(by_year, dict)
+                and all(has_headline(by_year.get(str(year))) for year in YEARS)):
+            return report
+    raise Refused('report is malformed')
+
+
+def check_facility_years(facility: pl.DataFrame, report: dict) -> pl.DataFrame:
+    '''The eligible facility-years, once checks 6 to 10 hold against the table and the report.'''
+    keys = facility.select('reporting_year', 'trifd')
+    require(sum(keys.null_count().row(0)) == 0 and not keys.is_duplicated().any(),
+            'facility-year keys are not unique')
+    require(facility['reporting_year'].is_in(list(YEARS)).all(),
+            'reporting year outside the window')
+    eligible = eligible_facility_years(facility.lazy())
+    require(sum(eligible.select('node', 'owner').null_count().row(0)) == 0,
+            'an eligible facility-year lacks an owner or node')
+    changes = eligible.group_by('trifd').agg(
+        pl.col('owner').n_unique().alias('owners')).filter(pl.col('owners') > 1).height
+    require(changes == report['owner_key_changes'], 'owner key changes differ from the report')
+    require(eligible['owner'].n_unique() == report['n_owners']['headline']
+            and all(eligible.filter(pl.col('year') == year)['owner'].n_unique()
+                    == report['owners_by_year'][str(year)]['headline'] for year in YEARS),
+            'owner counts differ from the report')
+    return eligible
+
+
+def check_cells(eligible: pl.DataFrame, support: pl.DataFrame, targets: pl.DataFrame,
+                report: dict) -> pl.DataFrame:
+    '''The recount of the eligible rows, once checks 11 to 13 hold against the cell tables.'''
+    counts = recount(eligible)
+    require(counts.equals(support.select(CELL + COUNT_COLUMNS).sort(CELL)),
+            'recount differs from the support table')
+    cells = [*CELL, 'j_owners']
+    published = targets.select(*CELL, pl.col('n_unweighted').alias('j_owners'))
+    require(targets['measure'].eq_missing(METADATA['measure']).all()
+            and published.sort(cells).equals(support.select(cells).sort(cells)),
+            'target rows differ from the support table')
+    require(json.loads(json.dumps(distribution(targets['n_unweighted'].to_list())))
+            == report['n_unweighted_distribution'],
+            'report distribution differs from the targets')
+    return counts
+
+
+def self_check(inputs: Inputs) -> Checked:
+    '''Check the authenticated bundle against itself and return what it recounted.
+
+    The checks run in the order of spec "What gets built", item 1, each with a fixed reason,
+    and none runs after a refusal. The null check on the eligible rows comes before the recount,
+    because a join drops a null key without a sign. The three tables are small, so each is
+    collected once.
+    '''
+    facility, support, targets = (read_parquet(inputs, name) for name in PARQUETS)
+    report = read_report(inputs.directory / 'report.json')
+    eligible = check_facility_years(facility, report)
+    counts = check_cells(eligible, support, targets, report)
+    return Checked(eligible, counts, targets, report['n_unweighted_distribution'])

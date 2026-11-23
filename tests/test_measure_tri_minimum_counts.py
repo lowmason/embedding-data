@@ -1,6 +1,7 @@
 '''The Stage 22 TRI minimum-count script, on small synthetic cells frames.'''
 
 import importlib.util
+import json
 from datetime import date
 from pathlib import Path
 
@@ -9,10 +10,15 @@ import pytest
 from polars.testing import assert_frame_equal
 from tri_fixtures import rows_frame
 
+from embedding_data.manifest import sha256_file
+from embedding_data.target_contract import write_targets
+from embedding_data.target_io import inventory, write_json
+from embedding_data.tri_bundle import FILES
 from embedding_data.tri_codes import NODE_PREFIX
 from embedding_data.tri_facility_years import EXCLUSIONS, public, reduce
 from embedding_data.tri_layout import load_layouts
-from embedding_data.tri_parent_link_targets import YEARS, estimate
+from embedding_data.tri_parent_industries import build_parent_industries
+from embedding_data.tri_parent_link_targets import YEARS, estimate, validate_parent_links
 
 SCRIPTS = Path(__file__).resolve().parents[1] / 'scripts'
 SCRIPT = SCRIPTS / 'measure_tri_minimum_counts.py'
@@ -580,3 +586,329 @@ def test_second_year_pair_reads_the_2024_filings(script, refile, expected):
     second = cell_row(script.year_cells(eligible, counts, 2023), N1, N2)
     assert (first['testable'], first['recurs']) == (True, True)
     assert (second['testable'], second['recurs']) == expected
+
+
+READ_FILES = ('report.json', 'tri_facility_years.parquet', 'tri_parent_link_support.parquet',
+              'tri_parent_links.parquet')
+UNREAD_FILES = ('inputs.json', 'tri_parent_link_marginals.parquet',
+                'tri_parent_industries.parquet')
+
+
+def code_change_records() -> list[dict]:
+    '''Pine owns T1 to T8 at N1 to N8 in 2022, then T1 moves to N9 and T2 to N10 in 2023 and 2024.
+
+    T3 to T8 keep their nodes in every year.
+    '''
+    placed = [(f'T{index}', node) for index, node in enumerate(NODE_LIST[:8], 1)]
+    moved = [('T1', N9), ('T2', N10), *placed[2:]]
+    return [*pine(2022, *placed), *pine(2023, *moved), *pine(2024, *moved)]
+
+
+def owner_key_change_records() -> list[dict]:
+    '''Rock owns T9 and T10 in 2022. In 2023 T9 is owned by Slate: the bundle has one change.'''
+    return [*rock(2022), form(2023, 'T9', N1, 'Slate', SLATE),
+            form(2023, 'T10', N2, 'Rock', SLATE)]
+
+
+def publish(root: Path, records: list[dict], *, run: str = 'fixture') -> dict:
+    '''Write a Stage 5 bundle of the records under `root/data` and return where it is.
+
+    The bundle has the five tables, `report.json`, an empty `inputs.json` and the detached
+    `outputs.json`, which `pin` hashes.
+    '''
+    frame = reduce(rows_frame(records), LAYOUTS, NODES)
+    links = estimate(frame, processed_as_of=DAY)
+    validate_parent_links(links, NODES)
+    data_dir = root / 'data'
+    directory = data_dir / 'derived/epa_tri/parent-links' / run
+    directory.mkdir(parents=True)
+    tables = {
+        'tri_parent_links': links.targets,
+        'tri_parent_link_marginals': links.marginals,
+        'tri_parent_link_support': links.support,
+        'tri_parent_industries': build_parent_industries(frame),
+        'tri_facility_years': public(frame),
+    }
+    for name, value in tables.items():
+        if name == 'tri_parent_links':
+            write_targets(value, directory / f'{name}.parquet')
+        else:
+            value.write_parquet(directory / f'{name}.parquet')
+    write_json(directory / 'report.json', links.report)
+    write_json(directory / 'inputs.json', {})
+    write_json(directory / 'outputs.json', inventory(directory, list(FILES)))
+    return {'data_dir': data_dir, 'directory': directory, 'run': run,
+            'pin': sha256_file(directory / 'outputs.json')}
+
+
+def rehash(directory: Path) -> str:
+    '''Rewrite `outputs.json` from the files of the run and return its new SHA-256.'''
+    write_json(directory / 'outputs.json', inventory(directory, list(FILES)))
+    return sha256_file(directory / 'outputs.json')
+
+
+def forge_table(bundle: dict, name: str, change) -> str:
+    '''Replace a table with `change(table)`, rehash the run and return the new pin.'''
+    file = bundle['directory'] / (name.removesuffix('.parquet') + '.parquet')
+    change(pl.read_parquet(file)).write_parquet(file)
+    return rehash(bundle['directory'])
+
+
+def forge_report(bundle: dict, change) -> str:
+    '''Replace the report with `change(report)`, rehash the run and return the new pin.'''
+    file = bundle['directory'] / 'report.json'
+    write_json(file, change(json.loads(file.read_text())))
+    return rehash(bundle['directory'])
+
+
+def edited(*path: str, new):
+    '''A report change that replaces the value at the path with `new(old value)`.'''
+    def change(report: dict) -> dict:
+        parent = report
+        for key in path[:-1]:
+            parent = parent[key]
+        parent[path[-1]] = new(parent[path[-1]])
+        return report
+    return change
+
+
+def dropped(*path: str):
+    '''A report change that deletes the key at the path.'''
+    def change(report: dict) -> dict:
+        parent = report
+        for key in path[:-1]:
+            parent = parent[key]
+        del parent[path[-1]]
+        return report
+    return change
+
+
+def bump_report(*path: str):
+    '''A report change that adds 1 to the value at the path.'''
+    return edited(*path, new=lambda old: old + 1)
+
+
+def compose(*changes):
+    '''One report change that applies each change in turn.'''
+    def change(report: dict) -> dict:
+        for each in changes:
+            report = each(report)
+        return report
+    return change
+
+
+def set_row(frame: pl.DataFrame, row: int, column: str, value) -> pl.DataFrame:
+    '''The frame with one cell replaced, in the type of its column.'''
+    values = frame[column].to_list()
+    values[row] = value
+    return frame.with_columns(pl.Series(column, values, dtype=frame.schema[column]))
+
+
+def bump(column: str, row: int = 0):
+    '''A table change that adds 1 to a cell.'''
+    return lambda frame: set_row(frame, row, column, frame[column][row] + 1)
+
+
+def first_eligible(frame: pl.DataFrame) -> int:
+    return frame['exclusion_reason'].is_null().arg_true()[0]
+
+
+def authenticated(script, bundle: dict, *, run: str | None = None, pin: str | None = None):
+    '''What `authenticate` returns for the bundle, with the run or the pin replaced.'''
+    return script.authenticate(bundle['data_dir'], bundle['run'] if run is None else run,
+                               bundle['pin'] if pin is None else pin)
+
+
+def checked(script, bundle: dict, *, pin: str | None = None):
+    '''What `self_check` returns for the bundle, once `authenticate` accepts it.'''
+    authenticate = script.authenticate
+    inputs = authenticate(bundle['data_dir'], bundle['run'],
+                          bundle['pin'] if pin is None else pin)
+    return script.self_check(inputs)
+
+
+def refusal(script, bundle: dict, *, run: str | None = None, pin: str | None = None) -> str:
+    '''The fixed reason with which `authenticate` or then `self_check` refuses the bundle.'''
+    authenticate = script.authenticate
+    with pytest.raises(script.Refused) as caught:
+        script.self_check(authenticate(bundle['data_dir'], bundle['run'] if run is None else run,
+                                       bundle['pin'] if pin is None else pin))
+    return str(caught.value)
+
+
+def append_byte(directory: Path, name: str) -> None:
+    with (directory / name).open('ab') as stream:
+        stream.write(b'\n')
+
+
+@pytest.fixture
+def golden(tmp_path):
+    return publish(tmp_path, golden_records())
+
+
+def test_authenticate_returns_pinned_files(script, golden):
+    inputs = authenticated(script, golden)
+    records = json.loads((golden['directory'] / 'outputs.json').read_text())
+    assert inputs.outputs_sha256 == golden['pin']
+    assert inputs.directory == golden['directory']
+    assert inputs.files == {name: records[name]['sha256'] for name in READ_FILES}
+
+
+@pytest.mark.parametrize(('run', 'pin'), [
+    pytest.param('../fixture', None, id='parent-directory'),
+    pytest.param('fixture/', None, id='trailing-slash'),
+    pytest.param('-fixture', None, id='leading-hyphen'),
+    pytest.param('fixture\n', None, id='trailing-newline'),
+    pytest.param(None, 'A' * 64, id='uppercase-pin'),
+    pytest.param(None, '0' * 63, id='short-pin'),
+])
+def test_unsafe_run_id_or_pin_refused(script, golden, run, pin):
+    assert refusal(script, golden, run=run, pin=pin) == 'unsafe run id or pin'
+
+
+@pytest.mark.parametrize('pin', ('0' * 64, None), ids=('wrong', 'missing'))
+def test_wrong_or_missing_pin_refused(script, golden, pin):
+    if pin is None:
+        (golden['directory'] / 'outputs.json').unlink()
+    assert refusal(script, golden, pin=pin) == 'outputs pin differs'
+
+
+@pytest.mark.parametrize('name', READ_FILES)
+def test_changed_file_refused(script, golden, name):
+    append_byte(golden['directory'], name)
+    assert refusal(script, golden) == f'{name} differs from its inventory'
+
+
+def test_size_is_checked(script, golden):
+    file = golden['directory'] / 'outputs.json'
+    records = json.loads(file.read_text())
+    records['tri_facility_years.parquet']['size'] += 1
+    write_json(file, records)
+    pin = sha256_file(file)
+    assert refusal(script, golden, pin=pin) == (
+        'tri_facility_years.parquet differs from its inventory')
+
+
+def test_missing_record_refused(script, golden):
+    file = golden['directory'] / 'outputs.json'
+    records = json.loads(file.read_text())
+    del records['tri_parent_link_support.parquet']
+    write_json(file, records)
+    pin = sha256_file(file)
+    assert refusal(script, golden, pin=pin) == (
+        'tri_parent_link_support.parquet differs from its inventory')
+
+
+def test_pin_is_checked_before_files(script, golden):
+    append_byte(golden['directory'], 'tri_parent_link_support.parquet')
+    assert refusal(script, golden, pin='0' * 64) == 'outputs pin differs'
+
+
+def test_unread_files_are_never_read(script, golden):
+    for name in UNREAD_FILES:
+        append_byte(golden['directory'], name)
+    assert checked(script, golden) is not None
+
+
+@pytest.mark.parametrize(('name', 'change', 'reason'), [
+    pytest.param(
+        'tri_facility_years',
+        lambda frame: frame.with_columns(pl.col('reporting_year').cast(pl.Int32)),
+        'tri_facility_years.parquet columns differ from the contract', id='retyped-year'),
+    pytest.param(
+        'tri_parent_link_support', lambda frame: frame.drop('j_2024'),
+        'tri_parent_link_support.parquet columns differ from the contract', id='dropped-j-2024'),
+    pytest.param(
+        'tri_parent_links',
+        lambda frame: frame.with_columns(pl.col('n_unweighted').cast(pl.Int64)),
+        'tri_parent_links.parquet columns differ from the contract', id='retyped-count'),
+])
+def test_retyped_or_missing_column_refused(script, golden, name, change, reason):
+    assert refusal(script, golden, pin=forge_table(golden, name, change)) == reason
+
+
+def test_golden_passes_with_excluded_rows(script, golden):
+    facility = pl.read_parquet(golden['directory'] / 'tri_facility_years.parquet')
+    excluded_rows = facility.filter(pl.col('exclusion_reason').is_not_null())
+    assert excluded_rows.height == 5
+    assert excluded_rows['owner_key'].null_count() == 5
+    assert excluded_rows['naics_2022_node_id'].null_count() == 3
+    result = checked(script, golden)
+    assert result.eligible.height == 32
+    assert result.counts.height == 56
+    assert result.targets.height == 56
+    assert result.targets.columns == ['measure', 'unit_a', 'unit_b', 'n_unweighted', 'flags']
+    report = json.loads((golden['directory'] / 'report.json').read_text())
+    assert result.distribution == report['n_unweighted_distribution']
+
+
+def test_owner_key_change_passes_the_self_check(script, tmp_path):
+    bundle = publish(tmp_path, owner_key_change_records())
+    assert checked(script, bundle) is not None
+    report = json.loads((bundle['directory'] / 'report.json').read_text())
+    assert report['owner_key_changes'] == 1
+
+
+def test_unread_report_keys_are_not_checked(script, golden):
+    pin = forge_report(golden, compose(
+        edited('n_owners', 'dnb', new=lambda old: -1),
+        edited('owners_by_year', '2023', 'federal', new=lambda old: -1)))
+    assert checked(script, golden, pin=pin) is not None
+
+
+def on_report(change):
+    '''A forge that replaces the report of a bundle with `change(report)`.'''
+    return lambda bundle: forge_report(bundle, change)
+
+
+def on_table(name: str, change):
+    '''A forge that replaces a table of a bundle with `change(table)`.'''
+    return lambda bundle: forge_table(bundle, name, change)
+
+
+SELF_CHECK_REFUSALS = [
+    pytest.param(on_report(dropped('n_unweighted_distribution')), 'report is malformed',
+                 id='5-distribution-missing'),
+    pytest.param(on_report(dropped('owners_by_year', '2024')), 'report is malformed',
+                 id='5-year-missing'),
+    pytest.param(on_report(edited('n_owners', 'headline', new=lambda old: '4')),
+                 'report is malformed', id='5-headline-text'),
+    pytest.param(on_table('tri_facility_years', lambda frame: pl.concat([frame, frame.head(1)])),
+                 'facility-year keys are not unique', id='6-repeated-key'),
+    pytest.param(on_table('tri_facility_years',
+                          lambda frame: set_row(frame, 0, 'reporting_year', 2021)),
+                 'reporting year outside the window', id='7-year-before-window'),
+    pytest.param(on_table('tri_facility_years',
+                          lambda frame: set_row(frame, first_eligible(frame), 'owner_key', None)),
+                 'an eligible facility-year lacks an owner or node', id='8-null-owner'),
+    pytest.param(on_table(
+        'tri_facility_years',
+        lambda frame: set_row(frame, first_eligible(frame), 'naics_2022_node_id', None)),
+        'an eligible facility-year lacks an owner or node', id='8-null-node'),
+    pytest.param(on_report(bump_report('owner_key_changes')),
+                 'owner key changes differ from the report', id='9-changes'),
+    pytest.param(on_report(bump_report('n_owners', 'headline')),
+                 'owner counts differ from the report', id='10-pooled-owners'),
+    pytest.param(on_report(bump_report('owners_by_year', '2023', 'headline')),
+                 'owner counts differ from the report', id='10-year-owners'),
+    pytest.param(on_table('tri_parent_link_support', lambda frame: frame.slice(1)),
+                 'recount differs from the support table', id='11-dropped-row'),
+    pytest.param(on_table('tri_parent_link_support', bump('j_2023')),
+                 'recount differs from the support table', id='11-year-count'),
+    pytest.param(on_table('tri_parent_link_support', bump('j_owners')),
+                 'recount differs from the support table', id='11-pooled-count'),
+    pytest.param(on_table('tri_parent_links', lambda frame: frame.slice(1)),
+                 'target rows differ from the support table', id='12-dropped-row'),
+    pytest.param(on_table('tri_parent_links',
+                          lambda frame: set_row(frame, 0, 'measure', 'other_share')),
+                 'target rows differ from the support table', id='12-measure'),
+    pytest.param(on_table('tri_parent_links', bump('n_unweighted')),
+                 'target rows differ from the support table', id='12-count'),
+    pytest.param(on_report(bump_report('n_unweighted_distribution', 'max')),
+                 'report distribution differs from the targets', id='13-distribution'),
+]
+
+
+@pytest.mark.parametrize(('forge', 'reason'), SELF_CHECK_REFUSALS)
+def test_self_check_refusals(script, golden, forge, reason):
+    assert refusal(script, golden, pin=forge(golden)) == reason
