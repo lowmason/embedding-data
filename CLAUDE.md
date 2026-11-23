@@ -175,7 +175,9 @@ staging names require inspection and a fresh selection, never overwrite. Relevan
 software/dependency changes invalidate preparation/resume. The nonfixture production
 measurement is separate from the 21-row/five-eligible V12 readiness fixture;
 later families remain planned. The V9 headline minimum for the 2023 area mix is in
-`specs/findings/v9-ita-naics-minimum-counts.md`.
+`specs/findings/v9-ita-naics-minimum-counts.md`. Reads of the 2023 area mix follow
+`specs/evaluation-protocol.md`, Section 4: it may train only naics-embedder's relatedness
+embedding, never judges or selects it, and trains only after R8.4 is amended (G1).
 
 **Delivered IPUMS verification (Stage 7).** `embedding-data ipums` provides explicit
 `acquire-references REFERENCE_ID`, `import-reference REFERENCE_ID KIND FILE`, offline
@@ -382,6 +384,9 @@ One exception (owner, 2026-11-18, the stage spec's amendment): selection may rea
 validation part of the text–code pairs, split by `description_key`. The sealed part
 only judges, and no pair trains. Reads of the text–code pairs follow
 `specs/evaluation-protocol.md`, Section 1. A family with no section there is not scored.
+Selection for naics-embedder's relatedness artifact may also read the validation part of
+co-ownership, split by anchor industry (owner, 2026-11-23). Reads of co-ownership follow
+Section 3 of the protocol. The link table keeps the full exclusion.
 The published Stage 6 and Stage 10 bundles keep `size_gate_pending`, and
 `specs/findings/v9-ita-naics-minimum-counts.md` holds the headline minimum counts for ITA
 co-ownership, the 2023 ITA area mix and ITA text–code pairs.

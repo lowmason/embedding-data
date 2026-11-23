@@ -26,6 +26,11 @@ held-out part is reported as evaluation." R8.4 itself is unchanged. The limits:
 - A real read still waits for the successor evaluation-protocol specification
   (source spec, Out of scope).
 
+**Pointer (owner, 2026-11-23).** Section 3 of
+[the evaluation protocol](../evaluation-protocol.md) extends this exception to the
+validation part of co-ownership, for the relatedness artifact of `naics-embedder`
+only, under its conditions CO3 and CO4. The link table keeps the full exclusion.
+
 ## Scope and governing contracts
 
 Stage 10 of [the roadmap](embedding-evaluation-data-spec-roadmap.md)

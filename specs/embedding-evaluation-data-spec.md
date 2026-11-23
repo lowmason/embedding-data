@@ -14,7 +14,8 @@ sources admitted by [the evidence-sources spec](uncovered-uses-evidence-sources.
 add further families, each adopted by its own roadmap stage. The
 *evaluation protocol* that scores embeddings against these targets is
 deliberately excluded and belongs to a successor spec (see Out of scope), which
-is [evaluation-protocol.md](evaluation-protocol.md) *(owner, 2026-11-18)*. Every
+is [evaluation-protocol.md](evaluation-protocol.md) *(owner, 2026-11-18)*. Its Sections 3
+and 4 cover ITA co-ownership and the 2023 ITA area mix *(owner, 2026-11-23)*. Every
 input is free to access and every output is an aggregate; no paid data and no
 microdata release is required to run, test, or reproduce any requirement here.
 
@@ -690,6 +691,8 @@ bullet here.
   [evaluation-protocol.md](evaluation-protocol.md). It covers the ITA text–code
   pairs. Every other family waits for its own section there. *(owner,
   2026-11-18)* Section 2 covers the ACS wage microdata. *(owner, 2026-11-23)*
+  Sections 3 and 4 cover ITA co-ownership and the 2023 ITA area mix. *(owner,
+  2026-11-23)*
 - **Sources considered and not adopted** (D):
   - SBA Paycheck Protection Program loans: borrower-level, a 2020–21 snapshot,
     with applicant-reported job counts.
