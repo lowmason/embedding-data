@@ -1418,3 +1418,18 @@ def test_bundle_without_cells_passes_the_self_check(script, tmp_path, records, e
     assert result.eligible.height == eligible
     assert (result.counts.height, result.targets.height) == (0, 0)
     assert result.distribution['count'] == 0
+
+
+@pytest.mark.parametrize('reason', EXCLUSIONS)
+def test_excluded_refile_is_no_owner_key_change(script, tmp_path, reason):
+    parents = ('Pine', 'Quartz') if reason == 'parent_conflict' else ('Pine',)
+    records = [*pine(2022, ('T1', N1), ('T2', N2)), *pine(2023, ('T1', N1)),
+               *excluded(reason, 2023, 'T2', *parents)]
+    bundle = publish(tmp_path, records)
+    facility = pl.read_parquet(bundle['directory'] / 'tri_facility_years.parquet')
+    refiles = facility.filter(pl.col('trifd') == 'T2').sort('reporting_year')
+    assert refiles['exclusion_reason'].to_list() == [None, reason]
+    assert refiles['owner_key'].to_list() == ['parent:Pine', None]
+    report = json.loads((bundle['directory'] / 'report.json').read_text())
+    assert report['owner_key_changes'] == 0
+    assert checked(script, bundle) is not None
