@@ -46,6 +46,7 @@ Choices made:
 - Resume after Stage 20 (owner, 2026-11-22, "Approve"): Track C keeps its ranking, O26 then O18. O26 becomes Stage 21. Stage 20 found the replay equal to Stage 14's run, with both `verify` runs passing. Its replay build took 25.83 s and 966 MB (`specs/findings/stage-14-usaspending-vendor-links.md`, "Measured cost").
 - Resume after Stage 18 (owner, 2026-11-22, "Approve as drafted"): Track B keeps its ranking, O13 then O17. O13 becomes Stage 22. Stage 18 found the replay equal to Stage 5's run, with both `verify` runs passing. Its replay build took 4.83 s and 1,475 MB, and another session's test run may have loaded it. Only the replay's `verify` (3.14 s, 1,509 MB) started on an idle host (`specs/findings/stage-5-tri-parent-links.md`, "Measured cost"). No other stage entry changed: plan 18's Handoff names only O13, O17 and its traps.
 - Resume after Stages 19 and 21 (owner, 2026-11-23, "Approve as drafted"): Tracks C and H keep their rankings. O18 becomes Stage 23 and O24 becomes Stage 24, so both Ranked lists are empty. Stage 21 set two minimums, 4 for `supplier_share` and 3 for `buyer_share`, in 0.36 s and 0.28 GB per run. Stage 19 set a minimum of 400 headline earners per category in 3.27 s and 3.06 GB per run (both decision records, "Run"). Stage 23 consumes Stage 16's section. The two USAspending shares are directional relatedness shares like ITA co-ownership, and Stage 16 settles the open questions for that shape (protocol, "Families with no section"). Stage 23 is therefore not ready until Stage 16 ticks. Stage 24 is ready, and naics-embedder's wage panel spec is not among its Consumes. Stages 16, 23 and 24 all edit `specs/evaluation-protocol.md`, so parallel sessions on them can conflict in that file. Plans 17 and 19 name only O24 and O18 in their Handoffs, so no other stage entry changed.
+- Resume after Stage 22 (owner, 2026-11-23, "Approve as drafted"): Track B keeps its ranking. O17 becomes Stage 25, so Track B's Ranked list is empty. Stage 22 set a minimum of 1 for `owner_share`. All 14,204 rows (7,102 industry pairs) and all 22,686 of the support meet it. Run 1 took 0.18 s and 0.19 GB (`specs/findings/v9-tri-minimum-counts.md`, sections 1 and 4). Stage 25 consumes Stage 16's section. TRI's `owner_share` is a directional relatedness share like ITA co-ownership (`specs/completed/tri-parent-links.md:27-29`), and Stage 16 settles the open questions for that shape (protocol, "Families with no section"). Stage 25 is therefore not ready until Stage 16 ticks. Stages 16, 23, 24 and 25 all edit `specs/evaluation-protocol.md`, so parallel sessions on them can conflict in that file. Plan 20 names only O17 in its Handoff, so no other stage entry changed.
 
 | # | Outcome | Track | Rank | Cost (estimate; basis) |
 |---|---|---|---|---|
@@ -107,8 +108,8 @@ promoted Track B item, follows Track A's Stages 3 and 4 (owner, 2026-11-16). Fro
 2026-11-18 the tracks run in parallel (see Choices made). Stage numbers name stages and
 do not set an order. Stages 18 and 19 were promoted from the Ranked lists of Tracks B and H
 on 2026-11-22, Stages 20 and 21 from Track C's later that day, and Stage 22 from Track B's
-after Stage 18. Stages 23 and 24 came from the Ranked lists of Tracks C and H on 2026-11-23
-(see Choices made).
+after Stage 18. Stages 23 and 24 came from the Ranked lists of Tracks C and H on 2026-11-23,
+and Stage 25 from Track B's after Stage 22 (see Choices made).
 
 - [x] Stage 1: ITA NAICS targets, first build
       Objective: Plan 11's bundle is built once on real ITA data and verified.
@@ -319,13 +320,22 @@ after Stage 18. Stages 23 and 24 came from the Ranked lists of Tracks C and H on
       Leaves out: the wage panel and its scores → naics-embedder's panel spec (spec `specs/completed/acs-wage-microdata.md`, Non-goals and "Handoff to naics-embedder")
       ROUTING: brainstorming
 
+- [ ] Stage 25: Evaluation-protocol section for the TRI parent links
+      Objective: The evaluation protocol gets a section for the TRI parent links, framed like Stage 16's section for ITA co-ownership.
+      Outcomes: O17
+      Track: B
+      Consumes: Stage 16's owner-approved section for ITA co-ownership in `specs/evaluation-protocol.md`, as the model for a directional relatedness share. TRI's `owner_share` is one (`specs/completed/tri-parent-links.md:27-29`) (Resolved at resume, 2026-11-23: owner). The decision record `specs/findings/v9-tri-minimum-counts.md`, the amended R7.3 and V9 of `specs/embedding-evaluation-data-spec.md`, and the rule commit and traps that plan 20's Handoff names (plan 20, Handoff). Stage 5's runs `stage5_tri_parent_links_20261121_r1` and `stage5_tri_parent_links_20261121_r1_replay` with their detached pins, the Stage 18 acceptance finding `specs/findings/stage-5-tri-parent-links.md`, and "For O12, O13 and O17" of `specs/naics-evaluation-data-stage-5-findings.md`, with the traps that both Handoffs name (plan 18, Handoff; plan 13, Handoff). The spec `specs/completed/tri-parent-links.md`, including its rule that TRI parent links and ITA co-ownership measure close relations, so neither judges an embedding that the other trained (lines 705–706). `specs/evaluation-protocol.md` (Section 1, "Families with no section", "What this repository does not decide"). "Rules for every new family" of the Stage 2 spec `specs/uncovered-uses-evidence-sources.md`
+      Produces: an owner-approved, committed section in `specs/evaluation-protocol.md` for the TRI family. `specs/naics-evaluation-data-stage-25-findings.md`
+      Exit: O17: the committed protocol has a section for the TRI family that states the evidence (which runs, pins and Stage 22 minimum to read), the assignment (who decides the split) and the conditions this repository keeps, as Section 1 and Stage 16's section do. It names who decides the scores. The findings file records the stage's measured cost in sessions. No source file, test or data file changed
+      Leaves out: the scores, their intervals, the margin and the adoption decision, if they stay with naics-embedder (protocol, "What this repository does not decide"). The deferred docstring and `python -OO` items of the frozen measurement script and the reconciler docstring and stale TRI row of `specs/deliverable-map.md` → `specs/deferred_items.md`, sections `20-tri-minimum-counts` and `18-tri-parent-links`. The R8.4 training-role amendment → a separate owner decision after naics-embedder's spec (reset prompt, Leave alone)
+      ROUTING: brainstorming
+
 ## Ranked list — Track B
 
 Owner's order after Stage 2 (2026-11-16), with ranks restarted on 2026-11-18. O7 and O8
-left the list as Stage 5, O12 as Stage 18 and O13 as Stage 22 (owner, 2026-11-22). O11 is
-uncovered and parked in `specs/deferred_items.md`.
-
-1. O17 — TRI protocol section. Design sessions only, after Stage 5's real build
+left the list as Stage 5, O12 as Stage 18 and O13 as Stage 22 (owner, 2026-11-22). O17 left
+it as Stage 25 (owner, 2026-11-23). The list is empty. O11 is uncovered and parked in
+`specs/deferred_items.md`.
 
 ## Ranked list — Track C
 
