@@ -306,7 +306,7 @@ def test_membership_types_cover_each_marker_and_separator():
     assert membership_types('311811,311812', naics) == ['several']
     assert membership_types('311811 ,311812', naics) == ['several']
     assert membership_types('311811, pt. 311812', naics) == ['part', 'several']
-    assert membership_types('Part of 31, 32, 33', naics) == ['group', 'part']
+    assert membership_types('Part of 31, 32, 33', naics) == ['group', 'part', 'several']
     assert membership_types(' 311811 ', naics) == ['whole']
 
 
@@ -317,13 +317,56 @@ def test_membership_types_read_a_sector_spelled_as_its_subsectors():
              level='sector', code=code, title=code) for code in ['44-45', '48-49']])
     nodes = pl.concat([naics, extra])
     for spelling in ['31, 32, 33', '31,32,33', '31 and 32 and 33']:
-        assert membership_types(spelling, nodes) == ['group']
-    assert membership_types('44, 45', nodes) == ['group']
-    assert membership_types('48 and 49', nodes) == ['group']
+        assert membership_types(spelling, nodes) == ['group', 'several']
+    assert membership_types('44, 45', nodes) == ['group', 'several']
+    assert membership_types('48 and 49', nodes) == ['group', 'several']
     assert membership_types('44, 45, 48, 49', nodes) == ['group', 'several']
     assert membership_types('311811, 31, 32, 33', nodes) == ['group', 'several']
     with pytest.raises(ValueError):
         membership_types('31, 32', nodes)
+
+
+REAL_SHAPES = [
+    # (real row it stands for, fixture-tree equivalent, types, candidates)
+    ('3990 Part of 31, 32, 33', 'Part of 31, 32, 33', ['group', 'part', 'several'],
+     ['311411', '311811', '311812', '311813', '311830', '333242', '333415']),
+    ('2990 Part of 331 and 332', 'Part of 311 and 333', ['group', 'part', 'several'],
+     ['311411', '311811', '311812', '311813', '311830', '333242', '333415']),
+    ('3291 3332, 3334, 3339, Part of 333', '3332, 3334, Part of 333',
+     ['group', 'part', 'several'], ['333242', '333415']),
+    ('0590 Pts. 2211, 2212', 'Pts. 3114, 3332', ['group', 'part', 'several'],
+     ['311411', '333242']),
+    ('9370 92111, 92112, 92114, pt. 92115', '311811, 311812, 311813, pt. 311830',
+     ['part', 'several'], ['311811', '311812', '311813', '311830']),
+    ('1890 32222,32223, 32229', '311811,311812, 311813', ['several'],
+     ['311811', '311812', '311813']),
+    ('6180 4851, 4852, 4854, 4855, 4859 ', '311411, 311811, 311812, 311813, 311830 ',
+     ['several'], ['311411', '311811', '311812', '311813', '311830'])]
+
+
+@pytest.mark.parametrize('real,expression,types,candidates', REAL_SHAPES,
+                         ids=[shape[0] for shape in REAL_SHAPES])
+def test_real_row_shapes_count_the_codes_as_written(real, expression, types, candidates):
+    naics, _, paths = tree_frames()
+    assert membership_types(expression, naics) == types
+    assert naics_candidates(expression, naics, paths) == candidates
+
+
+def test_part_of_two_sectors_is_several_with_candidates_under_both():
+    naics, _, paths = tree_frames()
+    extra = pl.DataFrame([
+        dict(node_id='naics:2022:sector:44-45', system='naics', vintage=2022, level='sector',
+             code='44-45', title='44-45'),
+        dict(node_id='naics:2022:national_industry:441110', system='naics', vintage=2022,
+             level='national_industry', code='441110', title='441110')])
+    path = pl.DataFrame([dict(node_id='naics:2022:national_industry:441110',
+                              path=['naics:2022:sector:44-45',
+                                    'naics:2022:national_industry:441110']),
+                         dict(node_id='naics:2022:sector:44-45',
+                              path=['naics:2022:sector:44-45'])])
+    nodes, every = pl.concat([naics, extra]), pl.concat([paths, path])
+    assert membership_types('Part of 44, 45', nodes) == ['group', 'part', 'several']
+    assert naics_candidates('Part of 44, 45', nodes, every) == ['441110']
 
 
 def test_membership_types_say_group_for_each_level_above_the_finest():

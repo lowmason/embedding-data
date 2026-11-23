@@ -110,8 +110,9 @@ def membership_types(expression: str, nodes: pl.DataFrame) -> list[str]:
 
     The types are `part` (a marker is present), `several` (two or more codes), `whole` (one
     unmarked national industry) and `group` (a code above the finest level). An `exc.`
-    clause adds no type. Like the candidate parser, it reads `31, 32, 33`, `44, 45` and
-    `48, 49` as the one sector each spells.
+    clause adds no type. `several` counts the codes as written, so `Part of 44, 45` is
+    `several`. The levels read `31, 32, 33`, `44, 45` and `48, 49` as the one sector each
+    spells, as the candidate parser does, so those rows are also `group`.
     '''
     if not isinstance(expression, str):
         raise ValueError('unsupported membership expression')
@@ -120,8 +121,8 @@ def membership_types(expression: str, nodes: pl.DataFrame) -> list[str]:
         raise ValueError('unsupported membership expression')
     positive = clauses[0]
     marked = MARKER.search(positive) is not None
-    listed = ','.join(token.strip() for token in
-                      re.split(r',|\s+and\s+', MARKER.sub('', positive)))
+    written = [token.strip() for token in re.split(r',|\s+and\s+', MARKER.sub('', positive))]
+    listed = ','.join(written)
     for spelling, sector in SECTOR_SPELLINGS:
         listed = f',{listed},'.replace(f',{spelling},', f',{sector},')[1:-1]
     tokens = listed.split(',')
@@ -131,9 +132,9 @@ def membership_types(expression: str, nodes: pl.DataFrame) -> list[str]:
     types = set()
     if marked:
         types.add('part')
-    if len(tokens) >= 2:
+    if len(written) >= 2:
         types.add('several')
-    if len(tokens) == 1 and not marked and levels[tokens[0]] == FINEST_LEVEL:
+    if len(written) == 1 and not marked and levels[tokens[0]] == FINEST_LEVEL:
         types.add('whole')
     if any(levels[token] != FINEST_LEVEL for token in tokens):
         types.add('group')
