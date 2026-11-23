@@ -15,7 +15,8 @@ add further families, each adopted by its own roadmap stage. The
 *evaluation protocol* that scores embeddings against these targets is
 deliberately excluded and belongs to a successor spec (see Out of scope), which
 is [evaluation-protocol.md](evaluation-protocol.md) *(owner, 2026-11-18)*. Its Sections 3
-and 4 cover ITA co-ownership and the 2023 ITA area mix *(owner, 2026-11-23)*. Every
+and 4 cover ITA co-ownership and the 2023 ITA area mix *(owner, 2026-11-23)*. Its Section 5
+covers the USAspending vendor links *(owner, 2026-11-23)*. Every
 input is free to access and every output is an aggregate; no paid data and no
 microdata release is required to run, test, or reproduce any requirement here.
 
@@ -692,6 +693,7 @@ bullet here.
   pairs. Every other family waits for its own section there. *(owner,
   2026-11-18)* Section 2 covers the ACS wage microdata. *(owner, 2026-11-23)*
   Sections 3 and 4 cover ITA co-ownership and the 2023 ITA area mix. *(owner,
+  2026-11-23)* Section 5 covers the USAspending vendor links. *(owner,
   2026-11-23)*
 - **Sources considered and not adopted** (D):
   - SBA Paycheck Protection Program loans: borrower-level, a 2020–21 snapshot,

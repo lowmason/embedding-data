@@ -1,13 +1,16 @@
 # Evaluation protocol, Section 5: USAspending vendor links
 
-Status: PROPOSED (2026-11-23). Written in a brainstorming session. The section text is Section 5
-of [the evaluation protocol](evaluation-protocol.md), with its own Status PROPOSED. A builder
+**Status: COMPLETE (2026-11-23)** — approved by the owner on 2026-11-23 ("Approve") and applied as
+Section 5 of [the evaluation protocol](../evaluation-protocol.md). No plan. Findings in
+[the Stage 23 findings](../naics-evaluation-data-stage-23-findings.md).
+
+Status: APPROVED (2026-11-23, owner: "Approve"). Written in a brainstorming session. A builder
 check raised three points. One was the owner's to rule (P11). The other two are folded in as my
 calls: the decision id P10, and an Assignment that names "the relatedness spec, or the spec to
 which it assigns the family".
 
 Roadmap: `specs/naics-evaluation-data-roadmap.md`, Stage 23 (Track C, O18). The design adds
-Section 5 to [the evaluation protocol](evaluation-protocol.md). This file holds its provenance,
+Section 5 to [the evaluation protocol](../evaluation-protocol.md). This file holds its provenance,
 the owner's decisions, the measurements and the pointer edits. The protocol file holds the rules.
 
 ## Design provenance
@@ -19,7 +22,7 @@ A brainstorming session with the owner on 2026-11-23. The inputs read were:
   section", "What this repository does not decide"); the Stage 16 spec
   `specs/completed/evaluation-protocol-ita-relatedness.md` and its findings; the Stage 24 spec
   `specs/completed/acs-wage-protocol-section.md`; the
-  [V9 USAspending decision](findings/v9-usaspending-minimum-counts.md); the Stage 20 acceptance
+  [V9 USAspending decision](../findings/v9-usaspending-minimum-counts.md); the Stage 20 acceptance
   finding `specs/findings/stage-14-usaspending-vendor-links.md`;
   `specs/naics-evaluation-data-stage-14-findings.md` ("E6 status", "For the resume and O18");
   the Stage 14 spec `specs/completed/usaspending-vendor-links.md` (Intent, estimand, Limits,
@@ -120,7 +123,7 @@ For the decision, the owner weighed three ways (P11):
 
 ## Design
 
-The rules are Section 5 of [the evaluation protocol](evaluation-protocol.md). It follows Section
+The rules are Section 5 of [the evaluation protocol](../evaluation-protocol.md). It follows Section
 3's frame: Evidence, Assignment, Conditions, and what this repository does not decide. The points
 below are the design choices behind it.
 

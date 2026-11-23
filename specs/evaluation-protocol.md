@@ -8,7 +8,8 @@
 Status: APPROVED (2026-11-18, owner: "Approve the spec"). Written 2026-11-18. Section 2
 added with the owner's approval of its design (2026-11-23, owner: "Approve"). Sections 3
 and 4 added with the owner's approval of their design (2026-11-23, owner: "Approve the
-design").
+design"). Section 5 added with the owner's approval of its design (2026-11-23,
+owner: "Approve").
 
 This is the successor evaluation-protocol spec that the
 [source spec](embedding-evaluation-data-spec.md) requires "before any embedder
@@ -16,8 +17,8 @@ is scored" (Out of scope, "Evaluation protocol"). It has one section for each
 evidence family or analysis file. A family with no section here is not scored. The first
 section covers the ITA text–code pairs. Section 2 covers the ACS wage microdata, a
 person-level analysis file *(owner, 2026-11-23)*. Sections 3 and 4 cover ITA
-co-ownership and the 2023 ITA area mix (roadmap Stage 16). Section 5, proposed,
-covers the USAspending vendor links (roadmap Stage 23).
+co-ownership and the 2023 ITA area mix (roadmap Stage 16). Section 5 covers the
+USAspending vendor links (roadmap Stage 23).
 
 ## Design provenance
 
@@ -27,7 +28,7 @@ are Section 1's. Section 2 has its design in
 and 4 have theirs in
 [completed/evaluation-protocol-ita-relatedness.md](completed/evaluation-protocol-ita-relatedness.md).
 Section 5 has its design in
-[evaluation-protocol-usaspending-vendor-links.md](evaluation-protocol-usaspending-vendor-links.md).
+[completed/evaluation-protocol-usaspending-vendor-links.md](completed/evaluation-protocol-usaspending-vendor-links.md).
 
 A brainstorming session with the owner on 2026-11-18. The inputs read were:
 
@@ -521,8 +522,8 @@ validation part. The R8.4 decision is the owner's, apart from this section.
 
 ## Section 5: USAspending vendor links
 
-Status: PROPOSED (2026-11-23). Design, decisions P10 and P11 and measurements:
-[evaluation-protocol-usaspending-vendor-links.md](evaluation-protocol-usaspending-vendor-links.md).
+Status: APPROVED (2026-11-23, owner: "Approve"). Design, decisions P10 and P11 and measurements:
+[completed/evaluation-protocol-usaspending-vendor-links.md](completed/evaluation-protocol-usaspending-vendor-links.md).
 
 ### Evidence
 

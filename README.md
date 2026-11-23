@@ -850,7 +850,10 @@ stays on disk and is not cited.
 [The V9 USAspending decision](specs/findings/v9-usaspending-minimum-counts.md) sets one
 headline minimum count for `supplier_share` and one for `buyer_share` (O26). A row meets its
 gate when its `n_unweighted` is at least its measure's minimum. The published targets keep
-`size_gate_pending`.
+`size_gate_pending`. Reads of the vendor links follow
+[the evaluation protocol](specs/evaluation-protocol.md), Section 5: they judge only, with the
+reference and the margin set inside one opening, and no read is allowed until the owner names
+the consuming spec there.
 
 ## Data sources
 
