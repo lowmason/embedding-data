@@ -902,8 +902,9 @@ Run the freeze-window `pgrep` check. Push with `git push -u origin <branch>`, th
 against `main` with `gh pr create`. The body gives the minimum, the kept rows and support with
 their shares, the lenient count, the link to the decision record and the R7.3 and V9
 amendments, says that the owner approves before the merge, and ends with the session's PR
-attribution line. Bind the PR (`ccd_pr` `get_status`, then `bind_pr` if needed) and turn on
-Auto-fix (`set_monitor`).
+attribution line. Bind the PR (`ccd_pr` `get_status`, then `bind_pr` if needed). Do not turn
+on Auto-fix (`set_monitor`). With no CI, it would act only on review comments, and a fix that
+it pushed to the script after the rule commit would skip OC3.
 
 - [ ] **Step 3: Stop for the owner (OC4)**
 
