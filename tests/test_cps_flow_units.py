@@ -67,7 +67,7 @@ PUMS = {'8025': (['51-4031', '51-4032'], 'pums_occupation_2018:ACS!A:B:row=7'),
         '8225': (['51-4041', '51-4099'], 'pums_occupation_2018:ACS!A:B:row=9')}
 
 
-def build(tree, industry=None, occupation=None, *, pums=None, delivered=None):
+def build(tree, industry=None, occupation=None, *, pums=None, delivered=None, evidence=None):
     naics_nodes, soc_nodes, paths = tree
     default_industry, default_occupation = sample_rows()
     return cps_flow_units.build_units(
@@ -77,7 +77,8 @@ def build(tree, industry=None, occupation=None, *, pums=None, delivered=None):
         pums=PUMS if pums is None else pums,
         delivered=delivered or {'industry': {'0170'},
                                 'occupation': {'0010', '8025', '8225'}},
-        evidence=cps_flow_references.special_evidence(receipt()), references=REFERENCES)
+        evidence=evidence or cps_flow_references.special_evidence(receipt()),
+        references=REFERENCES)
 
 
 def test_soc_candidates_are_detailed_descendants_at_any_level(tree):
@@ -436,3 +437,45 @@ def test_the_sample_registry_keeps_the_list_order_out_of_the_result(tree):
     first = build(tree)
     second = build(tree, industry[::-1], occupation[::-1])
     assert first.equals(second)
+
+
+def test_soc_candidates_reject_an_ambiguous_code(tree):
+    _, soc_nodes, paths = tree
+    doubled = pl.concat([soc_nodes, soc_nodes.filter(pl.col('code') == '13-2051')])
+    with pytest.raises(ValueError, match='unknown SOC code'):
+        cps_flow_units.soc_candidates('13-2051', doubled, paths)
+
+
+def test_soc_candidates_are_sorted_whatever_the_node_order(tree):
+    _, soc_nodes, paths = tree
+    assert cps_flow_units.soc_candidates('13-0000', soc_nodes.reverse(), paths) == [
+        '13-2051', '13-2052', '13-2054', '13-2099']
+
+
+def test_x_matches_refuse_an_x_that_is_not_trailing(detailed):
+    with pytest.raises(ValueError, match='unsupported X token'):
+        cps_flow_units.x_matches('51-X031', detailed)
+    with pytest.raises(ValueError, match='unsupported X token'):
+        cps_flow_units.x_matches('51-4031', detailed)
+
+
+def test_cross_check_equal_needs_no_claim_entry():
+    assert cps_flow_units.cross_check(
+        {'8025': ['51-4031']}, {'8025': ['51-4031']}, {}, {'8025'}) == {'8025': 'equal'}
+
+
+def test_special_fields_come_from_the_evidence(tree):
+    evidence = {
+        '9890': {'label': 'L-ind', 'monthly': 'm-ind', 'asec_current': 'c-ind',
+                 'asec_last_year': 'y-ind', 'bls': 'b-ind'},
+        '9840': {'label': 'L-occ', 'monthly': 'm-occ', 'asec_current': 'c-occ',
+                 'asec_last_year': 'y-occ', 'bls': 'b-occ'}}
+    rows = {r['unit']: r for r in build(tree, evidence=evidence).iter_rows(named=True)}
+    industry = rows['feature:cps_industry_category:9890']
+    occupation = rows['feature:cps_occupation_category:9840']
+    assert [industry[c] for c in ('label', 'evidence_monthly', 'evidence_asec_current',
+                                  'evidence_asec_last_year', 'bls_evidence')] == [
+        'L-ind', 'm-ind', 'c-ind', 'y-ind', 'b-ind']
+    assert [occupation[c] for c in ('label', 'evidence_monthly', 'evidence_asec_current',
+                                    'evidence_asec_last_year', 'bls_evidence')] == [
+        'L-occ', 'm-occ', 'c-occ', 'y-occ', 'b-occ']
