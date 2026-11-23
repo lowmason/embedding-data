@@ -4,6 +4,7 @@ from pathlib import Path
 from xml.sax.saxutils import escape
 from zipfile import ZipFile
 
+import polars as pl
 import pytest
 
 from embedding_data import cps_flow_references
@@ -144,3 +145,88 @@ def reference_originals(directory: Path) -> dict[str, Path]:
     names['ipums_cps_ind_2020_codes'].write_text(ipums_page('9890'), encoding='utf-8')
     names['ipums_cps_occ_2020_codes'].write_text(ipums_page('9840'), encoding='utf-8')
     return names
+
+
+INDUSTRY_SHEET = '2022 Census Ind Code List '
+OCCUPATION_SHEET = '2018 Census Occ Code List'
+INDUSTRY_PREAMBLE = [
+    ['2022 Census Industry Code List'], ['U.S. Census Bureau'], ['2024-09-09'],
+    [None, 'Industry 2022 Description', None, '2022 Census Industry Code', '2022 NAICS Code'],
+    [None]]
+OCCUPATION_PREAMBLE = [
+    [None, 'U.S. Census Bureau'], [None, '2018 Census Occupation Code List'], [None],
+    [None, 'last updated: September 26, 2019'],
+    [None, '2018 Census Title ', '2018 Census Code', '2018 SOC Code'], [None],
+    ['Management,  Business, Science, and Arts Occupations:', None, '0010-3550',
+     '11-0000 - 29-0000'], [None]]
+
+
+def industry_list_workbook(file: Path, rows: list[list[str | None]], *,
+                           sheet: str = INDUSTRY_SHEET) -> None:
+    '''Write the real sheet name and column layout (A group, B title, D code, E NAICS).
+
+    Each row is one worksheet row of columns A to E. It follows a five-row preamble, so
+    row `i` of `rows` is worksheet row `len(INDUSTRY_PREAMBLE) + i + 1`. It writes through
+    `write_workbook`, not `code_fixtures.write_xlsx`, because only that writer keeps the
+    padding of a cell, and the readers must strip it.
+    '''
+    write_workbook(file, {sheet: [*INDUSTRY_PREAMBLE, *rows]})
+
+
+def occupation_list_workbook(file: Path, rows: list[list[str | None]], *,
+                             sheet: str = OCCUPATION_SHEET) -> None:
+    '''Write the real sheet name and column layout (A group, B title, C code, D SOC token).
+
+    Row `i` of `rows` is worksheet row `len(OCCUPATION_PREAMBLE) + i + 1`.
+    '''
+    write_workbook(file, {sheet: [*OCCUPATION_PREAMBLE, *rows]})
+
+
+NAICS_EDGES = [
+    ('21', None, 'sector'), ('211', '21', 'subsector'), ('2111', '211', 'industry_group'),
+    ('21112', '2111', 'industry'), ('211120', '21112', 'national_industry'),
+    ('31-33', None, 'sector'), ('311', '31-33', 'subsector'),
+    ('3118', '311', 'industry_group'), ('31181', '3118', 'industry'),
+    ('311811', '31181', 'national_industry'), ('311812', '31181', 'national_industry'),
+    ('311813', '31181', 'national_industry'), ('31183', '3118', 'industry'),
+    ('311830', '31183', 'national_industry'), ('3114', '311', 'industry_group'),
+    ('31141', '3114', 'industry'), ('311411', '31141', 'national_industry'),
+    ('333', '31-33', 'subsector'), ('3332', '333', 'industry_group'),
+    ('33324', '3332', 'industry'), ('333242', '33324', 'national_industry'),
+    ('3334', '333', 'industry_group'), ('33341', '3334', 'industry'),
+    ('333415', '33341', 'national_industry')]
+SOC_EDGES = [
+    ('13-0000', None, 'major'), ('13-2000', '13-0000', 'minor'),
+    ('13-2050', '13-2000', 'broad'), ('13-2051', '13-2050', 'detailed'),
+    ('13-2052', '13-2050', 'detailed'), ('13-2054', '13-2050', 'detailed'),
+    ('13-2090', '13-2000', 'broad'), ('13-2099', '13-2090', 'detailed'),
+    ('25-0000', None, 'major'), ('25-1000', '25-0000', 'minor'),
+    ('25-1010', '25-1000', 'broad'), ('25-1011', '25-1010', 'detailed'),
+    ('25-1020', '25-1000', 'broad'), ('25-1021', '25-1020', 'detailed'),
+    ('51-0000', None, 'major'), ('51-4000', '51-0000', 'minor'),
+    ('51-4030', '51-4000', 'broad'), ('51-4031', '51-4030', 'detailed'),
+    ('51-4032', '51-4030', 'detailed'), ('51-4040', '51-4000', 'broad'),
+    ('51-4041', '51-4040', 'detailed'), ('51-4090', '51-4000', 'broad'),
+    ('51-4099', '51-4090', 'detailed')]
+
+
+def tree_frames() -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
+    '''Return `naics_nodes`, `soc_nodes` and `paths` with the Stage 4 columns.
+
+    Each path runs from the root to the node itself, as the Stage 4 `paths` table does.
+    '''
+    nodes, paths = {}, []
+    for system, vintage, edges in (('naics', 2022, NAICS_EDGES), ('soc', 2018, SOC_EDGES)):
+        parents = {code: parent for code, parent, _ in edges}
+        identifiers = {code: f'{system}:{vintage}:{level}:{code}' for code, _, level in edges}
+        rows = []
+        for code, _, level in edges:
+            rows.append(dict(node_id=identifiers[code], system=system, vintage=vintage,
+                             level=level, code=code, title=f'{system} {code}'))
+            chain, cursor = [], code
+            while cursor is not None:
+                chain.append(identifiers[cursor])
+                cursor = parents[cursor]
+            paths.append(dict(node_id=identifiers[code], path=chain[::-1]))
+        nodes[system] = pl.DataFrame(rows)
+    return nodes['naics'], nodes['soc'], pl.DataFrame(paths)
