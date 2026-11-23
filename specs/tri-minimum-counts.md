@@ -2,7 +2,7 @@
 
 > Next step: writing-plans, in a fresh session, against this file.
 
-Status: DRAFT (2026-11-22), for the owner's review. Written 2026-11-22. The owner's approval of
+Status: APPROVED (2026-11-22, owner: "Yes"). Written 2026-11-22. The owner's approval of
 this spec approves every constant and rule in it, the designer's calls included. So the plan
 needs no owner stop between the rule commit and the first real run.
 
