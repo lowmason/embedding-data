@@ -4,7 +4,9 @@
 > or import a reference, and do not build, before the plan exists and the owner
 > gives the go-ahead for each write.
 
-Status: draft for owner review. Stage 11 design session of
+Status: the owner approved this committed spec on 2026-11-23 ("Approve the
+spec"), including every call marked "My call" and the proposed refinement of
+decision 5. Stage 11 design session of
 [the roadmap](naics-evaluation-data-roadmap.md), 2026-11-23. The owner made the
 seven decisions below in this session. Calls marked "My call" were made while
 writing this file. A builder check by a separate reviewer read the draft before
@@ -56,8 +58,8 @@ the model for the commands, the bundle, the host rule and acceptance.
    SOC entry is an X token. Their candidates are the residual rule under
    [Candidate sets](#candidate-sets), checked against Stage 8's ACS PUMS
    "Combines" lists. Any disagreement stops the build for the owner. A
-   design-time measurement led to a proposed refinement of what counts as
-   agreement, marked there for the owner's approval.
+   design-time measurement led to a refinement of what counts as agreement,
+   which the owner approved with this spec.
 6. **Industry moves need a new employer** ("Industry needs new employer").
    Monthly industry flows count only employer changes (`EMPSAME` 01).
    Occupation flows count either guard. This amends R4.8's wording.
@@ -67,8 +69,8 @@ the model for the commands, the bundle, the host rule and acceptance.
 
 ### Proposals played back in the session
 
-These were played back to the owner during the session with no objection. They
-are proposals until the owner approves this file.
+These were played back to the owner during the session with no objection. The
+owner approved them with this file.
 
 - Measures are a pooled average total and a forward share, as in Stage 9.
 - Monthly employed→employed moves with a reported change form one product.
@@ -361,7 +363,7 @@ data, with about 6.8% of employed weight.
    X row's residual. Two token pairs overlap (`8025`/`8225` and `8865`/`8990`),
    so the order matters. Matching uses the Stage 4 detailed nodes, not
    arithmetic on code digits.
-2. **Cross-check (proposed refinement of decision 5, for the owner's approval).**
+2. **Cross-check (refinement of decision 5, approved by the owner).**
    Compare each residual with the member list for the same Census category in
    Stage 8's ACS PUMS occupation data (`pums_occupation_2018`, v2/46 receipt, as
    parsed in the Stage 8 code lookup). The PUMS list sometimes merges several
