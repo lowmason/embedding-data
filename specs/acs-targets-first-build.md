@@ -104,7 +104,7 @@ and cites the file and line, or marks it as lost where its source was in `/priva
 
 | Run | Date | Guard | Outcome | Cause, as far as the evidence goes |
 |---|---|---|---|---|
-| `stage9_acs_targets_20261019_r1` | 2026-10-20 | none | Exit 137 after 5,084.6 s. Maximum child RSS 26,600,947,712 bytes | A macOS memorystatus kill of `python3.14` (52,441 MB compressed accounting, kernel log hash in the old finding). Small diagnostics on the first 100,000 and 500,000 rows narrowed the growth to the two-plan native cell and denominator `collect_all` (`acs_target_estimation.py:110`): 500,000 rows passed 9.26 GiB there. The later spilled native aggregation replaced that path. The exact operator is unproven |
+| `stage9_acs_targets_20261019_r1` | 2026-10-20 | none | Exit 137 after 5,084.6 s. Maximum child RSS 26,600,947,712 bytes | A macOS memorystatus kill of `python3.14` (52,441 MB compressed accounting, kernel log hash in the old finding). Small diagnostics on the first 100,000 and 500,000 rows narrowed the growth to the two-plan native cell and denominator `collect_all` (`acs_target_estimation.py:110`): 500,000 rows passed 9.26 GiB there. On the Codex tip, `derive_tables` calls `_aggregate_native_spilled` (`acs_target_tables.py:911`, `:926`), and no production code calls `aggregate_native`, which holds that `collect_all`. Probes 1 to 7 passed native aggregation under the guard. The exact operator is unproven |
 | `stage9_acs_targets_20261021_r2` | 2026-10-21 | 24 GiB physical footprint, one thread, default morsel size | Guard stop at 24.19 GiB after 218.9 s, empty scratch | Input selection. A selector-only diagnostic at the default morsel size (100,000) crossed 24.03 GiB at 221.9 s inside `select_targets`. The same diagnostic with `POLARS_IDEAL_MORSEL_SIZE=8192` finished in 530 s at 16.45 GiB. The exact operator is unproven |
 | `stage9_acs_targets_20261021_r3` | 2026-10-21 | 24 GiB, one thread, morsel 8192, 8 h | Guard stop at 25.11 GiB after 17,316 s (4.8 h) | The replicate sink of the first county industry product (`1cf742bc…`). Its phases were slow: native binding about 10 min, wide-to-long 86 min, a per-county validator about 24 min, estimation 15 min. Plan 10 Tasks 1 to 5 targeted these |
 
@@ -163,6 +163,8 @@ A new branch from main merges `codex/acs-targets-design` as it is. The Codex bra
 worktree stay unchanged. The merge brings the 12 commits and nothing else. The branch then
 adds this stage's own files (below) and reaches main through one PR. Pushing the branch puts
 the 12 Codex commits on GitHub for the first time. They hold code and tests only, no data.
+The PR merges with a merge commit, never a squash or a rebase, because the old finding, the
+ledgers and this spec cite the Codex commit hashes.
 
 This stage adds no module under `src/embedding_data/`. It changes no file in
 `acs_target_inputs.SOFTWARE_FILES`, no frozen module, no acceptance script and neither
@@ -214,7 +216,7 @@ Stop rules *(Claude's call, set from the probes)*:
 | Physical footprint | 24 GiB | SIGKILL at once |
 | Free disk on the data volume, soft | under 50 GiB | SIGTERM, then wait up to 2 h for the child to exit |
 | Free disk on the data volume, hard | under 20 GiB | SIGKILL |
-| Wall clock | 36 h for `build`, 36 h for `verify` | SIGTERM, then wait up to 2 h |
+| Wall clock | 48 h for `build`, 48 h for `verify` | SIGTERM, then wait up to 2 h |
 | Grace period of a SIGTERM ends | 2 h | SIGKILL |
 
 Memory keeps the 24 GiB limit of r2, r3 and all seven probes, so the new run is comparable
@@ -222,6 +224,13 @@ with them. The largest peak measured is 18.66 GiB (probe 4, input selection), an
 inferred about 20.8 GiB for the largest unmeasured group. There is no soft memory stop: Python
 runs a signal handler only when the current Polars call returns, and single phases have run
 for 86 min, so a soft memory stop would almost always end in a kill anyway.
+
+The wall-clock limit is a host-time budget, not a technical setting. The 20–25 h estimate
+scales assembly linearly from probe 7, which covered 4 of the 50 products. The near-quadratic
+growth that probe 5 found was in the assembly method that A1 replaced, and nothing has
+measured the new method's growth at full scale. Under rule 1, a deadline stop ends the stage
+with nothing published. 48 h is about twice the estimate. *(Pending the owner's confirmation
+at spec review.)*
 
 Disk and time stops send SIGTERM and wait, because a clean exit removes the build's scratch
 and a kill does not. A real `ENOSPC` raises an exception, and the build's cleanup handles it.
@@ -310,6 +319,13 @@ scratch stays until the owner says otherwise. Steps 6 and 7 still run.
 - Each production write needs the owner's go-ahead: the build and the `verify` (both write
   guard controls under `data/derived/`) and any later cleanup.
 - Preserve every r1 to r3 path and control. Never reuse their run IDs.
+- The guarded run opens no Stage 9 freeze window: this stage takes no freeze. The Stage 10, 14
+  and 17 rules in `CLAUDE.md` ask other sessions to confirm that no window is open. Step 7's
+  `CLAUDE.md` edit says that Stage 9's first build took none. The one-build-at-a-time rule and
+  the `pgrep` check still apply while it runs.
+- Every `.py` file under `scripts/` and `tests/` is part of the inventory that a later freeze
+  records (`stage9_independent_io.software`). The new wrapper and its tests join it, which is
+  expected and changes no selected run.
 - No change to `pyproject.toml`, `uv.lock`, any frozen module or any acceptance script.
 - Source rows never leave this machine or enter git. The controls and the findings hold
   aggregates only.
