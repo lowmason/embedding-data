@@ -144,3 +144,59 @@ def curve(cells: pl.DataFrame) -> dict:
         'minimum': minimum,
         'reason': reason,
     }
+
+
+def eligible_facility_years(table: pl.LazyFrame) -> pl.DataFrame:
+    '''The eligible facility-years: `year`, `trifd`, `node` and `owner`, sorted by year and TRIFD.
+
+    A facility-year is eligible when its `exclusion_reason` is null, as spec "Per-year counts"
+    says. An excluded row has no owner, so every later join would drop it without this filter.
+    '''
+    return table.filter(pl.col('exclusion_reason').is_null()).select(
+        pl.col('reporting_year').alias('year'),
+        pl.col('trifd'),
+        pl.col('naics_2022_node_id').alias('node'),
+        pl.col('owner_key').alias('owner'),
+    ).sort('year', 'trifd').collect()
+
+
+def recount(eligible: pl.DataFrame) -> pl.DataFrame:
+    '''The owners of each ordered pair of distinct nodes, over all years and in each year.
+
+    An owner joins two nodes of one year. `j_owners` counts the distinct owners over all years,
+    and `j_<year>` counts them in that year, so `j_owners` is not the sum of the years.
+    '''
+    presence = eligible.select('owner', 'year', 'node').unique()
+    pairs = presence.join(presence, on=['owner', 'year'], suffix='_b').filter(
+        pl.col('node') != pl.col('node_b'))
+    owner = pl.col('owner')
+    return pairs.group_by('node', 'node_b').agg(
+        owner.n_unique().cast(pl.UInt64).alias('j_owners'),
+        *(owner.filter(pl.col('year') == year).n_unique().cast(pl.UInt64).alias(f'j_{year}')
+          for year in YEARS),
+    ).rename({'node': 'unit_a', 'node_b': 'unit_b'}).sort('unit_a', 'unit_b')
+
+
+def year_cells(eligible: pl.DataFrame, counts: pl.DataFrame, base: int) -> pl.DataFrame:
+    '''The base cells of year `base`, each with its count, its testability and its recurrence.
+
+    A year-`base` row is staying when a row of the next year has the same TRIFD and the same
+    owner. An owner is staying at a node when any of its rows there stays. A cell is testable
+    when one owner is staying at both nodes. It recurs when any owner links the nodes in the
+    next year. `base_count` and `recurs` come from `counts`.
+    '''
+    following = eligible.filter(pl.col('year') == base + 1).select('trifd', 'owner').unique()
+    rows = eligible.filter(pl.col('year') == base).join(
+        following.with_columns(pl.lit(True).alias('staying')), on=['trifd', 'owner'], how='left')
+    owners = rows.group_by('owner', 'node').agg(pl.col('staying').fill_null(False).any())
+    staying = owners.filter(pl.col('staying'))
+    testable = staying.join(staying, on='owner', suffix='_b').filter(
+        pl.col('node') != pl.col('node_b')).select(
+        pl.col('node').alias('unit_a'), pl.col('node_b').alias('unit_b'),
+        pl.lit(True).alias('testable')).unique()
+    base_cells = counts.filter(pl.col(f'j_{base}') >= 1).select(
+        'unit_a', 'unit_b', pl.col(f'j_{base}').alias('base_count'),
+        (pl.col(f'j_{base + 1}') >= 1).alias('recurs'))
+    return base_cells.join(testable, on=['unit_a', 'unit_b'], how='left').select(
+        'unit_a', 'unit_b', 'base_count', pl.col('testable').fill_null(False), 'recurs',
+    ).sort('unit_a', 'unit_b')
