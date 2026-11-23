@@ -3,6 +3,8 @@
 import ast
 import importlib.util
 import json
+import re
+import runpy
 import sys
 from datetime import date
 from pathlib import Path
@@ -1694,3 +1696,194 @@ def test_genuine_chain_bundles_pass_the_checks(script, v12, capsys):
     assert without_inputs(first) == without_inputs(second)
     records = json.loads((v12['first'] / 'outputs.json').read_text())
     assert first['inputs']['files']['report.json'] == records['report.json']['sha256']
+
+
+# Input shapes of the rules above that the plan tests do not use.
+
+PUBLISHED_SCHEMA = {'unit_a': pl.String, 'unit_b': pl.String, 'count': pl.UInt64,
+                    'largest_year_count': pl.UInt64, 'dnb_label': pl.Boolean,
+                    'federal_label': pl.Boolean}
+LABEL_CASES = (
+    ([], F, F),
+    ([DNB], T, F),
+    ([FEDERAL], F, T),
+    ([DNB, FEDERAL], T, T),
+    (['numerator:other:true'], F, F),
+    (['numerator:dnb_key_sensitivity:false', 'numerator:federal_sensitivity:false'], F, F),
+)
+
+
+def test_published_takes_the_largest_single_year_count(script):
+    counts = counts_frame(('a', 'b', 9, 7, 0, 0), ('c', 'd', 9, 0, 8, 0),
+                          ('e', 'f', 9, 0, 0, 9), ('g', 'h', 9, 3, 3, 3))
+    targets = targets_of(('g', 'h', 9, []), ('e', 'f', 9, []), ('c', 'd', 9, []),
+                         ('a', 'b', 9, []))
+    rows = script.published(targets, counts)
+    assert dict(rows.schema) == PUBLISHED_SCHEMA
+    assert dict(rows.select('unit_a', 'largest_year_count').rows()) == {
+        'a': 7, 'c': 8, 'e': 9, 'g': 3}
+    assert rows['count'].to_list() == [9] * 4
+
+
+def test_published_reads_the_labels_from_flags(script):
+    units = [str(index) for index in range(len(LABEL_CASES))]
+    counts = counts_frame(*((unit, unit + 'x', 1, 1, 0, 0) for unit in units))
+    targets = targets_of(*((unit, unit + 'x', 1, flags)
+                           for unit, (flags, _, _) in zip(units, LABEL_CASES, strict=True)))
+    rows = script.published(targets, counts)
+    found = {row['unit_a']: (row['dnb_label'], row['federal_label'])
+             for row in rows.iter_rows(named=True)}
+    assert found == {unit: (dnb, federal) for unit, (_, dnb, federal)
+                     in zip(units, LABEL_CASES, strict=True)}
+
+
+def test_published_has_one_row_for_each_target_row(script, golden):
+    found = checked(script, golden)
+    rows = script.published(found.targets, found.counts)
+    assert dict(rows.schema) == PUBLISHED_SCHEMA
+    assert (rows.height, rows.select('unit_a', 'unit_b').unique().height) == (56, 56)
+    cells = ['unit_a', 'unit_b']
+    assert rows['count'].to_list() == found.targets.sort(cells)['n_unweighted'].to_list()
+    assert (rows['dnb_label'].sum(), rows['federal_label'].sum()) == (2, 2)
+
+
+def test_kept_counts_at_the_boundaries(script):
+    rows = rows_of((1, 1, F, F), (2, 2, F, F), (3, 1, F, F), (2, 1, F, F))
+    low = script.kept(rows, 2)
+    assert (low['kept_rows'], low['kept_support'], low['lenient_kept_rows']) == (3, 7, 2)
+    assert (low['kept_row_share'], low['kept_support_share']) == (3 / 4, 7 / 8)
+    high = script.kept(rows, 3)
+    assert (high['kept_rows'], high['kept_support'], high['lenient_kept_rows']) == (1, 3, 1)
+    none = script.kept(rows, 4)
+    assert [none[key] for key in KEPT_KEYS] == [0, 0.0, 0, 0.0, 0, 0, 0]
+    assert none['rows'] == 4 and none['support'] == 8
+
+
+def test_kept_labels_are_counted_separately(script):
+    rows = rows_of(*[(1, 1, F, F)] * 2, *[(2, 1, T, F)] * 2, *[(3, 3, F, T)] * 2)
+    found = script.kept(rows, 3)
+    assert (found['kept_dnb_rows'], found['kept_federal_rows']) == (0, 2)
+    found = script.kept(rows, 1)
+    assert (found['kept_dnb_rows'], found['kept_federal_rows']) == (2, 2)
+    both = script.kept(rows_of((2, 2, T, T), (2, 2, F, F)), 2)
+    assert (both['dnb_rows'], both['federal_rows']) == (1, 1)
+    assert (both['kept_dnb_rows'], both['kept_federal_rows'], both['kept_rows']) == (1, 1, 2)
+
+
+def test_summarize_takes_the_larger_year_pair_minimum(script):
+    low = cells((1, 60, 60, 0))
+    high = cells((1, 60, 30, 0), (10, 60, 60, 0))
+    rows = rows_of((1, 1, F, F), (2, 2, F, F), (3, 3, F, F))
+    distribution = {'count': 3}
+    for pair in ((low, high), (high, low)):
+        found = script.summarize(dict(zip(PAIRS, pair, strict=True)), rows, distribution)
+        assert [script.curve(each)['minimum'] for each in pair] in ([1, 2], [2, 1])
+        assert found['minimum'] == 2
+        assert found['published'] == script.kept(rows, 2)
+        assert found['n_unweighted_distribution'] is distribution
+        assert found['year_pairs'] == {label: script.curve(each)
+                                       for label, each in zip(PAIRS, pair, strict=True)}
+
+
+@pytest.mark.parametrize('none', (cells((1, 49, 49, 0)), cells((1, 60, 30, 0))),
+                         ids=('too-few-testable-cells', 'top-band-misses-level'))
+def test_summarize_gives_no_minimum_when_a_pair_has_none(script, none):
+    fine = cells((1, 60, 60, 0))
+    rows = rows_of((1, 1, F, F), (2, 2, F, F))
+    for pair in ((fine, none), (none, fine)):
+        found = script.summarize(dict(zip(PAIRS, pair, strict=True)), rows, {})
+        assert found['minimum'] is None
+        assert [found['published'][key] for key in KEPT_KEYS] == [None] * 7
+        assert found['published']['rows'] == 2
+        assert set(found['year_pairs']) == set(PAIRS)
+
+
+@pytest.mark.parametrize(('forge', 'reason'), SELF_CHECK_REFUSALS)
+def test_self_check_refusals_print_only_the_reason(script, golden, capsys, monkeypatch, forge,
+                                                   reason):
+    called = []
+    monkeypatch.setattr(script, 'year_cells', lambda *args: called.append(args))
+    assert run_main(script, capsys, golden, pin=forge(golden)) == (
+        2, {'complete': False, 'reason': reason}, '')
+    assert called == []
+
+
+def raise_plain(*args):
+    raise KeyError(('parent:Pine', 'T1'))
+
+
+def raise_with_cause(*args):
+    try:
+        raise KeyError('owner:Slate T99')
+    except KeyError as cause:
+        raise ValueError('harmless words') from cause
+
+
+def raise_in_handler(*args):
+    try:
+        raise KeyError('owner:Slate T99')
+    except KeyError:
+        raise ValueError('harmless words')
+
+
+@pytest.mark.parametrize(('raiser', 'kind'), [
+    pytest.param(raise_plain, 'KeyError', id='plain'),
+    pytest.param(raise_with_cause, 'ValueError', id='explicit-cause'),
+    pytest.param(raise_in_handler, 'ValueError', id='implicit-context'),
+])
+def test_unexpected_error_hides_every_message_in_its_chain(
+        script, golden, capsys, monkeypatch, raiser, kind):
+    monkeypatch.setattr(script, 'year_cells', raiser)
+    status, result, error = run_main(script, capsys, golden)
+    assert (status, result) == (2, {'complete': False, 'reason': 'unexpected error'})
+    assert error.splitlines()[0] == kind
+    for text in ('Pine', 'T1', 'Slate', 'T99', 'owner:', 'parent:', 'harmless'):
+        assert text not in error
+
+
+def test_unexpected_error_gives_one_line_for_each_frame(script, golden, capsys, monkeypatch):
+    def explode(*args):
+        raise ValueError('a message')
+
+    monkeypatch.setattr(script, 'year_cells', explode)
+    _, _, error = run_main(script, capsys, golden)
+    lines = error.splitlines()
+    assert lines[0] == 'ValueError'
+    places = [re.fullmatch(r'(.+):(\d+) in (\S+)', line) for line in lines[1:]]
+    assert all(places)
+    assert [place[3] for place in places if not place[3].startswith('<')] == [
+        'main', 'measure', 'explode']
+    assert places[0][1] == str(SCRIPT)
+    assert int(places[0][2]) > 0
+    assert 'a message' not in error
+
+
+def test_a_result_that_is_not_json_is_an_unexpected_error(script, golden, capsys, monkeypatch):
+    monkeypatch.setattr(script, 'measure',
+                        lambda inputs: {'complete': True, 'rate': float('nan')})
+    status, result, error = run_main(script, capsys, golden)
+    assert (status, result) == (2, {'complete': False, 'reason': 'unexpected error'})
+    assert error.splitlines()[0] == 'ValueError'
+
+
+@pytest.mark.parametrize('missing', ('--data-dir', '--run', '--outputs-sha256'))
+def test_every_option_is_required(script, golden, capsys, missing):
+    options = {'--data-dir': str(golden['data_dir']), '--run': golden['run'],
+               '--outputs-sha256': golden['pin']}
+    del options[missing]
+    with pytest.raises(SystemExit) as stopped:
+        script.main([part for pair in options.items() for part in pair])
+    assert stopped.value.code == 2
+    assert capsys.readouterr().out == ''
+
+
+def test_the_command_line_exits_with_the_status(golden, capsys, monkeypatch):
+    changed = publish(golden['data_dir'].parent, code_change_records(), run='changed')
+    for bundle, pin, status in ((golden, None, 0), (changed, None, 1), (golden, '0' * 64, 2)):
+        monkeypatch.setattr(sys, 'argv', [
+            str(SCRIPT), '--data-dir', str(bundle['data_dir']), '--run', bundle['run'],
+            '--outputs-sha256', bundle['pin'] if pin is None else pin])
+        with pytest.raises(SystemExit) as stopped:
+            runpy.run_path(str(SCRIPT), run_name='__main__')
+        assert stopped.value.code == status
+        assert len(capsys.readouterr().out.splitlines()) == 1
