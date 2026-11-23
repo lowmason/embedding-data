@@ -479,3 +479,12 @@ def test_special_fields_come_from_the_evidence(tree):
     assert [occupation[c] for c in ('label', 'evidence_monthly', 'evidence_asec_current',
                                     'evidence_asec_last_year', 'bls_evidence')] == [
         'L-occ', 'm-occ', 'c-occ', 'y-occ', 'b-occ']
+
+
+def test_one_missing_candidate_among_valid_ones_fails(tree, monkeypatch):
+    monkeypatch.setattr(cps_flow_units, 'naics_candidates', lambda *args: ['211120', '999999'])
+    with pytest.raises(ValueError, match='candidate is not a Stage 4 node'):
+        build(tree, industry=[industry_row('0170', '211120')])
+    monkeypatch.setattr(cps_flow_units, 'soc_candidates', lambda *args: ['13-2051', '99-9999'])
+    with pytest.raises(ValueError, match='candidate is not a Stage 4 node'):
+        build(tree, occupation=[occupation_row('0010', '13-2051')], pums={})
