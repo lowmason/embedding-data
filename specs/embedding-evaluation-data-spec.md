@@ -543,6 +543,10 @@ here. The [V9 ITA NAICS decision](findings/v9-ita-naics-minimum-counts.md) sets
 it for ITA co-ownership, the 2023 ITA area mix and ITA text–code pairs. For every
 other family it stays *(open — resolved by measurement, not argument, discharged
 by V9)*. *(owner, plan 12, 2026-11-17)*
+The [V9 USAspending decision](findings/v9-usaspending-minimum-counts.md) sets it for the
+USAspending vendor-link family, with one value for `supplier_share` and one for
+`buyer_share`. That family is no longer among the families whose minimum stays open.
+*(owner, plan 19, 2026-11-22)*
 
 **R7.4** Outputs are Parquet. Pairwise families share one long schema —
 `source`, `family`, `unit_a_type`, `unit_a`, `unit_b_type`, `unit_b`, `measure`,
@@ -641,6 +645,8 @@ bullet here.
   [V9 ITA NAICS decision](findings/v9-ita-naics-minimum-counts.md) covers ITA
   co-ownership, the 2023 ITA area mix and ITA text–code pairs. *(owner, plan 12,
   2026-11-17)*
+  The [V9 USAspending decision](findings/v9-usaspending-minimum-counts.md) covers the
+  USAspending vendor-link family after its first full build. *(owner, plan 19, 2026-11-22)*
 - **V10 — totals reproduction**. Compare ITA rows per year with OSHA's published
   submission counts, ACS pooled employment by state with published ACS
   estimates, and CPS monthly employment with BLS levels. CPS totals use

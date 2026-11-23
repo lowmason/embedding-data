@@ -461,8 +461,9 @@ preflight script close to a domain (`A`, `E`, `A~E`; `D&B`, `E&Y`). The
 [Stage 14 findings](specs/naics-evaluation-data-stage-14-findings.md) record the commands,
 counts, cost and limits. `vendor_link_pairs.parquet` holds UEI pairs and stays on this
 machine. No output may feed embedder training, curriculum, hard-negative mining or model
-selection (R8.4). Every target keeps `size_gate_pending`, and no headline minimum count
-(O26) exists yet.
+selection (R8.4). Every target keeps `size_gate_pending`. The headline minimum counts (O26),
+one for `supplier_share` and one for `buyer_share`, are in
+`specs/findings/v9-usaspending-minimum-counts.md`.
 
 **TRI parent links (roadmap Stage 5).** `python -m embedding_data.tri_parent_links` exposes
 `acquire`, `import-file`, `build`, `verify` and `compare-runs`, separate from the frozen

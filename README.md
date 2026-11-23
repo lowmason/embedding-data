@@ -834,6 +834,10 @@ pass `verify`, and `compare-runs` finds them equal. The
 [Stage 14 finding](specs/findings/stage-14-usaspending-vendor-links.md) records the exact
 commands, the cost and what is not claimed. The superseded `stage14_vendor_links_20261121_r1`
 stays on disk and is not cited.
+[The V9 USAspending decision](specs/findings/v9-usaspending-minimum-counts.md) sets one
+headline minimum count for `supplier_share` and one for `buyer_share` (O26). A row meets its
+gate when its `n_unweighted` is at least its measure's minimum. The published targets keep
+`size_gate_pending`.
 
 ## Data sources
 
