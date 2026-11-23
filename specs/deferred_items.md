@@ -278,6 +278,18 @@
       and names the two runs, in the commit that next edits `specs/deliverable-map.md`.
       Done in PR 52 (`11fcf80`, 2026-11-22), which names both runs in the row.
 
+## 19-usaspending-minimum-counts — 2026-11-23
+- [ ] Stale spec path in the Stage 21 measurement script: the docstring of
+      `scripts/measure_usaspending_minimum_counts.py` (line 8) names
+      `specs/usaspending-minimum-counts.md`, which moved to
+      `specs/completed/usaspending-minimum-counts.md` when plan 19 retired. Carried
+      because the script is frozen at rule commit `588ae5a`: any edit breaks that tie
+      and, under OC3, forces both real runs again. The fix is a one-line docstring
+      edit. `specs/tri-minimum-counts.md` (line 26) names the same old path, and it
+      belongs to plan 20. Size: quick-fix. Done when: the docstring names the retired
+      path, in the same commit as the next change that already requires a new rule
+      commit and both real runs.
+
 ## 17-acs-wage-minimum-earners — 2026-11-23
 - [ ] Stale spec path in the wage-minimum script: the docstring of
       `scripts/measure_acs_wage_minimum_earners.py` (line 8) names

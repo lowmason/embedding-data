@@ -121,6 +121,19 @@ Differences from the design:
 - Owner gates (2026-11-22): "Go now (loaded)" with the host check confirmed, for the replay build. "Run Codex", for the second review.
 - Deferred: 2 items. Source: specs/deferred_items.md, § 18-tri-parent-links.
 
+## 19-usaspending-minimum-counts — 2026-11-23
+Plan: specs/plans/completed/19-usaspending-minimum-counts.md · Spec: specs/completed/usaspending-minimum-counts.md (retired) · Roadmap: specs/naics-evaluation-data-roadmap.md, Stage 21
+
+Differences from the design:
+- Deviation: the measurement reads the pair, support and target Parquets of the run, not only `report.json` as the roadmap's Consumes line says (owner, D1, 2026-11-22). Source: plan, header.
+- Deviation: the decision gives two minimums (`supplier_share` 4, `buyer_share` 3), where the roadmap's Exit names one. Source: plan, header.
+- Deviation (Task 1): a review fix round added mutants 31 to 33 and one test in a second commit `ce029e0`. Source: plan, Task 1.
+- Deviation (Task 5): the full suite ran through the xdist overlay, not a bare `pytest`, because a serial run takes hours. Source: plan, Task 5.
+- Deviation (Task 6): the deliverable map's Status cell keeps the Stage 20 text and adds the Stage 21 sentence, because `origin/main` had rewritten it. Source: plan, Task 6.
+- Deviation (Task 6): a merge of `origin/main` (`bde4be0`) and a hand fix that states the measured leniency (`9fa10c0`) are extra commits. Source: plan, Task 6.
+- Owner gate (2026-11-23): "Run Codex (Recommended)", for the second seat of the final review.
+- Deferred: 1 item. Source: specs/deferred_items.md, § 19-usaspending-minimum-counts.
+
 ## 17-acs-wage-minimum-earners — 2026-11-23
 Plan: specs/plans/completed/17-acs-wage-minimum-earners.md · Spec: specs/completed/acs-wage-minimum-earners.md (retired) · Roadmap: specs/naics-evaluation-data-roadmap.md, Stage 19
 

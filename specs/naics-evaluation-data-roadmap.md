@@ -271,7 +271,7 @@ after Stage 18 (see Choices made).
 > Stage 20: COMPLETE (2026-11-22) — implemented by plan 16 (specs/plans/completed/16-usaspending-vendor-links.md). Its Handoff section names what O26 and O18 consume.
 > Next: resume the roadmap.
 
-- [ ] Stage 21: Headline minimum count for the USAspending family
+- [x] Stage 21: Headline minimum count for the USAspending family
       Objective: A headline minimum count for the USAspending vendor-link targets is set from their observed counts.
       Outcomes: O26
       Track: C
@@ -280,6 +280,9 @@ after Stage 18 (see Choices made).
       Exit: O26: a committed decision sets the headline minimum count from the observed `n_unweighted` distributions of the family's buyer-share and supplier-share targets. It reports for each target how many cells meet it. The published bundles keep `size_gate_pending`
       Leaves out: the USAspending protocol section → O18. A changed D2 rule and the live `acquire-sam-extract` request → `specs/deferred_items.md`. The R8.4 training-role amendment → a separate owner decision after naics-embedder's spec (reset prompt, Leave alone)
       ROUTING: brainstorming
+
+> Stage 21: COMPLETE (2026-11-23) — implemented by plan 19 (specs/plans/completed/19-usaspending-minimum-counts.md). Its two Deviation notes record the wider Consumes and cost and the two minimums. Its Handoff section names what O18 consumes.
+> Next: resume the roadmap.
 
 - [ ] Stage 22: Headline minimum count for the TRI family
       Objective: A headline minimum count for the TRI parent-link targets is set from their observed counts.
