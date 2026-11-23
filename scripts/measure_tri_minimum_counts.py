@@ -8,10 +8,13 @@ whose recurrence rate reaches `LEVEL`, as the spec section "From curves to a min
 downward merge and the total check run after `bands`, in `merge_thin_top` and `curve`.
 '''
 
+import argparse
 import hashlib
 import json
 import math
 import re
+import sys
+import traceback
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -19,7 +22,14 @@ import polars as pl
 
 from embedding_data.target_contract import TARGET_SCHEMA
 from embedding_data.tri_facility_years import TABLE_SCHEMA
-from embedding_data.tri_parent_link_targets import METADATA, SUPPORT_SCHEMA, YEARS, distribution
+from embedding_data.tri_parent_link_targets import (
+    DNB_LABEL,
+    FEDERAL_LABEL,
+    METADATA,
+    SUPPORT_SCHEMA,
+    YEARS,
+    distribution,
+)
 
 LEVEL = 0.90
 TOP_BAND = 10
@@ -29,6 +39,9 @@ YEAR_PAIRS = tuple(zip(YEARS, YEARS[1:]))
 COUNTS = ('base_cells', 'testable_cells', 'recurring_cells')
 CELL = ['unit_a', 'unit_b']
 COUNT_COLUMNS = ['j_owners', *(f'j_{year}' for year in YEARS)]
+# The keys of `kept` that need a minimum.
+KEPT_KEYS = ('kept_rows', 'kept_row_share', 'kept_support', 'kept_support_share',
+             'lenient_kept_rows', 'kept_dnb_rows', 'kept_federal_rows')
 
 SAFE_RUN_ID = re.compile('[A-Za-z0-9][A-Za-z0-9_-]*')
 SAFE_PIN = re.compile('[0-9a-f]{64}')
@@ -382,3 +395,114 @@ def self_check(inputs: Inputs) -> Checked:
     eligible = check_facility_years(facility, report)
     counts = check_cells(eligible, support, targets, report)
     return Checked(eligible, counts, targets, report['n_unweighted_distribution'])
+
+
+def published(targets: pl.DataFrame, counts: pl.DataFrame) -> pl.DataFrame:
+    '''One row for each target row: its cell, its count, its largest single-year count, labels.
+
+    `count` is the published `n_unweighted`. `largest_year_count` is the largest of the cell's
+    `j_<year>` counts, so it is never above `count`. A label is true when `flags` holds it.
+    '''
+    largest = pl.max_horizontal(*(f'j_{year}' for year in YEARS)).alias('largest_year_count')
+    flags = pl.col('flags')
+    return targets.join(counts.select(*CELL, largest), on=CELL, how='left').select(
+        *CELL,
+        pl.col('n_unweighted').alias('count'),
+        'largest_year_count',
+        flags.list.contains(DNB_LABEL).alias('dnb_label'),
+        flags.list.contains(FEDERAL_LABEL).alias('federal_label'),
+    ).sort(CELL)
+
+
+def kept(rows: pl.DataFrame, minimum: int | None) -> dict:
+    '''The rows and support of the published rows, and those that meet the gate.
+
+    A row meets the gate when its `count` is at least the minimum. A kept row is lenient when
+    its `largest_year_count` is below the minimum. Without a minimum the kept keys are None.
+    '''
+    support = rows['count'].sum()
+    counted = {'rows': rows.height, 'support': support, 'dnb_rows': rows['dnb_label'].sum(),
+               'federal_rows': rows['federal_label'].sum()}
+    if minimum is None:
+        return counted | dict.fromkeys(KEPT_KEYS)
+    meeting = rows.filter(pl.col('count') >= minimum)
+    kept_support = meeting['count'].sum()
+    return counted | {
+        'kept_rows': meeting.height,
+        'kept_row_share': meeting.height / rows.height,
+        'kept_support': kept_support,
+        'kept_support_share': kept_support / support,
+        'lenient_kept_rows': meeting.filter(pl.col('largest_year_count') < minimum).height,
+        'kept_dnb_rows': meeting['dnb_label'].sum(),
+        'kept_federal_rows': meeting['federal_label'].sum(),
+    }
+
+
+def summarize(year_pair_cells: dict[str, pl.DataFrame], rows: pl.DataFrame,
+              distribution: dict) -> dict:
+    '''The curve of each year pair, the family minimum and the kept counts at that minimum.'''
+    year_pairs = {label: curve(cells) for label, cells in year_pair_cells.items()}
+    minimum = family_minimum([found['minimum'] for found in year_pairs.values()])
+    return {
+        'year_pairs': year_pairs,
+        'minimum': minimum,
+        'n_unweighted_distribution': distribution,
+        'published': kept(rows, minimum),
+    }
+
+
+def measure(inputs: Inputs) -> dict:
+    '''The result for an authenticated bundle. The self-checks run before any curve.'''
+    checked = self_check(inputs)
+    year_pair_cells = {
+        f'{base}-{later}': year_cells(checked.eligible, checked.counts, base)
+        for base, later in YEAR_PAIRS}
+    result = summarize(year_pair_cells, published(checked.targets, checked.counts),
+                       checked.distribution)
+    return {
+        'complete': result['minimum'] is not None,
+        'constants': {'level': LEVEL, 'top_band': TOP_BAND, 'min_band_cells': MIN_BAND_CELLS,
+                      'wilson_z': WILSON_Z, 'year_pairs': [list(pair) for pair in YEAR_PAIRS]},
+        'inputs': {'run': inputs.directory.name, 'outputs_sha256': inputs.outputs_sha256,
+                   'files': inputs.files},
+        **result,
+    }
+
+
+def reason_line(reason: str) -> str:
+    return json.dumps({'complete': False, 'reason': reason}, sort_keys=True)
+
+
+def report_unexpected(error: Exception) -> None:
+    '''Write the type of the error and the place of each frame to stderr, never its message.
+
+    The message, `__cause__` and `__context__` can hold a TRIFD or an owner key, so none of
+    them is formatted.
+    '''
+    print(type(error).__name__, file=sys.stderr)
+    for frame in traceback.extract_tb(error.__traceback__):
+        print(f'{frame.filename}:{frame.lineno} in {frame.name}', file=sys.stderr)
+
+
+def main(argv: list[str] | None = None) -> int:
+    '''Print the result as one JSON line. Exit 0 when complete, 1 when not, 2 on a refusal.'''
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument('--data-dir', type=Path, required=True)
+    parser.add_argument('--run', required=True)
+    parser.add_argument('--outputs-sha256', required=True)
+    args = parser.parse_args(argv)
+    try:
+        result = measure(authenticate(args.data_dir, args.run, args.outputs_sha256))
+        line = json.dumps(result, sort_keys=True, allow_nan=False)
+        status = 0 if result['complete'] else 1
+    except Refused as refusal:
+        line, status = reason_line(str(refusal)), 2
+    except Exception as error:
+        report_unexpected(error)
+        line, status = reason_line('unexpected error'), 2
+    print(line)
+    return status
+
+
+if __name__ == '__main__':
+    sys.exit(main())

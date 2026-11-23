@@ -1,14 +1,18 @@
 '''The Stage 22 TRI minimum-count script, on small synthetic cells frames.'''
 
+import ast
 import importlib.util
 import json
+import sys
 from datetime import date
 from pathlib import Path
 
+import httpx
 import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
-from tri_fixtures import rows_frame
+from target_fixtures import forbid_external_access
+from tri_fixtures import V12_RUNS, rows_frame, run_tri_v12
 
 from embedding_data.manifest import sha256_file
 from embedding_data.target_contract import write_targets
@@ -1433,3 +1437,260 @@ def test_excluded_refile_is_no_owner_key_change(script, tmp_path, reason):
     report = json.loads((bundle['directory'] / 'report.json').read_text())
     assert report['owner_key_changes'] == 0
     assert checked(script, bundle) is not None
+
+
+# The kept counts, the result and the command line.
+
+DNB = 'numerator:dnb_key_sensitivity:true'
+FEDERAL = 'numerator:federal_sensitivity:true'
+ROW_SCHEMA = {'count': pl.UInt64, 'largest_year_count': pl.UInt64, 'dnb_label': pl.Boolean,
+              'federal_label': pl.Boolean}
+TARGET_COLUMNS = {'measure': pl.String, 'unit_a': pl.String, 'unit_b': pl.String,
+                  'n_unweighted': pl.UInt64, 'flags': pl.List(pl.String)}
+KEPT_KEYS = ('kept_rows', 'kept_row_share', 'kept_support', 'kept_support_share',
+             'lenient_kept_rows', 'kept_dnb_rows', 'kept_federal_rows')
+RESULT_KEYS = {'complete', 'constants', 'inputs', 'year_pairs', 'minimum',
+               'n_unweighted_distribution', 'published'}
+PAIRS = ('2022-2023', '2023-2024')
+F, T = False, True
+
+
+def rows_of(*rows: tuple) -> pl.DataFrame:
+    '''A `published` frame from (count, largest_year_count, dnb_label, federal_label) tuples.'''
+    return pl.DataFrame(list(rows), schema=ROW_SCHEMA, orient='row')
+
+
+def targets_of(*rows: tuple) -> pl.DataFrame:
+    '''A target frame from (unit_a, unit_b, n_unweighted, flags) tuples.'''
+    return pl.DataFrame([('owner_share', *row) for row in rows], schema=TARGET_COLUMNS,
+                        orient='row')
+
+
+def lenient_records() -> list[dict]:
+    '''Pine and Rock link N1 and N2 in 2022 and 2023. Oak and Elm both link N3 and N4 in 2024.'''
+    return [*pine(2022, ('T1', N1), ('T2', N2)),
+            form(2023, 'T9', N1, 'Rock', ROCK), form(2023, 'T10', N2, 'Rock', ROCK),
+            form(2024, 'T21', N3, 'Oak'), form(2024, 'T22', N4, 'Oak'),
+            form(2024, 'T23', N3, 'Elm'), form(2024, 'T24', N4, 'Elm')]
+
+
+def run_main(script, capsys, bundle, pin=None):
+    '''Call `main` on the bundle: the status, the one parsed line of stdout and stderr.'''
+    status = script.main(['--data-dir', str(bundle['data_dir']), '--run', bundle['run'],
+                          '--outputs-sha256', bundle['pin'] if pin is None else pin])
+    captured = capsys.readouterr()
+    lines = captured.out.splitlines()
+    assert len(lines) == 1 and captured.out == lines[0] + '\n'
+    assert lines[0] == json.dumps(json.loads(lines[0]), sort_keys=True)
+    return status, json.loads(lines[0]), captured.err
+
+
+def without_inputs(result: dict) -> str:
+    return json.dumps({key: value for key, value in result.items() if key != 'inputs'},
+                      sort_keys=True)
+
+
+def test_kept_counts(script):
+    rows = rows_of(*[(1, 1, F, F)] * 2, *[(2, 1, T, F)] * 2, *[(3, 3, F, T)] * 2)
+    assert script.kept(rows, 2) == {
+        'rows': 6, 'support': 12, 'dnb_rows': 2, 'federal_rows': 2, 'kept_rows': 4,
+        'kept_row_share': 4 / 6, 'kept_support': 10, 'kept_support_share': 10 / 12,
+        'lenient_kept_rows': 2, 'kept_dnb_rows': 2, 'kept_federal_rows': 2}
+    assert script.kept(rows, None) == {
+        'rows': 6, 'support': 12, 'dnb_rows': 2, 'federal_rows': 2, **dict.fromkeys(KEPT_KEYS)}
+
+
+def test_lenient_count_reads_every_year(script, tmp_path):
+    found = checked(script, publish(tmp_path, lenient_records()))
+    rows = script.published(found.targets, found.counts)
+    assert rows.height == 4
+    for pair, largest in (((N1, N2), 1), ((N3, N4), 2)):
+        for unit_a, unit_b in (pair, pair[::-1]):
+            row = cell_row(rows, unit_a, unit_b)
+            assert (row['count'], row['largest_year_count']) == (2, largest)
+    result = script.kept(rows, 2)
+    assert (result['kept_rows'], result['lenient_kept_rows']) == (4, 2)
+    for base in (2022, 2023):
+        frame = script.year_cells(found.eligible, found.counts, base)
+        assert set(frame.select('unit_a', 'unit_b').rows()) == {(N1, N2), (N2, N1)}
+
+
+def test_golden_run_exits_zero(script, golden, capsys):
+    status, result, error = run_main(script, capsys, golden)
+    assert (status, error) == (0, '')
+    assert set(result) == RESULT_KEYS
+    assert (result['complete'], result['minimum']) == (True, 1)
+    assert set(result['year_pairs']) == set(PAIRS)
+    for found in result['year_pairs'].values():
+        assert (found['base_cells'], found['testable_cells'], found['recurring_cells']) == (
+            56, 56, 56)
+        assert shape(found['bands']) == [(1, None, 56, 56)]
+        assert found['bands'][0]['rate'] == 1.0
+        assert shape(found['before_downward_merge']) == [(1, 1, 54, 54), (2, None, 2, 2)]
+        assert (found['minimum'], found['reason']) == (1, None)
+    assert result['constants'] == {
+        'level': 0.9, 'top_band': 10, 'min_band_cells': 50, 'wilson_z': 1.959963984540054,
+        'year_pairs': [[2022, 2023], [2023, 2024]]}
+    records = json.loads((golden['directory'] / 'outputs.json').read_text())
+    assert result['inputs'] == {
+        'run': golden['run'], 'outputs_sha256': golden['pin'],
+        'files': {name: records[name]['sha256'] for name in READ_FILES}}
+    assert result['published'] == {
+        'rows': 56, 'support': 58, 'dnb_rows': 2, 'federal_rows': 2, 'kept_rows': 56,
+        'kept_row_share': 1.0, 'kept_support': 58, 'kept_support_share': 1.0,
+        'lenient_kept_rows': 0, 'kept_dnb_rows': 2, 'kept_federal_rows': 2}
+    report = json.loads((golden['directory'] / 'report.json').read_text())
+    assert result['n_unweighted_distribution'] == report['n_unweighted_distribution']
+
+
+def test_changed_codes_exit_one(script, tmp_path, capsys):
+    bundle = publish(tmp_path, code_change_records())
+    status, result, error = run_main(script, capsys, bundle)
+    assert (status, error) == (1, '')
+    assert (result['complete'], result['minimum']) == (False, None)
+    first, second = (result['year_pairs'][label] for label in PAIRS)
+    assert (first['base_cells'], first['testable_cells'], first['recurring_cells']) == (
+        56, 56, 30)
+    assert shape(first['bands']) == [(1, None, 56, 30)]
+    assert (first['minimum'], first['reason']) == (None, 'top_band_misses_level')
+    assert (second['minimum'], second['reason']) == (1, None)
+    published = result['published']
+    assert (published['rows'], published['kept_rows']) == (82, None)
+    assert [published[key] for key in KEPT_KEYS] == [None] * 7
+
+
+def test_too_few_cells_exit_one(script, tmp_path, capsys):
+    records = [*pine(2022, ('T1', N1), ('T2', N2)), *pine(2023, ('T1', N1), ('T2', N2))]
+    status, result, error = run_main(script, capsys, publish(tmp_path, records))
+    assert (status, error) == (1, '')
+    assert (result['complete'], result['minimum']) == (False, None)
+    first, second = (result['year_pairs'][label] for label in PAIRS)
+    assert (first['testable_cells'], first['recurring_cells']) == (2, 2)
+    assert first['bands'][0]['rate'] == 1.0
+    assert (first['minimum'], first['reason']) == (None, 'too_few_testable_cells')
+    assert (second['base_cells'], second['testable_cells']) == (2, 0)
+    assert (second['minimum'], second['reason']) == (None, 'too_few_testable_cells')
+
+
+def test_refusal_prints_only_the_reason(script, golden, capsys):
+    assert run_main(script, capsys, golden, pin='0' * 64) == (
+        2, {'complete': False, 'reason': 'outputs pin differs'}, '')
+
+
+def test_unexpected_error_hides_its_message(script, golden, capsys, monkeypatch):
+    def explode(*args):
+        raise ValueError('parent:Pine T1')
+
+    monkeypatch.setattr(script, 'year_cells', explode)
+    status, result, error = run_main(script, capsys, golden)
+    assert (status, result) == (2, {'complete': False, 'reason': 'unexpected error'})
+    assert 'ValueError' in error
+    for text in (json.dumps(result), error):
+        assert 'Pine' not in text and 'T1' not in text
+
+
+def test_shuffled_facility_years_give_identical_output(script, golden, capsys):
+    _, expected, _ = run_main(script, capsys, golden)
+    pin = forge_table(golden, 'tri_facility_years',
+                      lambda frame: frame.sample(fraction=1.0, shuffle=True, seed=7))
+    status, found, _ = run_main(script, capsys, golden, pin=pin)
+    assert status == 0
+    assert (found['inputs']['files']['tri_facility_years.parquet']
+            != expected['inputs']['files']['tri_facility_years.parquet'])
+    assert without_inputs(found) == without_inputs(expected)
+
+
+def test_two_runs_are_byte_identical(script, golden, capsys):
+    script.main(['--data-dir', str(golden['data_dir']), '--run', golden['run'],
+                 '--outputs-sha256', golden['pin']])
+    first = capsys.readouterr().out
+    script.main(['--data-dir', str(golden['data_dir']), '--run', golden['run'],
+                 '--outputs-sha256', golden['pin']])
+    assert first and capsys.readouterr().out == first
+
+
+def strings_of(value) -> list[str]:
+    '''Every key and string value of a parsed JSON value.'''
+    if isinstance(value, dict):
+        return [text for key, item in value.items() for text in (key, *strings_of(item))]
+    if isinstance(value, list):
+        return [text for item in value for text in strings_of(item)]
+    return [value] if isinstance(value, str) else []
+
+
+@pytest.mark.parametrize('make', (lambda path: publish(path, golden_records()),
+                                  lambda path: publish(path, code_change_records())),
+                         ids=('golden', 'changed-codes'))
+def test_output_holds_no_identifier(script, tmp_path, capsys, make):
+    _, result, _ = run_main(script, capsys, make(tmp_path))
+    found = strings_of(result)
+    assert found
+    names = [f'T{number}' for number in range(1, 25)] + [
+        'Pine', 'Rock', 'Tin', 'Zinc', 'Quartz', 'parent:', 'facility:', NODE_PREFIX]
+    for text in found:
+        assert not any(name in text for name in names), text
+
+
+def tree(root: Path) -> list[tuple[str, str | None]]:
+    '''Every file and directory under the root, with the SHA-256 of each file.'''
+    return sorted((str(path.relative_to(root)), sha256_file(path) if path.is_file() else None)
+                  for path in root.rglob('*'))
+
+
+def test_writes_nothing_under_data_dir(script, golden, capsys):
+    before = tree(golden['data_dir'])
+    assert before
+    assert run_main(script, capsys, golden)[0] == 0
+    assert tree(golden['data_dir']) == before
+
+
+def test_runs_offline(script, golden, capsys, monkeypatch):
+    def no_client(*args, **kwargs):
+        raise AssertionError('the script built an HTTP client')
+
+    forbid_external_access(monkeypatch)
+    monkeypatch.setattr(httpx.Client, '__init__', no_client)
+    monkeypatch.setattr(httpx.AsyncClient, '__init__', no_client)
+    assert run_main(script, capsys, golden)[0] == 0
+
+
+def test_script_imports(script):
+    allowed = {'polars', 'embedding_data.target_contract', 'embedding_data.tri_facility_years',
+               'embedding_data.tri_parent_link_targets'}
+    imports = [node for node in ast.walk(ast.parse(SCRIPT.read_text()))
+               if isinstance(node, (ast.Import, ast.ImportFrom))]
+    assert imports
+    for node in imports:
+        if isinstance(node, ast.Import):
+            modules = [alias.name for alias in node.names]
+        else:
+            assert node.level == 0
+            modules = [node.module]
+        for module in modules:
+            assert (module.partition('.')[0] in sys.stdlib_module_names
+                    or module in allowed), module
+        assert not any(alias.name.startswith('_') for alias in node.names)
+
+
+@pytest.fixture(scope='module')
+def v12(tmp_path_factory):
+    '''One run of the V12 chain, shared by the tests that only read its bundles.'''
+    with pytest.MonkeyPatch.context() as patch:
+        return run_tri_v12(tmp_path_factory.mktemp('minimum-v12'), patch)
+
+
+def test_genuine_chain_bundles_pass_the_checks(script, v12, capsys):
+    results = []
+    for name, run in zip(('first', 'second'), V12_RUNS, strict=True):
+        bundle = {'data_dir': v12['data_dir'], 'run': run, 'pin': v12[f'{name}_pin']}
+        assert v12[name].name == run
+        status, result, error = run_main(script, capsys, bundle)
+        assert (status, error) == (1, '')
+        assert result['complete'] is False
+        assert [result['year_pairs'][label]['reason'] for label in PAIRS] == [
+            'too_few_testable_cells'] * 2
+        results.append(result)
+    first, second = results
+    assert without_inputs(first) == without_inputs(second)
+    records = json.loads((v12['first'] / 'outputs.json').read_text())
+    assert first['inputs']['files']['report.json'] == records['report.json']['sha256']
