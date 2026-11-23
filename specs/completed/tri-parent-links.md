@@ -122,6 +122,10 @@ The design fails, even if it runs, when it:
 - Edits a frozen module or an earlier stage's artifact.
 - Lets any table feed embedder training, curriculum, hard-negative mining or
   model selection (R8.4).
+  *Pointer (owner, P13, 2026-11-23): Section 6 of
+  [the evaluation protocol](../evaluation-protocol.md) lets selection for
+  naics-embedder's relatedness artifact read the validation part of the parent
+  links (P8). This anti-goal is not reworded.*
 
 ## What the design session found
 
