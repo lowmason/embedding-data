@@ -45,6 +45,7 @@ Choices made:
 - Resume after Stage 14 (owner, 2026-11-22, "Approve as drafted"): Stage 14's Leaves out becomes O25 (USAspending hardening) and O26 (USAspending headline minimum count). Track C ranks O25, O26, O18, as Track B does. O25 becomes Stage 20. It goes first for the reason O12 did: a change to a file in `vendor_link_bundle.SOFTWARE_FILES` (26 files, among them `pyproject.toml`, `uv.lock` and `sam_raw.py`) makes `verify` refuse Stage 14's run (plan 15, Handoff). D2 stays: a blank or invalid last update date makes a firm `dnb_era_record`, so 6,403 firms get no industry (`specs/naics-evaluation-data-stage-14-findings.md`, "The cost of D2"). The live `acquire-sam-extract` request stays deferred (`specs/deferred_items.md`, section `15-usaspending-vendor-links`).
 - Resume after Stage 20 (owner, 2026-11-22, "Approve"): Track C keeps its ranking, O26 then O18. O26 becomes Stage 21. Stage 20 found the replay equal to Stage 14's run, with both `verify` runs passing. Its replay build took 25.83 s and 966 MB (`specs/findings/stage-14-usaspending-vendor-links.md`, "Measured cost").
 - Resume after Stage 18 (owner, 2026-11-22, "Approve as drafted"): Track B keeps its ranking, O13 then O17. O13 becomes Stage 22. Stage 18 found the replay equal to Stage 5's run, with both `verify` runs passing. Its replay build took 4.83 s and 1,475 MB, and another session's test run may have loaded it. Only the replay's `verify` (3.14 s, 1,509 MB) started on an idle host (`specs/findings/stage-5-tri-parent-links.md`, "Measured cost"). No other stage entry changed: plan 18's Handoff names only O13, O17 and its traps.
+- Resume after Stages 19 and 21 (owner, 2026-11-23, "Approve as drafted"): Tracks C and H keep their rankings. O18 becomes Stage 23 and O24 becomes Stage 24, so both Ranked lists are empty. Stage 21 set two minimums, 4 for `supplier_share` and 3 for `buyer_share`, in 0.36 s and 0.28 GB per run. Stage 19 set a minimum of 400 headline earners per category in 3.27 s and 3.06 GB per run (both decision records, "Run"). Stage 23 consumes Stage 16's section. The two USAspending shares are directional relatedness shares like ITA co-ownership, and Stage 16 settles the open questions for that shape (protocol, "Families with no section"). Stage 23 is therefore not ready until Stage 16 ticks. Stage 24 is ready, and naics-embedder's wage panel spec is not among its Consumes. Stages 16, 23 and 24 all edit `specs/evaluation-protocol.md`, so parallel sessions on them can conflict in that file. Plans 17 and 19 name only O24 and O18 in their Handoffs, so no other stage entry changed.
 
 | # | Outcome | Track | Rank | Cost (estimate; basis) |
 |---|---|---|---|---|
@@ -106,7 +107,8 @@ promoted Track B item, follows Track A's Stages 3 and 4 (owner, 2026-11-16). Fro
 2026-11-18 the tracks run in parallel (see Choices made). Stage numbers name stages and
 do not set an order. Stages 18 and 19 were promoted from the Ranked lists of Tracks B and H
 on 2026-11-22, Stages 20 and 21 from Track C's later that day, and Stage 22 from Track B's
-after Stage 18 (see Choices made).
+after Stage 18. Stages 23 and 24 came from the Ranked lists of Tracks C and H on 2026-11-23
+(see Choices made).
 
 - [x] Stage 1: ITA NAICS targets, first build
       Objective: Plan 11's bundle is built once on real ITA data and verified.
@@ -294,6 +296,26 @@ after Stage 18 (see Choices made).
       Leaves out: the TRI protocol section → O17. The R8.4 training-role amendment → a separate owner decision after naics-embedder's spec (reset prompt, Leave alone)
       ROUTING: brainstorming
 
+- [ ] Stage 23: Evaluation-protocol section for the USAspending vendor links
+      Objective: The evaluation protocol gets a section for the USAspending vendor links, framed like Stage 16's section for ITA co-ownership.
+      Outcomes: O18
+      Track: C
+      Consumes: Stage 16's owner-approved section for ITA co-ownership in `specs/evaluation-protocol.md`, as the model for a directional relatedness share (Resolved at resume, 2026-11-23: owner). The decision record `specs/findings/v9-usaspending-minimum-counts.md`, the amended R7.3 and V9 of `specs/embedding-evaluation-data-spec.md`, and the rule commit and traps that plan 19's Handoff names (plan 19, Handoff). Stage 14's runs `stage14_vendor_links_20261122_r2` and `stage14_vendor_links_20261122_r2_replay` with their detached pins, the Stage 20 acceptance finding `specs/findings/stage-14-usaspending-vendor-links.md`, and "For the resume and O18" of `specs/naics-evaluation-data-stage-14-findings.md` (plan 16, Handoff; plan 15, Handoff). `specs/evaluation-protocol.md` (Section 1, "Families with no section", "What this repository does not decide"). "Rules for every new family" of the Stage 2 spec `specs/uncovered-uses-evidence-sources.md`
+      Produces: an owner-approved, committed section in `specs/evaluation-protocol.md` for the USAspending family. `specs/naics-evaluation-data-stage-23-findings.md`
+      Exit: O18: the committed protocol has a section for the USAspending family that states the evidence (which runs, pins and Stage 21 minimums to read), the assignment (who decides the split) and the conditions this repository keeps, as Section 1 and Stage 16's section do. It names who decides the scores. The findings file records the stage's measured cost in sessions. No source file, test or data file changed
+      Leaves out: the scores, their intervals, the margin and the adoption decision, if they stay with naics-embedder (protocol, "What this repository does not decide"). A changed D2 rule and the live `acquire-sam-extract` request → `specs/deferred_items.md`. The R8.4 training-role amendment → a separate owner decision after naics-embedder's spec (reset prompt, Leave alone)
+      ROUTING: brainstorming
+
+- [ ] Stage 24: Evaluation-protocol section for the ACS wage microdata
+      Objective: The evaluation protocol gets a section for the ACS wage microdata, framed like Section 1.
+      Outcomes: O24
+      Track: H
+      Consumes: the decision record `specs/findings/v9-acs-wage-minimum-earners.md`, with its published column and the traps that plan 17's Handoff names (plan 17, Handoff). Stage 17's runs `stage17_acs_wage_microdata_20261119_r1` and `stage17_acs_wage_microdata_20261119_r1_replay` with their detached pins, `specs/naics-evaluation-data-stage-17-findings.md`, the four owner-tagged paragraphs of `specs/embedding-evaluation-data-spec.md` (R7.2, R7.4, R8.1, R8.4) and their traps (plan 14, Handoff). The spec `specs/completed/acs-wage-microdata.md` (Non-goals, "Handoff to naics-embedder"). `specs/evaluation-protocol.md`, approved 2026-11-18 (Section 1, "Families with no section", "What this repository does not decide"). naics-embedder's wage panel spec is not a Consumes: the section names it as the place that decides the scores (Resolved at resume, 2026-11-23: owner)
+      Produces: an owner-approved, committed section in `specs/evaluation-protocol.md` for the ACS wage microdata. `specs/naics-evaluation-data-stage-24-findings.md`
+      Exit: O24: the committed protocol has a section for the ACS wage microdata that states the evidence (which runs, pins and Stage 19 minimum to read), the assignment (which part selects and which part judges, R8.4) and the conditions this repository keeps, including the in-place read under R8.1, as Section 1 does. It names who decides the scores. The findings file records the stage's measured cost in sessions. No source file, test or data file changed
+      Leaves out: the wage panel and its scores → naics-embedder's panel spec (spec `specs/completed/acs-wage-microdata.md`, Non-goals and "Handoff to naics-embedder")
+      ROUTING: brainstorming
+
 ## Ranked list — Track B
 
 Owner's order after Stage 2 (2026-11-16), with ranks restarted on 2026-11-18. O7 and O8
@@ -305,9 +327,7 @@ uncovered and parked in `specs/deferred_items.md`.
 ## Ranked list — Track C
 
 Owner's order at the resume after Stage 14 (2026-11-22). O25 left the list as Stage 20, and O26
-as Stage 21 (owner, 2026-11-22).
-
-1. O18 — USAspending protocol section. Design sessions only, after Stage 14's real build
+as Stage 21 (owner, 2026-11-22). O18 left it as Stage 23 (owner, 2026-11-23). The list is empty.
 
 ## Ranked list — Track D
 
@@ -324,9 +344,8 @@ as Stage 21 (owner, 2026-11-22).
 ## Ranked list — Track H
 
 The order that `specs/completed/acs-wage-microdata.md` ("Roadmap placement") proposed, ranked by the
-owner on 2026-11-18. O23 left the list as Stage 19 (owner, 2026-11-22).
-
-1. O24 — ACS wage microdata protocol section. Design sessions only, after Stage 17's real build and O23
+owner on 2026-11-18. O23 left the list as Stage 19 (owner, 2026-11-22), and O24 as Stage 24
+(owner, 2026-11-23). The list is empty.
 
 Track E has no Ranked list. Its one outcome is Stage 16.
 
