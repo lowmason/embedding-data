@@ -1,4 +1,4 @@
-The deliverable map, as of 2026-11-19 at `8b25f4b`. Stage numbers refer to [the roadmap](naics-evaluation-data-roadmap.md). A stage is "ready" when its `Consumes` are met:
+The deliverable map, as of 2026-11-22 at `1bdf302`. Stage numbers refer to [the roadmap](naics-evaluation-data-roadmap.md). A stage is "ready" when its `Consumes` are met:
 
 | embedding-data deliverable | Status | 1. Relatedness | 2. Text→code | 3. Economic | Still blocked by |
 |---|---|---|---|---|---|
@@ -8,10 +8,10 @@ The deliverable map, as of 2026-11-19 at `8b25f4b`. Stage numbers refer to [the 
 | ACS staffing patterns | On hold (three failed full builds). Roadmap Stage 9, ready | **Yes** | No | No | Stage 9: the cause of the failed builds, then its build. Its count gate is old Stage 13, deferred |
 | ACS workplace area mix | On hold. Roadmap Stage 9, ready | **Yes** | No | No | Stage 9, then its count gate (old Stage 13, deferred) |
 | ACS and CPS worker profiles | Deferred (old Stage 12) | **Yes** | No | Possible later wage panel (my inference) | Roadmap Stages 9 and 11 first. Then its build and its count gate |
-| ACS wage microdata (person level) | Built and replayed (Stage 17). No count gate yet (O23) | No | No | **Yes.** It judges and never trains (R8.4). naics-embedder reads it in place on this machine under its pin (R8.1) | Its section in [the evaluation protocol](evaluation-protocol.md) (O24), its count gate (O23) and naics-embedder's wage panel spec |
+| ACS wage microdata (person level) | Built and replayed (Stage 17). No count gate yet. Roadmap Stage 19 (O23) in progress: its spec and plan 17 are approved | No | No | **Yes.** It judges and never trains (R8.4). naics-embedder reads it in place on this machine under its pin (R8.1) | Stage 19 (its count gate). Its section in [the evaluation protocol](evaluation-protocol.md) (O24) and naics-embedder's wage panel spec |
 | CPS job-change flows | Not started. Roadmap Stage 11, ready | **Yes** | No | No | Stage 11: the 2026 meaning of `9890`, then its build. Its count gate is old Stage 13, deferred |
-| EPA TRI parent links | Not built. Roadmap Stage 5, ready | **Yes** | No | No | Stage 5. Its count gate is outcome O13, on the Ranked list |
-| USAspending subawards with SAM.gov NAICS | Built (Stage 14, 2026-11-22), run `stage14_vendor_links_20261122_r2`. Not replayed. No count gate yet | **Yes** | No | No | The resume after Stage 14 (replay check, acceptance finding, headline minimum count, the D2 rule). Its section in [the evaluation protocol](evaluation-protocol.md) (O18). R8.4, if it trains |
+| EPA TRI parent links | Built (Stage 5, 2026-11-21) and replayed (Stage 18, 2026-11-22), runs `stage5_tri_parent_links_20261121_r1` and `_r1_replay`. No count gate yet | **Yes** | No | No | Its count gate (O13, on the Ranked list). Its section in [the evaluation protocol](evaluation-protocol.md) (O17). R8.4, if it trains |
+| USAspending subawards with SAM.gov NAICS | Built (Stage 14) and replayed (Stage 20), both 2026-11-22, runs `stage14_vendor_links_20261122_r2` and `_r2_replay`. No count gate yet. Roadmap Stage 21 (O26) in progress: its spec and plan 19 are approved | **Yes** | No | No | Stage 21 (its count gate). Its section in [the evaluation protocol](evaluation-protocol.md) (O18). R8.4, if it trains |
 | BEA input–output tables | Not built. Roadmap Stage 15, ready | **Yes, non-headline** | No | No | Stage 15 |
 | ACS commuting and migration flows, CPS state migration | ACS flows: on hold, in Stage 9's scope. CPS state migration: deferred (old Stage 12) | No (geography embedder only) | No | No | Not applicable |
 | NAICS 2022 node, edge and path tables | Built | Join key only | Join key only | No | Nothing |

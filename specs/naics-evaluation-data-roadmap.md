@@ -44,6 +44,7 @@ Choices made:
 - Resume after Stages 5 and 17 (owner, 2026-11-22, "Approve"): Tracks B and H keep their rankings. O12 becomes Stage 18 and O23 becomes Stage 19. O12 goes first in Track B because a change to a file in `tri_bundle.SOFTWARE_FILES` (it includes `pyproject.toml`, `uv.lock` and the shared Stage 4 to 6 modules) makes `verify` refuse Stage 5's run, so the replay can no longer be compared with it (plan 13, Handoff). Both Stage 17 gate readings stand (Stage 19, Consumes).
 - Resume after Stage 14 (owner, 2026-11-22, "Approve as drafted"): Stage 14's Leaves out becomes O25 (USAspending hardening) and O26 (USAspending headline minimum count). Track C ranks O25, O26, O18, as Track B does. O25 becomes Stage 20. It goes first for the reason O12 did: a change to a file in `vendor_link_bundle.SOFTWARE_FILES` (26 files, among them `pyproject.toml`, `uv.lock` and `sam_raw.py`) makes `verify` refuse Stage 14's run (plan 15, Handoff). D2 stays: a blank or invalid last update date makes a firm `dnb_era_record`, so 6,403 firms get no industry (`specs/naics-evaluation-data-stage-14-findings.md`, "The cost of D2"). The live `acquire-sam-extract` request stays deferred (`specs/deferred_items.md`, section `15-usaspending-vendor-links`).
 - Resume after Stage 20 (owner, 2026-11-22, "Approve"): Track C keeps its ranking, O26 then O18. O26 becomes Stage 21. Stage 20 found the replay equal to Stage 14's run, with both `verify` runs passing. Its replay build took 25.83 s and 966 MB (`specs/findings/stage-14-usaspending-vendor-links.md`, "Measured cost").
+- Resume after Stage 18 (owner, 2026-11-22, "Approve as drafted"): Track B keeps its ranking, O13 then O17. O13 becomes Stage 22. Stage 18 found the replay equal to Stage 5's run, with both `verify` runs passing. Its replay build took 4.83 s and 1,475 MB, and another session's test run may have loaded it. Only the replay's `verify` (3.14 s, 1,509 MB) started on an idle host (`specs/findings/stage-5-tri-parent-links.md`, "Measured cost"). No other stage entry changed: plan 18's Handoff names only O13, O17 and its traps.
 
 | # | Outcome | Track | Rank | Cost (estimate; basis) |
 |---|---|---|---|---|
@@ -104,7 +105,8 @@ first answer. The owner approved this partition on 2026-11-16. Stage 5, the firs
 promoted Track B item, follows Track A's Stages 3 and 4 (owner, 2026-11-16). From
 2026-11-18 the tracks run in parallel (see Choices made). Stage numbers name stages and
 do not set an order. Stages 18 and 19 were promoted from the Ranked lists of Tracks B and H
-on 2026-11-22, and Stages 20 and 21 from Track C's later that day (see Choices made).
+on 2026-11-22, Stages 20 and 21 from Track C's later that day, and Stage 22 from Track B's
+after Stage 18 (see Choices made).
 
 - [x] Stage 1: ITA NAICS targets, first build
       Objective: Plan 11's bundle is built once on real ITA data and verified.
@@ -232,7 +234,7 @@ on 2026-11-22, and Stages 20 and 21 from Track C's later that day (see Choices m
 > Stage 17: COMPLETE (2026-11-19) — implemented by plan 14 (specs/plans/completed/14-acs-wage-microdata.md). Its Handoff section names what O23 and O24 consume.
 > Next: resume the roadmap.
 
-- [ ] Stage 18: TRI parent links, hardening
+- [x] Stage 18: TRI parent links, hardening
       Objective: Stage 5's TRI bundle gets its exact replay check, a long-form acceptance finding and README and CLAUDE.md run pins.
       Outcomes: O12
       Track: B
@@ -241,6 +243,8 @@ on 2026-11-22, and Stages 20 and 21 from Track C's later that day (see Choices m
       Exit: O12: `verify` of Stage 5's run with its detached pin passes from Stage 18's checkout and venv. The replay bundle's `verify` with its own detached pin passes, and `compare-runs` against Stage 5's run reports equal. The acceptance finding is committed and records the replay run ID, its pin, and the wall time, maximum RSS and bundle size of the replay. README and CLAUDE.md name the selected TRI runs and their pins
       Leaves out: the TRI headline minimum count → O13. The TRI protocol section → O17. The R8.4 training-role amendment → a separate owner decision after naics-embedder's spec (reset prompt, Leave alone)
       ROUTING: writing-plans
+> Stage 18: COMPLETE (2026-11-22) — implemented by plan 18 (specs/plans/completed/18-tri-parent-links.md). Its Handoff section names what O13 and O17 consume.
+> Next: resume the roadmap.
 
 - [ ] Stage 19: Minimum headline earners for the ACS wage microdata
       Objective: A minimum number of headline earners for each category is set from Stage 17's built counts.
@@ -275,14 +279,23 @@ on 2026-11-22, and Stages 20 and 21 from Track C's later that day (see Choices m
       Leaves out: the USAspending protocol section → O18. A changed D2 rule and the live `acquire-sam-extract` request → `specs/deferred_items.md`. The R8.4 training-role amendment → a separate owner decision after naics-embedder's spec (reset prompt, Leave alone)
       ROUTING: brainstorming
 
+- [ ] Stage 22: Headline minimum count for the TRI family
+      Objective: A headline minimum count for the TRI parent-link targets is set from their observed counts.
+      Outcomes: O13
+      Track: B
+      Consumes: `report.json` of `stage5_tri_parent_links_20261121_r1` (detached pin `65159b8374d36beec136ae6a7779a5763bf8ced9360e2a365b67b138e10b7f8b`), whose bytes equal those of the replay `stage5_tri_parent_links_20261121_r1_replay` (detached pin `555f6b58099da43c054d828d27048f31a9e992ee32719c7e1462c59b30919cfc`), with its `n_unweighted_distribution` (plan 18, Handoff; plan 13, Handoff). That key summarizes the 14,204 cells of the one target table, `tri_parent_links`, by quantiles and thresholds only. The per-cell counts are the `n_unweighted` column of that table. The sections "Counts" and "For O12, O13 and O17" of `specs/naics-evaluation-data-stage-5-findings.md`. The Stage 18 finding `specs/findings/stage-5-tri-parent-links.md` adds no counts. The O4 decision `specs/findings/v9-ita-naics-minimum-counts.md` as the model, and "Rules for every new family" of the Stage 2 spec `specs/uncovered-uses-evidence-sources.md`. Not measured: how many `naics_*` facility-years name more than one parent (plan 18, Handoff). Traps: a change to any of the 24 files in `tri_bundle.SOFTWARE_FILES`, the Python build or the installed distributions makes `verify` refuse both runs. `verify` costs about 1.5 GB and counts as a full-data command under the Host rule (plan 18, Handoff)
+      Produces: a committed minimum-count decision for the TRI family
+      Exit: O13: a committed decision sets the headline minimum count from the observed `n_unweighted` distribution of the `tri_parent_links` target. It reports how many cells meet it. The published bundles keep `size_gate_pending`
+      Leaves out: the TRI protocol section → O17. The R8.4 training-role amendment → a separate owner decision after naics-embedder's spec (reset prompt, Leave alone)
+      ROUTING: brainstorming
+
 ## Ranked list — Track B
 
 Owner's order after Stage 2 (2026-11-16), with ranks restarted on 2026-11-18. O7 and O8
-left the list as Stage 5, and O12 as Stage 18 (owner, 2026-11-22). O11 is uncovered and
-parked in `specs/deferred_items.md`.
+left the list as Stage 5, O12 as Stage 18 and O13 as Stage 22 (owner, 2026-11-22). O11 is
+uncovered and parked in `specs/deferred_items.md`.
 
-1. O13 — TRI minimum count. Small: one pass over its counts
-2. O17 — TRI protocol section. Design sessions only, after Stage 5's real build
+1. O17 — TRI protocol section. Design sessions only, after Stage 5's real build
 
 ## Ranked list — Track C
 
