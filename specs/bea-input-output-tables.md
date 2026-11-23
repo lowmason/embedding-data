@@ -109,7 +109,7 @@ Read on 2026-11-23 from public HTML pages. No BEA file was fetched.
    ([BEA](https://www.bea.gov/data/industries/input-output-accounts-data)). No
    2022 benchmark release date was found.
 2. **The annual detail is coarser.** Annual underlying detail tables have 138
-   industries, not 402 *(unverified: search summary; BEA's
+   industries, not 402 *(unverified: search summary. BEA's
    [underlying estimates](https://www.bea.gov/node/22626) page, read directly,
    does not state it)*. If so, the 2017 benchmark is the only table near
    six-digit NAICS.
@@ -272,7 +272,7 @@ alternate, and the Stage 2 spec's verdict table is amended.
 
 | Check | Measures and records | Stops the stage when |
 |---|---|---|
-| **E1** concordance and layout | The concordance's sheets, header row and NAICS edition. Its depth: NAICS codes by digit count. Its markers, if any, for partial membership. Its rows for special codes, and which have no NAICS member. NAICS codes listed under more than one BEA code. The Use table's sheet name, header rows, commodity and industry code lists, final-demand columns, value-added rows and total codes. The zero marker. Negative cells. For each commodity row and industry column, the gap between the published total and the sum of the published cells. Whether every Use table code is in the concordance. Whether every NAICS 2017 code in the concordance is in `naics_native_nodes.parquet`. | The concordance names a NAICS edition other than 2017. A Use table code is missing from the concordance. A concordance NAICS code is not an official NAICS 2017 code. More than 5% of BEA codes have no NAICS member (**my call:** a trigger to ask the owner, not an acceptance threshold). The largest total gap exceeds the rounding bound of [Validation](#validation). No 2017 detail Use table before redefinitions at producer value with about 402 industries exists. |
+| **E1** concordance and layout | The concordance's sheets, header row and NAICS edition. Its depth: NAICS codes by digit count. Its markers, if any, for partial membership. Its rows for special codes, and which have no NAICS member. NAICS codes listed under more than one BEA code. The Use table's sheet name, header rows, commodity and industry code lists, final-demand columns, value-added rows and total codes. The zero marker. Negative cells. For each commodity row and industry column, the gap between the published total and the sum of the published cells. Whether every Use table code is in the concordance. Whether every NAICS 2017 code in the concordance is in `naics_native_nodes.parquet`. | The concordance names a NAICS edition other than 2017. A concordance entry has a form other than a plain code or a plain code with a partial marker (see [Code table](#code-table)). A concordance NAICS code is not an official NAICS 2017 code. More than 5% of BEA codes have no NAICS member (**my call:** a trigger to ask the owner, not an acceptance threshold). The largest total gap exceeds the rounding bound of [Validation](#validation). No 2017 detail Use table before redefinitions at producer value with about 402 industries exists. |
 | **E2** terms | BEA's reuse terms or public-domain statement for the tables and its date (read). Its citation guidance (read). | A BEA statement restricts publishing aggregates. A failed terms check never becomes "build it but keep the aggregates local" (Stage 2 rule). |
 | **E3** 2022 benchmark | BEA's published schedule for the 2022 benchmark, if any (read). Whether any 2022 detail table has been released. | BEA has released 2022 detail Use tables. The owner then chooses between 2017 and 2022. **My call:** a scheduled but unreleased date is recorded and does not stop the stage. |
 
@@ -284,7 +284,8 @@ table as a commodity row or an industry column, sorted by `bea_code`:
 | Column | Type | Meaning |
 |---|---|---|
 | `bea_code` | String | BEA detail code, as published |
-| `title` | String | BEA's title, from the concordance |
+| `title` | String | BEA's title, from the Use table's own label |
+| `commodity_unit`, `industry_unit` | String | The `unit_a` and `unit_b` strings of [Target rows](#target-rows), or null where the code does not appear in that role |
 | `is_commodity`, `is_industry` | Boolean | Where the code appears in the Use table |
 | `naics_2017_published` | List(String) | The NAICS codes BEA's concordance lists, as published, sorted |
 | `naics_2017_candidates` | List(String) | Six-digit NAICS 2017 national-industry node IDs, sorted |
@@ -293,6 +294,16 @@ table as a commodity row or an industry column, sorted by `bea_code`:
 
 Rules:
 
+- **My call:** the title comes from the Use table, so every code has one even
+  if the concordance leaves it out. A Use table code that the concordance does
+  not list gets empty candidate sets and the flags `not_in_concordance` and
+  `no_naics_member`. It is expected data, such as a special code, not a
+  failure. E1 lists these codes for the owner.
+- **My call:** a concordance entry is parsed only in two forms: a plain NAICS
+  code, or a plain NAICS code with the partial marker that E1 records. A range,
+  an exclusion, a wildcard or any other form stops the stage at E1 for an
+  owner decision, because expanding it would compute a set that BEA did not
+  list. "n.a." or a blank, if E1 records it, means no member.
 - A published six-digit code is its own NAICS 2017 candidate. A shorter code
   becomes the set of NAICS 2017 national industries whose node sits under it
   in `naics_native_nodes.parquet`. NAICS defines its own hierarchy by code
@@ -337,9 +348,15 @@ One row for each nonzero published cell and each of three measures:
 | `source` | `bea_io` |
 | `family` | `bea_io_use` |
 | `unit_a_type` | `bea_commodity_2017_detail` |
-| `unit_a` | Commodity `c`, as a BEA code |
+| `unit_a` | `feature:bea_commodity_2017_detail:<c>`, where `<c>` is the BEA code |
 | `unit_b_type` | `bea_industry_2017_detail` |
-| `unit_b` | Industry `j`, as a BEA code |
+| `unit_b` | `feature:bea_industry_2017_detail:<j>`, where `<j>` is the BEA code |
+
+**My call on unit strings:** `target_contract.valid_unit` accepts a typed
+`feature:<kind>:<value>` string, or a `naics`, `soc` or `geography` node ID. A
+BEA code is neither a NAICS node nor a geography, so the `feature:` form keeps
+`valid_unit` unchanged and adds no third exception to the contract. The code
+table gives each BEA code its two unit strings, so a reader joins on them.
 | `measure` | `use_value_usd_millions`, `input_share` or `customer_share` |
 | `value` | `U(c,j)`, `U(c,j)/T_j` or `U(c,j)/T_c` |
 | `se`, `se_method` | null, `none` |
@@ -357,6 +374,10 @@ Flags on every row: `count_not_published`, `non_headline`,
 - `diagonal`: `unit_a` equals `unit_b`. An industry buying its own main
   commodity is observed and kept. A reader may drop it.
 - `negative_value`: `U(c,j)` is negative.
+- `share_outside_unit_interval`: a share lies below 0 or above 1. A positive
+  cell can exceed its total when other cells in its line are negative, or by
+  rounding in a short line. **My call:** this is flagged data, not a failure.
+  The total-gap check already catches a misread line.
 - `share_denominator_not_positive`: the share's published total is zero or
   negative. The share `value` is then null. **My call:** the row stays, so
   the three measures keep the same cells.
@@ -380,17 +401,20 @@ publishes no standard errors or counts."
 
 ### Totals table
 
-`bea_io_totals.parquet` keeps, as published, every total row and column, every
-final-demand column, and every value-added row of the Use table, long form,
-sorted by `bea_code`, `item_code`:
+`bea_io_totals.parquet` keeps, as published, every nonblank cell of the Use
+table that is not a commodity × industry cell. These are the total rows and
+columns, the final-demand columns, the value-added rows and the corner cells
+where two of them meet. Long form, sorted by `row_code`, `column_code`:
 
 | Column | Type | Meaning |
 |---|---|---|
-| `bea_code` | String | The commodity or industry |
-| `role` | String | `commodity` or `industry` |
-| `item_code` | String | BEA's code for the total, the final-demand column or the value-added row |
-| `item_title` | String | BEA's title |
+| `row_code`, `column_code` | String | BEA's codes for the cell's row and column |
+| `row_title`, `column_title` | String | BEA's labels |
+| `row_role`, `column_role` | String | `commodity`, `industry`, `final_demand`, `value_added` or `total` |
 | `value` | Float64 | Millions of dollars, as published |
+
+**My call:** two role columns hold the corner cells with no special case. The
+roles come from the layout registry that E1 records.
 
 A reader can rescale a share to total use or total output from this table,
 with no rebuild. No value in it becomes a target row.
@@ -422,7 +446,8 @@ The build fails when:
   cells summed. A larger gap means a misread row or column.
 - A code is duplicated, a code in the Use table is missing from the code
   table, or the three measures do not cover the same cells.
-- A share lies outside `[0, 1]` on a row with no `negative_value` flag.
+- A share lies outside `[0, 1]` and the row has no
+  `share_outside_unit_interval` flag.
 
 ## Bundle, commands and provenance
 
