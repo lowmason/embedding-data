@@ -304,7 +304,7 @@ def test_membership_types_cover_each_marker_and_separator():
     assert membership_types('Pts. 311811, 311812', naics) == ['part', 'several']
     assert membership_types('311811 and 311812', naics) == ['several']
     assert membership_types('311811,311812', naics) == ['several']
-    assert membership_types('311811 , 311812', naics) == ['several']
+    assert membership_types('311811 ,311812', naics) == ['several']
     assert membership_types('311811, pt. 311812', naics) == ['part', 'several']
     assert membership_types('Part of 31, 32, 33', naics) == ['group', 'part']
     assert membership_types(' 311811 ', naics) == ['whole']
