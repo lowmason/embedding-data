@@ -1401,3 +1401,9 @@ def test_the_earlier_check_refuses_first(script, golden, index):
     later(golden)
     pin = earlier(golden)
     assert refusal(script, golden, pin=pin) == reason
+
+
+@pytest.mark.parametrize('name', READ_FILES)
+def test_changed_content_is_never_parsed(script, golden, name):
+    (golden['directory'] / name).write_bytes(b'garbage')
+    assert refusal(script, golden) == f'{name} differs from its inventory'
