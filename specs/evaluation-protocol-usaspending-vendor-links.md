@@ -1,11 +1,14 @@
 # Evaluation protocol, Section 5: USAspending vendor links
 
 Status: PROPOSED (2026-11-23). Written in a brainstorming session. The section text is Section 5
-of [the evaluation protocol](evaluation-protocol.md), with its own Status PROPOSED.
+of [the evaluation protocol](evaluation-protocol.md), with its own Status PROPOSED. A builder
+check raised three points. One was the owner's to rule (P11). The other two are folded in as my
+calls: the decision id P10, and an Assignment that names "the relatedness spec, or the spec to
+which it assigns the family".
 
 Roadmap: `specs/naics-evaluation-data-roadmap.md`, Stage 23 (Track C, O18). The design adds
 Section 5 to [the evaluation protocol](evaluation-protocol.md). This file holds its provenance,
-the owner's decision, the measurements and the pointer edits. The protocol file holds the rules.
+the owner's decisions, the measurements and the pointer edits. The protocol file holds the rules.
 
 ## Design provenance
 
@@ -33,11 +36,14 @@ naics-embedder has no spec that assigns this family at `2b2029c`. The roadmap re
 the place that assigns and scores the family, and the family stays unscored until the owner
 names that spec at a commit.
 
-**Owner decision (2026-11-23).** The id continues from P4–P7 of the Stage 16 spec.
+**Owner decisions (2026-11-23).** The ids P4–P7 are the Stage 16 spec's. The Stage 25 design
+(TRI, branch `docs/stage-25-tri-protocol`) proposes P8 and P9, so these decisions are P10 and P11
+whatever the merge order (my call).
 
 | Id | Question | Decision |
 | --- | --- | --- |
-| P8 | Which roles does the section grant: judge only, or judge and select (as co-ownership's CO3)? | "Judge only". No part of the family selects. The R8.4 exclusion stays whole |
+| P10 | Which roles does the section grant: judge only, or judge and select (as co-ownership's CO3)? | "Judge only". No part of the family selects. The R8.4 exclusion stays whole |
+| P11 | The relatedness spec (§4.6) picks each judging family's reference and margin from reads on its validation part, and tests a late-joining family on validation before the opening. Under P10, how does the family count in the decision: (A) report only, outside the test; (B) everything at the opening; (C) a validation part read by the reference arms only? | "B: all at the opening". No part is read before the opening. Inside it, the reference arms are scored first, fixed rules pick the reference and set the margin, and only then are candidates scored |
 
 The owner also confirmed the approach: one thin section in the protocol, with the design
 history in this file ("Yes, write it").
@@ -66,9 +72,11 @@ the section must change for a read to begin.
 
 **Goals.**
 
-1. State the family's one role: it judges and never selects or trains (P8).
-2. Assign the split, the null model, the scores and the treatment of absent and diagonal cells
-   to naics-embedder's relatedness spec, once the owner names it here.
+1. State the family's one role: it judges and never selects or trains (P10). It counts in the
+   decision through one opening, with the reference and the margin set inside it (P11).
+2. Assign the split of the reports, the null model, the scores, the reference and margin rules
+   and the treatment of absent and diagonal cells to naics-embedder's relatedness spec, or the
+   spec to which it assigns the family, once the owner names it here.
 3. Name the run, the pin, the two table hashes and the two count gates that a read uses.
 4. State which families measure the same relation (CO7, AM4).
 
@@ -99,9 +107,16 @@ the section must change for a read to begin.
 For the roles, the owner weighed judge only against a CO3-style grant, in which the validation
 part selects for the relatedness artifact. Judge only keeps the R8.4 exclusion whole, matches the
 relatedness spec's rule that selection reads co-ownership's validation part only (§4.1, from
-U43), and grants
-nothing that no consumer has asked for. A later amendment can add a grant. A grant cannot be
-taken back after a read has used it.
+U43), and grants nothing that no consumer has asked for. A later amendment can add a grant. A
+grant cannot be taken back after a read has used it.
+
+For the decision, the owner weighed three ways (P11):
+
+| Way | What it does | Trade-off | Decision |
+| --- | --- | --- | --- |
+| A. Report only | The family is scored once at the opening, outside the pass/fail test. | Keeps P10 with no change in naics-embedder, but the family never decides anything. | Rejected |
+| B. All at the opening | No part is read before the opening. Fixed rules pick the reference and set the margin from the reference arms' scores inside the opening, before any candidate is scored. | The whole family judges, so the test has twice the data of a half split. The reference arms are deterministic and untrained, so a candidate cannot tune toward them. naics-embedder must adapt its margin rule for this family. | **Chosen** (owner) |
+| C. Reference-only validation | A validation part is read by the reference arms only, to pick the reference and fix the margin. | Closer to naics-embedder's machinery, but it halves the judging data, and the late-join validation test of candidates must still go. | Rejected |
 
 ## Design
 
@@ -128,7 +143,9 @@ below are the design choices behind it.
 
 ### Measurements
 
-Read-only, on 2026-11-23, with no embedder output read. The scripts lived outside the repository.
+Read-only, on 2026-11-23, with no embedder output read. The scripts were throwaway and lived
+outside the repository (my call: no code enters this stage). Each count follows from the rules
+stated here, the V9 minimums and the split rule of the Stage 16 spec, so it can be redone.
 
 1. The SHA-256 of `outputs.json`, `vendor_links.parquet` and `vendor_link_marginals.parquet` was
    recomputed from the bytes on disk. Each equals its inventory value.
@@ -150,17 +167,22 @@ These counts depend on the salt and the run. They describe the evidence and set 
 
 ### Assignment
 
-- **Judge only (P8).** No part selects. The consuming spec may split the family, for example by
-  its anchor rule and salt so that each industry sits in the same part as in co-ownership. A split
-  only limits what the one opening reads and reports. No part is read before the opening (my
-  call: under judge only, a part read early could only inform a choice, and that is selection).
+- **Judge only (P10), all at the opening (P11).** No part selects, and no part is read before the
+  opening, by any arm. Inside the opening, the order is fixed: reference arms, then the reference
+  pick and the margin by fixed rules, then candidates. The consuming spec may split what the
+  opening reports, for example by its anchor rule and salt so that each industry sits in the same
+  part as in co-ownership. A split does not create a part that is read earlier.
 - **No development measurement.** Sections 1 and 3 let a validation-part score be published as a
-  development measurement. Section 5 has no such part (my call, from P8).
-- **The assignment waits for the owner (VL4).** It is to naics-embedder's relatedness spec as its
-  owner amends it, from the commit that the owner names, as in Section 2's W7.
+  development measurement. Section 5 has no such part (my call, from P10 and P11).
+- **The assignment waits for the owner (VL4).** It is to naics-embedder's relatedness spec, or the
+  spec to which it assigns the family, as its owner amends it, from the commit that the owner
+  names, as in Section 2's W7. The relatedness panel reads co-ownership only and refuses a pair
+  emitted in one direction (§4.2), and vendor-link cells are directed. So a new panel spec may be
+  the consumer (my call, from the builder check).
 - **Choices fixed before any value is read.** The consuming spec fixes which measures it reads,
-  its null model and its scores before it reads any target value of the family (my call). Without
-  this, a choice made after seeing values would act as selection on the judge.
+  its null model, its scores, its reference arms, the rule that picks the reference and the margin
+  rule before it reads any target value of the family (my call). Without this, a choice made after
+  seeing values would act as selection on the judge.
 
 ### Conditions
 
@@ -169,7 +191,7 @@ repeat a consuming-spec rule only where it is this repository's own limit (my ca
 1 and 3):
 
 - what counts as headline evidence (the two gates, the intra-group sensitivity);
-- the role under R8.4 (P8);
+- the role under R8.4 and the order inside the opening (P10, P11);
 - the wait for the owner to name the consuming spec (VL4);
 - the universe statement;
 - the same-relation rule (VL6).
@@ -232,7 +254,7 @@ unchanged.
   as recorded.
 - The commit hooks skip the test suites for changes under `specs/` and root-level Markdown. No
   flag is used to skip a hook.
-- R8.4's text is unchanged (P8).
+- R8.4's text is unchanged (P10).
 - Stage 25 (TRI) also adds a section to `specs/evaluation-protocol.md`. If it merges first, this
   section becomes Section 6, and the ids and pointers are renumbered at the merge, with no change
   to content (my call, as the Stage 16 and Stage 24 Constraints).
@@ -261,12 +283,15 @@ unchanged.
 
 - **naics-embedder.** The section opens nothing yet. A roadmap resume can record that a protocol
   section exists for the USAspending vendor links, with the role "judge only". G4 opens for the
-  family only after the owner amends Section 5 under VL4 to name the relatedness spec, at a
-  commit that assigns the family. That spec then fixes its measures, null model and scores before
-  it reads any value (VL3).
+  family only after the owner amends Section 5 under VL4 to name the consuming spec, at a commit
+  that assigns the family. That spec fixes its measures, null model, scores, reference arms,
+  reference rule and margin rule before it reads any value (VL3). Its margin rule for this
+  family differs from §4.6 of the relatedness spec: the reference and the margin come from the
+  reference arms' scores inside the one opening, not from a validation part, and no candidate is
+  tested on the family before the opening (P11).
 - **Stage 25.** It adds its own section. If it merges first, renumber at the merge. TRI and the
   vendor links measure different relations (VL6), so neither section limits the other's role.
-- **R8.4 (G1).** A separate owner decision. The vendor links stay out of training under P8 even if
+- **R8.4 (G1).** A separate owner decision. The vendor links stay out of training under P10 even if
   R8.4 changes, until the owner amends Section 5.
 
 ## Rollout note
