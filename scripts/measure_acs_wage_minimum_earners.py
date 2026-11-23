@@ -423,7 +423,7 @@ def main(argv: list[str] | None = None) -> int:
         line, status = _line(result), 0 if result['complete'] else 1
     except Refused as refusal:
         line, status = _line({'complete': False, 'reason': str(refusal)}), 2
-    except Exception:
+    except (Exception, pl.exceptions.PanicException):
         line, status = _line({'complete': False, 'reason': FAILED}), 2
     print(line)
     return status

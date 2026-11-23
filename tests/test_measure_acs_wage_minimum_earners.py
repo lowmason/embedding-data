@@ -1533,6 +1533,23 @@ def test_any_other_failure_prints_the_fixed_line_and_exits_two(script, capsys, g
     assert captured.err == ''
 
 
+@pytest.mark.parametrize('name', ['headline_frame', 'category_records'])
+def test_a_polars_panic_prints_the_fixed_line_and_exits_two(script, capsys, golden, monkeypatch,
+                                                            name):
+    '''`PanicException` derives from `BaseException`, so `except Exception` lets it through.
+
+    The program would then exit 1, which this script uses for "no minimum".
+    '''
+    def panic(*arguments):
+        raise pl.exceptions.PanicException('x')
+    monkeypatch.setattr(script, name, panic)
+    status = script.main(command_line(golden))
+    captured = capsys.readouterr()
+    assert status == 2
+    assert captured.out == '{"complete": false, "reason": "measurement failed"}\n'
+    assert captured.err == ''
+
+
 @pytest.mark.parametrize('missing', ['--data-dir', '--run', '--outputs-sha256'])
 def test_every_option_is_required(script, capsys, golden, missing):
     arguments = command_line(golden)
