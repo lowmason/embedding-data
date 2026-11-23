@@ -4,7 +4,8 @@
 > any BEA file, and do not build, before the plan exists and the owner gives
 > the go-ahead for each write.
 
-Status: draft for owner review. Stage 15 design session of
+Status: the owner approved this committed spec on 2026-11-23 ("Approve the
+spec"), including every call marked "My call". Stage 15 design session of
 [the roadmap](naics-evaluation-data-roadmap.md), 2026-11-23. The owner made the
 four decisions below in this session. Calls marked "My call" were made while
 writing this file. A builder check by a separate reviewer raised six questions
