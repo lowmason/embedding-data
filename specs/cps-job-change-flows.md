@@ -55,7 +55,9 @@ the model for the commands, the bundle, the host rule and acceptance.
    cross-check"). No official list names the members of the 38 categories whose
    SOC entry is an X token. Their candidates are the residual rule under
    [Candidate sets](#candidate-sets), checked against Stage 8's ACS PUMS
-   "Combines" lists. Any disagreement stops the build for the owner.
+   "Combines" lists. Any disagreement stops the build for the owner. A
+   design-time measurement led to a proposed refinement of what counts as
+   agreement, marked there for the owner's approval.
 6. **Industry moves need a new employer** ("Industry needs new employer").
    Monthly industry flows count only employer changes (`EMPSAME` 01).
    Occupation flows count either guard. This amends R4.8's wording.
@@ -253,7 +255,9 @@ code. A flow with both ends single-leaf keeps about 4% of industry mass.
   and `cps_00002` (ASEC), read in place as their existing Parquets. `build`
   authenticates the Stage 7 pin first, then checks that each Parquet and raw
   triple matches the hashes that Stage 7's `inputs.json` and the manifest
-  record. It never reconverts, re-downloads or calls IPUMS.
+  record. It never reconverts, re-downloads or calls IPUMS. It does not run
+  Stage 7's full `verify_bundle`: authentication is the `outputs.json` hash
+  check plus these file hashes, nothing more.
 - **Official lists.** `census_industry_2022` from the Stage 7 receipt and
   `census_occupation_2018` from the Stage 8 v2/46 receipt. These are the full
   Census lists that R4.6 names. They supply every candidate set.
@@ -264,10 +268,14 @@ code. A flow with both ends single-leaf keeps about 4% of industry mass.
   Stage 4 codes run. Every candidate must be a NAICS 2022 national industry or a
   SOC 2018 detailed occupation node there.
 - **Documentary evidence already frozen.** `asec_2025_documentation`,
-  `asec_2026_documentation`, `cps_jan2025_industry_documentation`,
+  `asec_2026_documentation`,
+  `cps_jan2025_industry_documentation`,
   `cps_lnkfw1mwt`, `cps_empsame`, `cps_actsame` and `ind_2025_codes` in the
-  Stage 7 receipt. The plan confirms that the two ASEC documents are the
-  `cpsmar25.pdf` and `cpsmar26.pdf` that the research pass read.
+  Stage 7 receipt. The frozen `asec_2026_documentation` is byte-identical to
+  the `cpsmar26.pdf` that the research pass read. The `cpsmar25.pdf` online on
+  2026-11-23 differs in bytes from the frozen `asec_2025_documentation`.
+  Stage 11 cites the frozen copy, whose appendix A-9 labels `9890` "Military"
+  (Stage 7, V6).
 
 ### Stage 11 references
 
@@ -301,8 +309,8 @@ evidence for the two specials that no earlier receipt holds:
   modules only.
 - Reuse unchanged, where they serve: `ipums_references.parse_industry_list`,
   the Stage 8 occupation-list and membership-expression parsers in
-  `acs_code_references`, `manifest.entry_for`, `ipums_verification_run`'s
-  detached verification, `target_contract.validate_targets` and
+  `acs_code_references`, `manifest.entry_for`,
+  `target_contract.validate_targets` and
   `write_targets`, and `ipums_weights`'s Decimal scan. If a reused function
   cannot serve unchanged, stop and ask the owner. Never edit it.
 - Stage 8 accepts ACS schemes only, and its `559830` special grants nothing to
@@ -346,19 +354,31 @@ give an X token as their SOC entry, for example `0960` → `13-20XX`, `8225` →
 CPS basic list and the BLS list name no members. 37 of them occur in the CPS
 data, with about 6.8% of employed weight.
 
-1. **Residual rule.** The candidates are the SOC 2018 detailed codes that match
-   the token as written, with each X standing for any digit, minus every
-   detailed code that another list row claims through its own expression.
-   Matching uses the Stage 4 detailed nodes, not arithmetic on code digits.
-2. **Cross-check.** Compare each residual set with the explicit member list for
-   the same Census category in Stage 8's ACS PUMS occupation workbook
-   (`pums_occupation_2018`, v2/46 receipt). Those lists are cited as evidence
-   only and never supply members.
-3. **Stop rule.** An empty residual, a residual that differs from the PUMS list,
-   or a category with no PUMS list fails the build with a fixed reason. The
-   owner decides each such case. The plan records the cross-check result before
-   the first full build.
-4. **Registry.** Membership type `x_residual`, the token, the cross-check
+1. **Residual rule.** Take the X rows from narrowest to widest (more fixed
+   digits first). Each row's candidates are the SOC 2018 detailed codes that
+   match the token as written, with each X standing for any digit, minus every
+   detailed code that a non-X row claims and every code already in a narrower
+   X row's residual. Two token pairs overlap (`8025`/`8225` and `8865`/`8990`),
+   so the order matters. Matching uses the Stage 4 detailed nodes, not
+   arithmetic on code digits.
+2. **Cross-check (proposed refinement of decision 5, for the owner's approval).**
+   Compare each residual with the member list for the same Census category in
+   Stage 8's ACS PUMS occupation data (`pums_occupation_2018`, v2/46 receipt, as
+   parsed in the Stage 8 code lookup). The PUMS list sometimes merges several
+   full-Census categories into one. The check passes when the residual is not
+   empty, the residual is a subset of the PUMS list, and every extra PUMS member
+   is claimed by another row of the full Census list. The PUMS lists are
+   evidence only and never supply members.
+3. **Stop rule.** A failed check, or a delivered X category with no PUMS list,
+   fails the build with a fixed reason. The owner decides each such case.
+4. **Measured at design time (2026-11-23).** The refined check passes for all
+   37 X categories that occur in the CPS data. 30 residuals equal their PUMS
+   list exactly. 7 are strict subsets whose extra members belong to other
+   Census rows: `1240`, `1970`, `3090`, `7100`, `7640`, `7750` and `8990`.
+   `8865` has no PUMS list and no CPS row. Under decision 5 as first worded
+   ("any disagreement stops the build"), these 7 categories, about 23,000
+   monthly rows, would stop the first build.
+5. **Registry.** Membership type `x_residual`, the token, the cross-check
    outcome and both locators.
 
 **Rows with SOC `none`.** **My call:** list rows whose SOC entry is `none`
@@ -727,9 +747,10 @@ stage ships, each marked *(owner, Stage 11 design, 2026-11-23;
   `EMPSAME` reports a different employer. A same-employer duty change admits an
   occupation move only."
 - **R5.3.** Add: "A CPS occupation category whose SOC entry is an X token takes
-  as candidates the detailed codes matching the token minus those other list
-  rows claim, checked against the ACS PUMS member lists. A disagreement fails
-  the build."
+  as candidates the detailed codes matching the token minus those that other
+  list rows and narrower X rows claim. Each set must be a subset of the ACS
+  PUMS member list, whose extra members other Census rows claim. A failed check
+  fails the build."
 - **R4.9.** Replace "Special-code 9890 remains outside-list, with 2026 meaning
   unresolved" with: "`9890` is the CPS Armed Forces code. Census settles it for
   the 2026 basic monthly files. No 2026 ASEC document defines it, so its ASEC
