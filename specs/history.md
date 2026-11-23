@@ -93,3 +93,17 @@ Differences from the design:
 - Decision D1 (spec amendment): Run the document checks, acquisition and the data checks (Tasks 1 and 9) before the targets, the bundle and V12, so that V12 uses the header layout that E4 records. The first build stays after V12. This amends the stage spec's Rollout bullet ("Approve"). Source: plan, `## Decisions`.
 - Gate answer (owner, 2026-11-22): the key order of `SAM_API_KEY`, skip-and-count and both code-string readings stand as built. The untested live `acquire-sam-extract` request is deferred.
 - Deferred: 3 items. Source: specs/deferred_items.md, § 15-usaspending-vendor-links.
+
+## 17-acs-wage-minimum-earners — 2026-11-23
+Plan: specs/plans/completed/17-acs-wage-minimum-earners.md · Spec: specs/completed/acs-wage-minimum-earners.md (retired) · Roadmap: specs/naics-evaluation-data-roadmap.md, Stage 19
+
+Differences from the design:
+- Ruling: key check exempts the three UNDEFINED reason names (constant_wage contains wage) - spec :153 fixes the reason names and the plan shape :417 needs them as output keys - the intent (no mean wage or person value) still holds for every other key - none.
+- Ruling: chain fixture wraps prepare_wage_delivery to make REPWTP37 an integer - the unchanged fixture delivers the text -2.5, which converts to Float64 and fails the column contract (spec :114 Int64) - the contract and Task 2 check 6 stay strict - Task 4 must read the real Parquet schema footer (names and dtypes only, no rows) before the first real run; a Float64 replicate column is an OC3 stop for the owner. Task 3 review must confirm the wrap changes nothing the test claims.
+- Ruling (replaces the schema pre-check in the Task 3 chain-fixture ruling): Task 4 reads nothing of the real run beyond the plan step 3 hashes - plan step 3 says read nothing else of the run, and the script own check 6 already refuses a Float64 replicate column with a fixed reason - a Float64 column costs one refused run that goes to the owner under OC3, it cannot be fixed toward the written rule - none.
+- Deviation: the measurement also reads `acs_wage_persons.parquet`, which the roadmap's Consumes line (`:248`) and O23 cost cell (`:71`) do not name. The Exit still holds (owner, D1, 2026-11-22). Source: plan, header.
+- Deviation (Task 3): the chain fixture makes `REPWTP37` an integer, and the output-key test exempts the three reason names. See the two Rulings above. Source: plan, Task 3.
+- Deviation (Task 3): the catch-all in `main` also catches `pl.exceptions.PanicException`, a `BaseException`, so a Polars panic cannot exit 1. Source: plan, Task 3.
+- Deviation (Task 4): the full pytest run used the repo's xdist overlay, not a serial run. Source: plan, Task 4.
+- Deviation (Task 5): the record has an unnumbered "Terms used in this record" list and states that the bands at 1, 50 and 100 merged into one band. Source: plan, Task 5.
+- Deferred: 1 item. Source: specs/deferred_items.md, § 17-acs-wage-minimum-earners.

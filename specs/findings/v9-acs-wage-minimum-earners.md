@@ -2,7 +2,7 @@
 
 Measured on 2026-11-22 with `scripts/measure_acs_wage_minimum_earners.py` (plan 17, Stage 19)
 at the rule commit in section 2. This record discharges spec R7.3 and V9 for the ACS wage
-microdata only. The design is in `specs/acs-wage-minimum-earners.md`. The record holds counts,
+microdata only. The design is in `specs/completed/acs-wage-minimum-earners.md`. The record holds counts,
 run IDs and pins only. It holds no SE of a single category and no mean wage.
 
 Terms used in this record:

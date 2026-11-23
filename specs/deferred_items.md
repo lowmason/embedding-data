@@ -247,3 +247,14 @@
       tree. The fix is a one-line docstring edit. Size: quick-fix.
       Done when: the docstring names the retired path, in the same commit as the
       next change to the script.
+
+## 17-acs-wage-minimum-earners — 2026-11-23
+- [ ] Stale spec path in the wage-minimum script: the docstring of
+      `scripts/measure_acs_wage_minimum_earners.py` (line 8) names
+      `specs/acs-wage-minimum-earners.md`, which moved to
+      `specs/completed/acs-wage-minimum-earners.md` when plan 17 retired. Carried
+      because the decision record names the rule commit `f060526`, and a
+      docstring edit would leave the script that ran differing from the one in the
+      tree. The fix is a one-line docstring edit. Size: quick-fix.
+      Done when: the docstring names the retired path, in the same commit as the
+      next change to the script.

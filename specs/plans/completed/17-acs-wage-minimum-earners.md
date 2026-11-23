@@ -1,5 +1,7 @@
 # ACS Wage Minimum Headline Earners Implementation Plan
 
+**Status: COMPLETE (2026-11-23)** — executed via subagent-driven-development; deferred items in specs/deferred_items.md, or specs/completed/deferred_items.md once archived
+
 > **For agentic workers:** REQUIRED SUB-SKILL: implement this plan task-by-task via subagent-driven-development (the default) — or executing-plans when your human partner chose inline execution at the handoff. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Measure the replicate-weight SE of each headline category's mean log wage in the
@@ -180,7 +182,7 @@ for index, start in enumerate(BAND_STARTS):
 `year_minimum` walks the bands from the top down while `passes` is true and returns the
 `start` of the last band it passed, or None when the top band fails.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add `load_script()` (copy `tests/test_reconcile_stage17.py:36-41`, script path
 `scripts/measure_acs_wage_minimum_earners.py`, assertion message
@@ -235,22 +237,22 @@ Theta is 0.5, `θ_r` alternates between 1/3 and 2/3, and `SE = sqrt(4/80 · 80/3
 - `test_no_minimum_when_top_band_fails`: pass, pass, fail gives None.
 - `test_overall_minimum_is_largest_year`: `[1, 200]` gives 200, `[50, None]` gives None.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_measure_acs_wage_minimum_earners.py -v`
 Expected: FAIL with "measurement script is missing".
 
-- [ ] **Step 3: Implement the constants and the functions**
+- [x] **Step 3: Implement the constants and the functions**
 
 The module docstring states the rule in two sentences, cites the spec and says that the
 script imports only the standard library and Polars.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_measure_acs_wage_minimum_earners.py -v`
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/measure_acs_wage_minimum_earners.py tests/test_measure_acs_wage_minimum_earners.py
@@ -320,7 +322,7 @@ Checks in order, each with its fixed reason:
 9. Every headline row has a finite `log_wage_2010` and `PERWT > 0`:
    `'headline row has a non-finite wage or a non-positive weight'`.
 
-- [ ] **Step 1: Write the helpers and the failing tests**
+- [x] **Step 1: Write the helpers and the failing tests**
 
 Add a `golden` fixture: `publish(tmp_path, golden_people())`.
 
@@ -352,24 +354,24 @@ Add a `golden` fixture: `publish(tmp_path, golden_people())`.
 - `test_padded_strings_stay_distinct`: `headline_frame` of the golden bundle has 20
   `(INDNAICS, YEAR)` keys, and both `'6231'` and `'6231  '` occur.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_measure_acs_wage_minimum_earners.py -v -k "authenticate or refused or checked or padded"`
 Expected: FAIL with `AttributeError: ... has no attribute 'authenticate'` (or the function
 named first).
 
-- [ ] **Step 3: Implement `Refused`, `Inputs`, `authenticate`, `load_report`,
+- [x] **Step 3: Implement `Refused`, `Inputs`, `authenticate`, `load_report`,
   `headline_frame` and `self_check`**
 
 Hash with `hashlib.file_digest`, as `scripts/reconcile_stage17.py:108-110` does. Unlike its
 `inventory_file`, also compare `stat().st_size` with the record's `size`.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_measure_acs_wage_minimum_earners.py -v`
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/measure_acs_wage_minimum_earners.py tests/test_measure_acs_wage_minimum_earners.py
@@ -425,7 +427,9 @@ with every band printed (OC2). On `Refused`, print only `{"complete": false, "re
 <fixed reason>}` and exit 2. Any other exception prints `{"complete": false, "reason":
 "measurement failed"}` and exits 2, so no exception text reaches the output.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
+
+> Deviation: the `template` fixture wraps `acs_wage_fixtures.prepare_wage_delivery` so that `REPWTP37` is the integer 127. The unchanged chain fixture delivers the text `-2.5`, which converts to Float64 and fails the Int64 column contract (spec `:114`). The output-key test exempts the three `UNDEFINED` reason names, because `constant_wage` holds `wage`. Source: ledger, Task 3 rulings.
 
 Add `run_main(script, capsys, bundle, pin=None)`, which calls `main` and returns the status
 and the parsed line after checking that the line equals
@@ -467,18 +471,20 @@ and the parsed line after checking that the line equals
   returns 0 or 1, never 2, and its `inputs.report_sha256` equals the bundle inventory's
   `report.json` record.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_measure_acs_wage_minimum_earners.py -v -k "kept or exits or rows or runs or output or writes or imports or chain"`
 Expected: FAIL with `AttributeError` on `kept`, `category_records` or `main`.
 
-- [ ] **Step 3: Implement `category_records`, `kept`, `measure` and `main`**
+- [x] **Step 3: Implement `category_records`, `kept`, `measure` and `main`**
+
+> Deviation: the catch-all in `main` is `except (Exception, pl.exceptions.PanicException)`. A Polars panic is a `BaseException`, so `except Exception` would let it exit 1, the status of the OC2 stop. Source: ledger, Task 3 review 1.
 
 Iterate the headline frame's groups with `partition_by('YEAR', 'INDNAICS', as_dict=True)` and
 sort the records afterwards, so group order never reaches the output. The
 `if __name__ == '__main__': sys.exit(main())` guard closes the file.
 
-- [ ] **Step 4: Run the tests and lint, and time the chain test**
+- [x] **Step 4: Run the tests and lint, and time the chain test**
 
 Run: `uv run --locked pytest tests/test_measure_acs_wage_minimum_earners.py -v --durations=5`
 Expected: all PASS. If `test_genuine_chain_bundle_passes_the_checks` takes 60 s or more,
@@ -486,7 +492,7 @@ setup included, add its node ID to `SLOW_TESTS` in `tests/conftest.py`.
 Run: `uv run --locked ruff check scripts/measure_acs_wage_minimum_earners.py tests/test_measure_acs_wage_minimum_earners.py`
 Expected: `All checks passed!`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/measure_acs_wage_minimum_earners.py tests/test_measure_acs_wage_minimum_earners.py
@@ -501,19 +507,21 @@ The controller runs this task itself, not a subagent.
 
 **Files:** none in the repository. Outputs go to `$OUT` (Global Constraints).
 
-- [ ] **Step 1: Full checks**
+- [x] **Step 1: Full checks**
+
+> Deviation: the full pytest run used the repo's xdist overlay (`uv run --locked --with-requirements tests/xdist-requirements.txt pytest -n 7 --hypothesis-profile=parallel`), because a serial run takes far longer. 8,647 tests passed. Source: ledger, Task 4.
 
 Run the `pgrep` check (no output), then `uv run --locked pytest`, `uv run --locked behave`
 and `uv run --locked ruff check .`.
 Expected: all pass, the `network` canary deselected.
 
-- [ ] **Step 2: Review before data**
+- [x] **Step 2: Review before data**
 
 Dispatch requesting-code-review over the branch (`main...HEAD`). Review against the spec's
 "The rule" and "What gets built" item 1 and this plan's Review Focus. Resolve every finding
 and rerun Step 1. This review guards the Anti-goal "a rule picked after seeing its result".
 
-- [ ] **Step 3: Record the rule commit and check the pinned records**
+- [x] **Step 3: Record the rule commit and check the pinned records**
 
 Run: `git status --porcelain` (expected: no output), then `git rev-parse HEAD`. Keep the SHA as
 the rule commit. Every real run runs at this commit, on a clean tree. Then:
@@ -527,7 +535,7 @@ python3 -c "import json,sys; o=json.load(open(sys.argv[1])); print(o['report.jso
 Expected: `6cb253e2…c201d1`, then `32ad9b69…11e413bd a9447149…10fd5ff2` (the Pinned input
 table). Read nothing else of the run.
 
-- [ ] **Step 4: First real run**
+- [x] **Step 4: First real run**
 
 ```bash
 OUT=$HOME/.cache/embedding-data/stage19-minimum-earners
@@ -543,7 +551,7 @@ In a restricted workspace, prefix `UV_CACHE_DIR=/private/tmp/embedding-data-uv-c
 - Exit 2: stop (OC3). Read the reason. A fix toward the written rule restarts at Step 1 with a
   new rule commit, and the decision record discloses it.
 
-- [ ] **Step 5: Second real run and identity**
+- [x] **Step 5: Second real run and identity**
 
 Repeat Step 4's commands with `run2.json` and `run2.time`. Then:
 
@@ -565,7 +573,9 @@ Expected: two equal digests, `identical`, and no output from `find`.
 Line numbers are as of `0e7cbd4`. Plan 16 (Stage 20) also edits `CLAUDE.md` and `README.md`,
 so find each passage by its quoted text.
 
-- [ ] **Step 1: Write the decision record**
+- [x] **Step 1: Write the decision record**
+
+> Deviation: the record holds an unnumbered "Terms used in this record" list before section 1. Its section 2 states that the bands at 1, 50 and 100 merged into one band in both years, and that the minimum is the same under either reading of the merge step. Source: ledger, Task 5.
 
 Plain technical English, beside `specs/findings/v9-ita-naics-minimum-counts.md`. All values
 come from `$OUT/run1.json` and `$OUT/run1.time`. Sections in order:
@@ -593,7 +603,7 @@ come from `$OUT/run1.json` and `$OUT/run1.time`. Sections in order:
 11. Not claimed: no Stage 17 bundle is relabeled, no protocol section (O24), no minimum for any
     target family, no panel result.
 
-- [ ] **Step 2: Amend the spec**
+- [x] **Step 2: Amend the spec**
 
 Use the execution date for `<date>`. In R7.3 (`:540-545`), after
 `*(owner, plan 12, 2026-11-17)*`, append on the same paragraph:
@@ -619,7 +629,7 @@ V9 sets the ACS wage microdata's minimum number of headline earners before any
 embedder is scored on that file. *(owner, plan 17, <date>)*
 ```
 
-- [ ] **Step 3: Change the stale lines**
+- [x] **Step 3: Change the stale lines**
 
 Change only the O23 part. O24 stays open in every line.
 
@@ -639,7 +649,7 @@ Change only the O23 part. O24 stays open in every line.
   [the evaluation protocol](evaluation-protocol.md) (O24) and naics-embedder's wage panel
   spec`.
 
-- [ ] **Step 4: Check that no frozen file changed**
+- [x] **Step 4: Check that no frozen file changed**
 
 ```bash
 uv run --locked python -c "import subprocess; from embedding_data.acs_wage_inputs import SOFTWARE_FILES; changed = set(subprocess.run(['git', 'diff', '--name-only', 'main...HEAD'], capture_output=True, text=True, check=True).stdout.split()); print(sorted(changed & set(SOFTWARE_FILES)) or 'none frozen'); print(sorted(changed))"
@@ -647,9 +657,30 @@ uv run --locked python -c "import subprocess; from embedding_data.acs_wage_input
 
 Expected: `none frozen`, then only the files of this plan's File Structure.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add specs/findings/v9-acs-wage-minimum-earners.md specs/embedding-evaluation-data-spec.md CLAUDE.md README.md specs/deliverable-map.md
 git commit -m "docs(specs): record the V9 ACS wage minimum earners"
 ```
+
+## Handoff to later stages
+
+- **O24 (Track H, the ACS wage microdata protocol section; no stage yet).** It consumes
+  `specs/findings/v9-acs-wage-minimum-earners.md`: a minimum of 400 headline earners for each
+  category, in both years. The minimum applies to `headline_rows` of each `categories` entry of
+  Stage 17's `report.json`, keyed by `INDNAICS` and `YEAR`. In 2023, 183 of 233 categories meet it.
+  In 2024, 178 of 233 meet it. This is what the roadmap's Produces states. Traps for the protocol
+  section:
+  - The lowest band of each year merged the bands at 1, 50 and 100, so the record shows one band
+    from 1 to 199 (15 categories in 2023, 19 in 2024). The minimum is the same under either reading
+    of the merge step.
+  - The count gate and a category's own SE disagree for a few categories: 2 and 21 in 2023, 0 and 29
+    in 2024 (the record's section 6). The protocol section decides what that means.
+  - The record shows `INDNAICS` codes without their space padding. The delivered strings keep it.
+  - The SE of each single category sits only in
+    `$HOME/.cache/embedding-data/stage19-minimum-earners/run1.json` on this machine. It never enters
+    git.
+  - `scripts/measure_acs_wage_minimum_earners.py` is frozen at rule commit `f060526`. A change to it
+    needs both real runs again and a disclosure in the record.
+  - Nothing was deferred into this stage.

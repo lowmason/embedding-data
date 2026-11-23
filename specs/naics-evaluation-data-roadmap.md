@@ -241,7 +241,7 @@ on 2026-11-22, and Stage 20 from Track C's later that day (see Choices made).
       Leaves out: the TRI headline minimum count → O13. The TRI protocol section → O17. The R8.4 training-role amendment → a separate owner decision after naics-embedder's spec (reset prompt, Leave alone)
       ROUTING: writing-plans
 
-- [ ] Stage 19: Minimum headline earners for the ACS wage microdata
+- [x] Stage 19: Minimum headline earners for the ACS wage microdata
       Objective: A minimum number of headline earners for each category is set from Stage 17's built counts.
       Outcomes: O23
       Track: H
@@ -250,6 +250,8 @@ on 2026-11-22, and Stage 20 from Track C's later that day (see Choices made).
       Exit: O23: a committed decision sets the minimum number of headline earners for each category from the observed `headline_rows` counts of Stage 17's run. The minimum applies to each category, not to each node (plan 14, Handoff). The decision reports, for each year, how many categories meet it
       Leaves out: the protocol section for the file → O24. The wage panel itself → naics-embedder's panel spec
       ROUTING: brainstorming
+> Stage 19: COMPLETE (2026-11-23) — implemented by plan 17 (specs/plans/completed/17-acs-wage-minimum-earners.md); decision in specs/findings/v9-acs-wage-minimum-earners.md. Its Handoff section names what O24 consumes. The measurement also read `acs_wage_persons.parquet`, which the Consumes line and the O23 cost cell do not name, per that plan's Deviation note.
+> Next: resume the roadmap.
 
 - [ ] Stage 20: USAspending vendor links, hardening
       Objective: Stage 14's USAspending bundle gets its exact replay check, a long-form acceptance finding and README and CLAUDE.md run pins.
