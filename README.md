@@ -597,7 +597,11 @@ TRI is a program-selected population, mostly industrial, so no table here repres
 establishments or firms. Codes are self-reported and unvalidated. `report.json` lists
 all the limits of the stage spec. R8.4 is the source-spec rule that benchmark tables
 never become embedder training data. Under R8.4, no TRI table may feed embedder training,
-curriculum, hard-negative mining or model selection. TRI parent links and ITA
+curriculum, hard-negative mining or model selection. One exception (owner, 2026-11-23):
+selection for naics-embedder's relatedness artifact may read the validation part of the
+parent links, split by anchor industry. Reads follow
+[the evaluation protocol](specs/evaluation-protocol.md), Section 6, and none is allowed until
+the owner names there the relatedness spec's commit that admits TRI. TRI parent links and ITA
 co-ownership measure close relations, so neither should judge an embedding that the
 other trained.
 

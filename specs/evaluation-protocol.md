@@ -9,7 +9,8 @@ Status: APPROVED (2026-11-18, owner: "Approve the spec"). Written 2026-11-18. Se
 added with the owner's approval of its design (2026-11-23, owner: "Approve"). Sections 3
 and 4 added with the owner's approval of their design (2026-11-23, owner: "Approve the
 design"). Section 5 added with the owner's approval of its design (2026-11-23,
-owner: "Approve"). Section 6 PROPOSED (2026-11-23).
+owner: "Approve"). Section 6 added with the owner's approval of its design (2026-11-23,
+owner: "Approve the design").
 
 This is the successor evaluation-protocol spec that the
 [source spec](embedding-evaluation-data-spec.md) requires "before any embedder
@@ -18,8 +19,8 @@ evidence family or analysis file. A family with no section here is not scored. T
 section covers the ITA text–code pairs. Section 2 covers the ACS wage microdata, a
 person-level analysis file *(owner, 2026-11-23)*. Sections 3 and 4 cover ITA
 co-ownership and the 2023 ITA area mix (roadmap Stage 16). Section 5 covers the
-USAspending vendor links (roadmap Stage 23). Section 6, proposed, covers the TRI
-parent links (roadmap Stage 25).
+USAspending vendor links (roadmap Stage 23). Section 6 covers the TRI parent links
+(roadmap Stage 25).
 
 ## Design provenance
 
@@ -31,7 +32,7 @@ and 4 have theirs in
 Section 5 has its design in
 [completed/evaluation-protocol-usaspending-vendor-links.md](completed/evaluation-protocol-usaspending-vendor-links.md).
 Section 6 has its design in
-[evaluation-protocol-tri-parent-links.md](evaluation-protocol-tri-parent-links.md).
+[completed/evaluation-protocol-tri-parent-links.md](completed/evaluation-protocol-tri-parent-links.md).
 
 A brainstorming session with the owner on 2026-11-18. The inputs read were:
 
@@ -657,8 +658,9 @@ log of the opening.
 
 ## Section 6: TRI parent links
 
-Status: PROPOSED (2026-11-23). Design, decisions P8, P9, P12 and P13 and measurements:
-[evaluation-protocol-tri-parent-links.md](evaluation-protocol-tri-parent-links.md).
+Status: APPROVED (2026-11-23, owner: "Approve the design"). Design, decisions P8, P9, P12
+and P13 and measurements:
+[completed/evaluation-protocol-tri-parent-links.md](completed/evaluation-protocol-tri-parent-links.md).
 
 ### Evidence
 

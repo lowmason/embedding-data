@@ -329,7 +329,7 @@ and Stage 25 from Track B's after Stage 22 (see Choices made).
 > Stage 24: COMPLETE (2026-11-23) — implemented by spec specs/completed/acs-wage-protocol-section.md, approved by the owner (no plan). Its section is Section 2 of specs/evaluation-protocol.md. Findings in specs/naics-evaluation-data-stage-24-findings.md. The owner also recorded an exception in R8.1 and R8.4: the file's selecting part may select which embedder candidate goes forward (Q4). Track H has no later stage.
 > Next: resume the roadmap.
 
-- [ ] Stage 25: Evaluation-protocol section for the TRI parent links
+- [x] Stage 25: Evaluation-protocol section for the TRI parent links
       Objective: The evaluation protocol gets a section for the TRI parent links, framed like Stage 16's section for ITA co-ownership.
       Outcomes: O17
       Track: B
@@ -338,6 +338,9 @@ and Stage 25 from Track B's after Stage 22 (see Choices made).
       Exit: O17: the committed protocol has a section for the TRI family that states the evidence (which runs, pins and Stage 22 minimum to read), the assignment (who decides the split) and the conditions this repository keeps, as Section 1 and Stage 16's section do. It names who decides the scores. The findings file records the stage's measured cost in sessions. No source file, test or data file changed
       Leaves out: the scores, their intervals, the margin and the adoption decision, if they stay with naics-embedder (protocol, "What this repository does not decide"). The deferred docstring and `python -OO` items of the frozen measurement script and the reconciler docstring and stale TRI row of `specs/deliverable-map.md` → `specs/deferred_items.md`, sections `20-tri-minimum-counts` and `18-tri-parent-links`. The R8.4 training-role amendment → a separate owner decision after naics-embedder's spec (reset prompt, Leave alone)
       ROUTING: brainstorming
+
+> Stage 25: COMPLETE (2026-11-23) — implemented by spec specs/completed/evaluation-protocol-tri-parent-links.md, approved by the owner (no plan). Its section is Section 6 of specs/evaluation-protocol.md. Findings in specs/naics-evaluation-data-stage-25-findings.md. The validation part selects for the relatedness artifact only (P8). No read is allowed until the owner names in the section the relatedness spec's commit that admits TRI (TR8). Track B has no later stage.
+> Next: resume the roadmap.
 
 ## Ranked list — Track B
 
