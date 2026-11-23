@@ -18,6 +18,7 @@
 - Before every commit, every full pytest run and every full-data command, run `pgrep -fl 'embedding_data\.acs_targets|stage9_independent|reconcile_stage9'`. If it prints a line, read it: a shell wrapper that only contains that `pgrep` text is a false positive; a real `embedding_data.acs_targets` process is a stop. This binds this session too: no commit, full pytest run or push while the guarded build or `verify` runs.
 - One full-data build at a time across all sessions, and one acquisition at a time.
 - No change to `pyproject.toml`, `uv.lock`, any file in `acs_target_inputs.SOFTWARE_FILES`, any frozen module, or any acceptance script. No new module under `src/embedding_data/`. Never add a test tool to `pyproject.toml` or `uv.lock`.
+- No test reads the real host's free space or carries `CHILD_TOKEN` for longer than one short `ps` check. Every test sets `launch_floor_bytes`, `disk_soft_bytes` and `disk_hard_bytes` to 0, or injects `free_bytes`, unless it forces a disk stop. Test children carry `TEST_TOKEN`, so other sessions' `pgrep` checks never see them. These tests run in every session's hooks, also after the production build has used its disk.
 - Never edit a `.py` file while a full pytest run is going (the ACS reconciliation tests hash every `.py` file).
 - Preserve every r1–r3 path and control: `stage9_acs_targets_20261019_r1`, `stage9_acs_targets_20261021_r2`, `stage9_acs_targets_20261021_r3` (their `.part` and `-scratch-*` directories under `data/derived/acs/targets/`) and `stage9_acceptance_20261019_r1`, `stage9_acceptance_20261021_r2`, `stage9_acceptance_20261021_r3` under `data/derived/acs/target-controls/`. Never reuse those run IDs.
 - Leave alone: branch `codex/acs-targets-design` (head `1a6377d`) and its worktree `/Users/lowell/.codex/worktrees/acs-targets-design/embedding-data` (read only), and every worktree this session did not create (today `.claude/worktrees/stage-11-plan`).
@@ -97,7 +98,7 @@ git rev-parse codex/acs-targets-design
 
 Expected: `ancestor`; both diffs empty; `1a6377d…` unchanged. `tests/conftest.py` keeps the line that `1a6377d` added.
 
-- [ ] **Step 4: Copy plan 10 under a status line.** Copy the Codex worktree's `specs/plans/10-acs-targets.md` byte for byte to `specs/plans/completed/10-acs-targets.md`, then insert two lines at the top: a status line and a blank line. Wording (builder may adjust): `**Status: SHIPPED (2026-11-23)** — its tasks shipped in commits 6a30106…1a6377d, merged into main by plan 21. Plan 21 (specs/plans/21-acs-targets-first-build.md) replaces its open checkpoints.`
+- [ ] **Step 4: Copy plan 10 under a status line.** Copy the Codex worktree's `specs/plans/10-acs-targets.md` byte for byte to `specs/plans/completed/10-acs-targets.md`, then insert two lines at the top: a status line and a blank line. Wording (builder may adjust; the date is the execution date): `**Status: SHIPPED (<YYYY-MM-DD>)** — its tasks shipped in commits 6a30106…1a6377d, merged into main by plan 21. Plan 21 (specs/plans/21-acs-targets-first-build.md) replaces its open checkpoints.`
 
 Check: `tail -n +3 specs/plans/completed/10-acs-targets.md | cmp - /Users/lowell/.codex/worktrees/acs-targets-design/embedding-data/specs/plans/10-acs-targets.md` prints nothing.
 
@@ -219,18 +220,19 @@ git commit -m "feat(stage9): add guard measurement primitives"
 **Interfaces:**
 - Consumes: `embedding_data.acs_target_bundle.build`, `verify_bundle`, `run_directory`; `embedding_data.acs_mapping_contract.SelectionRequest`; `embedding_data.acs_targets` (tests only, for the option comparison).
 - Produces:
-  - `CHILD_TOKEN = 'embedding_data.acs_targets'`
+  - `CHILD_TOKEN = 'embedding_data.acs_targets'`; `TEST_TOKEN = 'stage9_guard_test_child'` (matches no part of `PGREP_PATTERN`)
   - `PGREP_PATTERN = r'embedding_data\.acs_targets|stage9_independent|reconcile_stage9'`
   - `class GuardStop(BaseException)`, `class DirtyWorktree(Exception)`
   - `install_stop_handler() -> None` — the first SIGTERM raises `GuardStop`; every later SIGTERM is ignored.
   - `install_quiet_hooks() -> None` — `sys.excepthook`, `threading.excepthook`, `sys.unraisablehook` and `warnings.showwarning` write only the class name (and, for warnings, category, file and line) to stderr.
   - `start_parent_watch(parent_pid: int, interval: float = 5.0) -> threading.Thread` — daemon thread; when `os.getppid() != parent_pid` it sends SIGTERM to its own process once.
   - `failure_record(error: BaseException) -> dict` — `{'class': 'module.QualName', 'errno': int | None, 'frames': [{'file', 'line', 'function'}], 'chain': ['module.QualName', …]}` from `__cause__`/`__context__`. Never `str(error)`, `args` or source-line text.
-  - `child_argv(prefix: list[str], command: str, options: list[str], *, control_dir: Path, repository: Path, parent_pid: int, phase_interval: float) -> list[str]` — `prefix + ['child', CHILD_TOKEN, command, *options, '--control-dir', …, '--repository', …, '--parent-pid', …, '--phase-interval', …]`.
+  - `child_argv(prefix: list[str], command: str, options: list[str], *, control_dir: Path, repository: Path, parent_pid: int, phase_interval: float, token: str = CHILD_TOKEN) -> list[str]` — `prefix + ['child', token, command, *options, '--control-dir', …, '--repository', …, '--parent-pid', …, '--phase-interval', …]`.
   - `parse_operation(command: str, options: list[str]) -> Callable[[], dict]` — argparse with exactly the `acs_targets` command's arguments (`build`: `RUN_ID --data-dir --mapping-run --mapping-outputs-sha256 --codes-run --codes-outputs-sha256 --geography-run --geography-outputs-sha256 --ipums-run --ipums-outputs-sha256 --ipums-references-sha256`; `verify`: `RUN_ID --data-dir --mapping-run --mapping-outputs-sha256 --outputs-sha256`), all required. Returns a closure that makes the same call the CLI makes (`acs_targets.py:46` and `:55`).
-  - `child_main(argv: list[str]) -> int` — order: `install_stop_handler()`, `install_quiet_hooks()`, `start_parent_watch`, `faulthandler.enable` and `faulthandler.dump_traceback_later(phase_interval, repeat=True)` both into `<control_dir>/phase.log`; refuse unless `argv[0] == CHILD_TOKEN` (`argv` is everything after `child`); raise `DirtyWorktree` if `git_state(repository)['porcelain']` is not empty; only then import `embedding_data`; run the operation; on success print `json.dumps(result, sort_keys=True, allow_nan=False)` to stdout and return 0; on any `BaseException` write `<control_dir>/failure.json`, print exactly `ACS target validation failed.` to stderr and return 2. Signal handlers and hooks are installed before the heavy import, so a stop during import is also clean.
+  - `child_main(argv: list[str]) -> int` — `return run_child(argv, expected_token=CHILD_TOKEN)`.
+  - `run_child(argv: list[str], *, expected_token: str) -> int` — order: `install_stop_handler()`, `install_quiet_hooks()`, `start_parent_watch`, `faulthandler.enable` and `faulthandler.dump_traceback_later(phase_interval, repeat=True)` both into `<control_dir>/phase.log`; refuse unless `argv[0] == expected_token` (`argv` is everything after `child`); raise `DirtyWorktree` if `git_state(repository)['porcelain']` is not empty; only then import `embedding_data`; run the operation; on success print `json.dumps(result, sort_keys=True, allow_nan=False)` to stdout and return 0; on any `BaseException` write `<control_dir>/failure.json`, print exactly `ACS target validation failed.` to stderr and return 2. Signal handlers and hooks are installed before the heavy import, so a stop during import is also clean.
   - The script's `__main__` dispatches `child` to `child_main(sys.argv[2:])`.
-  - `tests/stage9_guard_children.py MODE [ignored argv…]` — stand-in children that use the real child helpers: `sleep` (blocks 60 s), `scratch DIR` (creates `DIR/x.part` and a `TemporaryDirectory(dir=DIR)`, then loops; removes `x.part` in `finally`), `stubborn` (catches `GuardStop` and sleeps), `alloc BYTES` (allocates and touches, then sleeps), `ok JSON` (prints JSON, exits 0), `leak SENTINEL` (raises in the main thread, a worker thread, a `__del__` and a warning, all with the sentinel in the message). Each mode writes `failure.json` on `BaseException` the way `child_main` does.
+  - `tests/stage9_guard_children.py MODE [ignored argv…]` — stand-in children that use the real child helpers: `sleep` (blocks 60 s), `scratch DIR` (creates `DIR/x.part` and a `TemporaryDirectory(dir=DIR)`, then loops; removes `x.part` in `finally`), `stubborn` (catches `GuardStop` and sleeps), `alloc BYTES` (allocates and touches, then sleeps), `ok JSON` (prints JSON, exits 0), and `child-leak SENTINEL CONTROL_DIR REPOSITORY` (patches `stage9_guard.parse_operation` to return a closure that emits a warning, raises in a worker thread, triggers an unraisable `__del__` error and then raises in the main thread, all with the sentinel in the message, and then calls the real `run_child` with `TEST_TOKEN`). Each other mode writes `failure.json` on `BaseException` the way `run_child` does. Stand-ins are started with `TEST_TOKEN` in their argv.
 
 - [ ] **Step 1: Write the failing tests.**
 
@@ -254,9 +256,14 @@ def test_child_argv_matches_pgrep_pattern(tmp_path):
                             ['r4', '--data-dir', str(tmp_path)], control_dir=tmp_path,
                             repository=tmp_path, parent_pid=1, phase_interval=60.0)
     assert re.search(guard.PGREP_PATTERN, ' '.join(argv))
+    test_argv = guard.child_argv(..., token=guard.TEST_TOKEN)   # same arguments otherwise
+    assert not re.search(guard.PGREP_PATTERN, ' '.join(test_argv))
+
+def test_run_child_refuses_a_wrong_token(tmp_path):
+    assert guard.run_child([guard.TEST_TOKEN, 'build', ...], expected_token=guard.CHILD_TOKEN) == 2
 
 def test_live_child_command_line_is_visible():
-    # one short-lived stand-in: [sys.executable, children, 'sleep', 'child', CHILD_TOKEN]
+    # the only test child that carries CHILD_TOKEN: [sys.executable, children, 'sleep', 'child', CHILD_TOKEN]
     command = subprocess.check_output(['ps', '-o', 'command=', '-p', str(proc.pid)], text=True)
     assert re.search(guard.PGREP_PATTERN, command)
     # terminate at once: other sessions' pgrep sees it while it lives
@@ -278,7 +285,7 @@ def test_child_stops_cleanly_when_supervisor_dies(tmp_path):
 
 def test_no_message_text_reaches_any_output(tmp_path):
     sentinel = 'SENTINEL-4f1c-value'
-    # run the 'leak' stand-in with control_dir=tmp_path, capture stdout and stderr
+    # run the 'child-leak' stand-in (it drives the real run_child) with control_dir=tmp_path
     assert sentinel not in stdout + stderr
     assert all(sentinel not in f.read_text(errors='replace')
                for f in tmp_path.rglob('*') if f.is_file())
@@ -289,7 +296,7 @@ def test_failure_record_keeps_errno(tmp_path):
     # OSError(errno.ENOSPC, 'SENTINEL') → record['errno'] == errno.ENOSPC, no message
 
 def test_child_refuses_dirty_repository(tmp_path):
-    # git init + commit + an untracked file; child_main with an operation that would fail loudly
+    # git init + commit + an untracked file; run_child(..., expected_token=TEST_TOKEN) with an operation that would fail loudly
     assert exit_code == 2
     assert failure['class'].endswith('DirtyWorktree')
     # no embedding_data module was imported (check sys.modules in a subprocess)
@@ -325,15 +332,15 @@ git commit -m "feat(stage9): add the guarded child with a message-free failure r
   - `class GuardRefusal(Exception)` with a fixed `reason` string.
   - `control_directory(data_dir: Path, run_id: str, command: str) -> Path` — `<data>/derived/acs/target-controls/<run_id>-guard` for `build`, `<run_id>-verify-guard` for `verify`.
   - `preflight(command: str, run_id: str, data_dir: Path, repository: Path, limits: Limits, probes: Probes) -> dict` — read-only. Refuses: a run ID that fails `acs_target_bundle`'s safe-ID pattern `[A-Za-z0-9][A-Za-z0-9_-]*`; a run ID in `OLD_RUN_IDS`; for `build`, an existing run directory, `.part` or any `<run_id>-scratch-*`; for `verify`, a missing run directory; an existing control directory; a non-empty `git status --porcelain`; a missing `<repository>/.venv/bin/python` (unless the caller passes a child prefix); for `build`, free data-volume bytes under `launch_floor_bytes`. Returns `{'free_bytes': {'data': int, 'temp': int}, 'volumes': …, 'git': …}`.
-  - `supervise(command: str, options: list[str], *, data_dir: Path, repository: Path, limits: Limits = Limits(), probes: Probes | None = None, child_prefix: list[str] | None = None) -> dict` — runs `preflight`, then creates the control directory with `mkdir(exist_ok=False)`, writes `preserved-before.json` (build only), starts the child with `RUN_PROFILE` added to its environment and stdout/stderr to `child.stdout`/`child.stderr`, samples, stops, reaps with `os.wait4`, and writes `result.json`. Returns the result.
+  - `supervise(command: str, options: list[str], *, data_dir: Path, repository: Path, limits: Limits = Limits(), probes: Probes | None = None, child_prefix: list[str] | None = None, token: str = CHILD_TOKEN) -> dict` — runs `preflight`, then creates the control directory with `mkdir(exist_ok=False)`, writes `preserved-before.json` (build only) and `launch.json` (`manifest_prefix`, `launch_git`, `limits`, `profile`, `volumes`, child argv, `started_at`) before the child starts, then starts the child with `RUN_PROFILE` added to its environment and stdout/stderr to `child.stdout`/`child.stderr`, samples, stops, reaps with `os.wait4`, and writes `result.json`. Returns the result.
   - Stop order on each tick: footprint ≥ `footprint_bytes` → SIGKILL, reason `footprint`. Every `disk_interval`: the lower free value of the data and temp volumes < `disk_hard_bytes` → SIGKILL `disk_hard`; < `disk_soft_bytes` → SIGTERM `disk_soft`; elapsed ≥ `deadline_seconds` → SIGTERM `deadline`. After a SIGTERM, elapsed since it ≥ `grace_seconds` → SIGKILL with `escalated: true` and the first reason kept. Footprint and hard-disk checks continue during the grace period. The supervisor never deletes anything.
   - `samples.jsonl`: one line per `disk_interval`, `{'t': seconds, 'footprint_max': int, 'footprint_last': int, 'free': {'data': int, 'temp': int}}`.
   - `result.json` keys: `command`, `run_id`, `data_dir`, `repository`, `launch_git`, `exit_git`, `python`, `profile`, `limits`, `volumes`, `started_at`, `ended_at`, `wall_seconds`, `max_rss_bytes`, `peak_footprint_bytes`, `disk_low_bytes` (`data`, `temp`), `exit_status`, `signal`, `stop_reason`, `escalated`, `last_phase`, `failure` (the child's `failure.json` or `null`), `manifest_prefix`, `preserved_inventory_sha256`, `response` (the child's stdout JSON or `null`), `outputs_sha256` (the supervisor's own SHA-256 of `<run>/outputs.json`, build only), `bundle` (`bundle_size`, build only), `verify_status` (verify only), `ok`.
   - `ok` is true only if the child exited 0 and, for `build`, the run directory holds eleven files and `response['outputs_sha256'] == outputs_sha256`; for `verify`, `response['status'] == 'verified'`.
-  - `post_checks(run_id: str, data_dir: Path) -> dict` — reads the build control's `result.json` and `preserved-before.json`; returns one flat dict: the keys of `check_manifest_prefix` (with `written` = the run directory, `.part`, scratch and both control directories) plus `'preserved_equal': bool`. Writes nothing.
+  - `post_checks(run_id: str, data_dir: Path) -> dict` — reads the build control's `launch.json` (for the manifest prefix taken before the child started) and `preserved-before.json`; returns one flat dict: the keys of `check_manifest_prefix` (with `written` = the run directory, `.part`, scratch and both control directories) plus `'preserved_equal': bool`. Writes nothing.
   - CLI: `stage9_guard.py build RUN_ID <the acs_targets build options>`, `stage9_guard.py verify RUN_ID <the acs_targets verify options>`, `stage9_guard.py post-checks RUN_ID --data-dir D`, plus `--repository` (default: the script's repository root), `--preflight-only` (print `preflight` JSON, write nothing) and one override flag per `Limits` field. The supervisor prints `result.json`'s content as one JSON line. Exit 0 if `ok`, 1 otherwise, 2 on `GuardRefusal` (one line `Stage 9 guard refused: <reason>` on stderr).
 
-- [ ] **Step 1: Write the failing tests** (stand-in children through `child_prefix=[sys.executable, CHILDREN, MODE, …]`; small `Limits`; a fake `free_bytes` where needed).
+- [ ] **Step 1: Write the failing tests** (stand-in children through `child_prefix=[sys.executable, CHILDREN, MODE, …]` and `token=TEST_TOKEN`; small `Limits` with all disk limits 0 unless forced; a fake `free_bytes` where needed).
 
 ```python
 def test_footprint_limit_kills_at_once(tmp_path):
@@ -370,6 +377,16 @@ def test_refusals_write_nothing(tmp_path, case):
     with pytest.raises(GuardRefusal):    # or exit 2 through the CLI for missing_data_dir
         ...
     assert snapshot(tmp_path) == before and no_child_started
+
+def test_launch_record_exists_while_the_child_runs(tmp_path):
+    # 'sleep' stand-in; poll until the child is alive, then read launch.json
+    assert launch['manifest_prefix']['bytes'] == manifest_size_before_launch
+    assert launch['launch_git']['porcelain'] == ''
+
+def test_supervisor_never_imports_polars(tmp_path):
+    # run the supervisor CLI in a subprocess on an 'ok' stand-in, with a flag-free
+    # wrapper that prints sorted(sys.modules) at exit
+    assert not {'polars', 'embedding_data'} & top_level_modules
 
 def test_result_records_measurements_and_git(tmp_path):
     # 'ok' stand-in that also prints the two RUN_PROFILE variables it sees
@@ -412,9 +429,9 @@ git commit -m "feat(stage9): add the guard supervisor, stop rules and post-check
 **Interfaces:**
 - Consumes: `acs_target_fixtures.authenticated_mapping(tmp_path, monkeypatch, prepare_acs=prepare_target_delivery)` (returns `data_dir`, `request`, `mapping`, `mapping_outputs_sha256`); `stage9_guard.supervise`, `child_main`, `post_checks`, `Limits`, `Probes`.
 - Fact measured at planning (2026-11-23): a fresh process cannot build the seeded fixture (`ipums_references` refuses the original), because the fixture patches five registries in-process. Restoring them in the child makes both `build` and `verify_bundle` pass (about 3.5 min on all cores). The five are `REGISTRY` of `embedding_data.acs_mapping_references`, `code_references`, `geography_references` and `ipums_references`, and `CT_REGISTRY` of `acs_mapping_references`.
-- Produces: `tests/stage9_guard_fixture_child.py STATE_PICKLE child embedding_data.acs_targets …` — loads the pickle, sets each `(module, attribute)` to its value, then calls `stage9_guard.child_main(sys.argv[3:])`. It lives under `tests/` only, and `scripts/stage9_guard.py` never imports it. The dry run passes `child_prefix=[sys.executable, FIXTURE_CHILD, str(state_pickle)]`, so the child argv still carries `CHILD_TOKEN`.
+- Produces: `tests/stage9_guard_fixture_child.py STATE_PICKLE child TEST_TOKEN …` — loads the pickle, sets each `(module, attribute)` to its value, then calls `stage9_guard.run_child(sys.argv[3:], expected_token=TEST_TOKEN)`, the same path as production `child_main`. It lives under `tests/` only, and `scripts/stage9_guard.py` never imports it. The dry run passes `child_prefix=[sys.executable, FIXTURE_CHILD, str(state_pickle)]` and `token=TEST_TOKEN`, so its minutes-long children stay invisible to other sessions' `pgrep` checks.
 
-- [ ] **Step 1: Write the failing tests.** A module-scoped fixture seeds the chain once under `pytest.MonkeyPatch.context()`, pickles every `REGISTRY`/`CT_REGISTRY` attribute of each loaded `embedding_data.*` module, and makes a clean throwaway git repository to pass as `repository`. Tests use the default `Limits` except where a stop is forced, with `phase_interval=0.5`.
+- [ ] **Step 1: Write the failing tests.** A module-scoped fixture seeds the chain once under `pytest.MonkeyPatch.context()`, pickles every `REGISTRY`/`CT_REGISTRY` attribute of each loaded `embedding_data.*` module, and makes a clean throwaway git repository to pass as `repository`. Tests use `Limits(launch_floor_bytes=0, disk_soft_bytes=0, disk_hard_bytes=0, phase_interval=0.5)` with the production footprint, deadline and grace values, except where a stop is forced, and `token=TEST_TOKEN`.
 
 ```python
 def test_dry_run_guarded_build_and_verify(seeded):
@@ -444,7 +461,7 @@ def test_dry_run_hard_stop_leaves_only_sigkill_paths(seeded, stop):
     assert result['last_phase']['innermost_embedding_data'] is not None
 ```
 
-Each forced-stop test uses its own run ID in the same seeded root. Assert at the end of the module that `preserved_inventory` of the seeded root is unchanged and the raw manifest prefix holds.
+Each forced-stop test uses its own run ID in the same seeded root. Each test also asserts, for its own run, that the raw manifest prefix from its `launch.json` holds; the module fixture's teardown asserts that `preserved_inventory` of the seeded root is unchanged (no reliance on test order under xdist).
 
 - [ ] **Step 2: Run them and see them fail.** `uv run --locked pytest tests/test_stage9_guard.py -v -k dry_run` → FAIL (no shim).
 
@@ -565,7 +582,7 @@ Expected: `prefix_equal: true`, `names_written_path: false`, `preserved_equal: t
 
 - [ ] **Step 3: Update `CLAUDE.md` and `README.md`.** Replace the Stage 9 text that says "Task 10 remains in progress" (`CLAUDE.md`, "ACS target software (Stage 9)"; `README.md` near lines 1387–1428) with: the run ID, its detached pin, the guarded build and verify invocations (`stage9_guard.py` with `STAGE9_BUILD_ARGS` written out), a pointer to the new findings file, and the sentence that Stage 9's first build took no freeze window. Keep the r1 history as one sentence pointing at the findings file.
 
-- [ ] **Step 4: Retire plan 9.** `git mv specs/plans/9-acs-targets.md specs/plans/completed/9-acs-targets.md` and add a status line under its title: plan 21 (`specs/plans/21-acs-targets-first-build.md`) replaced its Tasks 10 and 11. Re-point any relative link the move breaks.
+- [ ] **Step 4: Retire plan 9.** `git mv specs/plans/9-acs-targets.md specs/plans/completed/9-acs-targets.md` and add a status line under its title: plan 21 (`specs/plans/21-acs-targets-first-build.md`) replaced its Tasks 10 and 11. Re-point any relative link the move breaks. The move does not retire `specs/acs-targets.md`: it stays in `specs/`, because the findings (section 6), `CLAUDE.md` and the deferred old Stages 12–13 bind to it. Plan 9 gets no history entry or deferral scan of its own: its status note points at this plan, whose history entry covers it.
 
 - [ ] **Step 5: Commit** (`pgrep` check first, after the guarded runs have exited).
 
