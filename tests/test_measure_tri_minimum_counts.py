@@ -237,6 +237,19 @@ def test_wilson_interval_stays_inside_zero_and_one(script):
     assert script.wilson(0, 0) is None
 
 
+def test_untestable_base_cells_do_not_keep_a_thin_top_band(script):
+    result = script.curve(cells((1, 60, 60, 0), (10, 10, 5, 50)))
+    assert shape(result['before_downward_merge']) == [(1, 1, 60, 60), (2, None, 10, 5)]
+    assert shape(result['bands']) == [(1, None, 70, 65)]
+    assert (result['minimum'], result['reason']) == (1, None)
+
+
+def test_untestable_cells_do_not_fill_a_band(script):
+    found = script.bands(cells((1, 10, 0, 100), (2, 50, 0, 0)))
+    assert [(b['low'], b['high'], b['base_cells'], b['testable_cells']) for b in found] == [
+        (1, 2, 160, 60), (3, None, 0, 0)]
+
+
 def test_curve_sums_counts_over_the_bands(script):
     result = script.curve(cells(*THIN_TOP))
     assert (result['base_cells'], result['testable_cells'], result['recurring_cells']) == (
