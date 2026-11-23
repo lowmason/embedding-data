@@ -40,7 +40,9 @@
 
 ## Decisions
 
-None. All four owner decisions and every "Claude's call" are in the spec's "Owner decisions (2026-11-23)".
+- **D1** (owner, plan review, 2026-11-23): this plan takes a plan id free of the parallel Stage 11 and Stage 15 plans. The owner chose 23. The Stage 11 session took 23 before the commit, so the plan is 24. Applied in: the file name, Task 1 Step 4, Task 9 Step 4.
+
+The spec's four owner decisions and every "Claude's call" are in its "Owner decisions (2026-11-23)".
 
 ## Files
 
@@ -98,7 +100,7 @@ git rev-parse codex/acs-targets-design
 
 Expected: `ancestor`; both diffs empty; `1a6377d…` unchanged. `tests/conftest.py` keeps the line that `1a6377d` added.
 
-- [ ] **Step 4: Copy plan 10 under a status line.** Copy the Codex worktree's `specs/plans/10-acs-targets.md` byte for byte to `specs/plans/completed/10-acs-targets.md`, then insert two lines at the top: a status line and a blank line. Wording (builder may adjust; the date is the execution date): `**Status: SHIPPED (<YYYY-MM-DD>)** — its tasks shipped in commits 6a30106…1a6377d, merged into main by plan 21. Plan 21 (specs/plans/21-acs-targets-first-build.md) replaces its open checkpoints.`
+- [ ] **Step 4: Copy plan 10 under a status line.** Copy the Codex worktree's `specs/plans/10-acs-targets.md` byte for byte to `specs/plans/completed/10-acs-targets.md`, then insert two lines at the top: a status line and a blank line. Wording (builder may adjust; the date is the execution date): `**Status: SHIPPED (<YYYY-MM-DD>)** — its tasks shipped in commits 6a30106…1a6377d, merged into main by plan 24. Plan 24 (specs/plans/24-acs-targets-first-build.md) replaces its open checkpoints.`
 
 Check: `tail -n +3 specs/plans/completed/10-acs-targets.md | cmp - /Users/lowell/.codex/worktrees/acs-targets-design/embedding-data/specs/plans/10-acs-targets.md` prints nothing.
 
@@ -582,7 +584,7 @@ Expected: `prefix_equal: true`, `names_written_path: false`, `preserved_equal: t
 
 - [ ] **Step 3: Update `CLAUDE.md` and `README.md`.** Replace the Stage 9 text that says "Task 10 remains in progress" (`CLAUDE.md`, "ACS target software (Stage 9)"; `README.md` near lines 1387–1428) with: the run ID, its detached pin, the guarded build and verify invocations (`stage9_guard.py` with `STAGE9_BUILD_ARGS` written out), a pointer to the new findings file, and the sentence that Stage 9's first build took no freeze window. Keep the r1 history as one sentence pointing at the findings file.
 
-- [ ] **Step 4: Retire plan 9.** `git mv specs/plans/9-acs-targets.md specs/plans/completed/9-acs-targets.md` and add a status line under its title: plan 21 (`specs/plans/21-acs-targets-first-build.md`) replaced its Tasks 10 and 11. Re-point any relative link the move breaks. The move does not retire `specs/acs-targets.md`: it stays in `specs/`, because the findings (section 6), `CLAUDE.md` and the deferred old Stages 12–13 bind to it. Plan 9 gets no history entry or deferral scan of its own: its status note points at this plan, whose history entry covers it.
+- [ ] **Step 4: Retire plan 9.** `git mv specs/plans/9-acs-targets.md specs/plans/completed/9-acs-targets.md` and add a status line under its title: plan 24 (`specs/plans/24-acs-targets-first-build.md`) replaced its Tasks 10 and 11. Re-point any relative link the move breaks. The move does not retire `specs/acs-targets.md`: it stays in `specs/`, because the findings (section 6), `CLAUDE.md` and the deferred old Stages 12–13 bind to it. Plan 9 gets no history entry or deferral scan of its own: its status note points at this plan, whose history entry covers it.
 
 - [ ] **Step 5: Commit** (`pgrep` check first, after the guarded runs have exited).
 
