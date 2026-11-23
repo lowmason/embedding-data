@@ -707,8 +707,9 @@ and never enter a repository. naics-embedder may read the file in place on that 
 under its detached pin (R8.1). The reader's results for single persons are bound by the same
 rule. Only aggregate scores and decisions are shared. Under R8.4 the file only judges and
 never trains. The tests and the fixture chain show software readiness only. Fixture results
-are never benchmarks. No headline minimum count (O23) and no protocol section (O24) exist
-yet.
+are never benchmarks. [The V9 ACS wage decision](specs/findings/v9-acs-wage-minimum-earners.md)
+sets the minimum number of headline earners for each category (O23). No protocol section
+(O24) exists yet.
 
 The measured production runs are `stage17_acs_wage_microdata_20261119_r1` (the first run)
 and `stage17_acs_wage_microdata_20261119_r1_replay`. Their detached pins, which `verify`

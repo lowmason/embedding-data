@@ -1,5 +1,7 @@
 # Minimum headline earners for the ACS wage microdata
 
+**Status: COMPLETE (2026-11-23)** — implemented by [plan 17](../plans/completed/17-acs-wage-minimum-earners.md); decision in the [V9 ACS wage decision](../findings/v9-acs-wage-minimum-earners.md).
+
 > Next step: writing-plans, in a fresh session, against this file.
 
 Status: APPROVED (2026-11-22, owner: "Approve"). Written 2026-11-22.
