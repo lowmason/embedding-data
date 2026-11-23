@@ -1,6 +1,6 @@
 # ACS targets: first full build under a memory guard
 
-Status: DRAFT (2026-11-23), awaiting the owner's approval.
+Status: APPROVED (2026-11-23, owner: "Approve, 48 h"). Written 2026-11-23.
 
 This is the stage spec for Stage 9 of `specs/naics-evaluation-data-roadmap.md` (Track F,
 outcome O15). It does not replace the approved ACS targets spec `specs/acs-targets.md` or
@@ -53,6 +53,8 @@ Recon results that shaped the design:
    stage without that choice. (Owner: "1".)
 3. **Approach I.** The build runs directly under a new guard wrapper, with no probe first.
    (Owner: "I".)
+4. **Deadline 48 h** each for the build and for `verify`, and approval of this spec with the
+   calls marked "Claude's call". (Owner: "Approve, 48 h".)
 
 ## Intent
 
@@ -229,8 +231,8 @@ The wall-clock limit is a host-time budget, not a technical setting. The 20–25
 scales assembly linearly from probe 7, which covered 4 of the 50 products. The near-quadratic
 growth that probe 5 found was in the assembly method that A1 replaced, and nothing has
 measured the new method's growth at full scale. Under rule 1, a deadline stop ends the stage
-with nothing published. 48 h is about twice the estimate. *(Pending the owner's confirmation
-at spec review.)*
+with nothing published. 48 h is about twice the estimate. *(Owner, 2026-11-23: "Approve,
+48 h".)*
 
 Disk and time stops send SIGTERM and wait, because a clean exit removes the build's scratch
 and a kill does not. A real `ENOSPC` raises an exception, and the build's cleanup handles it.
