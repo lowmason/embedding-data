@@ -13,10 +13,12 @@ the person rows. A failed check raises `Refused` with a fixed reason: no path, v
 text goes into it.
 '''
 
+import argparse
 import hashlib
 import json
 import math
 import re
+import sys
 from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
@@ -64,6 +66,11 @@ COLUMNS_DIFFER = 'person table columns differ from the contract'
 RECOUNT_DIFFERS = 'headline recount differs from the report'
 COUNT_DIFFERS = 'headline category count differs from the report'
 BAD_ROW = 'headline row has a non-finite wage or a non-positive weight'
+FAILED = 'measurement failed'
+
+KEPT_AT_A_MINIMUM = ('kept_categories', 'kept_category_share', 'kept_headline_rows',
+                     'kept_headline_row_share', 'count_meets_se_misses',
+                     'count_misses_se_meets', 'missed')
 
 
 def category_se(rows: pl.DataFrame) -> tuple[float | None, str | None]:
@@ -287,3 +294,140 @@ def self_check(report: dict, headline: pl.DataFrame) -> None:
               & pl.col('PERWT').is_not_nan()).fill_null(False)
     if not headline.select(usable.all()).item():
         raise Refused(BAD_ROW)
+
+
+def category_records(headline: pl.DataFrame) -> list[dict]:
+    '''One record per `(YEAR, INDNAICS)` of the headline rows, sorted by year and then code.
+
+    `partition_by` returns the groups in the order of their first row, which follows the row
+    order of the table. So the records are sorted before they leave, and group order never
+    reaches the output. `INDNAICS` stays as delivered, with its space padding.
+    '''
+    records = []
+    for (year, code), rows in headline.partition_by('YEAR', 'INDNAICS', as_dict=True).items():
+        se, undefined = category_se(rows)
+        records.append({
+            'INDNAICS': code,
+            'YEAR': year,
+            'headline_rows': rows.height,
+            'se': se,
+            'undefined': undefined,
+            'meets_se_target': meets_target(se),
+        })
+    return sorted(records, key=lambda entry: (entry['YEAR'], entry['INDNAICS']))
+
+
+def _share(part: int, whole: int) -> float | None:
+    return part / whole if whole else None
+
+
+def kept(records: list[dict], report: dict, year: int, minimum: int | None) -> dict:
+    '''What a minimum keeps of one year's headline categories and rows.
+
+    A category meets the count when its `headline_rows` is at least `minimum`. The shared-node
+    categories are the report entries of the year with no headline rows. With no minimum, only
+    the three totals are set. The two shares divide by the year's headline categories and rows.
+    '''
+    in_year = [entry for entry in records if entry['YEAR'] == year]
+    totals = {
+        'headline_categories': len(in_year),
+        'headline_rows': sum(entry['headline_rows'] for entry in in_year),
+        'shared_node_categories': sum(
+            1 for entry in report['categories']
+            if entry['YEAR'] == year and entry['headline_rows'] == 0),
+    }
+    if minimum is None:
+        return totals | dict.fromkeys(KEPT_AT_A_MINIMUM)
+    meeting = [entry for entry in in_year if entry['headline_rows'] >= minimum]
+    below = [entry for entry in in_year if entry['headline_rows'] < minimum]
+    kept_rows = sum(entry['headline_rows'] for entry in meeting)
+    return totals | {
+        'kept_categories': len(meeting),
+        'kept_category_share': _share(len(meeting), totals['headline_categories']),
+        'kept_headline_rows': kept_rows,
+        'kept_headline_row_share': _share(kept_rows, totals['headline_rows']),
+        'count_meets_se_misses': sum(1 for entry in meeting if not entry['meets_se_target']),
+        'count_misses_se_meets': sum(1 for entry in below if entry['meets_se_target']),
+        'missed': sorted(
+            ({'INDNAICS': entry['INDNAICS'], 'headline_rows': entry['headline_rows']}
+             for entry in below),
+            key=lambda missed: missed['INDNAICS']),
+    }
+
+
+def measure(data_dir: Path, run_id: str, pin: str) -> dict:
+    '''The result of one run. Every check of the pinned bundle passes before any SE.
+
+    The year minimums come from each year's bands, and the minimum is the larger of the two.
+    `kept` applies that one minimum to both years.
+    '''
+    inputs = authenticate(data_dir, run_id, pin)
+    report = load_report(inputs.report)
+    headline = headline_frame(inputs.persons)
+    self_check(report, headline)
+    records = category_records(headline)
+    year_bands = {year: bands([entry for entry in records if entry['YEAR'] == year])
+                  for year in YEARS}
+    year_minimums = {year: year_minimum(year_bands[year]) for year in YEARS}
+    minimum = overall_minimum(list(year_minimums.values()))
+    return {
+        'complete': minimum is not None,
+        'constants': {
+            'se_target': SE_TARGET,
+            'level': LEVEL,
+            'band_starts': list(BAND_STARTS),
+            'min_band_categories': MIN_BAND_CATEGORIES,
+            'replicate_factor': REPLICATE_FACTOR,
+            'years': list(YEARS),
+        },
+        'inputs': {
+            'run': run_id,
+            'outputs_sha256': inputs.outputs_sha256,
+            'report_sha256': inputs.report_sha256,
+            'persons_sha256': inputs.persons_sha256,
+        },
+        'years': {
+            str(year): {
+                'bands': year_bands[year],
+                'minimum': year_minimums[year],
+                'undefined': {
+                    reason: sum(1 for entry in records
+                                if entry['YEAR'] == year and entry['undefined'] == reason)
+                    for reason in UNDEFINED},
+                'kept': kept(records, report, year, minimum),
+            }
+            for year in YEARS},
+        'minimum': minimum,
+        'categories': records,
+    }
+
+
+def _line(result: dict) -> str:
+    return json.dumps(result, sort_keys=True, allow_nan=False)
+
+
+def main(argv: list[str] | None = None) -> int:
+    '''Print the result as one JSON line and return the exit status.
+
+    The status is 0 when the run has a minimum and 1 when it has none. A refusal prints its fixed
+    reason and gives 2. Any other failure prints `FAILED` and gives 2, with nothing of the
+    exception, so no path, value or error text reaches the output.
+    '''
+    parser = argparse.ArgumentParser(description='Measure the Stage 19 minimum headline earners.')
+    parser.add_argument('--data-dir', required=True, type=Path)
+    parser.add_argument('--run', required=True)
+    parser.add_argument('--outputs-sha256', required=True)
+    arguments = parser.parse_args(argv)
+    try:
+        result = measure(arguments.data_dir, arguments.run, arguments.outputs_sha256)
+        line, status = _line(result), 0 if result['complete'] else 1
+    except Refused as refusal:
+        line, status = _line({'complete': False, 'reason': str(refusal)}), 2
+    except Exception:
+        line, status = _line({'complete': False, 'reason': FAILED}), 2
+    print(line)
+    return status
+
+
+if __name__ == '__main__':
+    sys.exit(main())

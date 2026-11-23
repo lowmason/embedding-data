@@ -1,20 +1,26 @@
 '''The Stage 19 minimum-earners measurement script: the SE and band rule on small typed rows, and
 the authentication of the pinned Stage 17 bundle on small hand-made bundles.'''
 
+import ast
 import dataclasses
 import importlib.util
 import json
 import math
+import os
 import random
 import shutil
+import subprocess
+import sys
 from fractions import Fraction
 from pathlib import Path
 
+import acs_wage_fixtures
 import polars as pl
 import pytest
-from acs_wage_fixtures import core_row
+from acs_mapping_fixtures import forbid_external_access
+from acs_wage_fixtures import core_row, wage_mapping
 
-from embedding_data import manifest, target_io
+from embedding_data import acs_wage_bundle, manifest, target_io
 from embedding_data.acs_wage_bundle import FILES
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -1006,3 +1012,610 @@ def test_headline_frame_returns_the_delivered_weights(script, tmp_path):
     for column in ('PERWT', *REPLICATE_NAMES):
         assert headline[column].to_list() == [row[column] for row in delivered]
         assert headline.schema[column] == READ_SCHEMA[column]
+
+
+# Task 3: the category records, the kept counts and the command line.
+
+RECORD_KEYS = {'INDNAICS', 'YEAR', 'headline_rows', 'se', 'undefined', 'meets_se_target'}
+KEPT_KEYS = {'headline_categories', 'headline_rows', 'shared_node_categories', 'kept_categories',
+             'kept_category_share', 'kept_headline_rows', 'kept_headline_row_share',
+             'count_meets_se_misses', 'count_misses_se_meets', 'missed'}
+NO_REASONS = {'fewer_than_two_rows': 0, 'constant_wage': 0,
+              'replicate_denominator_not_positive': 0}
+CONSTANTS = {'se_target': 0.05, 'level': 0.9, 'band_starts': [1, 50, 100, 200, 400, 800, 1600],
+             'min_band_categories': 10, 'replicate_factor': 0.05, 'years': [2023, 2024]}
+GOLDEN_ROWS = len(SMALL_CODES) * 2 + LARGE_ROWS
+GOLDEN_KEPT = {'headline_categories': 10, 'headline_rows': GOLDEN_ROWS,
+               'shared_node_categories': 0, 'kept_categories': 10, 'kept_category_share': 1.0,
+               'kept_headline_rows': GOLDEN_ROWS, 'kept_headline_row_share': 1.0,
+               'count_meets_se_misses': 0, 'count_misses_se_meets': 0, 'missed': []}
+NO_MINIMUM_KEPT = dict.fromkeys(KEPT_KEYS - {'headline_categories', 'headline_rows',
+                                             'shared_node_categories'})
+
+
+def command_line(bundle, pin=None, run=None):
+    return ['--data-dir', str(bundle['data_dir']), '--run', bundle['run'] if run is None else run,
+            '--outputs-sha256', bundle['pin'] if pin is None else pin]
+
+
+def run_main(script, capsys, bundle, pin=None):
+    '''Run `main` on a bundle. Return its status and its one JSON line, parsed.'''
+    status = script.main(command_line(bundle, pin))
+    captured = capsys.readouterr()
+    assert captured.err == '' and captured.out.endswith('\n')
+    lines = captured.out.splitlines()
+    assert len(lines) == 1
+    result = json.loads(lines[0])
+    assert lines[0] == json.dumps(result, sort_keys=True)
+    return status, result
+
+
+def run_command(arguments, *, threads=None, hash_seed=None):
+    '''Run the script as a program, with a Polars thread count and a Python hash seed.'''
+    env = dict(os.environ)
+    if threads is not None:
+        env['POLARS_MAX_THREADS'] = str(threads)
+    if hash_seed is not None:
+        env['PYTHONHASHSEED'] = str(hash_seed)
+    return subprocess.run([sys.executable, str(SCRIPT), *arguments], cwd=ROOT, env=env,
+                          capture_output=True, text=True, check=False)
+
+
+def tree(data_dir):
+    '''Every file under `data_dir` as a sorted list of (relative path, SHA-256).'''
+    return sorted((path.relative_to(data_dir).as_posix(), manifest.sha256_file(path))
+                  for path in data_dir.rglob('*') if path.is_file())
+
+
+def swing(index):
+    '''Replicate weights of 2 and 1 that swap with each replicate, in opposite phase by parity.'''
+    return {name: 1 + (index + number) % 2 for number, name in enumerate(REPLICATE_NAMES, start=1)}
+
+
+def category(code, year, count, *, swinging=False):
+    '''`count` headline rows alternating between the wages 10 and 11.
+
+    For an even `count`, equal weights give SE 0 and swinging weights give SE 1/3.
+    '''
+    return [person(code, year, 10.0 + index % 2, **(swing(index) if swinging else {}))
+            for index in range(count)]
+
+
+def headline_of(people):
+    return pl.from_dicts(people, schema=READ_SCHEMA)
+
+
+def noisy_people(seed=5):
+    '''`golden_people` with row-by-row wages and weights in the 1,600-row categories.
+
+    Their SEs are above 0 and below the target, and the sums depend on the order of addition.
+    '''
+    rng = random.Random(seed)
+    people = golden_people()
+    for row in people:
+        if row['INDNAICS'] == LARGE_CODE and row['flag_headline']:
+            row['log_wage_2010'] = round(rng.uniform(10.0, 12.0), 4)
+            row['PERWT'] = round(rng.uniform(50.0, 150.0), 3)
+            row |= {name: rng.randint(50, 150) for name in REPLICATE_NAMES}
+    return people
+
+
+def crowded_people():
+    '''`noisy_people` and 60 more two-row categories in each year, so that group order shows.'''
+    people = noisy_people()
+    for year in (2023, 2024):
+        for number in range(60):
+            people += category(f'3{number:03d}', year, 2)
+    return people
+
+
+def banded_people(hard_year):
+    '''Per year: ten 2-row categories, ten 60-row ones and one 1,600-row one.
+
+    In `hard_year` the 2-row categories miss the target, so the band that starts at 1 fails and
+    the year's minimum is 50. In the other year one 60-row category misses it: 9 of 10 meet, and
+    every band passes.
+    '''
+    people = []
+    for year in (2023, 2024):
+        hard = year == hard_year
+        for number in range(10):
+            people += category(f'1{number:03d}', year, 2, swinging=hard)
+            people += category(f'2{number:03d}', year, 60, swinging=not hard and number == 0)
+        people += category(LARGE_CODE, year, LARGE_ROWS)
+    return people
+
+
+def without_second_row(people, year, codes=('1111', '2222')):
+    '''Make the second headline row of each of `codes` in `year` a non-headline row.'''
+    for row in people:
+        if row['YEAR'] == year and row['INDNAICS'] in codes and row['log_wage_2010'] == 11.0:
+            row['flag_headline'] = False
+    return people
+
+
+def keyed(code, headline_rows, meets, year=2023):
+    return record(headline_rows, meets) | {'INDNAICS': code, 'YEAR': year}
+
+
+def shared_node(code, year):
+    return {'INDNAICS': code, 'YEAR': year, 'rows': 3, 'headline_rows': 0}
+
+
+def test_kept_counts_and_disagreements(script):
+    records = [keyed('1111', 30, False), keyed('2222', 60, True), keyed('3333', 60, False),
+               keyed('4444', 90, True)]
+    report = {'categories': [shared_node('0000', 2023)]}
+    assert script.kept(records, report, 2023, 50) == {
+        'headline_categories': 4, 'headline_rows': 240, 'shared_node_categories': 1,
+        'kept_categories': 3, 'kept_category_share': 0.75, 'kept_headline_rows': 210,
+        'kept_headline_row_share': 0.875, 'count_meets_se_misses': 1,
+        'count_misses_se_meets': 0, 'missed': [{'INDNAICS': '1111', 'headline_rows': 30}]}
+    assert script.kept(records, report, 2023, None) == {
+        'headline_categories': 4, 'headline_rows': 240, 'shared_node_categories': 1,
+        'kept_categories': None, 'kept_category_share': None, 'kept_headline_rows': None,
+        'kept_headline_row_share': None, 'count_meets_se_misses': None,
+        'count_misses_se_meets': None, 'missed': None}
+
+
+def test_kept_counts_only_the_year_asked(script):
+    records = [keyed('1111', 30, True), keyed('2222', 70, False),
+               keyed('1111', 80, True, 2024), keyed('3333', 20, False, 2024),
+               keyed('4444', 200, True, 2024)]
+    report = {'categories': [
+        shared_node('0000', 2023), shared_node('0001', 2023), shared_node('0000', 2024),
+        {'INDNAICS': '1111', 'YEAR': 2023, 'rows': 5, 'headline_rows': 2}]}
+    assert script.kept(records, report, 2023, 50) == {
+        'headline_categories': 2, 'headline_rows': 100, 'shared_node_categories': 2,
+        'kept_categories': 1, 'kept_category_share': 1 / 2, 'kept_headline_rows': 70,
+        'kept_headline_row_share': 70 / 100, 'count_meets_se_misses': 1,
+        'count_misses_se_meets': 1, 'missed': [{'INDNAICS': '1111', 'headline_rows': 30}]}
+    assert script.kept(records, report, 2024, 50) == {
+        'headline_categories': 3, 'headline_rows': 300, 'shared_node_categories': 1,
+        'kept_categories': 2, 'kept_category_share': 2 / 3, 'kept_headline_rows': 280,
+        'kept_headline_row_share': 280 / 300, 'count_meets_se_misses': 0,
+        'count_misses_se_meets': 0, 'missed': [{'INDNAICS': '3333', 'headline_rows': 20}]}
+
+
+def test_kept_at_the_minimum_is_kept(script):
+    records = [keyed('a', 49, True), keyed('b', 50, True), keyed('c', 51, True)]
+    result = script.kept(records, {'categories': []}, 2023, 50)
+    assert result['kept_categories'] == 2 and result['kept_headline_rows'] == 101
+    assert result['missed'] == [{'INDNAICS': 'a', 'headline_rows': 49}]
+
+
+def test_kept_tallies_each_disagreement_apart(script):
+    records = ([keyed(f'a{n}', 60, False) for n in range(3)]
+               + [keyed(f'b{n}', 10, True) for n in range(2)]
+               + [keyed('c', 60, True), keyed('d', 10, False)])
+    result = script.kept(records, {'categories': []}, 2023, 50)
+    assert (result['count_meets_se_misses'], result['count_misses_se_meets']) == (3, 2)
+
+
+def test_kept_missed_are_sorted_by_code_with_their_padding(script):
+    records = [keyed('6231  ', 5, False), keyed('1111', 7, False), keyed('6231', 9, False),
+               keyed('0200', 1, False)]
+    missed = script.kept(records, {'categories': []}, 2023, 50)['missed']
+    assert missed == [{'INDNAICS': '0200', 'headline_rows': 1},
+                      {'INDNAICS': '1111', 'headline_rows': 7},
+                      {'INDNAICS': '6231', 'headline_rows': 9},
+                      {'INDNAICS': '6231  ', 'headline_rows': 5}]
+
+
+def test_kept_of_a_year_without_headline_categories(script):
+    report = {'categories': [shared_node('0000', 2023)]}
+    assert script.kept([], report, 2023, 1) == {
+        'headline_categories': 0, 'headline_rows': 0, 'shared_node_categories': 1,
+        'kept_categories': 0, 'kept_category_share': None, 'kept_headline_rows': 0,
+        'kept_headline_row_share': None, 'count_meets_se_misses': 0, 'count_misses_se_meets': 0,
+        'missed': []}
+
+
+def test_category_records_are_one_per_year_and_code_in_sorted_order(script):
+    people = (category('6231  ', 2024, 4) + category('1111', 2023, 2) + category('6231', 2024, 2)
+              + category('6231  ', 2023, 6) + category('6231', 2023, 2)
+              + category('1111', 2024, 2))
+    records = script.category_records(headline_of(people))
+    assert [(r['YEAR'], r['INDNAICS'], r['headline_rows']) for r in records] == [
+        (2023, '1111', 2), (2023, '6231', 2), (2023, '6231  ', 6),
+        (2024, '1111', 2), (2024, '6231', 2), (2024, '6231  ', 4)]
+    assert all(set(r) == RECORD_KEYS for r in records)
+
+
+def test_category_records_hold_the_se_the_reason_and_the_target_flag(script):
+    people = (category('1111', 2023, 2, swinging=True) + category('2222', 2023, 4)
+              + [person('3333', 2023, 10.0)])
+    by_code = {r['INDNAICS']: r for r in script.category_records(headline_of(people))}
+    swinging, equal, single = by_code['1111'], by_code['2222'], by_code['3333']
+    assert swinging['se'] == pytest.approx(1 / 3)
+    assert (swinging['undefined'], swinging['meets_se_target']) == (None, False)
+    assert (equal['se'], equal['undefined'], equal['meets_se_target']) == (0.0, None, True)
+    assert (single['se'], single['undefined'], single['meets_se_target']) == (
+        None, 'fewer_than_two_rows', False)
+
+
+def test_category_records_of_no_rows_are_empty(script):
+    assert script.category_records(headline_of([])) == []
+
+
+def test_golden_run_exits_zero(script, capsys, golden):
+    status, result = run_main(script, capsys, golden)
+    assert status == 0 and result['complete'] is True and result['minimum'] == 1
+    assert set(result) == {'complete', 'constants', 'inputs', 'years', 'minimum', 'categories'}
+    assert result['constants'] == CONSTANTS
+    assert result['inputs'] == {
+        'run': 'fixture', 'outputs_sha256': golden['pin'],
+        'report_sha256': manifest.sha256_file(golden['directory'] / REPORT),
+        'persons_sha256': manifest.sha256_file(golden['directory'] / PERSONS)}
+    assert set(result['years']) == {'2023', '2024'}
+    for year in result['years'].values():
+        assert year == {
+            'bands': [{'start': 1, 'next_start': None, 'categories': 10, 'meeting': 10,
+                       'share': 1.0, 'passes': True}],
+            'minimum': 1, 'undefined': NO_REASONS, 'kept': GOLDEN_KEPT}
+
+
+def test_golden_categories_are_sorted_and_keep_the_delivered_codes(script, capsys, golden):
+    _, result = run_main(script, capsys, golden)
+    codes = sorted((*SMALL_CODES, LARGE_CODE))
+    assert [(c['YEAR'], c['INDNAICS'], c['headline_rows']) for c in result['categories']] == [
+        (year, code, LARGE_ROWS if code == LARGE_CODE else 2)
+        for year in (2023, 2024) for code in codes]
+    assert {'6231', '6231  '} <= {c['INDNAICS'] for c in result['categories']}
+    assert all((c['se'], c['undefined'], c['meets_se_target']) == (0.0, None, True)
+               for c in result['categories'])
+
+
+def test_failing_top_band_exits_one(script, capsys, tmp_path):
+    people = without_second_row(golden_people(), 2024)
+    status, result = run_main(script, capsys, publish(tmp_path, people))
+    assert status == 1 and result['complete'] is False and result['minimum'] is None
+    assert result['years']['2024']['bands'] == [
+        {'start': 1, 'next_start': None, 'categories': 10, 'meeting': 8, 'share': 0.8,
+         'passes': False}]
+    assert result['years']['2024']['minimum'] is None
+    assert result['years']['2024']['undefined'] == NO_REASONS | {'fewer_than_two_rows': 2}
+    assert result['years']['2023']['bands'] == [
+        {'start': 1, 'next_start': None, 'categories': 10, 'meeting': 10, 'share': 1.0,
+         'passes': True}]
+    assert result['years']['2023']['minimum'] == 1
+    assert result['years']['2023']['undefined'] == NO_REASONS
+    assert result['years']['2023']['kept'] == {
+        'headline_categories': 10, 'headline_rows': GOLDEN_ROWS,
+        'shared_node_categories': 0} | NO_MINIMUM_KEPT
+    assert result['years']['2024']['kept'] == {
+        'headline_categories': 10, 'headline_rows': GOLDEN_ROWS - 2,
+        'shared_node_categories': 0} | NO_MINIMUM_KEPT
+    assert len(result['categories']) == 20
+
+
+@pytest.mark.parametrize('failing_year', [2023, 2024])
+def test_one_failing_year_leaves_no_minimum(script, capsys, tmp_path, failing_year):
+    people = without_second_row(golden_people(), failing_year)
+    status, result = run_main(script, capsys, publish(tmp_path, people))
+    other = ({2023, 2024} - {failing_year}).pop()
+    assert (status, result['complete'], result['minimum']) == (1, False, None)
+    assert result['years'][str(other)]['minimum'] == 1
+    assert result['years'][str(failing_year)]['minimum'] is None
+
+
+def test_a_year_without_headline_rows_exits_one(script, capsys, tmp_path):
+    people = [row for row in golden_people() if row['YEAR'] == 2023]
+    people.append(person('1111', 2024, 10.0, headline=False))
+    status, result = run_main(script, capsys, publish(tmp_path, people))
+    assert status == 1 and result['complete'] is False and result['minimum'] is None
+    empty = result['years']['2024']
+    assert empty['bands'] == [{'start': 1, 'next_start': None, 'categories': 0, 'meeting': 0,
+                               'share': None, 'passes': False}]
+    assert empty['minimum'] is None and empty['undefined'] == NO_REASONS
+    assert empty['kept'] == {'headline_categories': 0, 'headline_rows': 0,
+                             'shared_node_categories': 1} | NO_MINIMUM_KEPT
+    assert result['years']['2023']['minimum'] == 1
+    assert {c['YEAR'] for c in result['categories']} == {2023}
+
+
+@pytest.mark.parametrize('hard_year', [2023, 2024])
+def test_the_minimum_is_the_larger_year_minimum(script, capsys, tmp_path, hard_year):
+    status, result = run_main(script, capsys, publish(tmp_path, banded_people(hard_year)))
+    easy_year = ({2023, 2024} - {hard_year}).pop()
+    assert status == 0 and result['complete'] is True and result['minimum'] == 50
+    hard, easy = result['years'][str(hard_year)], result['years'][str(easy_year)]
+    assert (hard['minimum'], easy['minimum']) == (50, 1)
+    assert hard['bands'] == [
+        {'start': 1, 'next_start': 50, 'categories': 10, 'meeting': 0, 'share': 0.0,
+         'passes': False},
+        {'start': 50, 'next_start': 100, 'categories': 10, 'meeting': 10, 'share': 1.0,
+         'passes': True},
+        {'start': 100, 'next_start': None, 'categories': 1, 'meeting': 1, 'share': 1.0,
+         'passes': True}]
+    assert easy['bands'] == [
+        {'start': 1, 'next_start': 50, 'categories': 10, 'meeting': 10, 'share': 1.0,
+         'passes': True},
+        {'start': 50, 'next_start': 100, 'categories': 10, 'meeting': 9, 'share': 0.9,
+         'passes': True},
+        {'start': 100, 'next_start': None, 'categories': 1, 'meeting': 1, 'share': 1.0,
+         'passes': True}]
+    missed = [{'INDNAICS': f'1{number:03d}', 'headline_rows': 2} for number in range(10)]
+    common = {'headline_categories': 21, 'headline_rows': 20 + 600 + LARGE_ROWS,
+              'shared_node_categories': 0, 'kept_categories': 11,
+              'kept_category_share': 11 / 21, 'kept_headline_rows': 600 + LARGE_ROWS,
+              'kept_headline_row_share': (600 + LARGE_ROWS) / (20 + 600 + LARGE_ROWS),
+              'missed': missed}
+    assert hard['kept'] == common | {'count_meets_se_misses': 0, 'count_misses_se_meets': 0}
+    assert easy['kept'] == common | {'count_meets_se_misses': 1, 'count_misses_se_meets': 10}
+
+
+def test_undefined_ses_are_counted_for_each_year_and_reason(script, capsys, tmp_path):
+    def zero_denominator(code, year, wages=(10.0, 11.0)):
+        return [person(code, year, wage, REPWTP7=0) for wage in wages]
+
+    people = (
+        [person('1111', 2023, 10.0), person('1112', 2023, 10.0)]
+        + [person('2222', 2023, 10.0), person('2222', 2023, 10.0)]
+        + zero_denominator('2223', 2023, (10.0, 10.0))
+        + category('3333', 2023, 2)
+        + [person('1111', 2024, 10.0)] + zero_denominator('4444', 2024)
+        + zero_denominator('4445', 2024) + category('3333', 2024, 2, swinging=True))
+    status, result = run_main(script, capsys, publish(tmp_path, people))
+    assert status == 1
+    assert result['years']['2023']['undefined'] == {
+        'fewer_than_two_rows': 2, 'constant_wage': 2, 'replicate_denominator_not_positive': 0}
+    assert result['years']['2024']['undefined'] == {
+        'fewer_than_two_rows': 1, 'constant_wage': 0, 'replicate_denominator_not_positive': 2}
+    by_key = {(c['YEAR'], c['INDNAICS']): c for c in result['categories']}
+    assert by_key[2023, '2223'] == {
+        'INDNAICS': '2223', 'YEAR': 2023, 'headline_rows': 2, 'se': None,
+        'undefined': 'constant_wage', 'meets_se_target': False}
+    assert by_key[2024, '4444']['undefined'] == 'replicate_denominator_not_positive'
+    assert by_key[2024, '3333']['se'] == pytest.approx(1 / 3)
+    assert by_key[2024, '3333']['undefined'] is None
+
+
+def test_shared_node_categories_are_counted_for_each_year(script, capsys, tmp_path):
+    people = golden_people() + [person('0000', 2023, 10.0, headline=False),
+                                person('0001', 2023, 10.0, headline=False),
+                                person('0000', 2024, 10.0, headline=False)]
+    status, result = run_main(script, capsys, publish(tmp_path, people))
+    assert status == 0
+    assert result['years']['2023']['kept'] == GOLDEN_KEPT | {'shared_node_categories': 2}
+    assert result['years']['2024']['kept'] == GOLDEN_KEPT | {'shared_node_categories': 1}
+
+
+def test_refusal_exits_two(script, capsys, golden):
+    status, result = run_main(script, capsys, golden, pin='0' * 64)
+    assert status == 2 and result == {'complete': False, 'reason': 'outputs pin differs'}
+
+
+def refuse_unsafe_run(bundle):
+    return {'run': '../fixture'}
+
+
+def refuse_malformed_report(bundle):
+    return {'pin': forge_report(bundle, drop_categories)}
+
+
+def refuse_retyped_column(bundle):
+    return {'pin': forge_persons(bundle, retype('REPWTP5', pl.Float64))}
+
+
+def refuse_changed_recount(bundle):
+    return {'pin': forge_report(bundle, one_more)}
+
+
+def refuse_bad_row(bundle):
+    return {'pin': forge_persons(bundle, set_value('PERWT', 0.0))}
+
+
+REFUSALS = {
+    'unsafe_run': (refuse_unsafe_run, UNSAFE),
+    'malformed_report': (refuse_malformed_report, MALFORMED),
+    'retyped_column': (refuse_retyped_column, COLUMNS_DIFFER),
+    'changed_recount': (refuse_changed_recount, RECOUNT_DIFFERS),
+    'bad_row': (refuse_bad_row, BAD_ROW),
+}
+
+
+@pytest.mark.parametrize('refuse, reason', REFUSALS.values(), ids=REFUSALS.keys())
+def test_refusals_at_each_check_print_the_fixed_reason(script, capsys, golden, refuse, reason):
+    change = refuse(golden)
+    arguments = command_line(golden, pin=change.get('pin'), run=change.get('run'))
+    assert script.main(arguments) == 2
+    assert capsys.readouterr().out == json.dumps(
+        {'complete': False, 'reason': reason}, sort_keys=True) + '\n'
+
+
+def test_the_checks_run_in_the_order_of_the_command_line(script, capsys, golden):
+    forge_report(golden, drop_categories)
+    pin = forge_persons(golden, retype('REPWTP5', pl.Float64))
+    status, result = run_main(script, capsys, golden, pin)
+    assert (status, result) == (2, {'complete': False, 'reason': MALFORMED})
+
+
+@pytest.mark.parametrize('refuse, reason', [(refuse_changed_recount, RECOUNT_DIFFERS),
+                                            (refuse_bad_row, BAD_ROW)],
+                         ids=['changed_recount', 'bad_row'])
+def test_every_check_runs_before_any_se(script, golden, monkeypatch, refuse, reason):
+    computed = []
+    monkeypatch.setattr(script, 'category_se', lambda rows: computed.append(rows) or (0.0, None))
+    pin = refuse(golden)['pin']
+    with pytest.raises(script.Refused) as refusal:
+        script.measure(golden['data_dir'], golden['run'], pin)
+    assert str(refusal.value) == reason and computed == []
+
+
+def forge_null_replicate(bundle):
+    return forge_persons(bundle, set_value('REPWTP7', None))
+
+
+def forge_infinite_weight(bundle):
+    return forge_persons(bundle, set_value('PERWT', math.inf))
+
+
+def forge_unreadable_table(bundle):
+    '''Replace the person table with bytes that are not Parquet, and record them in the inventory.
+
+    `rehash` cannot do it: the inventory reads the table's schema.
+    '''
+    file = bundle['directory'] / PERSONS
+    file.write_bytes(b'not a parquet file')
+    return edit_outputs(bundle, lambda inventory: inventory[PERSONS].update(
+        sha256=manifest.sha256_file(file), size=file.stat().st_size))
+
+
+FAILURES = {'null_replicate_weight': forge_null_replicate,
+            'infinite_weight': forge_infinite_weight,
+            'persons_not_parquet': forge_unreadable_table}
+
+
+@pytest.mark.parametrize('forge', FAILURES.values(), ids=FAILURES.keys())
+def test_any_other_failure_prints_the_fixed_line_and_exits_two(script, capsys, golden, forge):
+    status = script.main(command_line(golden, pin=forge(golden)))
+    captured = capsys.readouterr()
+    assert status == 2
+    assert captured.out == '{"complete": false, "reason": "measurement failed"}\n'
+    assert captured.err == ''
+
+
+@pytest.mark.parametrize('missing', ['--data-dir', '--run', '--outputs-sha256'])
+def test_every_option_is_required(script, capsys, golden, missing):
+    arguments = command_line(golden)
+    position = arguments.index(missing)
+    del arguments[position:position + 2]
+    with pytest.raises(SystemExit) as stop:
+        script.main(arguments)
+    assert stop.value.code == 2 and capsys.readouterr().out == ''
+
+
+def test_shuffled_rows_give_identical_output(script, capsys, tmp_path):
+    bundle = publish(tmp_path, noisy_people())
+    status, before = run_main(script, capsys, bundle)
+    large = [c for c in before['categories'] if c['INDNAICS'] == LARGE_CODE]
+    assert len(large) == 2 and all(0 < c['se'] < 0.05 for c in large)
+    pin = forge_persons(bundle, lambda frame: frame.sample(fraction=1.0, shuffle=True, seed=7))
+    status_after, after = run_main(script, capsys, bundle, pin)
+    assert before['inputs']['persons_sha256'] != after['inputs']['persons_sha256']
+    assert before['inputs']['report_sha256'] == after['inputs']['report_sha256']
+    assert status_after == status == 0
+
+    def body(result):
+        return json.dumps({k: v for k, v in result.items() if k != 'inputs'}, sort_keys=True)
+    assert body(after) == body(before)
+
+
+def test_two_runs_are_byte_identical(script, capsys, tmp_path):
+    bundle = publish(tmp_path, noisy_people())
+    statuses, lines = [], []
+    for _ in range(2):
+        statuses.append(script.main(command_line(bundle)))
+        lines.append(capsys.readouterr().out)
+    assert statuses == [0, 0] and lines[0] == lines[1] and lines[0].count('\n') == 1
+
+
+def test_output_does_not_depend_on_thread_count_or_hash_seed(tmp_path):
+    arguments = command_line(publish(tmp_path, crowded_people()))
+    runs = [run_command(arguments, threads=threads, hash_seed=seed)
+            for threads, seed in ((1, 0), (2, 1), (8, 2))]
+    assert [run.returncode for run in runs] == [0, 0, 0]
+    assert [run.stderr for run in runs] == ['', '', '']
+    assert runs[0].stdout == runs[1].stdout == runs[2].stdout
+    categories = json.loads(runs[0].stdout)['categories']
+    assert len(categories) == 140 and any(c['se'] > 0 for c in categories)
+
+
+def test_the_program_exits_with_the_status_of_the_run(tmp_path):
+    incomplete = publish(tmp_path / 'incomplete', without_second_row(golden_people(), 2024))
+    run = run_command(command_line(incomplete))
+    assert run.returncode == 1 and run.stderr == ''
+    assert json.loads(run.stdout)['complete'] is False
+    refused = run_command(command_line(incomplete, pin='0' * 64))
+    assert refused.returncode == 2 and refused.stderr == ''
+    assert json.loads(refused.stdout) == {'complete': False, 'reason': PIN_DIFFERS}
+
+
+def walk(value):
+    '''Every key and every float in a parsed JSON value, nested ones included.'''
+    if isinstance(value, dict):
+        for key, inner in value.items():
+            yield 'key', key
+            yield from walk(inner)
+    elif isinstance(value, list):
+        for inner in value:
+            yield from walk(inner)
+    elif type(value) is float:
+        yield 'float', value
+
+
+def test_output_holds_no_means_or_person_values(script, capsys, tmp_path):
+    people = golden_people()
+    for row in people:
+        if row['INDNAICS'] == '1111':
+            row['log_wage_2010'] = 10.25 if row['log_wage_2010'] == 10.0 else 11.75
+    status, result = run_main(script, capsys, publish(tmp_path, people))
+    assert status == 0
+    assert all(set(entry) == RECORD_KEYS for entry in result['categories'])
+    keys = {value for kind, value in walk(result) if kind == 'key'}
+    floats = {value for kind, value in walk(result) if kind == 'float'}
+    # `constant_wage` is the name of an undefined-SE reason, fixed by the plan, not a wage value.
+    assert not [key for key in keys - set(NO_REASONS) if any(
+        word in key.lower() for word in ('mean', 'theta', 'wage'))]
+    assert set(NO_REASONS) <= keys
+    assert floats and not floats & {10.25, 11.75, 11.0}
+
+
+def test_writes_nothing_under_data_dir(script, capsys, golden):
+    before = tree(golden['data_dir'])
+    assert len(before) == 4
+    status, _ = run_main(script, capsys, golden)
+    assert status == 0 and tree(golden['data_dir']) == before
+
+
+def test_script_imports_are_offline():
+    imported = set()
+    for node in ast.walk(ast.parse(SCRIPT.read_text(encoding='utf-8'))):
+        if isinstance(node, ast.Import):
+            imported |= {alias.name.partition('.')[0] for alias in node.names}
+        elif isinstance(node, ast.ImportFrom):
+            assert node.level == 0
+            imported.add(node.module.partition('.')[0])
+    assert imported - set(sys.stdlib_module_names) == {'polars'}
+    assert not imported & {'embedding_data', 'httpx', 'dotenv', 'ipumspy', 'requests', 'urllib',
+                           'socket', 'subprocess', 'typer'}
+
+
+def integer_replicate_delivery(original):
+    '''The wage delivery with an integer `REPWTP37`, as IPUMS delivers every replicate weight.
+
+    The Stage 9 target fixture delivers `REPWTP37` as the text -2.5, and the unchanged upstream
+    conversion types that column Float64. The script's contract is Int64 for all 80 (spec
+    "Inputs"), so the chain would be refused for a fixture choice, not for the script.
+    '''
+    def prepare(profile, ddi, frame):
+        ddi, frame = original(profile, ddi, frame)
+        return ddi, frame.with_columns(pl.lit(127, dtype=pl.Int64).alias('REPWTP37'))
+    return prepare
+
+
+@pytest.fixture(scope='module')
+def template(tmp_path_factory):
+    '''One genuine Stage 17 bundle named `first`, built through the fixture chain.'''
+    with pytest.MonkeyPatch.context() as patches:
+        forbid_external_access(patches)
+        patches.setattr(acs_wage_fixtures, 'prepare_wage_delivery',
+                        integer_replicate_delivery(acs_wage_fixtures.prepare_wage_delivery))
+        chain = wage_mapping(tmp_path_factory.mktemp('minimum-earners-chain'), patches)
+        built = acs_wage_bundle.build(
+            chain['data_dir'], 'first', mapping_run=chain['mapping_run'],
+            mapping_outputs_sha256=chain['mapping_outputs_sha256'], codes_run=chain['codes_run'],
+            codes_outputs_sha256=chain['codes_outputs_sha256'])
+    return chain | {'first_pin': built['outputs_sha256']}
+
+
+def test_genuine_chain_bundle_passes_the_checks(script, capsys, template):
+    bundle = {'data_dir': template['data_dir'], 'run': 'first', 'pin': template['first_pin']}
+    status, result = run_main(script, capsys, bundle)
+    inventory = json.loads(
+        (template['data_dir'] / 'derived/acs/wage-microdata/first' / OUTPUTS).read_text())
+    assert status in (0, 1), result
+    assert result['inputs']['report_sha256'] == inventory[REPORT]['sha256']
+    assert result['inputs']['persons_sha256'] == inventory[PERSONS]['sha256']
+    assert result['inputs']['outputs_sha256'] == template['first_pin']
