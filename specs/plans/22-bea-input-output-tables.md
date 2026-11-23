@@ -186,7 +186,7 @@ subagent cannot ask the owner for a go-ahead.
 
 ## Decisions
 
-None.
+- **D1** (owner, plan review, 2026-11-23): Approve plan 22 as committed at `c73f820`, with Settled Defaults 1–24 unchanged ("Approve plan 22"). Applied in: Settled Defaults.
 
 ## Settled Defaults (for owner review)
 
