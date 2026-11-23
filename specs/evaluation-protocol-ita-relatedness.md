@@ -1,12 +1,12 @@
 # Evaluation protocol: ITA co-ownership and the 2023 ITA area mix
 
-Status: PROPOSED (2026-11-23). Written in a brainstorming session. A builder check raised three
+Status: APPROVED (2026-11-23, owner: "Approve the design"). Written in a brainstorming session. A builder check raised three
 points. One was the owner's to rule (P7). The other two are folded in as my calls: CO3 and AM3
 are scoped to the relatedness artifact, and the Handoff notes that Stage 23 has no consuming
-spec yet. The owner has not yet approved the committed design.
+spec yet.
 
 Roadmap: `specs/naics-evaluation-data-roadmap.md`, Stage 16 (Track E, O14). The design adds
-Sections 2 and 3 to [the evaluation protocol](evaluation-protocol.md). This file holds their
+Sections 3 and 4 to [the evaluation protocol](evaluation-protocol.md). This file holds their
 provenance, the owner's decisions and the pointer edits. The protocol file holds the rules.
 
 ## Design provenance
@@ -37,6 +37,10 @@ Two read-only measurements were made on the selected runs. Neither reads an embe
    "Measured split" below).
 
 **Owner decisions (2026-11-23).** The ids continue from the protocol's P1–P3.
+
+**Renumbered at the merge.** Stage 24 merged its ACS wage section first as Section 2, so the
+sections that this design proposed as Sections 2 and 3 are Sections 3 and 4. Only the numbers
+changed (my call, as the Constraints say).
 
 | Id | Question | Decision |
 | --- | --- | --- |
@@ -99,13 +103,13 @@ G4 as open for co-ownership and the area mix, and G6 as open. G1 stays closed.
 
 | Approach | What it does | Trade-off | Decision |
 | --- | --- | --- | --- |
-| 1. Thin delegation, history apart | Sections 2 and 3 in the protocol assign split and scoring to the relatedness spec and keep the read conditions. Provenance and decisions live in this file. | Each rule has one home. The shared protocol file stays short for Stages 23 to 25. A reader needs this file only for the why. | **Chosen** (P6) |
+| 1. Thin delegation, history apart | Sections 3 and 4 in the protocol assign split and scoring to the relatedness spec and keep the read conditions. Provenance and decisions live in this file. | Each rule has one home. The shared protocol file stays short for Stages 23 to 25. A reader needs this file only for the why. | **Chosen** (P6) |
 | 2. Thin delegation, history in the protocol | The same sections, with provenance and decisions inside the protocol file, as Section 1 did. | One file, but it doubles in size and gives later stages a long file to merge into. | Rejected |
 | 3. Restate the relatedness rules | Copy the anchor split, the NDCG@10 headline and the lift gain into this repository. | Self-contained, but the copies drift. Section 1 rejected the same approach. | Rejected |
 
 ## Design
 
-The rules are Sections 2 and 3 of [the evaluation protocol](evaluation-protocol.md). They follow
+The rules are Sections 3 and 4 of [the evaluation protocol](evaluation-protocol.md). They follow
 Section 1's frame: Evidence, Assignment, Conditions, and what this repository does not decide.
 The points below are the design choices behind them.
 
@@ -181,40 +185,40 @@ section assigns no role to TRI, USAspending or ACS.
 
 ### Edits to the protocol file in this design commit
 
-1. Add Section 2 (co-ownership) and Section 3 (area mix) after Section 1, each with
+1. Add Section 3 (co-ownership) and Section 4 (area mix) after Section 1, each with
    `Status: PROPOSED`.
 2. Under "Design provenance", add one line: that provenance, Intent, Goals, Approaches and "Edits
-   on approval" are Section 1's, and Sections 2 and 3 have theirs in this file.
+   on approval" are Section 1's, and Sections 3 and 4 have theirs in this file.
 3. In the introduction, replace "No other family has a section yet" with a sentence that names
-   Sections 2 and 3.
+   Sections 3 and 4.
 4. In Section 1's Assignment, replace "For co-ownership, those questions stay open (Families with
-   no section)" with a pointer to Section 2, and say that the retired Stage 10 spec gets only
-   Section 2's dated pointer (P7).
-5. In "Families with no section", remove co-ownership and the area mix. Say that Section 2 answers
+   no section)" with a pointer to Section 3, and say that the retired Stage 10 spec gets only
+   Section 3's dated pointer (P7).
+5. In "Families with no section", remove co-ownership and the area mix. Say that Section 3 answers
    the shape questions by assignment.
-6. In the Handoff, say that G4 opens for co-ownership and the area mix with Sections 2 and 3, that
+6. In the Handoff, say that G4 opens for co-ownership and the area mix with Sections 3 and 4, that
    G6 opens with CO3, and that G1 stays closed.
 
 ### Edits on approval
 
 One docs commit applies these. Each edit is a pointer or a status, not a rule change.
 
-1. **Protocol, Sections 2 and 3.** Change both statuses to "APPROVED (date, owner)".
+1. **Protocol, Sections 3 and 4.** Change both statuses to "APPROVED (date, owner)".
 2. **This file.** Change Status to "APPROVED (date, owner)".
 3. **Source spec**, the introduction (line 17) and Out of scope, "Evaluation protocol"
-   (line 686): add that Sections 2 and 3 cover co-ownership and the 2023 area mix.
+   (line 686): add that Sections 3 and 4 cover co-ownership and the 2023 area mix.
 4. **`CLAUDE.md`**, Stage 10 paragraph: add that selection for naics-embedder's relatedness
    artifact may also read co-ownership's validation part, and that reads of co-ownership follow
-   Section 2. Stage 6 paragraph: add that reads of the
-   2023 area mix follow Section 3, which allows training only after R8.4 is amended.
+   Section 3. Stage 6 paragraph: add that reads of the
+   2023 area mix follow Section 4, which allows training only after R8.4 is amended.
 5. **`README.md`**, the Stage 10 and Stage 6 sections: the same two sentences.
 6. **`specs/deliverable-map.md`**, the co-ownership and area-mix rows: replace "Role not assigned"
-   and the pending protocol cell with the assigned roles and a pointer to Sections 2 and 3.
+   and the pending protocol cell with the assigned roles and a pointer to Sections 3 and 4.
 7. **`specs/naics-evaluation-data-stage-16-findings.md`**: a new one-screen file. It records the
    stage's cost in sessions, the two measurements and what is not claimed.
 8. **Roadmap**: tick Stage 16 and add its COMPLETE stamp, as Stage 22's PR did (my call).
 9. **Retired Stage 10 spec** `specs/completed/ita-establishment-targets.md`, after its amendment
-   block (lines 11–27): one dated pointer line (P7). Section 2 of the protocol extends the
+   block (lines 11–27): one dated pointer line (P7). Section 3 of the protocol extends the
    selection exception to co-ownership's validation part, for naics-embedder's relatedness
    artifact only. The link table keeps the full exclusion. The amendment of 2026-11-18 is not
    reworded. G2's exception, written into the same retired spec (`e03ec67`), is the precedent.
@@ -235,7 +239,7 @@ the pointer of edit 9. R8.4's text is unchanged.
 
 ## Verification: observable outcomes
 
-- [ ] The protocol file on `main` has Sections 2 and 3, each with Status APPROVED.
+- [ ] The protocol file on `main` has Sections 3 and 4, each with Status APPROVED.
 - [ ] Each Evidence value equals the selected run's `outputs.json`, and the SHA-256 of each
       `outputs.json` equals its pin.
 - [ ] The split counts equal a recount with the salt at naics-embedder `2b2029c`.
@@ -243,7 +247,7 @@ the pointer of edit 9. R8.4's text is unchanged.
       scores; which part selects and which judges; what the area mix may do and when; which run,
       pin and tables to read; which families are still unscored.
 - [ ] "Families with no section" no longer lists co-ownership or the area mix.
-- [ ] `CLAUDE.md`, `README.md`, the source spec and the deliverable map point to Sections 2 and 3.
+- [ ] `CLAUDE.md`, `README.md`, the source spec and the deliverable map point to Sections 3 and 4.
 - [ ] The retired Stage 10 spec's only change is the dated pointer of edit 9.
 - [ ] R8.4's text is unchanged.
 - [ ] `git diff --stat` for the change lists only Markdown files.
@@ -259,7 +263,7 @@ the pointer of edit 9. R8.4's text is unchanged.
   opens for co-ownership (judging and selection) and for the area mix (role stated). G6 opens under
   CO3 and CO4. G1 stays closed, so Stage 7's training on the area mix stays held. CO4 asks the
   relatedness spec for one new report beside its headline. Its decision rule is unchanged.
-- **Stages 23 and 25.** Section 2 is their model. They assign the null model and the scores to the
+- **Stages 23 and 25.** Section 3 is their model. They assign the null model and the scores to the
   consuming spec, name their run, pin and tables, and keep CO-style conditions. Each says whether
   its family measures the same relation as co-ownership (CO7). A family split by anchor industry
   measures its own crossing share, as here. The assignment needs a consuming spec. At `2b2029c`
