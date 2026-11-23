@@ -189,3 +189,58 @@ def test_family_minimum_is_largest_and_needs_both_pairs(script):
     assert script.family_minimum([1, 3]) == 3
     assert script.family_minimum([2, None]) is None
     assert script.family_minimum([]) is None
+
+
+def test_band_with_exactly_the_minimum_keeps_its_own_band(script):
+    found = script.bands(cells((1, 49, 0, 0), (2, 50, 0, 0), (3, 49, 0, 0), (4, 1, 0, 0)))
+    assert [(b['low'], b['high'], b['testable_cells']) for b in found] == [
+        (1, 2, 99), (3, 4, 50), (5, None, 0)]
+    found = script.bands(cells((1, 50, 0, 0), (2, 60, 0, 0)))
+    assert [(b['low'], b['high'], b['testable_cells']) for b in found] == [
+        (1, 1, 50), (2, 2, 60), (3, None, 0)]
+
+
+def test_top_band_one_below_the_minimum_merges_down(script):
+    result = script.curve(cells((1, 60, 60, 0), (10, 49, 49, 0)))
+    assert shape(result['before_downward_merge']) == [(1, 1, 60, 60), (2, None, 49, 49)]
+    assert shape(result['bands']) == [(1, None, 109, 109)]
+    assert (result['minimum'], result['reason']) == (1, None)
+
+
+def test_rate_counts_testable_cells_only(script):
+    result = script.curve(cells((1, 60, 54, 40)))
+    (only,) = result['bands']
+    assert (only['base_cells'], only['testable_cells'], only['recurring_cells']) == (100, 60, 54)
+    assert only['rate'] == 0.9
+    assert (result['minimum'], result['reason']) == (1, None)
+
+
+def test_untestable_cells_never_count_as_recurring(script):
+    frame = pl.DataFrame(
+        {'base_count': [3, 3, 3], 'testable': [True, False, False],
+         'recurs': [True, True, False]},
+        schema={'base_count': pl.UInt64, 'testable': pl.Boolean, 'recurs': pl.Boolean})
+    (only,) = script.bands(frame)
+    assert (only['base_cells'], only['testable_cells'], only['recurring_cells']) == (3, 1, 1)
+
+
+def test_base_count_below_one_is_refused(script):
+    with pytest.raises(ValueError, match='base count'):
+        script.bands(cells((0, 3, 0, 0)))
+    with pytest.raises(ValueError, match='base count'):
+        script.curve(cells((0, 3, 0, 0)))
+
+
+def test_wilson_interval_stays_inside_zero_and_one(script):
+    assert script.wilson(16, 16)[1] == 1.0
+    assert script.wilson(0, 21)[0] == 0.0
+    assert script.wilson(0, 0) is None
+
+
+def test_curve_sums_counts_over_the_bands(script):
+    result = script.curve(cells(*THIN_TOP))
+    assert (result['base_cells'], result['testable_cells'], result['recurring_cells']) == (
+        387, 380, 0)
+    result = script.curve(cells((1, 60, 30, 5), (9, 60, 53, 0), (10, 20, 20, 2)))
+    assert (result['base_cells'], result['testable_cells'], result['recurring_cells']) == (
+        147, 140, 103)
