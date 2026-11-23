@@ -194,6 +194,7 @@ def test_industry_csv_allows_other_codes(tmp_path, extra):
 def test_industry_csv_reads_with_or_without_a_byte_order_mark(tmp_path):
     file = industry_csv(tmp_path / 'industry.csv')
     assert file.read_bytes().startswith(b'\xef\xbb\xbf')
+    module.validate_original('cps_basic_2026_industry_codes', file)
     file.write_bytes(file.read_bytes()[3:])
     module.validate_original('cps_basic_2026_industry_codes', file)
 
