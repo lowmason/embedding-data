@@ -147,12 +147,12 @@ stage and puts this stamp under its entry, which cites the Deviation note:
 
 ## Decisions
 
-None.
+- **D1** (owner, plan review, 2026-11-22): Approve plan 20 as committed at `cf75f8c`, with the OC1 defaults unchanged ("Yes"). Applied in: Owner Checkpoints (OC1), Global Constraints, Tasks 1 to 7.
 
 ## Owner Checkpoints
 
-- **OC1 (plan review).** The defaults this plan sets where the spec or the brief leaves a
-  choice:
+- **OC1 (plan review, settled by D1).** The defaults this plan sets where the spec or the
+  brief leaves a choice:
   1. Real output goes to `$HOME/.cache/embedding-data/stage22-minimum-counts/<rule commit>/`,
      outside the repository and outside `data/`, after the Stage 21 precedent. It is not the
      leave-alone `stage-18/` directory.
