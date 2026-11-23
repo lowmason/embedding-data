@@ -772,3 +772,25 @@ def test_a_publication_copy_that_differs_from_staging_is_refused(tmp_path, monke
     with pytest.raises(ValueError, match='changed during publication'):
         module.import_reference(tmp_path / 'data', 'refs', KINDS[-1], originals[KINDS[-1]])
     assert not manifest_entries(tmp_path)
+
+
+def test_a_transport_error_refuses_only_its_kind(tmp_path, monkeypatch):
+    def broken(request):
+        raise httpx.ConnectError('unreachable', request=request)
+
+    serve(monkeypatch, tmp_path / 'served', overrides={REFUSED_URL: broken})
+    with pytest.raises(ValueError, match=REFUSED_KIND):
+        module.acquire(tmp_path / 'data', 'refs')
+    staging = tmp_path / 'data/raw/references/cps-job-flows/refs.part'
+    assert len(list(staging.iterdir())) == 7  # six originals and the state file
+
+
+def test_a_filesystem_error_is_not_a_refusal(tmp_path, monkeypatch):
+    serve(monkeypatch, tmp_path / 'served')
+
+    def disk_full(client, reference, file):
+        raise OSError('disk full')
+
+    monkeypatch.setattr(module, '_download', disk_full)
+    with pytest.raises(OSError, match='disk full'):
+        module.acquire(tmp_path / 'data', 'refs')
