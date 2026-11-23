@@ -400,8 +400,9 @@ not a target family. It has one row for each Stage 8 core row with `INCWAGE > 0`
 columns and six flags. `flag_headline` marks the rows that a panel reads. Person rows never
 leave this machine or enter git, and `report.json` holds counts only. naics-embedder may
 read the file in place on this machine under its detached pin (R8.1). It only judges and
-never trains (R8.4). The selected runs are `stage17_acs_wage_microdata_20261119_r1` and
-`..._r1_replay`, with detached pins
+never trains (R8.4). One exception (owner, 2026-11-23): its selecting part may select which
+embedder candidate goes forward. The selected runs are
+`stage17_acs_wage_microdata_20261119_r1` and `..._r1_replay`, with detached pins
 `6cb253e2e5c2e48a5b31d2790a0378636d3b6ef9197cfb2d33cca2813ac201d1` and
 `f4e47d9c2e0d3274bc047372d440d73276df56b627d1d4c7c6da9a939a0658e8`, built from the Stage 8
 run `stage8_acs_mapping_20261018_r7` (pin
@@ -418,8 +419,9 @@ no Stage 9 freeze window is open: the freeze with the first build, the replay bu
 cleanup of a failed run's leftover staging. The
 [Stage 17 finding](specs/naics-evaluation-data-stage-17-findings.md) records the commands,
 counts, cost and what is not claimed. The minimum number of headline earners for each
-category (O23) is in `specs/findings/v9-acs-wage-minimum-earners.md`. No protocol section
-(O24) exists yet, so no panel result is claimed.
+category (O23) is in `specs/findings/v9-acs-wage-minimum-earners.md`. Reads of the file follow
+`specs/evaluation-protocol.md`, Section 2 (O24). No read is allowed, and no panel result is
+claimed, until the owner names naics-embedder's wage panel spec there (W7).
 
 **USAspending vendor links (roadmap Stage 14).** `python -m
 embedding_data.usaspending_vendor_links` exposes seven commands, separate from the frozen

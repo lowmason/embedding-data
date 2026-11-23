@@ -5,13 +5,15 @@
 > The pointer edits in "Edits on approval" were applied with the approval. No
 > plan was needed, because the spec adds no code (my call).
 
-Status: APPROVED (2026-11-18, owner: "Approve the spec"). Written 2026-11-18.
+Status: APPROVED (2026-11-18, owner: "Approve the spec"). Written 2026-11-18. Section 2
+added with the owner's approval of its design (2026-11-23, owner: "Approve").
 
 This is the successor evaluation-protocol spec that the
 [source spec](embedding-evaluation-data-spec.md) requires "before any embedder
 is scored" (Out of scope, "Evaluation protocol"). It has one section for each
-evidence family. A family with no section here is not scored. The first section
-covers the ITA text–code pairs. No other family has a section yet.
+evidence family or analysis file. A family with no section here is not scored. The first
+section covers the ITA text–code pairs. Section 2 covers the ACS wage microdata, a
+person-level analysis file *(owner, 2026-11-23)*.
 
 ## Design provenance
 
@@ -207,6 +209,126 @@ the roles that the amendment allows (my call).
 The scores, their intervals, the margin and the adoption decision. It also does
 not check naics-embedder's selection log. That repository's own rules guard the
 order of reads.
+
+## Section 2: ACS wage microdata
+
+The ACS wage microdata are a person-level analysis file, not a target family (source spec
+R7.2). The rules for every family apply to the file as they apply to a family (my call).
+Stage 17 built the file and Stage 19 set its minimum. The design is in
+`specs/completed/acs-wage-protocol-section.md`. Its "Owner decisions" table holds Q1 to Q4
+and the proposals marked (proposal, Q3). The owner approved the whole design on 2026-11-23
+("Approve").
+
+### Evidence
+
+A read uses the first run (my call). The replay
+`stage17_acs_wage_microdata_20261119_r1_replay` has a byte-identical Parquet and
+`report.json`, but its own pin. The Stage 19 decision read the first run.
+
+| Item | Value |
+| --- | --- |
+| Run | `stage17_acs_wage_microdata_20261119_r1` in `data/derived/acs/wage-microdata/` |
+| Detached pin (SHA-256 of `outputs.json`) | `6cb253e2e5c2e48a5b31d2790a0378636d3b6ef9197cfb2d33cca2813ac201d1` |
+| `acs_wage_persons.parquet` | 3,035,086 rows, SHA-256 `a94471492dc91aebe3a3436e8d738d399520791b0eace6f01a719fad10fd5ff2` |
+| `report.json` | SHA-256 `32ad9b698c9b940760d74eec0ae3b234abd14ba4c08ca07f04770a8f11e413bd` |
+| Headline rows | 1,278,878 rows with `flag_headline = true`: 639,002 in 2023 and 639,876 in 2024, over 233 categories in each year (Stage 17 finding) |
+| Count gate | Minimum 400 headline rows for each category (`INDNAICS`) in each year, applied to `headline_rows` of each `categories` entry of `report.json`, keyed by `INDNAICS` and `YEAR` ([V9 ACS wage decision](findings/v9-acs-wage-minimum-earners.md)) |
+| Rows that meet the gate | 2023: 183 of 233 categories, 626,564 headline rows (98.05%). 2024: 178 of 233 categories, 625,828 headline rows (97.80%) |
+| Depth of the join node | 262,711 headline rows (20.5%) join at a six-digit node. The rest join at sector, subsector, industry-group or five-digit nodes (`report.json`, `node_levels`) |
+
+The `INDNAICS` strings in `report.json` and in the file carry space padding. A reader
+matches on the delivered strings.
+
+### Assignment
+
+The file has a **selecting part** and a **judging part** *(owner, Q1, 2026-11-23)*.
+
+- The selecting part chooses the panel's own settings and which embedder candidate goes
+  forward. This is the exception that R8.1 and R8.4 record *(owner, Q4, 2026-11-23)*.
+- The judging part is sealed. It judges and is opened once.
+
+naics-embedder's wage panel spec, when the owner names it in this section (W7), decides
+*(owner, Q2, 2026-11-23)*:
+
+- the split into the two parts, within W4;
+- the regimes, such as a seen regime and a held-out regime;
+- the comparators, the metrics, the headline, the reference, the margin and the decision
+  rule;
+- how rows of mixed depth are scored, and how a category that meets the gate in one year
+  but not the other is handled;
+- the logging of reads and the one opening of the judging part.
+
+The Stage 17 spec's "Handoff to naics-embedder" lists recommendations for that spec. They
+bind nothing.
+
+### Conditions this repository keeps
+
+- **W1. Check the hashes before the first read.** The reader computes the SHA-256 of
+  `outputs.json`, `acs_wage_persons.parquet` and `report.json` and compares each with the
+  Evidence table. `report.json` is checked because W4's gate reads its counts (my call). A mismatch stops the read. This comparison is the required form. `verify` is not
+  required, because it refuses both runs after any change to a file in
+  `acs_wage_inputs.SOFTWARE_FILES` (my call, as Section 1's C1).
+- **W2. Read in place (R8.1).** The read runs on the machine that built the file, this Mac.
+  Person rows and every result for a single person stay on that machine and out of every
+  repository. Such results include predictions, residuals, folds, cached features and
+  debug output. Only aggregate scores and decisions leave it.
+- **W3. Publish scores, not wage tables** (proposal, Q3). A published result holds no mean
+  wage, wage quantile or wage distribution of a category. Such a table is evaluation data
+  that could later tune a model (R8.4). The Stage 19 decision follows the same rule.
+- **W4. Headline rows and the gate.** Every row that the panel reads, to fit or to score,
+  has `flag_headline = true`. A headline score counts only rows whose category has at
+  least 400 headline rows in the row's own year. Category-years below 400 stay out of the
+  headline score. A panel may report them apart, labeled as below the gate (proposal, Q3).
+  Whether rows of a category-year below 400 may enter a fit is the panel spec's choice
+  (Assignment), because the gate is a floor for headline use, not for fitting (my call). The count gate is the only size gate. The Stage 19 decision found
+  categories where the count gate and the category's own SE disagree: 23 in 2023 and 29 in
+  2024 (its section 6). These are a disclosure, not a second gate, because the per-category
+  SEs stay on this machine and are not pinned evidence (proposal, Q3). The 31 categories
+  that share a node have no headline rows and are never scored.
+- **W5. Roles.**
+  - The split is fixed and recorded in the wage panel spec before any wage value of the
+    file is read for the panel, and it never moves after a read.
+  - The selecting part selects. The judging part judges. No row of the judging part is read
+    for selection.
+  - "Opened once" means one logged opening. Several candidates and seeds may be scored
+    inside it. A second opening needs a recorded reason.
+  - Only the judging part is reported as evaluation. A selecting-part score may be
+    published as a development measurement. It is labeled as not evaluation, and W3 and
+    W6 apply to it.
+  - **Fitting the panel's own regression is part of judging, not training** (my call). The
+    panel fits its covariates and a candidate's coordinates to wages, and that fit belongs
+    to the judging instrument. No row trains an embedder, builds a curriculum or mines
+    hard negatives.
+- **W6. State the universe with every published score.** The statement names the run and
+  the pin, and says at least this:
+  - The rows are ACS 2023–2024 one-year earners from IPUMS USA. Headline rows are
+    employees who work full time for the full year and have no allocated value in the nine
+    headline fields.
+  - The outcome is the natural log of annual wage income in constant 2010 dollars.
+    Top-coded wages stay in the headline.
+  - Industry is a Census category, joined at the deepest node that holds exactly its
+    industries. The node depth is mixed. Mixture categories have approximate coordinates.
+  - The minimum of 400 headline rows applies to each category in each year.
+  - IPUMS USA is cited as its terms require (R8.2).
+- **W7. No read until the owner names the panel spec here** (proposal, Q3). A read is
+  allowed only after the owner amends this section to name naics-embedder's approved wage
+  panel spec and the commit read. Until then the file is not scored. After that, the
+  assignment is to that spec as its owner amends it, not to a frozen copy, as in Section 1
+  (my call). The conditions here bind every version. If a later version conflicts with a
+  condition, the condition governs until the owner amends this section. W5 still fixes the
+  split once a read has happened. A new bundle, such as a
+  rebuild or a file with ACS 2025, also needs an amendment of the Evidence table before
+  any read of it.
+- **W8. No candidate trained on ACS 2023–2024 is judged on this file.** This is the
+  Stage 17 spec's Handoff ("Relatedness") and naics-embedder's split Req 23.
+- **W9. Fixtures are not evidence.** A score from fixture tables shows software readiness.
+  It is never reported as a result.
+
+### What this repository does not decide
+
+The split, the regimes, the scores, their intervals, the margin and the adoption decision.
+It also does not check naics-embedder's selection log. That repository's own rules guard
+the order of reads.
 
 ## Families with no section
 

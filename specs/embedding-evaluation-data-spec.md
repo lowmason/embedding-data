@@ -575,10 +575,11 @@ the Census Bureau's own public-domain PUMS files instead. *(verified; USA)*
 
 One person-level analysis file, the ACS wage microdata, may be read in place on the
 machine that built it, under its detached pin, to judge an economic candidate of
-naics-embedder. The file never leaves that machine and never enters a repository. The
-reader's results for single persons, such as predictions, residuals, cached folds and
-debug output, are bound by the same rule. Only aggregate scores and decisions are
-shared. *(owner, plan 14, 2026-11-19)*
+naics-embedder or, on its selecting part, to select one *(owner, 2026-11-23)*. The
+file never leaves that machine and never enters a repository. The reader's results for
+single persons, such as predictions, residuals, cached folds and debug output, are bound
+by the same rule. Only aggregate scores and decisions are shared. *(owner, plan 14,
+2026-11-19)*
 
 **R8.2** Cite IPUMS USA and IPUMS CPS as their terms require. *(verified; USA)*
 
@@ -593,6 +594,9 @@ synthesis)*
 
 The ACS wage microdata only judge and never train. Their section in the evaluation
 protocol states which part selects and which part judges. *(owner, plan 14, 2026-11-19)*
+One exception: the selecting part of the ACS wage microdata may select which embedder
+candidate goes forward. No row trains, builds a curriculum or mines examples. The section
+is [Section 2 of the evaluation protocol](evaluation-protocol.md). *(owner, 2026-11-23)*
 
 ### R9 — Pipeline conventions
 
@@ -685,7 +689,7 @@ bullet here.
   R7 delivers the targets it consumes. The successor spec is
   [evaluation-protocol.md](evaluation-protocol.md). It covers the ITA text–code
   pairs. Every other family waits for its own section there. *(owner,
-  2026-11-18)*
+  2026-11-18)* Section 2 covers the ACS wage microdata. *(owner, 2026-11-23)*
 - **Sources considered and not adopted** (D):
   - SBA Paycheck Protection Program loans: borrower-level, a 2020–21 snapshot,
     with applicant-reported job counts.
