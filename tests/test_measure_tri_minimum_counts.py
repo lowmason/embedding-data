@@ -456,3 +456,127 @@ def test_mirror_rows_share_counts_and_outcome(script, base):
     assert joined.height == frame.height
     for name in ('base_count', 'testable', 'recurs'):
         assert (joined[name] == joined[f'{name}_mirror']).all()
+
+
+def test_eligible_facility_years_are_the_null_reason_rows_in_order(script):
+    eligible = script.eligible_facility_years(table(golden_records()).reverse().lazy())
+    assert dict(eligible.schema) == {'year': pl.Int64, 'trifd': pl.String, 'node': pl.String,
+                                     'owner': pl.String}
+    assert eligible.height == 32
+    assert not {'T14', 'T15', 'T16', 'T17', 'T18'} & set(eligible['trifd'])
+    keys = eligible.select('year', 'trifd').rows()
+    assert keys == sorted(keys)
+    assert eligible.row(0) == (2022, 'T1', N1, 'parent:Pine')
+    assert (2022, 'T11', N3, 'facility:T11') in eligible.rows()
+
+
+def test_no_eligible_facility_years_give_no_cells(script):
+    eligible, counts = counted(script, excluded('federal', 2022, 'T1', 'Pine'))
+    assert eligible.height == 0
+    assert (dict(counts.schema), counts.height) == (COUNT_SCHEMA, 0)
+    frame = script.year_cells(eligible, counts, 2022)
+    assert (dict(frame.schema), frame.height) == (CELL_SCHEMA, 0)
+
+
+def test_result_types_and_one_row_for_each_cell(script):
+    eligible, counts = counted(script, golden_records())
+    assert dict(counts.schema) == COUNT_SCHEMA
+    for base in (2022, 2023):
+        frame = script.year_cells(eligible, counts, base)
+        assert dict(frame.schema) == CELL_SCHEMA
+        assert frame.height == 56
+        assert frame.select('unit_a', 'unit_b').unique().height == 56
+
+
+def test_results_are_sorted_whatever_the_row_order(script):
+    eligible, counts = counted(script, golden_records())
+    assert_frame_equal(script.recount(eligible.reverse()), counts)
+    keys = counts.select('unit_a', 'unit_b').rows()
+    assert keys == sorted(keys)
+    for base in (2022, 2023):
+        expected = script.year_cells(eligible, counts, base)
+        found = script.year_cells(eligible.reverse(), counts.reverse(), base)
+        assert_frame_equal(found, expected)
+        keys = found.select('unit_a', 'unit_b').rows()
+        assert keys == sorted(keys)
+
+
+def test_owners_of_different_years_count_once_each_in_j_owners(script):
+    _, counts = counted(script, [*pine(2022, ('T1', N1), ('T2', N2)), *rock(2023)])
+    assert_frame_equal(counts, counts_frame((N1, N2, 2, 1, 1, 0), (N2, N1, 2, 1, 1, 0)))
+
+
+def test_nodes_of_different_years_form_no_cell(script):
+    _, counts = counted(script, [*pine(2022, ('T1', N1)), *pine(2023, ('T2', N2))])
+    assert counts.height == 0
+
+
+def test_testable_needs_one_owner_at_both_nodes(script):
+    records = [*pine(2022, ('T1', N1), ('T2', N2)), *rock(2022), *pine(2023, ('T1', N1)),
+               form(2023, 'T10', N2, 'Rock', SLATE)]
+    row = cell_row(year_cells_of(script, records), N1, N2)
+    assert (row['base_count'], row['testable'], row['recurs']) == (2, False, False)
+
+
+def test_base_count_is_the_owners_of_the_base_year(script):
+    records = [*pine(2022, ('T1', N1), ('T2', N2)), *pine(2023, ('T1', N1), ('T2', N2)),
+               *rock(2023)]
+    eligible, counts = counted(script, records)
+    assert cell_row(counts, N1, N2)['j_owners'] == 2
+    first = cell_row(script.year_cells(eligible, counts, 2022), N1, N2)
+    second = cell_row(script.year_cells(eligible, counts, 2023), N1, N2)
+    assert (first['base_count'], first['testable'], first['recurs']) == (1, True, True)
+    assert (second['base_count'], second['testable'], second['recurs']) == (2, False, False)
+
+
+def test_one_owner_again_is_a_recurrence(script):
+    records = [*pine(2022, ('T1', N1), ('T2', N2)), *rock(2022),
+               *pine(2023, ('T1', N1), ('T2', N2))]
+    row = cell_row(year_cells_of(script, records), N1, N2)
+    assert (row['base_count'], row['testable'], row['recurs']) == (2, True, True)
+
+
+@pytest.mark.parametrize('leaver', ('T1', 'T3'))
+def test_a_node_stays_while_any_of_its_facilities_stays(script, leaver):
+    stayer = 'T3' if leaver == 'T1' else 'T1'
+    records = [*pine(2022, ('T1', N1), ('T3', N1), ('T2', N2)),
+               *pine(2023, (stayer, N1), ('T2', N2))]
+    frame = year_cells_of(script, records)
+    for unit_a, unit_b in ((N1, N2), (N2, N1)):
+        assert cell_row(frame, unit_a, unit_b)['testable'] is True
+
+
+def test_mirror_cells_of_a_leaving_facility_are_both_untestable(script):
+    records = [*pine(2022, ('T1', N1), ('T2', N2)), *pine(2023, ('T1', N1))]
+    frame = year_cells_of(script, records)
+    for unit_a, unit_b in ((N1, N2), (N2, N1)):
+        row = cell_row(frame, unit_a, unit_b)
+        assert (row['base_count'], row['testable'], row['recurs']) == (1, False, False)
+
+
+def test_staying_means_the_next_year_and_no_later_year(script):
+    records = [*pine(2022, ('T1', N1), ('T2', N2)), *pine(2023, ('T1', N1)),
+               *pine(2024, ('T1', N1), ('T2', N2))]
+    row = cell_row(year_cells_of(script, records), N1, N2)
+    assert (row['testable'], row['recurs']) == (False, False)
+
+
+def test_only_base_year_rows_can_stay(script):
+    records = [*pine(2022, ('T1', N1), ('T2', N2)), *pine(2023, ('T5', N1), ('T6', N2)),
+               *pine(2024, ('T5', N1), ('T6', N2))]
+    row = cell_row(year_cells_of(script, records), N1, N2)
+    assert (row['testable'], row['recurs']) == (False, True)
+
+
+@pytest.mark.parametrize(('refile', 'expected'), [
+    pytest.param(pine(2024, ('T1', N1), ('T2', N3)), (True, False), id='changed-code'),
+    pytest.param(pine(2024, ('T1', N1)), (False, False), id='leaves'),
+])
+def test_second_year_pair_reads_the_2024_filings(script, refile, expected):
+    records = [*pine(2022, ('T1', N1), ('T2', N2)), *pine(2023, ('T1', N1), ('T2', N2)),
+               *refile]
+    eligible, counts = counted(script, records)
+    first = cell_row(script.year_cells(eligible, counts, 2022), N1, N2)
+    second = cell_row(script.year_cells(eligible, counts, 2023), N1, N2)
+    assert (first['testable'], first['recurs']) == (True, True)
+    assert (second['testable'], second['recurs']) == expected
