@@ -198,3 +198,12 @@ def test_pair_minimum_shapes_of_one_band_and_a_lone_passing_top(script):
 def test_base_count_below_one_is_refused(script):
     with pytest.raises(ValueError, match='base count'):
         script.bands(cells((0, 3, 0, 0)))
+
+
+def test_measure_minimum_is_none_when_either_pair_has_none(script):
+    spec = importlib.util.spec_from_file_location('stage3_measure', STAGE_3_SCRIPT)
+    stage3 = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(stage3)
+    for minimums in ([None, 3], [None, None], [3, None]):
+        assert script.measure_minimum(minimums) is None
+        assert script.measure_minimum(minimums) == stage3.family_minimum(minimums)
