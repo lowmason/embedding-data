@@ -52,7 +52,7 @@ Process: software readiness first (Tasks 2–14, tests and the fixture chain), t
 - **Full pytest.** It takes about 20 minutes and hashes every `.py` file. Edit no `.py` file while it runs. Task 13's chain test carries `@pytest.mark.slow` in its own file (the marker is registered in `tests/conftest.py`, which stays untouched), so the commit hook skips it and the pre-push hook runs it.
 - **Commands in steps.** `uv run --offline --locked pytest <path> -v` and `uv run --offline --locked ruff check src tests scripts`. Single quotes, 99 columns, 4-space indentation, `'''` docstrings (CPS and test files use 4 spaces).
 
-## Owner decisions needed at plan review
+## Owner decisions at plan review (all approved as written, 2026-11-23)
 
 Each is a default of this plan. Task 1 applies the spec edits that follow from the answers. A different answer rewrites the Task 1 block and the code task named.
 
@@ -64,7 +64,7 @@ Each is a default of this plan. Task 1 applies the spec edits that follow from t
 - **OD6. Bootstrap scope (Tasks 1, 9).** The spec draws "from the sorted list of households that contribute any eligible link to the product". A product covers both dimensions. Default: one list per product, the union of `CPSID` over links that are eligible for either dimension under sensitivity with positive weight, one fresh `random.Random(seed)`, and one set of draws for every variant of the product. Alternative: one list per product, dimension and policy, which makes strict and sensitivity draws unrelated.
 - **OD7. `cps_linked_pairs.parquet` scope (Tasks 1, 10).** Default: monthly one-month and two-month links only. ASEC persons are not links, and their product membership is counted in `cps_flow_diagnostics.parquet`. Alternative: add ASEC persons with link type `asec_last_year`.
 
-## Settled Defaults (for owner review)
+## Settled Defaults (approved by the owner, 2026-11-23)
 
 - **SD1. Weights.** Decimal weights come from the raw CSV through `measure_weights` and `scan_numeric_csv`, joined to the Parquet by row position after `compare_ordered` proves all non-weight columns equal (the Stage 9 pattern, `acs_target_weights.py`). The ASEC replicate columns are read only for the eligible rows.
 - **SD2. Flags.** Classified by label text (Global Constraints), not by number.
@@ -75,7 +75,7 @@ Each is a default of this plan. Task 1 applies the spec edits that follow from t
 
 ## Owner Checkpoints
 
-1. **Plan review** (now): the owner answers OD1–OD7 and approves the Settled Defaults. Task 1 then applies the spec edits.
+1. **Plan review** (done, 2026-11-23): the owner approved OD1–OD7 and SD1–SD6 as written. Task 1 applies the spec edits.
 2. **Before Task 15:** the owner's go-ahead for the reference acquisition, and for each browser import, with the `pgrep` output shown and a confirmed closed Stage 9 freeze window (spec, Host rule).
 3. **A failed anchor or a `strict_subset`/failed X check that differs from design time** (Tasks 15, 16): the owner decides. No one loosens a validator.
 4. **Before Task 16:** the owner's go-ahead for the full-data build, the same checks, and a fresh run ID.
@@ -83,7 +83,14 @@ Each is a default of this plan. Task 1 applies the spec edits that follow from t
 
 ## Decisions
 
-None. The brief took no decision after spec approval. The owner's answers to OD1–OD7 are logged here as `D<n>` lines at plan review, each as `- **D<n>** (owner, plan review, YYYY-MM-DD): <decision>. Applied in: <Task N>.`
+- **D1** (owner, plan review, 2026-11-23): add the Stage 8 mapping run `stage8_acs_mapping_20261018_r7` (pin `1ec9701092f576b122b01464cdb6fa3fbee49db030e4ad3df7b64e621b8e75f4`) as a fifth pinned input, read only for `acs_code_lookup.parquet`. Applied in: Task 1 (spec amendment A1–A3), Task 5.
+- **D2** (owner, plan review, 2026-11-23): industry list row `9920` has status `no_naics_equivalent`, empty candidates, and a delivered value fails the build. Applied in: Task 1 (A6), Task 4, Task 6.
+- **D3** (owner, plan review, 2026-11-23): write new readers of the two Census list workbooks. `parse_industry_list` is a test cross-check only. Applied in: Task 1 (A4), Task 3.
+- **D4** (owner, plan review, 2026-11-23): a row with an `exc.` clause takes its membership types from its positive clause, its candidates exclude the excepted codes, and there is no fifth type. Applied in: Task 1 (A5), Task 3.
+- **D5** (owner, plan review, 2026-11-23): reuse `parse_membership_expression` and `ipums_weights` unchanged, accept that they load the `dotenv` and `ipumspy` modules, and prove that no `.env` is read and no client is built. Applied in: Task 12 (`test_import_closure_is_the_recorded_one` expects `(True, True)`), Global Constraints.
+- **D6** (owner, plan review, 2026-11-23): one bootstrap household list per product, the union over both dimensions and both policies, with one set of draws for every variant of the product. Applied in: Task 1 (A7), Task 9, Task 11.
+- **D7** (owner, plan review, 2026-11-23): `cps_linked_pairs.parquet` holds monthly one-month and two-month links only. Applied in: Task 1 (A8), Task 10.
+- **D8** (owner, plan review, 2026-11-23): approve Settled Defaults SD1–SD6 as written. Applied in: Global Constraints, Tasks 2, 7, 8, 9.
 
 ## Review Focus
 
@@ -165,26 +172,26 @@ All new, under `src/embedding_data/` unless stated. Each test file sits in `test
 
 **Interfaces:**
 - Consumes: the owner's answers to OD1–OD4, OD6 and OD7. OD5 changes no spec text.
-- Produces: a spec that matches Tasks 3–10. Replace `<review date>` in each tag with the date of the owner's approval. A different owner answer rewrites the block it governs before this task runs.
+- Produces: a spec that matches Tasks 3–10. The owner approved OD1–OD7 as written on 2026-11-23, so every tag reads that date.
 
 - [ ] **Step 1: Apply the eight edits.** Each replaces the Old text with the New text in `specs/cps-job-change-flows.md`.
 
   **A1 (OD1), Inputs table.** After the row that starts `| Stage 8 references receipt (v2/46) |`, insert
-  `| Stage 8 ACS mapping run | `stage8_acs_mapping_20261018_r7` | `1ec9701092f576b122b01464cdb6fa3fbee49db030e4ad3df7b64e621b8e75f4` *(owner, plan 23, <review date>)* |`
+  `| Stage 8 ACS mapping run | `stage8_acs_mapping_20261018_r7` | `1ec9701092f576b122b01464cdb6fa3fbee49db030e4ad3df7b64e621b8e75f4` *(owner, plan 23, 2026-11-23)* |`
 
-  **A2 (OD1), Cross-check evidence bullet.** Old: "`pums_occupation_2018` from the Stage 8 v2/46\n  receipt, for the X-category cross-check only (decision 5). It supplies no\n  member." New: "The PUMS member lists in `acs_code_lookup.parquet` of the Stage 8 mapping run, which parsed `pums_occupation_2018` of the v2/46 receipt, for the X-category cross-check only (decision 5). The run's `inputs.json` must record the receipt `stage8_acs_references_20261018_r4`. Nothing else of that run is read, and the lists supply no member. *(owner, plan 23, <review date>)*"
+  **A2 (OD1), Cross-check evidence bullet.** Old: "`pums_occupation_2018` from the Stage 8 v2/46\n  receipt, for the X-category cross-check only (decision 5). It supplies no\n  member." New: "The PUMS member lists in `acs_code_lookup.parquet` of the Stage 8 mapping run, which parsed `pums_occupation_2018` of the v2/46 receipt, for the X-category cross-check only (decision 5). The run's `inputs.json` must record the receipt `stage8_acs_references_20261018_r4`. Nothing else of that run is read, and the lists supply no member. *(owner, plan 23, 2026-11-23)*"
 
-  **A3 (OD1), Commands table.** Old: "`build RUN_ID` with the four upstream IDs and pins". New: "`build RUN_ID` with the five upstream IDs and pins and the Stage 11 references receipt ID and pin *(owner, plan 23, <review date>)*".
+  **A3 (OD1), Commands table.** Old: "`build RUN_ID` with the four upstream IDs and pins". New: "`build RUN_ID` with the five upstream IDs and pins and the Stage 11 references receipt ID and pin *(owner, plan 23, 2026-11-23)*".
 
-  **A4 (OD3), Reused interfaces bullet.** Old: "Reuse unchanged, where they serve: `ipums_references.parse_industry_list`,\n  the Stage 8 occupation-list and membership-expression parsers in\n  `acs_code_references`, `manifest.entry_for`,\n  `target_contract.validate_targets` and\n  `write_targets`, and `ipums_weights`'s Decimal scan." New: "Reuse unchanged: `acs_code_references.parse_membership_expression` (NAICS expressions only), `manifest.entry_for`, `target_contract.validate_targets` and `write_targets`, and `ipums_weights`'s Decimal scan. Stage 11 reads the two Census list workbooks with its own readers: `ipums_references.parse_industry_list` returns no NAICS column and drops `9920`, and Stage 8's row readers are private and take Stage 8 snapshot types. `parse_industry_list` is a test cross-check only. *(owner, plan 23, <review date>)*" The next sentence ("If a reused function cannot serve unchanged, stop and ask the owner. Never edit it.") stays.
+  **A4 (OD3), Reused interfaces bullet.** Old: "Reuse unchanged, where they serve: `ipums_references.parse_industry_list`,\n  the Stage 8 occupation-list and membership-expression parsers in\n  `acs_code_references`, `manifest.entry_for`,\n  `target_contract.validate_targets` and\n  `write_targets`, and `ipums_weights`'s Decimal scan." New: "Reuse unchanged: `acs_code_references.parse_membership_expression` (NAICS expressions only), `manifest.entry_for`, `target_contract.validate_targets` and `write_targets`, and `ipums_weights`'s Decimal scan. Stage 11 reads the two Census list workbooks with its own readers: `ipums_references.parse_industry_list` returns no NAICS column and drops `9920`, and Stage 8's row readers are private and take Stage 8 snapshot types. `parse_industry_list` is a test cross-check only. *(owner, plan 23, 2026-11-23)*" The next sentence ("If a reused function cannot serve unchanged, stop and ask the owner. Never edit it.") stays.
 
-  **A5 (OD4), membership types.** Old: "A row can carry\n  more than one type. Keep them all." New: "A row can carry more than one type. Keep them all. A row with an `exc.` clause takes its types from its positive clause and its candidates exclude the excepted codes. No type records the exclusion: the source expression stays beside the set. *(owner, plan 23, <review date>)*"
+  **A5 (OD4), membership types.** Old: "A row can carry\n  more than one type. Keep them all." New: "A row can carry more than one type. Keep them all. A row with an `exc.` clause takes its types from its positive clause and its candidates exclude the excepted codes. No type records the exclusion: the source expression stays beside the set. *(owner, plan 23, 2026-11-23)*"
 
-  **A6 (OD2), Rows with SOC `none`.** After "None\noccurs in the selected deliveries." add: "The industry list row `9920` has no NAICS entry. It is kept with status `no_naics_equivalent`, empty candidates and the same failing rule. *(owner, plan 23, <review date>)*"
+  **A6 (OD2), Rows with SOC `none`.** After "None\noccurs in the selected deliveries." add: "The industry list row `9920` has no NAICS entry. It is kept with status `no_naics_equivalent`, empty candidates and the same failing rule. *(owner, plan 23, 2026-11-23)*"
 
-  **A7 (OD6), bootstrap.** Old: "list of households that contribute any eligible link to the product, using\n    the standard library's `random.Random` with a fixed integer seed recorded in\n    `inputs.json`. No new dependency is added." New: the same text, then: " A product covers both dimensions and both policies, so the list is the union over them, with positive weight, and one set of draws serves every variant of the product. *(owner, plan 23, <review date>)*"
+  **A7 (OD6), bootstrap.** Old: "list of households that contribute any eligible link to the product, using\n    the standard library's `random.Random` with a fixed integer seed recorded in\n    `inputs.json`. No new dependency is added." New: the same text, then: " A product covers both dimensions and both policies, so the list is the union over them, with positive weight, and one set of draws serves every variant of the product. *(owner, plan 23, 2026-11-23)*"
 
-  **A8 (OD7), Bundle table.** Old: "| `cps_linked_pairs.parquet` | Person-level linked pairs, with codes, guards, flags, weight, link type and product membership |" New: "| `cps_linked_pairs.parquet` | Person-level monthly links (one-month and two-month), with codes, guards, flags, weight, link type and product membership. ASEC persons are not in it *(owner, plan 23, <review date>)* |"
+  **A8 (OD7), Bundle table.** Old: "| `cps_linked_pairs.parquet` | Person-level linked pairs, with codes, guards, flags, weight, link type and product membership |" New: "| `cps_linked_pairs.parquet` | Person-level monthly links (one-month and two-month), with codes, guards, flags, weight, link type and product membership. ASEC persons are not in it *(owner, plan 23, 2026-11-23)* |"
 
 - [ ] **Step 2: Verify.** Run `grep -c 'owner, plan 23' specs/cps-job-change-flows.md`. Expected: `8`. Run `git diff -U0 specs/cps-job-change-flows.md | grep '^@@'`. Expected: no hunk starts before line 240.
 - [ ] **Step 3: Commit** `docs(specs): amend the Stage 11 spec after plan 23 review`. The hook skips tests for a `specs/`-only commit.
