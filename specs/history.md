@@ -133,4 +133,5 @@ Differences from the design:
 - Deviation (Task 3): the catch-all in `main` also catches `pl.exceptions.PanicException`, a `BaseException`, so a Polars panic cannot exit 1. Source: plan, Task 3.
 - Deviation (Task 4): the full pytest run used the repo's xdist overlay, not a serial run. Source: plan, Task 4.
 - Deviation (Task 5): the record has an unnumbered "Terms used in this record" list and states that the bands at 1, 50 and 100 merged into one band. Source: plan, Task 5.
+- Owner gates: "Run Codex" for the final review (2026-11-22). At the finish (2026-11-23): "Push and open a PR", "Merge main in, resolve" for the conflicts in `specs/deferred_items.md`, `specs/deliverable-map.md` and `specs/history.md`, and "Wait for my approval". The PR opens with Auto-fix on and auto-merge off, and the owner approves it before it merges.
 - Deferred: 1 item. Source: specs/deferred_items.md, § 17-acs-wage-minimum-earners.
