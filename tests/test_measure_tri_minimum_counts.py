@@ -1382,12 +1382,12 @@ CHAIN = [
     ('8', on_table('tri_facility_years',
                    lambda frame: set_row(frame, first_eligible(frame), 'owner_key', None)),
      'an eligible facility-year lacks an owner or node'),
-    ('9', on_report(bump_report('owner_key_changes')),
+    ('9', on_report(edited('owner_key_changes', new=lambda old: old + 2)),
      'owner key changes differ from the report'),
     ('10', on_report(bump_report('n_owners', 'headline')), 'owner counts differ from the report'),
     ('11', on_table('tri_parent_link_support', bump('j_owners')),
      'recount differs from the support table'),
-    ('12', on_table('tri_parent_links', bump('n_unweighted')),
+    ('12', on_table('tri_parent_links', bump('n_unweighted', 7)),
      'target rows differ from the support table'),
     ('13', on_report(bump_report('n_unweighted_distribution', 'max')),
      'report distribution differs from the targets'),
@@ -1407,3 +1407,14 @@ def test_the_earlier_check_refuses_first(script, golden, index):
 def test_changed_content_is_never_parsed(script, golden, name):
     (golden['directory'] / name).write_bytes(b'garbage')
     assert refusal(script, golden) == f'{name} differs from its inventory'
+
+
+@pytest.mark.parametrize(('records', 'eligible'), [
+    pytest.param([form(2022, 'T11', N3)], 1, id='self-owned-facility'),
+    pytest.param(excluded('federal', 2022, 'T1', 'Pine'), 0, id='excluded-facility'),
+])
+def test_bundle_without_cells_passes_the_self_check(script, tmp_path, records, eligible):
+    result = checked(script, publish(tmp_path, records))
+    assert result.eligible.height == eligible
+    assert (result.counts.height, result.targets.height) == (0, 0)
+    assert result.distribution['count'] == 0
