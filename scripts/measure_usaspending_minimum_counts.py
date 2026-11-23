@@ -12,12 +12,20 @@ Before any curve, the script authenticates the pinned Stage 14 run by its detach
 the SHA-256 and size of the four files it reads. Then it checks a recount from the pair table
 against the bundle's own support table, targets and report. A refusal is a `Refused` whose
 message is one fixed reason.
+
+The command prints one sorted JSON line: the constants, the input pins, each measure's curves,
+minimum, report distribution and kept counts, and the cells whose two rows are both kept. It
+exits 0 when both measures have a minimum, 1 when one does not, and 2 on a refusal or any
+other error.
 '''
 
+import argparse
 import hashlib
 import json
 import math
 import re
+import sys
+import traceback
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -26,7 +34,7 @@ import polars as pl
 from embedding_data.target_contract import TARGET_SCHEMA
 from embedding_data.usaspending_raw import WINDOW
 from embedding_data.vendor_link_pairs import PAIR_SCHEMA, PAIR_STATUSES
-from embedding_data.vendor_link_targets import MEASURES, SUPPORT_SCHEMA, _distribution
+from embedding_data.vendor_link_targets import INTRA_LABEL, MEASURES, SUPPORT_SCHEMA, _distribution
 
 LEVEL = 0.90
 TOP_BAND = 10
@@ -343,3 +351,156 @@ def self_check(inputs: Inputs) -> Checked:
             raise Refused('report distribution differs from the targets')
     return Checked(eligible=eligible, years=years, targets=targets,
                    distributions={measure: entries[measure] for measure in MEASURES})
+
+
+# ---- kept counts, the result and the command line
+
+# The keys of `kept` that a minimum decides. With no minimum, each is None.
+KEPT_KEYS = ('kept_rows', 'kept_row_share', 'kept_support', 'kept_support_share',
+             'lenient_kept_rows', 'kept_intra_group_rows')
+
+
+def published(targets: pl.DataFrame, years: pl.DataFrame) -> dict[str, pl.DataFrame]:
+    '''The published rows of each measure, sorted by cell.
+
+    Each row holds its cell, its pooled `n_unweighted` as `count`, its `largest_year_count`
+    and its `intra_group` label. The largest year count is the measure's largest firm count
+    over every fiscal year of `WINDOW`: `S_t` for `supplier_share` and `B_t` for
+    `buyer_share`, never a pair count `L_t`. `intra_group` is true when the row's `flags`
+    hold `INTRA_LABEL`.
+    '''
+    rows = {}
+    for measure, count in _BASE_COUNTS.items():
+        largest = years.lazy().group_by(*_CELL).agg(
+            pl.col(count).max().alias('largest_year_count'))
+        rows[measure] = (
+            targets.lazy().filter(pl.col('measure') == measure)
+            .join(largest, on=_CELL, how='left')
+            .select(*_CELL, pl.col('n_unweighted').alias('count'), 'largest_year_count',
+                    pl.col('flags').list.contains(INTRA_LABEL).alias('intra_group'))
+            .sort(*_CELL).collect())
+    return rows
+
+
+def kept(rows: pl.DataFrame, minimum: int | None) -> dict:
+    '''The rows and support of one measure, and what its minimum keeps.
+
+    A row is kept when its `count` is at least `minimum`. A kept row is lenient when its
+    largest single-year count is below `minimum`. The shares divide by this measure's rows and
+    by its summed counts. With no minimum, the keys of `KEPT_KEYS` are None.
+    '''
+    support = int(rows['count'].sum())
+    counts = {'rows': rows.height, 'support': support,
+              'intra_group_rows': rows.filter(pl.col('intra_group')).height}
+    if minimum is None:
+        return counts | dict.fromkeys(KEPT_KEYS)
+    meeting = rows.filter(pl.col('count') >= minimum)
+    kept_support = int(meeting['count'].sum())
+    return counts | {
+        'kept_rows': meeting.height,
+        'kept_row_share': meeting.height / rows.height,
+        'kept_support': kept_support,
+        'kept_support_share': kept_support / support,
+        'lenient_kept_rows': meeting.filter(pl.col('largest_year_count') < minimum).height,
+        'kept_intra_group_rows': meeting.filter(pl.col('intra_group')).height,
+    }
+
+
+def curve(cells: pl.DataFrame) -> dict:
+    '''One year pair's bands, their summed cell counts and the year pair's minimum.'''
+    found = bands(cells)
+    return {
+        **{key: sum(band[key] for band in found) for key in COUNTS},
+        'bands': found,
+        'minimum': pair_minimum(found),
+    }
+
+
+def summarize(year_pair_cells: dict[str, dict[str, pl.DataFrame]],
+              rows: dict[str, pl.DataFrame], distributions: dict[str, dict]) -> dict:
+    '''Each measure's curves, minimum, report distribution and kept counts, and the number of
+    cells whose two rows are both kept.
+
+    The measures never share a minimum: each takes the larger of its own year-pair minimums,
+    and each row is gated by the minimum of its own measure. `cells_meeting_both` is None when
+    either measure has no minimum.
+    '''
+    measures = {}
+    for name in MEASURES:
+        year_pairs = {pair: curve(frame) for pair, frame in year_pair_cells[name].items()}
+        minimum = measure_minimum([found['minimum'] for found in year_pairs.values()])
+        measures[name] = {'year_pairs': year_pairs, 'minimum': minimum,
+                          'n_unweighted_distribution': distributions[name],
+                          'published': kept(rows[name], minimum)}
+    minimums = {name: measures[name]['minimum'] for name in MEASURES}
+    both = None
+    if all(minimum is not None for minimum in minimums.values()):
+        supplier, buyer = (rows[name].lazy().filter(pl.col('count') >= minimums[name])
+                           .select(*_CELL) for name in MEASURES)
+        both = supplier.join(buyer, on=_CELL, how='inner').select(pl.len()).collect().item()
+    return {'measures': measures, 'cells_meeting_both': both}
+
+
+def measure(inputs: Inputs) -> dict:
+    '''The result of an authenticated run, with `complete` true when both measures have a
+    minimum.
+
+    `self_check` runs first, so a refusal stops the run before any cells frame or curve. The
+    cells frames come from the base year of each year pair.
+    '''
+    checked = self_check(inputs)
+    by_base = {base: cells(checked.eligible, base) for base, _later in YEAR_PAIRS}
+    year_pair_cells = {name: {f'{base}-{later}': by_base[base][name]
+                              for base, later in YEAR_PAIRS} for name in MEASURES}
+    result = summarize(year_pair_cells, published(checked.targets, checked.years),
+                       checked.distributions)
+    return {
+        'complete': all(result['measures'][name]['minimum'] is not None for name in MEASURES),
+        'constants': {'level': LEVEL, 'top_band': TOP_BAND, 'min_band_cells': MIN_BAND_CELLS,
+                      'wilson_z': WILSON_Z, 'year_pairs': [list(pair) for pair in YEAR_PAIRS]},
+        'inputs': {'run': inputs.directory.name, 'outputs_sha256': inputs.outputs_sha256,
+                   'files': dict(inputs.files)},
+        **result,
+    }
+
+
+def parse(argv: list[str] | None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description='Measure the Stage 21 minimum counts of the USAspending vendor links.')
+    parser.add_argument('--data-dir', type=Path, required=True)
+    parser.add_argument('--run', required=True)
+    parser.add_argument('--outputs-sha256', required=True)
+    return parser.parse_args(argv)
+
+
+def _line(value: dict) -> str:
+    return json.dumps(value, sort_keys=True, allow_nan=False)
+
+
+def main(argv: list[str] | None = None) -> int:
+    '''Print one sorted JSON line. Exit 0 when both measures have a minimum, 1 when one does
+    not, and 2 on a refusal or any other error.
+
+    A refusal prints only its fixed reason. Any other error prints a fixed reason, and stderr
+    gets the exception's type name and one `file:line in function` line per frame. Its
+    message is never printed, because it can hold a value read from the run.
+    '''
+    options = parse(argv)
+    try:
+        result = measure(authenticate(options.data_dir, options.run, options.outputs_sha256))
+        line = _line(result)
+    except Refused as refusal:
+        print(_line({'complete': False, 'reason': str(refusal)}))
+        return 2
+    except Exception as error:
+        print(type(error).__name__, file=sys.stderr)
+        for frame in traceback.extract_tb(error.__traceback__):
+            print(f'{frame.filename}:{frame.lineno} in {frame.name}', file=sys.stderr)
+        print(_line({'complete': False, 'reason': 'unexpected error'}))
+        return 2
+    print(line)
+    return 0 if result['complete'] else 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())

@@ -4,17 +4,26 @@ Every pair table is a typed frame in `PAIR_SCHEMA` with made-up UEIs that passes
 `validate_pairs`, as in `tests/test_vendor_link_targets.py`.
 '''
 
+import ast
 import dataclasses
 import importlib.util
 import json
+import math
+import re
+import subprocess
+import sys
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
+import httpx
 import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
+from target_fixtures import forbid_external_access
+from vendor_link_fixtures import run_vendor_link_v12
 
+from embedding_data import vendor_link_targets
 from embedding_data.manifest import sha256_file
 from embedding_data.target_io import inventory, write_json
 from embedding_data.vendor_link_bundle import FILES, TABLES
@@ -1053,3 +1062,555 @@ def test_checked_holds_the_checked_frames(script, golden):
         '11-before-12'])
 def test_earlier_check_refuses_first(script, golden, forge, reason):
     assert_refused(script, golden, reason, pin=forge(golden))
+
+
+# ---- kept counts, the result and the command line (Task 4)
+
+CELL = ('unit_a', 'unit_b')
+PUBLISHED_SCHEMA = {'unit_a': pl.String, 'unit_b': pl.String, 'count': pl.UInt64,
+                    'largest_year_count': pl.UInt64, 'intra_group': pl.Boolean}
+KEPT_KEYS = ('kept_rows', 'kept_row_share', 'kept_support', 'kept_support_share',
+             'lenient_kept_rows', 'kept_intra_group_rows')
+PAIR_NAMES = ('2024-2025', '2025-2026')
+EMPTY_DISTRIBUTIONS = {SUPPLIER: {}, BUYER: {}}
+THREE_CELLS = (('a', 'x'), ('b', 'x'), ('c', 'x'))
+OPTIONS = ('--data-dir', '--run', '--outputs-sha256')
+ALLOWED_MODULES = {'embedding_data.target_contract', 'embedding_data.usaspending_raw',
+                   'embedding_data.vendor_link_pairs', 'embedding_data.vendor_link_targets'}
+
+
+def argv_of(bundle, pin=None):
+    return ['--data-dir', str(bundle['data_dir']), '--run', bundle['run'],
+            '--outputs-sha256', bundle['pin'] if pin is None else pin]
+
+
+def run_main(script, capsys, bundle, pin=None):
+    '''Call `main` on `bundle`, under its own pin by default. Check that stdout is one sorted
+    JSON line, and return the status, the parsed line and stderr.'''
+    capsys.readouterr()
+    status = script.main(argv_of(bundle, pin))
+    captured = capsys.readouterr()
+    lines = captured.out.splitlines()
+    assert len(lines) == 1 and captured.out == lines[0] + '\n'
+    assert lines[0] == json.dumps(json.loads(lines[0]), sort_keys=True)
+    return status, json.loads(lines[0]), captured.err
+
+
+def rows_frame(*rows):
+    '''Published rows from (cell, count, largest_year_count, intra_group) tuples.'''
+    return frame(PUBLISHED_SCHEMA, *rows)
+
+
+def counted_rows(counts, cells_=THREE_CELLS):
+    '''Rows of `cells_` with `counts`, each count its own largest year count, and no label.'''
+    return rows_frame(*((cell, count, count, False)
+                        for cell, count in zip(cells_, counts, strict=True)))
+
+
+def both_pairs(first, last=None):
+    '''The cells frames of the two year pairs, keyed by name. The last defaults to the first.'''
+    return dict(zip(PAIR_NAMES, (first, first if last is None else last), strict=True))
+
+
+def without_inputs(result):
+    return json.dumps({key: value for key, value in result.items() if key != 'inputs'},
+                      sort_keys=True)
+
+
+def tree(directory):
+    return sorted((path.relative_to(directory).as_posix(), sha256_file(path))
+                  for path in directory.rglob('*') if path.is_file())
+
+
+def keys_of(value):
+    '''Every key of every object inside `value`.'''
+    if isinstance(value, dict):
+        for key, item in value.items():
+            yield key
+            yield from keys_of(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from keys_of(item)
+
+
+def stage_3():
+    spec = importlib.util.spec_from_file_location('stage3_measure', STAGE_3_SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.fixture(scope='module')
+def v12(tmp_path_factory):
+    '''The V12 chain, built once for the module with external access blocked.'''
+    with pytest.MonkeyPatch.context() as patches:
+        return run_vendor_link_v12(tmp_path_factory.mktemp('minimum-v12'), patches)
+
+
+def test_kept_counts(script):
+    rows = rows_frame((('a', 'x'), 1, 1, False), (('b', 'x'), 2, 1, True),
+                      (('c', 'x'), 3, 3, False), (('d', 'x'), 5, 2, True))
+    assert script.kept(rows, 2) == {
+        'rows': 4, 'support': 11, 'intra_group_rows': 2, 'kept_rows': 3, 'kept_row_share': 0.75,
+        'kept_support': 10, 'kept_support_share': 10 / 11, 'lenient_kept_rows': 1,
+        'kept_intra_group_rows': 2}
+    assert script.kept(rows, None) == {'rows': 4, 'support': 11, 'intra_group_rows': 2,
+                                       **dict.fromkeys(KEPT_KEYS)}
+
+
+def test_lenient_count_uses_firm_counts_of_every_year(script, tmp_path):
+    bundle = publish(tmp_path, [
+        link('P1', 'U1', fy=(1, 0, 0)), link('P1', 'U2', fy=(0, 1, 0)),
+        link('P1', 'U6', fy=(0, 0, 1)), link('P3', 'U4', fy=(1, 0, 1)),
+        link('P3', 'U5', fy=(0, 0, 1))], firms=FIRMS | {'U4': S, 'U5': S, 'U6': S})
+    checked = run_checks(script, bundle)
+    supplier = script.published(checked.targets, checked.years)[SUPPLIER]
+    assert supplier.sort(*CELL).select(*CELL, 'count', 'largest_year_count').rows() == [
+        (*SE, 2, 2), (*SD, 3, 1)]
+    assert script.kept(supplier, 2)['lenient_kept_rows'] == 1
+
+
+def test_two_measures_get_different_minimums(script):
+    supplier = cells((1, 100, 0, 0), (10, 60, 60, 0))
+    buyer = cells((1, 100, 100, 0), (10, 60, 60, 0))
+    found = script.summarize({SUPPLIER: both_pairs(supplier), BUYER: both_pairs(buyer)},
+                             {SUPPLIER: counted_rows((1, 2, 5)), BUYER: counted_rows((1, 1, 1))},
+                             EMPTY_DISTRIBUTIONS)
+    measures = found['measures']
+    assert (measures[SUPPLIER]['minimum'], measures[BUYER]['minimum']) == (2, 1)
+    assert measures[SUPPLIER]['published']['kept_rows'] == 2
+    assert measures[BUYER]['published']['kept_rows'] == 3
+    assert found['cells_meeting_both'] == 2
+
+
+def test_one_measure_without_a_minimum(script):
+    supplier = cells((1, 100, 0, 0), (10, 60, 60, 0))
+    buyer = cells((1, 100, 100, 0), (10, 60, 60, 0))
+    short = cells((1, 100, 100, 0), (10, 60, 30, 0))
+    found = script.summarize({SUPPLIER: both_pairs(supplier), BUYER: both_pairs(buyer, short)},
+                             {SUPPLIER: counted_rows((1, 2, 5)), BUYER: counted_rows((1, 1, 1))},
+                             EMPTY_DISTRIBUTIONS)
+    measures = found['measures']
+    assert measures[BUYER]['minimum'] is None
+    assert measures[BUYER]['published']['kept_rows'] is None
+    assert measures[SUPPLIER]['minimum'] == 2
+    assert measures[SUPPLIER]['published'] == {
+        'rows': 3, 'support': 8, 'intra_group_rows': 0, 'kept_rows': 2, 'kept_row_share': 2 / 3,
+        'kept_support': 7, 'kept_support_share': 7 / 8, 'lenient_kept_rows': 0,
+        'kept_intra_group_rows': 0}
+    assert found['cells_meeting_both'] is None
+
+
+def test_golden_run_exits_zero(script, golden, capsys):
+    status, result, _err = run_main(script, capsys, golden)
+    assert status == 0
+    assert result['complete'] is True
+    measures = result['measures']
+    assert {name: measures[name]['minimum'] for name in (SUPPLIER, BUYER)} == {
+        SUPPLIER: 1, BUYER: 1}
+    for name in (SUPPLIER, BUYER):
+        for pair in PAIR_NAMES:
+            found = measures[name]['year_pairs'][pair]['bands']
+            assert [(b['low'], b['high'], b['base_cells'], b['testable_cells'],
+                     b['recurring_cells']) for b in found] == [(1, None, 2, 2, 2)]
+    assert result['constants'] == {'level': 0.9, 'top_band': 10, 'min_band_cells': 50,
+                                   'wilson_z': 1.959963984540054,
+                                   'year_pairs': [[2024, 2025], [2025, 2026]]}
+    records = outputs_records(golden)
+    assert result['inputs']['files'] == {name: records[name]['sha256'] for name in READ_FILES}
+    supplier, buyer = measures[SUPPLIER]['published'], measures[BUYER]['published']
+    assert {key: supplier[key] for key in (
+        'rows', 'support', 'intra_group_rows', 'kept_rows', 'lenient_kept_rows')} == {
+        'rows': 2, 'support': 3, 'intra_group_rows': 0, 'kept_rows': 2, 'lenient_kept_rows': 0}
+    assert {key: buyer[key] for key in (
+        'rows', 'support', 'intra_group_rows', 'kept_intra_group_rows')} == {
+        'rows': 2, 'support': 2, 'intra_group_rows': 1, 'kept_intra_group_rows': 1}
+    assert result['cells_meeting_both'] == 2
+    report = json.loads((golden['directory'] / 'report.json').read_text(encoding='utf-8'))
+    for name in (SUPPLIER, BUYER):
+        assert measures[name]['n_unweighted_distribution'] == report[DIST][name]
+
+
+def test_failing_top_band_exits_one(script, tmp_path, capsys):
+    status, result, _err = run_main(script, capsys, publish(tmp_path, failing_links()))
+    assert status == 1
+    assert result['complete'] is False
+    for name in (SUPPLIER, BUYER):
+        measure = result['measures'][name]
+        assert measure['minimum'] is None
+        first = measure['year_pairs']['2024-2025']
+        assert [(b['testable_cells'], b['recurring_cells']) for b in first['bands']] == [(1, 0)]
+        assert first['minimum'] is None
+        assert measure['year_pairs']['2025-2026']['minimum'] == 1
+    assert result['cells_meeting_both'] is None
+
+
+def test_refusal_prints_only_the_reason(script, golden, capsys):
+    status, result, _err = run_main(script, capsys, golden, pin='0' * 64)
+    assert status == 2
+    assert result == {'complete': False, 'reason': 'outputs pin differs'}
+
+
+def test_unexpected_error_hides_its_message(script, golden, capsys, monkeypatch):
+    def broken(_eligible):
+        raise ValueError(uei('P1'))
+
+    monkeypatch.setattr(script, 'year_counts', broken)
+    status, result, err = run_main(script, capsys, golden)
+    assert status == 2
+    assert result == {'complete': False, 'reason': 'unexpected error'}
+    assert 'ValueError' in err
+    assert uei('P1') not in json.dumps(result, sort_keys=True)
+    assert uei('P1') not in err
+
+
+def test_shuffled_pairs_give_identical_output(script, golden, capsys):
+    _status, before, _err = run_main(script, capsys, golden)
+    pin = forge_table(golden, PAIR_TABLE,
+                      lambda frame: frame.sample(fraction=1.0, shuffle=True, seed=7))
+    _status, after, _err = run_main(script, capsys, golden, pin=pin)
+    assert without_inputs(after) == without_inputs(before)
+
+
+def test_two_runs_are_byte_identical(script, golden, capsys):
+    lines = []
+    for _ in range(2):
+        capsys.readouterr()
+        script.main(argv_of(golden))
+        lines.append(capsys.readouterr().out)
+    assert lines[0] == lines[1]
+
+
+def test_output_holds_no_uei_amount_or_cell(script, golden, capsys):
+    status, result, _err = run_main(script, capsys, golden)
+    assert status == 0
+    line = json.dumps(result, sort_keys=True)
+    firms = sorted({item[role] for item in golden_links() for role in ('prime', 'sub')})
+    assert [name for name in firms if uei(name) in line] == []
+    assert NODE_PREFIX not in line
+    assert [key for key in keys_of(result) if 'uei' in key or 'amount' in key] == []
+
+
+def test_writes_nothing_under_data_dir(script, golden, capsys):
+    before = tree(golden['data_dir'])
+    run_main(script, capsys, golden)
+    assert tree(golden['data_dir']) == before
+
+
+def test_runs_offline(script, golden, capsys, monkeypatch):
+    def no_client(*_args, **_kwargs):
+        raise AssertionError('the script constructed an HTTP client')
+
+    forbid_external_access(monkeypatch)
+    monkeypatch.setattr(httpx.Client, '__init__', no_client)
+    monkeypatch.setattr(httpx.AsyncClient, '__init__', no_client)
+    status, _result, _err = run_main(script, capsys, golden)
+    assert status == 0
+
+
+def test_script_imports():
+    modules = []
+    for found in ast.walk(ast.parse(SCRIPT.read_text(encoding='utf-8'))):
+        if isinstance(found, ast.Import):
+            modules += [alias.name for alias in found.names]
+        elif isinstance(found, ast.ImportFrom):
+            modules.append(found.module if found.level == 0 else None)
+    assert modules
+    assert [module for module in modules
+            if not (module is not None and (module.split('.')[0] in sys.stdlib_module_names
+                                            or module == 'polars'
+                                            or module in ALLOWED_MODULES))] == []
+
+
+def test_genuine_chain_bundles_pass_the_checks(script, v12, capsys):
+    results = []
+    for name in ('first', 'second'):
+        directory = v12[name]
+        assert directory.parent == v12['data_dir'] / RUNS
+        bundle = {'data_dir': v12['data_dir'], 'run': directory.name, 'pin': v12[name + '_pin']}
+        status, result, _err = run_main(script, capsys, bundle)
+        assert status in (0, 1)
+        results.append(result)
+    assert without_inputs(results[0]) == without_inputs(results[1])
+    records = json.loads((v12['first'] / 'outputs.json').read_text(encoding='utf-8'))
+    assert results[0]['inputs']['files']['report.json'] == records['report.json']['sha256']
+
+
+# ---- Task 4 input shapes beyond the plan tests
+
+def test_curve_sums_its_bands_as_stage_3_does(script):
+    found = script.curve(cells((1, 50, 40, 5), (2, 60, 57, 0), (10, 3, 3, 1)))
+    assert found['bands'] == script.bands(cells((1, 50, 40, 5), (2, 60, 57, 0), (10, 3, 3, 1)))
+    assert [(b['low'], b['high']) for b in found['bands']] == [(1, 1), (2, 2), (3, None)]
+    assert (found['base_cells'], found['testable_cells'], found['recurring_cells']) == (
+        119, 113, 100)
+    assert found['minimum'] == 2
+    assert found == stage_3().curve(cells((1, 50, 40, 5), (2, 60, 57, 0), (10, 3, 3, 1)))
+
+
+def test_kept_intra_group_rows_count_only_kept_rows(script):
+    '''An intra-group row is gated on its own count like any other row.'''
+    rows = rows_frame((('a', 'x'), 1, 1, True), (('b', 'x'), 3, 3, True),
+                      (('c', 'x'), 2, 2, False))
+    found = script.kept(rows, 2)
+    assert (found['intra_group_rows'], found['kept_rows'], found['kept_intra_group_rows']) == (
+        2, 2, 1)
+
+
+def test_largest_year_count_counts_firms_of_its_measure(script, tmp_path):
+    '''In SD, FY2024 has S = 1, B = 2 and L = 2, and FY2026 has 1, 1 and 1. In SE, FY2025 has
+    S = 2, B = 1 and L = 2, and FY2026 has 1, 1 and 1. So each largest count is a firm count of
+    the measure, and it falls in an earlier year than FY2026.'''
+    bundle = publish(tmp_path, [link('P1', 'U1', fy=(1, 0, 1)), link('P2', 'U1', fy=(1, 0, 0)),
+                                link('P3', 'U1', fy=(0, 1, 1)), link('P3', 'U2', fy=(0, 1, 0))])
+    checked = run_checks(script, bundle)
+    found = script.published(checked.targets, checked.years)
+    assert list(found) == [SUPPLIER, BUYER]
+    assert_frame_equal(found[SUPPLIER], rows_frame((SE, 2, 2, False), (SD, 1, 1, False)))
+    assert_frame_equal(found[BUYER], rows_frame((SE, 1, 1, False), (SD, 2, 2, False)))
+
+
+@pytest.mark.parametrize('links, labelled', [
+    (golden_links(), BUYER),
+    ([link('P1', 'U1', fy=(1, 1, 0)), link('P1', 'U2', intra=True, fy=(1, 0, 0))], SUPPLIER),
+], ids=['buyer-row', 'supplier-row'])
+def test_published_marks_the_intra_group_row_of_its_measure(script, tmp_path, links, labelled):
+    checked = run_checks(script, publish(tmp_path, links))
+    found = script.published(checked.targets, checked.years)
+    for name in (SUPPLIER, BUYER):
+        marked = found[name].filter(pl.col('intra_group')).select(*CELL).rows()
+        assert marked == ([SD] if name == labelled else [])
+
+
+def test_sensitivity_only_cell_is_not_a_published_row(script, tmp_path):
+    '''P3–U3 is intra-group, so cell EE exists only under the intra-group sensitivity.'''
+    bundle = publish(tmp_path, [*golden_links(), link('P3', 'U3', intra=True, fy=(1, 1, 1))])
+    checked = run_checks(script, bundle)
+    found = script.published(checked.targets, checked.years)
+    for name in (SUPPLIER, BUYER):
+        assert found[name].select(*CELL).rows() == [ED, SD]
+
+
+def test_measure_takes_the_larger_year_pair_minimum(script):
+    '''The larger minimum is in the last year pair for `supplier_share` and in the first for
+    `buyer_share`.'''
+    one = cells((1, 100, 100, 0), (10, 60, 60, 0))
+    two = cells((1, 100, 0, 0), (10, 60, 60, 0))
+    found = script.summarize({SUPPLIER: both_pairs(one, two), BUYER: both_pairs(two, one)},
+                             {SUPPLIER: counted_rows((1, 2, 5)), BUYER: counted_rows((1, 2, 5))},
+                             EMPTY_DISTRIBUTIONS)
+    measures = found['measures']
+    assert [measures[name]['year_pairs'][pair]['minimum']
+            for name in (SUPPLIER, BUYER) for pair in PAIR_NAMES] == [1, 2, 2, 1]
+    assert (measures[SUPPLIER]['minimum'], measures[BUYER]['minimum']) == (2, 2)
+    assert (measures[SUPPLIER]['published']['kept_rows'],
+            measures[BUYER]['published']['kept_rows']) == (2, 2)
+    assert found['cells_meeting_both'] == 2
+
+
+@pytest.mark.parametrize('missing, pair, failed', [
+    (SUPPLIER, '2024-2025', cells((1, 100, 100, 0), (10, 60, 30, 0))),
+    (SUPPLIER, '2025-2026', cells((1, 60, 60, 0))),
+    (BUYER, '2024-2025', cells((1, 60, 60, 0))),
+    (BUYER, '2025-2026', cells((1, 100, 100, 0), (10, 60, 30, 0))),
+], ids=['supplier-first-rate', 'supplier-last-empty-top', 'buyer-first-empty-top',
+        'buyer-last-rate'])
+def test_measure_without_a_minimum_leaves_the_other_whole(script, missing, pair, failed):
+    one = cells((1, 100, 100, 0), (10, 60, 60, 0))
+    year_pairs = {name: both_pairs(one) for name in (SUPPLIER, BUYER)}
+    year_pairs[missing] = both_pairs(one) | {pair: failed}
+    rows = {SUPPLIER: counted_rows((1, 2, 5)), BUYER: counted_rows((1, 1, 1))}
+    found = script.summarize(year_pairs, rows, EMPTY_DISTRIBUTIONS)
+    measures = found['measures']
+    other = BUYER if missing == SUPPLIER else SUPPLIER
+    assert measures[missing]['minimum'] is None
+    assert {name: measures[missing]['year_pairs'][name]['minimum'] for name in PAIR_NAMES} == {
+        name: None if name == pair else 1 for name in PAIR_NAMES}
+    support = {SUPPLIER: 8, BUYER: 3}
+    assert measures[missing]['published'] == {
+        'rows': 3, 'support': support[missing], 'intra_group_rows': 0,
+        **dict.fromkeys(KEPT_KEYS)}
+    assert measures[other]['minimum'] == 1
+    assert measures[other]['published'] == {
+        'rows': 3, 'support': support[other], 'intra_group_rows': 0, 'kept_rows': 3,
+        'kept_row_share': 1.0, 'kept_support': support[other], 'kept_support_share': 1.0,
+        'lenient_kept_rows': 0, 'kept_intra_group_rows': 0}
+    assert found['cells_meeting_both'] is None
+
+
+def test_cells_meeting_both_needs_both_rows_of_one_cell(script):
+    '''At minimum 2 each, `supplier_share` keeps (a, x) and (b, x), and `buyer_share` keeps
+    (a, y) and (b, x). Only (b, x) meets both. The buyer rows come in another order.'''
+    two = cells((1, 100, 0, 0), (10, 60, 60, 0))
+    rows = {SUPPLIER: counted_rows((2, 1, 3), (('a', 'x'), ('a', 'y'), ('b', 'x'))),
+            BUYER: counted_rows((2, 1, 2), (('b', 'x'), ('a', 'x'), ('a', 'y')))}
+    found = script.summarize({SUPPLIER: both_pairs(two), BUYER: both_pairs(two)}, rows,
+                             EMPTY_DISTRIBUTIONS)
+    assert [found['measures'][name]['published']['kept_rows'] for name in (SUPPLIER, BUYER)] == [
+        2, 2]
+    assert found['cells_meeting_both'] == 1
+
+
+def test_summarize_keeps_each_distribution(script):
+    one = cells((1, 100, 100, 0), (10, 60, 60, 0))
+    distributions = {SUPPLIER: {'max': 5}, BUYER: {'max': 1}}
+    found = script.summarize({SUPPLIER: both_pairs(one), BUYER: both_pairs(one)},
+                             {SUPPLIER: counted_rows((1, 2, 5)), BUYER: counted_rows((1, 1, 1))},
+                             distributions)
+    assert {name: found['measures'][name]['n_unweighted_distribution']
+            for name in (SUPPLIER, BUYER)} == distributions
+
+
+@pytest.mark.parametrize('missing', [SUPPLIER, BUYER])
+def test_one_measure_without_a_minimum_exits_one(script, golden, capsys, monkeypatch, missing):
+    '''The FY2025 base cells of one measure stop recurring, so only that measure has no
+    minimum.'''
+    real = script.cells
+
+    def cells_without_recurrence(eligible, base):
+        found = real(eligible, base)
+        if base == 2025:
+            found[missing] = found[missing].with_columns(recurs=pl.lit(False))
+        return found
+
+    monkeypatch.setattr(script, 'cells', cells_without_recurrence)
+    status, result, _err = run_main(script, capsys, golden)
+    assert status == 1
+    assert result['complete'] is False
+    measures = result['measures']
+    other = BUYER if missing == SUPPLIER else SUPPLIER
+    assert [measures[missing]['year_pairs'][pair]['minimum'] for pair in PAIR_NAMES] == [1, None]
+    assert (measures[missing]['minimum'], measures[other]['minimum']) == (None, 1)
+    assert measures[missing]['published']['kept_rows'] is None
+    assert measures[other]['published']['kept_rows'] == 2
+    assert result['cells_meeting_both'] is None
+    assert all(measures[name]['year_pairs'][pair]['bands']
+               for name in (SUPPLIER, BUYER) for pair in PAIR_NAMES)
+
+
+def test_output_has_the_fixed_shape(script, golden, capsys):
+    _status, result, _err = run_main(script, capsys, golden)
+    assert set(result) == {'complete', 'constants', 'inputs', 'measures', 'cells_meeting_both'}
+    assert set(result['constants']) == {'level', 'top_band', 'min_band_cells', 'wilson_z',
+                                        'year_pairs'}
+    assert set(result['inputs']) == {'run', 'outputs_sha256', 'files'}
+    assert set(result['measures']) == {SUPPLIER, BUYER}
+    for measure in result['measures'].values():
+        assert set(measure) == {'year_pairs', 'minimum', 'n_unweighted_distribution',
+                                'published'}
+        assert set(measure['year_pairs']) == set(PAIR_NAMES)
+        assert set(measure['published']) == {'rows', 'support', 'intra_group_rows', *KEPT_KEYS}
+        for found in measure['year_pairs'].values():
+            assert set(found) == {'base_cells', 'testable_cells', 'recurring_cells', 'bands',
+                                  'minimum'}
+            for band_ in found['bands']:
+                assert set(band_) == {'low', 'high', 'base_cells', 'testable_cells',
+                                      'recurring_cells', 'rate', 'wilson_low', 'wilson_high'}
+
+
+def test_bands_print_their_rate_and_wilson_interval(script, golden, capsys):
+    _status, result, _err = run_main(script, capsys, golden)
+    low, high = script.wilson(2, 2)
+    for measure in result['measures'].values():
+        for found in measure['year_pairs'].values():
+            assert [(b['rate'], b['wilson_low'], b['wilson_high']) for b in found['bands']] == [
+                (1.0, low, high)]
+
+
+def test_inputs_name_the_run_and_its_pin(script, tmp_path, capsys):
+    bundle = publish(tmp_path, golden_links(), run='Stage14_run-2')
+    _status, result, _err = run_main(script, capsys, bundle)
+    records = outputs_records(bundle)
+    assert result['inputs'] == {
+        'run': 'Stage14_run-2', 'outputs_sha256': bundle['pin'],
+        'files': {name: records[name]['sha256'] for name in READ_FILES}}
+
+
+@pytest.mark.parametrize('option', OPTIONS)
+def test_every_option_is_required(script, golden, capsys, option):
+    argv = argv_of(golden)
+    index = argv.index(option)
+    del argv[index:index + 2]
+    capsys.readouterr()
+    with pytest.raises(SystemExit) as caught:
+        script.main(argv)
+    assert caught.value.code == 2
+    assert capsys.readouterr().out == ''
+
+
+def test_self_check_refusal_exits_two_before_any_curve(script, golden, capsys, monkeypatch):
+    def fail(*_args):
+        pytest.fail('a cells frame or curve was built before every self-check passed')
+
+    pin = forge_table(golden, SUPPORT_TABLE, bump('s_suppliers', is_cell(SD)))
+    for name in ('cells', 'curve', 'published', 'summarize'):
+        monkeypatch.setattr(script, name, fail)
+    status, result, _err = run_main(script, capsys, golden, pin=pin)
+    assert status == 2
+    assert result == {'complete': False, 'reason': 'pooled recount differs from the support table'}
+
+
+def test_unexpected_error_prints_its_type_and_frames_only(script, golden, capsys, monkeypatch):
+    def broken(_eligible):
+        raise ValueError(uei('P1'))
+
+    monkeypatch.setattr(script, 'year_counts', broken)
+    _status, _result, err = run_main(script, capsys, golden)
+    lines = err.splitlines()
+    assert lines[0] == 'ValueError'
+    frames = lines[1:]
+    assert len(frames) >= 4
+    assert [line for line in frames if not re.fullmatch(r'.+:\d+ in [\w<>]+', line)] == []
+    assert frames[0].startswith(f'{SCRIPT}:') and frames[0].endswith(' in main')
+    assert frames[-1].endswith(' in broken')
+    assert [line for line in frames if line.endswith(' in self_check')]
+
+
+def test_unreadable_file_is_an_unexpected_error(script, golden, capsys, monkeypatch):
+    def unreadable(_file):
+        raise PermissionError(13, 'Permission denied', uei('P1'))
+
+    monkeypatch.setattr(script, '_sha256', unreadable)
+    status, result, err = run_main(script, capsys, golden)
+    assert status == 2
+    assert result == {'complete': False, 'reason': 'unexpected error'}
+    assert err.splitlines()[0] == 'PermissionError'
+    assert uei('P1') not in err and 'Permission denied' not in err
+
+
+def test_result_that_is_not_json_is_an_unexpected_error(script, golden, capsys, monkeypatch):
+    real = script.summarize
+
+    def with_nan(*args):
+        found = real(*args)
+        found['cells_meeting_both'] = math.nan
+        return found
+
+    monkeypatch.setattr(script, 'summarize', with_nan)
+    status, result, err = run_main(script, capsys, golden)
+    assert status == 2
+    assert result == {'complete': False, 'reason': 'unexpected error'}
+    assert err.splitlines()[0] == 'ValueError'
+
+
+@pytest.mark.parametrize('links, pin, status', [
+    (golden_links(), None, 0), (failing_links(), None, 1), (golden_links(), '0' * 64, 2),
+], ids=['complete', 'incomplete', 'refused'])
+def test_script_runs_as_a_command(tmp_path, links, pin, status):
+    bundle = publish(tmp_path, links)
+    done = subprocess.run([sys.executable, str(SCRIPT), *argv_of(bundle, pin)],
+                          capture_output=True, text=True, check=False)
+    assert done.returncode == status
+    (line,) = done.stdout.splitlines()
+    assert json.loads(line)['complete'] is (status == 0)
+
+
+def test_intra_label_is_imported_not_retyped(script):
+    source = SCRIPT.read_text(encoding='utf-8')
+    imported = [alias.name for found in ast.walk(ast.parse(source))
+                if isinstance(found, ast.ImportFrom)
+                and found.module == 'embedding_data.vendor_link_targets'
+                for alias in found.names]
+    assert 'INTRA_LABEL' in imported
+    assert script.INTRA_LABEL is vendor_link_targets.INTRA_LABEL
+    assert INTRA_LABEL not in source
