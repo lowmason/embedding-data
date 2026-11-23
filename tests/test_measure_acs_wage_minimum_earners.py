@@ -1228,6 +1228,8 @@ def test_category_records_hold_the_se_the_reason_and_the_target_flag(script):
     by_code = {r['INDNAICS']: r for r in script.category_records(headline_of(people))}
     swinging, equal, single = by_code['1111'], by_code['2222'], by_code['3333']
     assert swinging['se'] == pytest.approx(1 / 3)
+    group = headline_of(category('1111', 2023, 2, swinging=True))
+    assert swinging['se'] == script.category_se(group)[0]
     assert (swinging['undefined'], swinging['meets_se_target']) == (None, False)
     assert (equal['se'], equal['undefined'], equal['meets_se_target']) == (0.0, None, True)
     assert (single['se'], single['undefined'], single['meets_se_target']) == (
@@ -1345,18 +1347,24 @@ def test_the_minimum_is_the_larger_year_minimum(script, capsys, tmp_path, hard_y
     assert easy['kept'] == common | {'count_meets_se_misses': 1, 'count_misses_se_meets': 10}
 
 
-def test_undefined_ses_are_counted_for_each_year_and_reason(script, capsys, tmp_path):
+def undefined_people():
+    '''2023: two one-row categories, a constant-wage one and one that is constant and has a zero
+    denominator. 2024: a one-row category, two with a zero denominator and a defined one.
+    '''
     def zero_denominator(code, year, wages=(10.0, 11.0)):
         return [person(code, year, wage, REPWTP7=0) for wage in wages]
 
-    people = (
+    return (
         [person('1111', 2023, 10.0), person('1112', 2023, 10.0)]
         + [person('2222', 2023, 10.0), person('2222', 2023, 10.0)]
         + zero_denominator('2223', 2023, (10.0, 10.0))
         + category('3333', 2023, 2)
         + [person('1111', 2024, 10.0)] + zero_denominator('4444', 2024)
         + zero_denominator('4445', 2024) + category('3333', 2024, 2, swinging=True))
-    status, result = run_main(script, capsys, publish(tmp_path, people))
+
+
+def test_undefined_ses_are_counted_for_each_year_and_reason(script, capsys, tmp_path):
+    status, result = run_main(script, capsys, publish(tmp_path, undefined_people()))
     assert status == 1
     assert result['years']['2023']['undefined'] == {
         'fewer_than_two_rows': 2, 'constant_wage': 2, 'replicate_denominator_not_positive': 0}
@@ -1369,6 +1377,55 @@ def test_undefined_ses_are_counted_for_each_year_and_reason(script, capsys, tmp_
     assert by_key[2024, '4444']['undefined'] == 'replicate_denominator_not_positive'
     assert by_key[2024, '3333']['se'] == pytest.approx(1 / 3)
     assert by_key[2024, '3333']['undefined'] is None
+
+
+def kinds(mapping, **expected):
+    '''Check the exact type of each named value: one type or a tuple of types.'''
+    for name, kind in expected.items():
+        allowed = kind if isinstance(kind, tuple) else (kind,)
+        assert type(mapping[name]) in allowed, (name, mapping[name])
+
+
+def assert_json_types(result):
+    '''Counts are ints, SEs and shares are floats or null, flags are booleans.
+
+    `==` cannot show it: 1 == 1.0 == True. The parsed line keeps the written type.
+    '''
+    absent = type(None)
+    kinds(result, complete=bool, minimum=(int, absent))
+    kinds(result['constants'], se_target=float, level=float, min_band_categories=int,
+          replicate_factor=float)
+    assert all(type(number) is int for number in
+               result['constants']['band_starts'] + result['constants']['years'])
+    for entry in result['categories']:
+        kinds(entry, INDNAICS=str, YEAR=int, headline_rows=int, se=(float, absent),
+              undefined=(str, absent), meets_se_target=bool)
+    for year in result['years'].values():
+        kinds(year, minimum=(int, absent))
+        for band in year['bands']:
+            kinds(band, start=int, next_start=(int, absent), categories=int, meeting=int,
+                  share=(float, absent), passes=bool)
+        assert all(type(count) is int for count in year['undefined'].values())
+        kinds(year['kept'], headline_categories=int, headline_rows=int,
+              shared_node_categories=int, kept_categories=(int, absent),
+              kept_category_share=(float, absent), kept_headline_rows=(int, absent),
+              kept_headline_row_share=(float, absent), count_meets_se_misses=(int, absent),
+              count_misses_se_meets=(int, absent), missed=(list, absent))
+        for missed in year['kept']['missed'] or []:
+            kinds(missed, INDNAICS=str, headline_rows=int)
+
+
+def test_output_values_have_their_json_types(script, capsys, tmp_path):
+    empty_2024 = [row for row in golden_people() if row['YEAR'] == 2023]
+    empty_2024.append(person('1111', 2024, 10.0, headline=False))
+    shapes = {'golden': golden_people(), 'banded': banded_people(2023),
+              'undefined': undefined_people(), 'one_year_empty': empty_2024}
+    statuses = {}
+    for name, people in shapes.items():
+        status, result = run_main(script, capsys, publish(tmp_path / name, people))
+        assert_json_types(result)
+        statuses[name] = status
+    assert statuses == {'golden': 0, 'banded': 0, 'undefined': 1, 'one_year_empty': 1}
 
 
 def test_shared_node_categories_are_counted_for_each_year(script, capsys, tmp_path):
