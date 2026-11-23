@@ -131,6 +131,8 @@ It does not say that the relation is true.
     facilities and 1 industry, at most 477 facilities and 63 industries).
   - 405 industries in the marginals, 264 D&B-only cells, 298 federal-only cells and 102
     partial owners.
+  - Facility-years with a D&B number: 13,560, 13,397 and 13,188 (section "E7 and E8
+    measures").
 
   The downward merge of a thin top band (below) was proposed because only 94 rows (47
   industry pairs) have a pooled count of 10 or more. The session had also seen the V9 curves
@@ -191,8 +193,9 @@ written, so the script cannot read them.
 Three other tests were dropped:
 
 - **D&B agreement**, that is, whether a cell also holds under the D&B owner key. About 39% of
-  facility-years have no usable D&B number and fall back to `facility:<TRIFD>` (13,560 of
-  22,112 have one in RY2022). So the test would measure D&B coverage, not the cell.
+  facility-years have no D&B number (13,560 of 22,112 have one in RY2022, Stage 5 findings,
+  "E7 and E8 measures"). Their D&B key falls back to `facility:<TRIFD>`. So the test would
+  measure D&B coverage, not the cell.
 - **A random split of owners into halves.** It is circular: a cell with pooled count k appears
   in both halves only through its k.
 - **A Poisson error.** It treats the counts as a sample, but they come from all reports.
@@ -304,9 +307,12 @@ Rates use the point estimate. The Wilson interval does not enter the rule.
 
 **Why the downward merge.** V9 lets a small top band stand. With few large cells, a top band
 of a few testable cells can miss `LEVEL` through one or two code changes and stop the stage.
-The merge makes the top band as large as the others. It cannot lower the minimum below what
-the lower bands support, because the merged band starts at the lower band's start and must
-itself reach `LEVEL`.
+The merge stops a few cells from deciding the top band. It has a cost: the merged rate mixes
+two bands. So the merge can move the minimum by one band either way, or turn a pass into a
+stop. For example, a band at 9 with 60 testable cells at rate 0.88 and a top band with 20
+cells at rate 1.0 merge to a rate of about 0.91 and a minimum of 9, although the cells at 9
+alone miss `LEVEL`. The decision record reports the bands before the downward merge as well,
+so a reader can see its effect.
 
 **Mirrored cells (My call).** Both rows `(a,b)` and `(b,a)` of an industry pair are cells, as
 in V9's co-ownership curves. The two have the same `j_t`, the same testability and the same
@@ -368,7 +374,8 @@ is below the minimum.
      - the rule constants and the input pins.
      - for each year pair: the base cells and testable cells in total, the bands (start, end,
        base cells, testable cells, recurring cells, rate and Wilson interval) and the
-       year-pair minimum or its absence with the reason.
+       year-pair minimum or its absence with the reason. When the downward merge happens,
+       it also gives the two bands as they were after the upward merge.
      - the family minimum, the pooled `n_unweighted` distribution as `report.json` gives it,
        and the kept counts: the rows, the support (the sum of `n_unweighted`), the kept rows
        and their share, the kept support and its share, the lenient kept rows, and the kept
@@ -476,8 +483,9 @@ is below the minimum.
   owner in each year. So the test cannot see a change of ownership, and a cell can rest on an
   ownership that did not hold in the base year.
 - Testability keeps only cells with a linking pair of facilities that both file eligibly
-  again. Facilities that leave TRI are out. So are ineligible refiles, which the published
-  counts bound: 97 `naics_*` facility-years in RY2023 and 70 in RY2024.
+  again. Facilities that leave TRI are out, and so are ineligible refiles. The published
+  counts bound the `naics_*` refiles only: 97 `naics_*` facility-years in RY2023 and 70 in
+  RY2024. They do not bound a facility that turns `federal`.
 - RY2024 completeness depends on the snapshot (2025-11-05). Under this rule a missing RY2024
   report removes a cell from the test. It does not count as a failure.
 - Codes are self-reported and unvalidated.
