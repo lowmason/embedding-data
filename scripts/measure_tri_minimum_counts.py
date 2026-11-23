@@ -473,11 +473,12 @@ def reason_line(reason: str) -> str:
     return json.dumps({'complete': False, 'reason': reason}, sort_keys=True)
 
 
-def report_unexpected(error: Exception) -> None:
+def report_unexpected(error: BaseException) -> None:
     '''Write the type of the error and the place of each frame to stderr, never its message.
 
     The message, `__cause__` and `__context__` can hold a TRIFD or an owner key, so none of
-    them is formatted.
+    them is formatted. A Polars panic is a `BaseException`, not an `Exception`, so `main`
+    names it. It does not catch `KeyboardInterrupt` or `SystemExit`.
     '''
     print(type(error).__name__, file=sys.stderr)
     for frame in traceback.extract_tb(error.__traceback__):
@@ -497,7 +498,7 @@ def main(argv: list[str] | None = None) -> int:
         status = 0 if result['complete'] else 1
     except Refused as refusal:
         line, status = reason_line(str(refusal)), 2
-    except Exception as error:
+    except (Exception, pl.exceptions.PanicException) as error:
         report_unexpected(error)
         line, status = reason_line('unexpected error'), 2
     print(line)

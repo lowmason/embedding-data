@@ -1831,10 +1831,16 @@ def raise_in_handler(*args):
         raise ValueError('harmless words')
 
 
+def raise_panic(*args):
+    '''A Polars panic is a `BaseException`, so `except Exception` does not catch it.'''
+    raise pl.exceptions.PanicException('parent:Pine T1')
+
+
 @pytest.mark.parametrize(('raiser', 'kind'), [
     pytest.param(raise_plain, 'KeyError', id='plain'),
     pytest.param(raise_with_cause, 'ValueError', id='explicit-cause'),
     pytest.param(raise_in_handler, 'ValueError', id='implicit-context'),
+    pytest.param(raise_panic, 'PanicException', id='polars-panic'),
 ])
 def test_unexpected_error_hides_every_message_in_its_chain(
         script, golden, capsys, monkeypatch, raiser, kind):
@@ -1844,6 +1850,16 @@ def test_unexpected_error_hides_every_message_in_its_chain(
     assert error.splitlines()[0] == kind
     for text in ('Pine', 'T1', 'Slate', 'T99', 'owner:', 'parent:', 'harmless'):
         assert text not in error
+
+
+def test_an_interrupt_is_not_an_unexpected_error(script, golden, monkeypatch):
+    def interrupt(*args):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(script, 'year_cells', interrupt)
+    with pytest.raises(KeyboardInterrupt):
+        script.main(['--data-dir', str(golden['data_dir']), '--run', golden['run'],
+                     '--outputs-sha256', golden['pin']])
 
 
 def test_unexpected_error_gives_one_line_for_each_frame(script, golden, capsys, monkeypatch):
