@@ -135,12 +135,12 @@ the stage and puts this stamp under its entry, which cites both Deviation notes:
 
 ## Decisions
 
-None.
+- **D1** (owner, plan review, 2026-11-22): Approve plan 19 as committed at `dc18c5d`, with the OC1 defaults unchanged ("Approve plan 19"). Applied in: Owner Checkpoints (OC1), Global Constraints, Tasks 3 to 5.
 
 ## Owner Checkpoints
 
-- **OC1 (plan review).** The defaults this plan sets where the spec or the brief leaves a
-  choice:
+- **OC1 (plan review, settled by D1).** The defaults this plan sets where the spec or the
+  brief leaves a choice:
   1. Real output goes to `$HOME/.cache/embedding-data/stage21-minimum-counts/<rule commit>/`
      (brief default, after the Stage 3 and Stage 19 precedents), outside the repository and
      outside `data/`.
