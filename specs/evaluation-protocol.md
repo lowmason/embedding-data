@@ -268,7 +268,8 @@ defers to the protocol: its Out of scope line on embedding scoring, null-model
 normalization, data splits and acceptance thresholds; its note that the
 scoring protocol can use the partial-employer counts with n(a); and its Handoff
 line on the counts and marginals for a null model. It also answers methodology
-K6-Q1 by assignment. That spec is retired and is not edited.
+K6-Q1 by assignment. That spec is retired. It gets only a dated pointer to this
+section, after its amendment of 2026-11-18 *(owner, 2026-11-23)*.
 
 ### Conditions this repository keeps
 
@@ -279,8 +280,10 @@ K6-Q1 by assignment. That spec is retired and is not edited.
   `ita_co_ownership.parquet` meets the count gate. J is `n_unweighted`, which
   counts unreconstructed EINs only. A count that admits zero-padded EINs is a
   sensitivity. It never replaces J and never adds a pair.
-- **CO3. Roles (G6).** The validation part selects. The sealed part judges and
-  is opened once. No co-ownership row, and no quantity derived from one, enters
+- **CO3. Roles (G6).** The validation part selects, for naics-embedder's
+  relatedness artifact only (my call: the scope that the relatedness spec, §7,
+  asks for, as the Stage 10 amendment limited its exception to the text→code
+  artifact). The sealed part judges and is opened once. No co-ownership row, and no quantity derived from one, enters
   training, curriculum construction or hard-negative mining. The split comes
   first, and a part depends on the industry code alone, so a rebuilt table
   keeps each industry in its part. Only the sealed part is reported as
@@ -364,9 +367,11 @@ its owner amends it. The conditions below bind every version.
   tables are never training data. This section grants nothing under R8.4. A
   real read for training waits for the owner's separate R8.4 decision (G1)
   *(owner, 2026-11-23)*. Fixture tables may be read before it.
-- **AM3. It never judges and never selects.** No score on the area mix is
-  reported as an evaluation of an embedder. No part of it, and no held-out set
-  of its counties or cells, selects a model, a checkpoint or a configuration.
+- **AM3. It never judges and never selects the relatedness embedding.** No
+  score on the area mix is reported as an evaluation of it. No part of the area
+  mix, and no held-out set of its counties or cells, selects its model,
+  checkpoint or configuration. For any other embedder, the area mix has no role
+  until the owner amends this section (my call; Rule 1).
 - **AM4. A family that measures the same relation never judges what the area
   mix trains** (my call). The relatedness spec names one, the ACS workplace
   area mix (§4.1). Each later family's section says whether it is one.

@@ -1,7 +1,9 @@
 # Evaluation protocol: ITA co-ownership and the 2023 ITA area mix
 
-Status: PROPOSED (2026-11-23). Written in a brainstorming session. The owner has not yet
-approved the committed design.
+Status: PROPOSED (2026-11-23). Written in a brainstorming session. A builder check raised three
+points. One was the owner's to rule (P7). The other two are folded in as my calls: CO3 and AM3
+are scoped to the relatedness artifact, and the Handoff notes that Stage 23 has no consuming
+spec yet. The owner has not yet approved the committed design.
 
 Roadmap: `specs/naics-evaluation-data-roadmap.md`, Stage 16 (Track E, O14). The design adds
 Sections 2 and 3 to [the evaluation protocol](evaluation-protocol.md). This file holds their
@@ -41,6 +43,7 @@ Two read-only measurements were made on the selected runs. Neither reads an embe
 | P4 | naics-embedder's relatedness spec asks for G6 (selection may read co-ownership's validation part) and G1 (R8.4 amended so that the area mix may train). Which does Stage 16 carry? | "G6 in, G1 out" |
 | P5 | Splitting by anchor industry puts 50.3% of co-owned pairs in both parts, one end in each. What does the co-ownership section require? | "Report it beside": the headline stays as naics-embedder designed it. Every sealed score also states the crossing share and a sealed score restricted to pairs with both industries sealed, labeled as a sensitivity |
 | P6 | How is it written? | "Approach 1": two thin sections in the protocol, with the design history in this file, applied in this session in one docs-only PR |
+| P7 | The retired Stage 10 spec says "Co-ownership and the link table keep the full exclusion", and naics-embedder reads G6 from that line. Does it get a dated pointer amendment, as G2's exception did? | "Add pointer" |
 
 **My calls.** Choices made while writing, which the owner has not ruled on, are marked (my call).
 
@@ -199,8 +202,9 @@ One docs commit applies these. Each edit is a pointer or a status, not a rule ch
 2. **This file.** Change Status to "APPROVED (date, owner)".
 3. **Source spec**, the introduction (line 17) and Out of scope, "Evaluation protocol"
    (line 686): add that Sections 2 and 3 cover co-ownership and the 2023 area mix.
-4. **`CLAUDE.md`**, Stage 10 paragraph: add that selection may also read co-ownership's validation
-   part, and that reads of co-ownership follow Section 2. Stage 6 paragraph: add that reads of the
+4. **`CLAUDE.md`**, Stage 10 paragraph: add that selection for naics-embedder's relatedness
+   artifact may also read co-ownership's validation part, and that reads of co-ownership follow
+   Section 2. Stage 6 paragraph: add that reads of the
    2023 area mix follow Section 3, which allows training only after R8.4 is amended.
 5. **`README.md`**, the Stage 10 and Stage 6 sections: the same two sentences.
 6. **`specs/deliverable-map.md`**, the co-ownership and area-mix rows: replace "Role not assigned"
@@ -208,9 +212,14 @@ One docs commit applies these. Each edit is a pointer or a status, not a rule ch
 7. **`specs/naics-evaluation-data-stage-16-findings.md`**: a new one-screen file. It records the
    stage's cost in sessions, the two measurements and what is not claimed.
 8. **Roadmap**: tick Stage 16 and add its COMPLETE stamp, as Stage 22's PR did (my call).
+9. **Retired Stage 10 spec** `specs/completed/ita-establishment-targets.md`, after its amendment
+   block (lines 11–27): one dated pointer line (P7). Section 2 of the protocol extends the
+   selection exception to co-ownership's validation part, for naics-embedder's relatedness
+   artifact only. The link table keeps the full exclusion. The amendment of 2026-11-18 is not
+   reworded. G2's exception, written into the same retired spec (`e03ec67`), is the precedent.
 
-Findings, retired specs and retired plans are records and are not edited. R8.4's text is
-unchanged.
+Findings and retired plans are records and are not edited. The retired Stage 10 spec gets only
+the pointer of edit 9. R8.4's text is unchanged.
 
 ## Constraints
 
@@ -234,6 +243,7 @@ unchanged.
       pin and tables to read; which families are still unscored.
 - [ ] "Families with no section" no longer lists co-ownership or the area mix.
 - [ ] `CLAUDE.md`, `README.md`, the source spec and the deliverable map point to Sections 2 and 3.
+- [ ] The retired Stage 10 spec's only change is the dated pointer of edit 9.
 - [ ] R8.4's text is unchanged.
 - [ ] `git diff --stat` for the change lists only Markdown files.
 - [ ] Stage 16 is ticked in the roadmap, and the findings file exists.
@@ -251,7 +261,10 @@ unchanged.
 - **Stages 23 and 25.** Section 2 is their model. They assign the null model and the scores to the
   consuming spec, name their run, pin and tables, and keep CO-style conditions. Each says whether
   its family measures the same relation as co-ownership (CO7). A family split by anchor industry
-  measures its own crossing share, as here.
+  measures its own crossing share, as here. The assignment needs a consuming spec. At `2b2029c`
+  the relatedness spec lets TRI join as a second judge (§4.1), but lists USAspending subawards as
+  unassigned. So Stage 23 finds no consuming spec yet. That is Stage 23's to resolve, not this
+  stage's (builder check).
 - **Stage 24.** It adds its own section. If it merges first, renumber at the merge.
 - **R8.4 (G1).** A separate owner decision. The relatedness spec has now named the area mix as the
   one family that trains, so the decision can be made.
