@@ -555,7 +555,8 @@ def test_import_refuses_an_oversize_source(tmp_path, monkeypatch):
         module.import_reference(tmp_path / 'data', 'refs', KINDS[0], originals[KINDS[0]])
 
 
-@pytest.mark.parametrize('reference_id', ['../refs', 'a/b', '.hidden', '', 'a b'])
+@pytest.mark.parametrize('reference_id', ['../refs', 'a/b', '.hidden', '', 'a b', '_refs',
+                                          '-refs'])
 def test_unsafe_reference_ids_are_refused(tmp_path, reference_id):
     originals = reference_originals(tmp_path / 'originals')
     with pytest.raises(ValueError, match='unsafe'):
@@ -718,3 +719,52 @@ def test_the_receipt_manifest_entry_must_be_generated_provenance(tmp_path, chang
     manifest_file.write_text('\n'.join(lines) + '\n')
     with pytest.raises(ValueError, match='receipt provenance'):
         module.check_references(tmp_path / 'data', 'refs')
+
+
+def refused_staging(tmp_path, monkeypatch):
+    refuse_industry_workbook(monkeypatch, tmp_path / 'served')
+    data_dir = tmp_path / 'data'
+    with pytest.raises(ValueError):
+        module.acquire(data_dir, 'refs')
+    return data_dir, data_dir / 'raw/references/cps-job-flows/refs.part' / 'staging-state.json'
+
+
+def test_staging_state_with_an_unregistered_kind_is_refused(tmp_path, monkeypatch):
+    data_dir, state_file = refused_staging(tmp_path, monkeypatch)
+    state = json.loads(state_file.read_text())
+    state['kinds']['cps_basic_2027_codes'] = state['kinds'][KINDS[0]]
+    state_file.write_text(json.dumps(state))
+    with pytest.raises(ValueError, match='unknown identity'):
+        module.acquire(data_dir, 'refs')
+
+
+@pytest.mark.parametrize('change', ['naive time', 'invalid time', 'proxy not boolean',
+                                    'other url', 'other method'])
+def test_staging_request_records_must_be_exact(tmp_path, monkeypatch, change):
+    data_dir, state_file = refused_staging(tmp_path, monkeypatch)
+    state = json.loads(state_file.read_text())
+    request = state['kinds'][KINDS[0]]['request']
+    request.update({
+        'naive time': {'retrieved_at': '2026-11-23T00:00:00'},
+        'invalid time': {'retrieved_at': 'yesterday'},
+        'proxy not boolean': {'retrieved_at_is_proxy': 'no'},
+        'other url': {'source_url': 'https://example.test/'},
+        'other method': {'method': 'POST'},
+    }[change])
+    state_file.write_text(json.dumps(state))
+    with pytest.raises(ValueError):
+        module.acquire(data_dir, 'refs')
+
+
+def test_a_publication_copy_that_differs_from_staging_is_refused(tmp_path, monkeypatch):
+    originals = reference_originals(tmp_path / 'originals')
+    for kind in KINDS[:-1]:
+        module.import_reference(tmp_path / 'data', 'refs', kind, originals[kind])
+
+    def truncated(source, output):
+        output.write(source.read()[:-1])
+
+    monkeypatch.setattr(module.shutil, 'copyfileobj', truncated)
+    with pytest.raises(ValueError, match='changed during publication'):
+        module.import_reference(tmp_path / 'data', 'refs', KINDS[-1], originals[KINDS[-1]])
+    assert not manifest_entries(tmp_path)
