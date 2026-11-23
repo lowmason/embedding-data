@@ -1,6 +1,7 @@
 '''Stage 11 reference snapshot: registry, anchors, staged acquisition and import, receipt.'''
 
 import json
+import shutil
 from datetime import UTC, datetime
 from functools import partial
 from importlib.metadata import version
@@ -656,3 +657,64 @@ def test_special_evidence_needs_a_current_complete_receipt(tmp_path, mutation):
         receipt['originals'].pop('bls_cps_industry_2022')
     with pytest.raises(ValueError, match='receipt'):
         module.special_evidence(receipt)
+
+
+@pytest.mark.parametrize('status', [301, 403, 404, 500])
+def test_a_non_success_status_with_a_valid_body_is_still_refused(tmp_path, monkeypatch, status):
+    body = reference_originals(tmp_path / 'probe')[REFUSED_KIND].read_bytes()
+    serve(monkeypatch, tmp_path / 'served', overrides={REFUSED_URL: lambda request: (
+        httpx.Response(status, headers={'content-length': str(len(body))},
+                       stream=httpx.ByteStream(body)))})
+    with pytest.raises(ValueError, match=REFUSED_KIND):
+        module.acquire(tmp_path / 'data', 'refs')
+    assert not manifest_entries(tmp_path)
+
+
+def test_the_download_bound_holds_for_a_declared_and_for_an_undeclared_size(
+        tmp_path, monkeypatch):
+    body = reference_originals(tmp_path / 'probe')[REFUSED_KIND].read_bytes()
+    monkeypatch.setattr(module, 'MAX_ORIGINAL_BYTES', len(body) - 1)
+    declared = ok(body, **{'content-encoding': 'identity'})
+    undeclared = httpx.Response(200, stream=httpx.ByteStream(body))
+    for response in (declared, undeclared):
+        serve(monkeypatch, tmp_path / 'served',
+              overrides={REFUSED_URL: lambda request, response=response: response})
+        with pytest.raises(ValueError, match=REFUSED_KIND):
+            module.acquire(tmp_path / 'data', 'refs')
+        shutil.rmtree(tmp_path / 'data')
+
+
+def test_an_oversize_header_alone_refuses_before_any_byte_is_kept(tmp_path, monkeypatch):
+    body = reference_originals(tmp_path / 'probe')[REFUSED_KIND].read_bytes()
+    monkeypatch.setattr(module, 'MAX_ORIGINAL_BYTES', len(body) + 100)
+    huge = ok(body, **{'content-length': str(len(body) + 101), 'content-encoding': 'identity'})
+    serve(monkeypatch, tmp_path / 'served', overrides={REFUSED_URL: lambda request: huge})
+    with pytest.raises(ValueError, match=REFUSED_KIND):
+        module.acquire(tmp_path / 'data', 'refs')
+
+
+def test_an_import_source_below_a_symlinked_directory_is_refused(tmp_path):
+    originals = reference_originals(tmp_path / 'real')
+    (tmp_path / 'alias').symlink_to(tmp_path / 'real', target_is_directory=True)
+    with pytest.raises(ValueError, match='symlink'):
+        module.import_reference(tmp_path / 'data', 'refs', KINDS[0],
+                                tmp_path / 'alias' / originals[KINDS[0]].name)
+
+
+@pytest.mark.parametrize('change', ['client', 'proxies', 'source_url'])
+def test_the_receipt_manifest_entry_must_be_generated_provenance(tmp_path, change):
+    published(tmp_path)
+    manifest_file = paths.manifest_path(tmp_path / 'data')
+    lines = manifest_file.read_text().splitlines()
+    record = json.loads(lines[-1])
+    assert record['path'].endswith('/receipt.json')
+    if change == 'client':
+        record['client'] = 'manual-import'
+    elif change == 'proxies':
+        record['proxies'] = ['retrieved_at']
+    else:
+        record['source_url'] = 'https://example.test/'
+    lines[-1] = json.dumps(record)
+    manifest_file.write_text('\n'.join(lines) + '\n')
+    with pytest.raises(ValueError, match='receipt provenance'):
+        module.check_references(tmp_path / 'data', 'refs')
