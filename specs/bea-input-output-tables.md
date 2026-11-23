@@ -109,9 +109,10 @@ Read on 2026-11-23 from public HTML pages. No BEA file was fetched.
    ([BEA](https://www.bea.gov/data/industries/input-output-accounts-data)). No
    2022 benchmark release date was found.
 2. **The annual detail is coarser.** Annual underlying detail tables have 138
-   industries, not 402
-   ([underlying estimates](https://www.bea.gov/node/22626)). The 2017 benchmark
-   is the only table near six-digit NAICS.
+   industries, not 402 *(unverified: search summary; BEA's
+   [underlying estimates](https://www.bea.gov/node/22626) page, read directly,
+   does not state it)*. If so, the 2017 benchmark is the only table near
+   six-digit NAICS.
 3. **Annual tables update each September.** The 2026 annual update has shipped
    ([iTable page](https://www.bea.gov/itable/input-output)). The 2017 detail
    values can change only in a comprehensive update.
@@ -120,12 +121,16 @@ Read on 2026-11-23 from public HTML pages. No BEA file was fetched.
    `https://www.bea.gov/sites/default/files/2023-10/BEA-Industry-and-Commodity-Codes-and-NAICS-Concordance.xlsx`.
    Its 2023-10 path fits the 2017 benchmark, which follows NAICS 2017. Not
    opened.
-5. **The table needed exists at detail.** BEA's annual I-O page lists "Use
-   Tables / Before Redefinitions / Producer Value, 2017: 402 Industries XLSX"
-   ([io annual](https://www.bea.gov/industry/io_annual.htm)). USEPA's
-   `useeior` reads the same table from BEA's static `AllTablesIO.zip`
+5. **The table needed exists at detail.** BEA's old data page now says that
+   "Make-Use-Import (Before Redefinitions)" tables "are now in BEA's
+   Input-Output Interactive Data Application"
+   ([migration note](https://www.bea.gov/industry/input-output-accounts-data)).
+   A 2017 Use table before redefinitions at producer value with 402 industries
+   is listed there *(unverified: search summary)*. USEPA's `useeior` reads a
+   2017 detail table of this kind from BEA's static `AllTablesIO.zip`
    ([BEAData.R](https://rdrr.io/github/USEPA/useeior/src/data-raw/BEAData.R)).
-   The exact file name and sheet layout are *unverified*.
+   The exact file name and sheet layout are *unverified*. If E1 finds no such
+   table at 402 industries, the stage stops for the owner.
 6. **BEA asks for citation.** "Citations are appreciated and appropriate". A
    reference must not suggest that BEA endorses a product
    ([guidelines](https://www.bea.gov/help/guidelines-for-citing-bea)). No
@@ -138,10 +143,13 @@ Read on 2026-11-23 from public HTML pages. No BEA file was fetched.
    reads official workbooks with it. Tests already write XLSX fixtures with
    `zipfile` (`tests/code_fixtures.py`).
 9. **Stage 4 holds what the code table needs.** `naics_native_nodes.parquet`
-   holds the NAICS 2017 nodes (11,199 nodes, vintages 2002–2022).
-   `naics_concordance.parquet` holds the official six-digit 2017→2022 rows
-   (4,603 rows over four vintage pairs). `naics_nodes.parquet` holds the
+   holds the NAICS 2017 nodes (11,199 nodes over vintages 2002–2022).
+   `naics_concordance.parquet` holds 1,150 official six-digit 2017→2022 rows:
+   928 `1:1`, 5 `1:m`, 120 `m:1` and 97 `m:m`. `naics_nodes.parquet` holds the
    NAICS 2022 nodes. `naics_edges.parquet` covers NAICS 2022 only.
+10. **V12 is tested per family.** Each family has its own V12 fixture test, for
+    example `tests/test_tri_v12.py`. No shared test assumes `targets-v1` for
+    every family, so BEA's V12 extension is a new test file.
 
 ## Approaches
 
@@ -239,6 +247,9 @@ build.
   E1. A changed layout fails the build.
 - A value cell is a number, or the zero marker that E1 records. Any other text
   fails the build.
+- The concordance's NAICS cells are parsed by the exact token forms that E1
+  records, for example separators, partial markers or "n.a." text. A form
+  not in the registry fails the build. **My call.**
 - Values are dollars in millions, as published. They are stored as
   `Float64`. **My call.**
 
@@ -261,7 +272,7 @@ alternate, and the Stage 2 spec's verdict table is amended.
 
 | Check | Measures and records | Stops the stage when |
 |---|---|---|
-| **E1** concordance and layout | The concordance's sheets, header row and NAICS edition. Its depth: NAICS codes by digit count. Its markers, if any, for partial membership. Its rows for special codes, and which have no NAICS member. NAICS codes listed under more than one BEA code. The Use table's sheet name, header rows, commodity and industry code lists, final-demand columns, value-added rows and total codes. The zero marker. Negative cells. For each commodity row and industry column, the gap between the published total and the sum of the published cells. Whether every Use table code is in the concordance. Whether every NAICS 2017 code in the concordance is in `naics_native_nodes.parquet`. | The concordance names a NAICS edition other than 2017. A Use table code is missing from the concordance. A concordance NAICS code is not an official NAICS 2017 code. More than 5% of BEA codes have no NAICS member (**my call:** a trigger to ask the owner, not an acceptance threshold). |
+| **E1** concordance and layout | The concordance's sheets, header row and NAICS edition. Its depth: NAICS codes by digit count. Its markers, if any, for partial membership. Its rows for special codes, and which have no NAICS member. NAICS codes listed under more than one BEA code. The Use table's sheet name, header rows, commodity and industry code lists, final-demand columns, value-added rows and total codes. The zero marker. Negative cells. For each commodity row and industry column, the gap between the published total and the sum of the published cells. Whether every Use table code is in the concordance. Whether every NAICS 2017 code in the concordance is in `naics_native_nodes.parquet`. | The concordance names a NAICS edition other than 2017. A Use table code is missing from the concordance. A concordance NAICS code is not an official NAICS 2017 code. More than 5% of BEA codes have no NAICS member (**my call:** a trigger to ask the owner, not an acceptance threshold). The largest total gap exceeds the rounding bound of [Validation](#validation). No 2017 detail Use table before redefinitions at producer value with about 402 industries exists. |
 | **E2** terms | BEA's reuse terms or public-domain statement for the tables and its date (read). Its citation guidance (read). | A BEA statement restricts publishing aggregates. A failed terms check never becomes "build it but keep the aggregates local" (Stage 2 rule). |
 | **E3** 2022 benchmark | BEA's published schedule for the 2022 benchmark, if any (read). Whether any 2022 detail table has been released. | BEA has released 2022 detail Use tables. The owner then chooses between 2017 and 2022. **My call:** a scheduled but unreleased date is recorded and does not stop the stage. |
 
@@ -292,8 +303,9 @@ Rules:
 - Flags: `no_naics_member` (empty published list), `naics_partial_member` (if
   E1 finds a partial marker), `naics_shared` (a NAICS 2017 code listed under
   more than one BEA code), `naics_expanded` (a published code shorter than six
-  digits), `crosswalk_one_to_many` and `crosswalk_many_to_one` (from the Stage 4
-  link types), `naics_2022_unmapped` (a NAICS 2017 candidate with no 2017→2022
+  digits), `crosswalk_one_to_many`, `crosswalk_many_to_one` and
+  `crosswalk_many_to_many` (from the Stage 4 link types `1:m`, `m:1` and `m:m`),
+  `naics_2022_unmapped` (a NAICS 2017 candidate with no 2017→2022
   row).
 
 ## Use targets (O9 and O10)
@@ -351,7 +363,10 @@ Flags on every row: `count_not_published`, `non_headline`,
 - `unit_a_no_naics_member`, `unit_b_no_naics_member`: from the code table.
 
 Rows carry no `size_gate_pending` flag, because no count exists to gate.
-**My call.**
+**My call.** This breaks a convention: every target of every other family
+keeps `size_gate_pending` (`CLAUDE.md`). `non_headline` and
+`count_not_published` take its place, because no minimum count can ever apply
+to a family with no counts.
 
 Zero cells are not stored. The code table lists every commodity and industry,
 so a zero is recoverable.
@@ -584,8 +599,8 @@ its own rows.
   the publisher does not supply, sets it to null and flags it. It never fills
   or models that field. Such targets use the R7.4 columns under schema
   version `targets-published-v1`." The first three sentences are the Stage 2
-  spec's text, *(owner, Stage 2 default 3, 2026-11-16)*. The last is **my
-  call**, *(owner, Stage 15 design, 2026-11-23)*.
+  spec's text, *(owner, Stage 2 default 3, 2026-11-16)*. The last follows from
+  the owner's pick of approach 1, *(owner, Stage 15 design, 2026-11-23)*.
 - Item 3, a new R1.1 row:
 
   | Source | Unit | Years | Role |
