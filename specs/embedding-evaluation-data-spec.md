@@ -547,6 +547,9 @@ The [V9 USAspending decision](findings/v9-usaspending-minimum-counts.md) sets it
 USAspending vendor-link family, with one value for `supplier_share` and one for
 `buyer_share`. That family is no longer among the families whose minimum stays open.
 *(owner, plan 19, 2026-11-22)*
+The [V9 TRI decision](findings/v9-tri-minimum-counts.md) sets it for the TRI parent-link
+family. That family is no longer among the families whose minimum stays open.
+*(owner, plan 20, 2026-11-23)*
 
 **R7.4** Outputs are Parquet. Pairwise families share one long schema —
 `source`, `family`, `unit_a_type`, `unit_a`, `unit_b_type`, `unit_b`, `measure`,
@@ -647,6 +650,8 @@ bullet here.
   2026-11-17)*
   The [V9 USAspending decision](findings/v9-usaspending-minimum-counts.md) covers the
   USAspending vendor-link family after its first full build. *(owner, plan 19, 2026-11-22)*
+  The [V9 TRI decision](findings/v9-tri-minimum-counts.md) covers the TRI parent-link family
+  after its first full build. *(owner, plan 20, 2026-11-23)*
 - **V10 — totals reproduction**. Compare ITA rows per year with OSHA's published
   submission counts, ACS pooled employment by state with published ACS
   estimates, and CPS monthly employment with BLS levels. CPS totals use

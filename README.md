@@ -604,6 +604,9 @@ pass `verify`, and `compare-runs` finds them equal. The first run's counts are i
 `specs/naics-evaluation-data-stage-5-findings.md`. The
 [Stage 5 finding](specs/findings/stage-5-tri-parent-links.md) records the replay, the exact
 commands, the cost and what is not claimed.
+[The V9 TRI decision](specs/findings/v9-tri-minimum-counts.md) sets the headline minimum count
+for `tri_parent_links` (O13). A row meets the gate when its `n_unweighted` is at least the
+minimum. The published targets keep `size_gate_pending`.
 
 ## ACS wage microdata (Stage 17)
 
