@@ -133,3 +133,19 @@ Differences from the design:
 - Deviation (Task 6): a merge of `origin/main` (`bde4be0`) and a hand fix that states the measured leniency (`9fa10c0`) are extra commits. Source: plan, Task 6.
 - Owner gate (2026-11-23): "Run Codex (Recommended)", for the second seat of the final review.
 - Deferred: 1 item. Source: specs/deferred_items.md, § 19-usaspending-minimum-counts.
+
+## 20-tri-minimum-counts — 2026-11-23
+Plan: specs/plans/completed/20-tri-minimum-counts.md · Spec: specs/completed/tri-minimum-counts.md (retired) · Roadmap: specs/naics-evaluation-data-roadmap.md, Stage 22
+
+Differences from the design:
+- Ruling: Pre-data reviewer declined: the JSON holds keys beyond the spec's output list (top-level complete, a recurring_cells total per year pair, published.dnb_rows and published.federal_rows) — the spec's list already names recurring cells per band and the kept rows among the rows with each sensitivity label (those row totals are the denominators), complete mirrors the exit code, the owner-approved plan fixes the Task 4 key set, and none holds an identifier — costs nothing: extra counts only.
+- Deviation: the measurement reads the facility-year, support and target Parquets of the run, besides `report.json` as the roadmap's Consumes line says, and it recomputes per-year owner counts (owner, D1, 2026-11-22). Source: plan, header.
+- Deviation (Task 1): a review fix round added one test and one mutant for untestable cells in the downward-merge threshold, in commit `92cec82`. Source: plan, Task 1.
+- Deviation (Task 3): a review fix round added a test for a TRIFD that is eligible in one year and excluded in another, 14 mutants and an `Unreachable:` line, in commit `1674f16`. Source: plan, Task 3.
+- Deviation (Task 4): `main` also catches a Polars panic (a `BaseException`) and prints only the reason with exit code 2, where it had leaked the message with exit code 1. The fix is the rule commit `b282dd7`. Source: plan, Task 4.
+- Deviation (Task 5): the full suite ran through the xdist overlay, not a bare `pytest`, because a serial run takes close to an hour. Source: plan, Task 5.
+- Deviation (Task 5): `$OUT` was written out as a literal path, because the worktree's shell guard refuses `$(git rev-parse ...)`. Source: plan, Task 5.
+- Deviation (Task 6): a merge commit `31a90b0` of `origin/main` came before Step 2. The Stage 19 branch holds unmerged edits to the same shared files, so its later merge needs a manual join. Source: plan, Task 6.
+- Deviation (Task 7): its steps stay unticked, because they run after the protocol. Source: plan, Task 7.
+- Owner gate (2026-11-23): "Run Codex (Recommended)", for the second seat of the final review.
+- Deferred: 2 items. Source: specs/deferred_items.md, § 20-tri-minimum-counts.

@@ -5,7 +5,7 @@ rule commit in section 2. This record discharges spec R7.3 and V9 for one family
 TRI parent links of roadmap Stage 5. TRI is EPA's Toxics Release Inventory. R7.3 asks for a
 headline minimum count set by measurement. V9 sets it for each family after its first full
 build. Roadmap Stage 22 delivers it as outcome O13. The design is in
-`specs/tri-minimum-counts.md`. The record holds counts, rates, constants, run IDs and pins
+`specs/completed/tri-minimum-counts.md`. The record holds counts, rates, constants, run IDs and pins
 only. It holds no TRIFD (EPA's stable TRI facility ID), no parent name, no owner key, no node
 ID and no list of cells.
 

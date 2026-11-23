@@ -1,6 +1,6 @@
 # Headline minimum count for the TRI parent links
 
-> Next step: writing-plans, in a fresh session, against this file.
+**Status: COMPLETE (2026-11-23)** — implemented by plan 20 (`specs/plans/completed/20-tri-minimum-counts.md`); decision in `specs/findings/v9-tri-minimum-counts.md`.
 
 Status: APPROVED (2026-11-22, owner: "Yes"). Written 2026-11-22. The owner's approval of
 this spec approves every constant and rule in it, the designer's calls included. So the plan
@@ -23,8 +23,8 @@ inputs read were:
 - the Stage 3 design `specs/completed/ita-naics-minimum-counts.md` and its decision
   `specs/findings/v9-ita-naics-minimum-counts.md`.
 - the Stage 19 design `specs/acs-wage-minimum-earners.md`, the Stage 21 design
-  `specs/usaspending-minimum-counts.md`, and the amendment steps of
-  `specs/plans/17-acs-wage-minimum-earners.md` and `specs/plans/19-usaspending-minimum-counts.md`.
+  `specs/completed/usaspending-minimum-counts.md`, and the amendment steps of
+  `specs/plans/17-acs-wage-minimum-earners.md` and `specs/plans/completed/19-usaspending-minimum-counts.md`.
 - the Stage 5 design `specs/completed/tri-parent-links.md`, the Stage 5 findings
   `specs/naics-evaluation-data-stage-5-findings.md` (sections "Counts", "Limits" and "For O12,
   O13 and O17") and the Stage 18 finding `specs/findings/stage-5-tri-parent-links.md`.

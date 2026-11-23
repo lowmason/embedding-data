@@ -21,7 +21,7 @@ record transcribes the output.
 
 **Tech Stack:** Python 3.14, Polars, argparse, pytest, uv. No new dependency.
 
-**Spec:** `specs/tri-minimum-counts.md` (owner-approved 2026-11-22, merged in
+**Spec:** `specs/completed/tri-minimum-counts.md` (owner-approved 2026-11-22, merged in
 lowmason/embedding-data#54, `89949ef`).
 
 > Roadmap: specs/naics-evaluation-data-roadmap.md, Stage 22 — on plan
