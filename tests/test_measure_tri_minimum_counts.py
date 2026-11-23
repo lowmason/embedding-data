@@ -912,3 +912,492 @@ SELF_CHECK_REFUSALS = [
 @pytest.mark.parametrize(('forge', 'reason'), SELF_CHECK_REFUSALS)
 def test_self_check_refusals(script, golden, forge, reason):
     assert refusal(script, golden, pin=forge(golden)) == reason
+
+
+# Input shapes of the rules above that the plan tests do not use.
+
+READ_COLUMNS = {
+    'tri_facility_years': ('reporting_year', 'trifd', 'naics_2022_node_id', 'owner_key',
+                           'exclusion_reason'),
+    'tri_parent_link_support': ('unit_a', 'unit_b', 'j_owners', 'j_2022', 'j_2023', 'j_2024'),
+    'tri_parent_links': ('measure', 'unit_a', 'unit_b', 'n_unweighted', 'flags'),
+}
+COLUMN_CASES = [pytest.param(table, column, id=f'{table}-{column}')
+                for table, columns in READ_COLUMNS.items() for column in columns]
+
+
+def forge_outputs(bundle: dict, change) -> str:
+    '''Replace the records of `outputs.json` with `change(records)` and return its new SHA-256.'''
+    file = bundle['directory'] / 'outputs.json'
+    write_json(file, change(json.loads(file.read_text())))
+    return sha256_file(file)
+
+
+def seal(bundle: dict, content: bytes) -> str:
+    '''Write the bytes as `outputs.json` and return its SHA-256.'''
+    file = bundle['directory'] / 'outputs.json'
+    file.write_bytes(content)
+    return sha256_file(file)
+
+
+def forge_bytes(bundle: dict, name: str, content: bytes) -> str:
+    '''Write the bytes as a file of the run, give it a matching record and return the new pin.'''
+    file = bundle['directory'] / name
+
+    def record(records: dict) -> dict:
+        records[name].update(sha256=sha256_file(file), size=file.stat().st_size)
+        return records
+
+    file.write_bytes(content)
+    return forge_outputs(bundle, record)
+
+
+def drop_record(*names: str):
+    '''An `outputs.json` change that deletes the records of the files.'''
+    def change(records: dict) -> dict:
+        for name in names:
+            del records[name]
+        return records
+    return change
+
+
+@pytest.mark.parametrize('run', ('stage5_tri_parent_links_20261121_r1', '9-Run_A', 'a'))
+def test_safe_run_ids_are_accepted(script, tmp_path, run):
+    bundle = publish(tmp_path, golden_records(), run=run)
+    assert authenticated(script, bundle).directory == bundle['directory']
+
+
+UNSAFE = {
+    'empty-run': lambda bundle: ('', bundle['pin']),
+    'space-in-run': lambda bundle: ('fix ture', bundle['pin']),
+    'slash-in-run': lambda bundle: ('fix/ture', bundle['pin']),
+    'dot-in-run': lambda bundle: ('fixture.', bundle['pin']),
+    'backslash-in-run': lambda bundle: ('fix\\ture', bundle['pin']),
+    'pin-with-extra-hex': lambda bundle: (bundle['run'], bundle['pin'] + 'a'),
+    'pin-with-newline': lambda bundle: (bundle['run'], bundle['pin'] + '\n'),
+    'pin-of-65-digits': lambda bundle: (bundle['run'], '0' * 65),
+    'empty-pin': lambda bundle: (bundle['run'], ''),
+    'uppercase-pin': lambda bundle: (bundle['run'], bundle['pin'].upper()),
+}
+
+
+@pytest.mark.parametrize('shape', UNSAFE.values(), ids=UNSAFE)
+def test_more_unsafe_shapes_are_refused(script, golden, shape):
+    run, pin = shape(golden)
+    assert pin != golden['pin'] or run != golden['run']
+    assert refusal(script, golden, run=run, pin=pin) == 'unsafe run id or pin'
+
+
+@pytest.mark.parametrize('first', range(len(READ_FILES)))
+def test_files_are_checked_in_order(script, golden, first):
+    for name in READ_FILES[first:]:
+        append_byte(golden['directory'], name)
+    assert refusal(script, golden) == f'{READ_FILES[first]} differs from its inventory'
+
+
+@pytest.mark.parametrize('name', READ_FILES)
+def test_change_of_equal_size_is_refused(script, golden, name):
+    file = golden['directory'] / name
+    content = bytearray(file.read_bytes())
+    content[-1] ^= 1
+    file.write_bytes(bytes(content))
+    assert file.stat().st_size == json.loads(
+        (golden['directory'] / 'outputs.json').read_text())[name]['size']
+    assert refusal(script, golden) == f'{name} differs from its inventory'
+
+
+@pytest.mark.parametrize('name', READ_FILES)
+def test_deleted_file_with_its_record_is_refused(script, golden, name):
+    (golden['directory'] / name).unlink()
+    assert refusal(script, golden) == f'{name} differs from its inventory'
+
+
+def drop_key(name: str, key: str):
+    def change(records: dict) -> dict:
+        del records[name][key]
+        return records
+    return change
+
+
+def put_record(name: str, value):
+    def change(records: dict) -> dict:
+        records[name] = value
+        return records
+    return change
+
+
+UNUSABLE_RECORDS = [
+    pytest.param(drop_record('report.json'), 'report.json', id='report-record-missing'),
+    pytest.param(drop_record('tri_facility_years.parquet'), 'tri_facility_years.parquet',
+                 id='facility-record-missing'),
+    pytest.param(drop_record('tri_parent_links.parquet'), 'tri_parent_links.parquet',
+                 id='targets-record-missing'),
+    pytest.param(put_record('report.json', None), 'report.json', id='record-null'),
+    pytest.param(put_record('report.json', 'abc'), 'report.json', id='record-text'),
+    pytest.param(put_record('report.json', []), 'report.json', id='record-list'),
+    pytest.param(drop_key('tri_parent_link_support.parquet', 'sha256'),
+                 'tri_parent_link_support.parquet', id='record-without-hash'),
+    pytest.param(drop_key('tri_parent_link_support.parquet', 'size'),
+                 'tri_parent_link_support.parquet', id='record-without-size'),
+    pytest.param(lambda records: {**records, 'report.json': {**records['report.json'],
+                                                             'sha256': '0' * 64}},
+                 'report.json', id='record-with-another-hash'),
+    pytest.param(lambda records: [records], 'report.json', id='inventory-is-a-list'),
+]
+
+
+@pytest.mark.parametrize(('change', 'name'), UNUSABLE_RECORDS)
+def test_unusable_records_are_refused(script, golden, change, name):
+    pin = forge_outputs(golden, change)
+    assert refusal(script, golden, pin=pin) == f'{name} differs from its inventory'
+
+
+@pytest.mark.parametrize('content', (b'', b'not json', b'null', b'[]', b'\xff\xfe'),
+                         ids=('empty', 'text', 'null', 'list', 'not-utf8'))
+def test_outputs_that_are_no_object_refuse_the_first_file(script, golden, content):
+    pin = seal(golden, content)
+    assert refusal(script, golden, pin=pin) == 'report.json differs from its inventory'
+
+
+def test_unread_files_and_records_may_be_missing(script, golden):
+    for name in UNREAD_FILES:
+        (golden['directory'] / name).unlink()
+    pin = forge_outputs(golden, drop_record(*UNREAD_FILES))
+    assert checked(script, golden, pin=pin) is not None
+
+
+def test_pin_of_another_run_is_refused(script, tmp_path):
+    first = publish(tmp_path, golden_records(), run='first')
+    second = publish(tmp_path, code_change_records(), run='second')
+    assert first['pin'] != second['pin']
+    assert refusal(script, first, pin=second['pin']) == 'outputs pin differs'
+
+
+def test_inputs_and_checked_are_frozen(script, golden):
+    inputs = authenticated(script, golden)
+    with pytest.raises(AttributeError):
+        inputs.outputs_sha256 = 'x'
+    result = script.self_check(inputs)
+    with pytest.raises(AttributeError):
+        result.eligible = None
+
+
+def test_checked_holds_the_recount_and_the_read_columns(script, golden):
+    result = checked(script, golden)
+    facility = pl.read_parquet(golden['directory'] / 'tri_facility_years.parquet')
+    assert_frame_equal(result.eligible, script.eligible_facility_years(facility.lazy()))
+    assert_frame_equal(result.counts, script.recount(result.eligible))
+    assert result.counts.columns == ['unit_a', 'unit_b', 'j_owners', 'j_2022', 'j_2023', 'j_2024']
+    targets = pl.read_parquet(golden['directory'] / 'tri_parent_links.parquet')
+    assert_frame_equal(result.targets, targets.select(
+        'measure', 'unit_a', 'unit_b', 'n_unweighted', 'flags'))
+
+
+def test_code_change_bundle_passes_the_self_check(script, tmp_path):
+    bundle = publish(tmp_path, code_change_records())
+    result = checked(script, bundle)
+    assert result.eligible.height == 24
+    report = json.loads((bundle['directory'] / 'report.json').read_text())
+    assert report['owner_key_changes'] == 0
+
+
+def test_owner_key_change_is_counted(script, tmp_path):
+    bundle = publish(tmp_path, owner_key_change_records())
+    pin = forge_report(bundle, edited('owner_key_changes', new=lambda old: 0))
+    assert refusal(script, bundle, pin=pin) == 'owner key changes differ from the report'
+
+
+@pytest.mark.parametrize('name', ('tri_facility_years', 'tri_parent_link_support',
+                                  'tri_parent_links'))
+def test_row_order_does_not_matter(script, golden, name):
+    expected = checked(script, golden)
+    pin = forge_table(golden, name, lambda frame: frame.reverse())
+    found = checked(script, golden, pin=pin)
+    assert_frame_equal(found.eligible, expected.eligible)
+    assert_frame_equal(found.counts, expected.counts)
+    assert found.distribution == expected.distribution
+
+
+def test_shuffled_facility_years_pass(script, golden):
+    expected = checked(script, golden)
+    pin = forge_table(golden, 'tri_facility_years',
+                      lambda frame: frame.sample(fraction=1.0, shuffle=True, seed=7))
+    assert_frame_equal(checked(script, golden, pin=pin).eligible, expected.eligible)
+
+
+@pytest.mark.parametrize(('table', 'column'), COLUMN_CASES)
+def test_every_read_column_is_required(script, golden, table, column):
+    pin = forge_table(golden, table, lambda frame: frame.drop(column))
+    assert refusal(script, golden, pin=pin) == (
+        f'{table}.parquet columns differ from the contract')
+
+
+@pytest.mark.parametrize(('table', 'column'), COLUMN_CASES)
+def test_every_read_column_needs_its_type(script, golden, table, column):
+    pin = forge_table(golden, table, lambda frame: frame.with_columns(
+        pl.lit(None, dtype=pl.Boolean).alias(column)))
+    assert refusal(script, golden, pin=pin) == (
+        f'{table}.parquet columns differ from the contract')
+
+
+@pytest.mark.parametrize('table', READ_COLUMNS)
+def test_unreadable_parquet_is_refused(script, golden, table):
+    pin = forge_bytes(golden, f'{table}.parquet', b'not a parquet file')
+    assert refusal(script, golden, pin=pin) == (
+        f'{table}.parquet columns differ from the contract')
+
+
+def test_columns_are_checked_in_file_order(script, golden):
+    retype = pl.lit(None, dtype=pl.Boolean)
+    forge_table(golden, 'tri_parent_links',
+                lambda frame: frame.with_columns(retype.alias('flags')))
+    pin = forge_table(golden, 'tri_parent_link_support',
+                      lambda frame: frame.with_columns(retype.alias('j_2022')))
+    assert refusal(script, golden, pin=pin) == (
+        'tri_parent_link_support.parquet columns differ from the contract')
+    pin = forge_table(golden, 'tri_facility_years',
+                      lambda frame: frame.with_columns(retype.alias('trifd')))
+    assert refusal(script, golden, pin=pin) == (
+        'tri_facility_years.parquet columns differ from the contract')
+
+
+def without(*names: str):
+    '''A table change that drops the columns and reverses the order of the others.'''
+    return lambda frame: frame.drop(names).select(frame.drop(names).columns[::-1])
+
+
+def test_unread_columns_and_column_order_do_not_matter(script, golden):
+    forge_table(golden, 'tri_facility_years', without('n_forms', 'parent_names'))
+    forge_table(golden, 'tri_parent_link_support', without('j_dnb', 'j_including_federal'))
+    pin = forge_table(golden, 'tri_parent_links', without('value', 'universe'))
+    assert checked(script, golden, pin=pin) is not None
+
+
+def test_unread_cells_are_not_checked(script, golden):
+    forge_table(golden, 'tri_parent_link_support', compose_tables(
+        bump('j_dnb'), bump('j_including_federal', 1)))
+    forge_table(golden, 'tri_parent_links', lambda frame: set_row(frame, 0, 'flags', []))
+    pin = forge_table(golden, 'tri_facility_years', bump('n_forms'))
+    assert checked(script, golden, pin=pin) is not None
+
+
+def compose_tables(*changes):
+    '''One table change that applies each change in turn.'''
+    def change(frame: pl.DataFrame) -> pl.DataFrame:
+        for each in changes:
+            frame = each(frame)
+        return frame
+    return change
+
+
+REPORT_SHAPES = [
+    pytest.param(edited('n_unweighted_distribution', new=lambda old: []),
+                 id='distribution-is-a-list'),
+    pytest.param(edited('n_unweighted_distribution', new=lambda old: None),
+                 id='distribution-is-null'),
+    pytest.param(dropped('owner_key_changes'), id='changes-missing'),
+    pytest.param(edited('owner_key_changes', new=lambda old: True), id='changes-is-true'),
+    pytest.param(edited('owner_key_changes', new=lambda old: False), id='changes-is-false'),
+    pytest.param(edited('owner_key_changes', new=lambda old: 0.0), id='changes-is-a-float'),
+    pytest.param(edited('owner_key_changes', new=lambda old: None), id='changes-is-null'),
+    pytest.param(edited('owner_key_changes', new=lambda old: '0'), id='changes-is-text'),
+    pytest.param(dropped('n_owners'), id='owners-missing'),
+    pytest.param(edited('n_owners', new=lambda old: []), id='owners-is-a-list'),
+    pytest.param(dropped('n_owners', 'headline'), id='owners-headline-missing'),
+    pytest.param(edited('n_owners', 'headline', new=lambda old: True), id='owners-headline-true'),
+    pytest.param(edited('n_owners', 'headline', new=lambda old: float(old)),
+                 id='owners-headline-float'),
+    pytest.param(edited('n_owners', 'headline', new=lambda old: None), id='owners-headline-null'),
+    pytest.param(dropped('owners_by_year'), id='years-missing'),
+    pytest.param(edited('owners_by_year', new=lambda old: []), id='years-is-a-list'),
+    *(pytest.param(change, id=f'{year}-{label}')
+      for year in YEARS
+      for label, change in (
+          ('missing', dropped('owners_by_year', str(year))),
+          ('is-a-list', edited('owners_by_year', str(year), new=lambda old: [old])),
+          ('headline-missing', dropped('owners_by_year', str(year), 'headline')),
+          ('headline-true', edited('owners_by_year', str(year), 'headline',
+                                   new=lambda old: True)),
+          ('headline-float', edited('owners_by_year', str(year), 'headline',
+                                    new=lambda old: float(old))),
+          ('headline-text', edited('owners_by_year', str(year), 'headline',
+                                   new=lambda old: str(old))),
+      )),
+]
+
+
+@pytest.mark.parametrize('change', REPORT_SHAPES)
+def test_report_shapes_are_malformed(script, golden, change):
+    pin = forge_report(golden, change)
+    assert refusal(script, golden, pin=pin) == 'report is malformed'
+
+
+@pytest.mark.parametrize('content', (b'', b'not json', b'null', b'[]', b'[{}]', b'3',
+                                     b'\xff\xfe'),
+                         ids=('empty', 'text', 'null', 'list', 'list-of-object', 'number',
+                              'not-utf8'))
+def test_report_that_is_no_object_is_malformed(script, golden, content):
+    pin = forge_bytes(golden, 'report.json', content)
+    assert refusal(script, golden, pin=pin) == 'report is malformed'
+
+
+@pytest.mark.parametrize('value', ('x', None, [], {}, 1.5, True), ids=repr)
+def test_unread_report_keys_may_hold_anything(script, golden, value):
+    pin = forge_report(golden, compose(
+        edited('n_owners', 'dnb', new=lambda old: value),
+        edited('n_owners', 'federal', new=lambda old: value),
+        edited('owners_by_year', '2022', 'dnb', new=lambda old: value),
+        edited('owners_by_year', '2024', 'federal', new=lambda old: value),
+        edited('parent_name_collisions', new=lambda old: value)))
+    assert checked(script, golden, pin=pin) is not None
+
+
+def excluded_row(frame: pl.DataFrame) -> int:
+    return frame['exclusion_reason'].is_not_null().arg_true()[0]
+
+
+def last_eligible(frame: pl.DataFrame) -> int:
+    return frame['exclusion_reason'].is_null().arg_true()[-1]
+
+
+FACILITY_SHAPES = [
+    pytest.param(lambda frame: set_row(frame, 3, 'trifd', None),
+                 'facility-year keys are not unique', id='6-null-trifd'),
+    pytest.param(lambda frame: set_row(frame, 3, 'reporting_year', None),
+                 'facility-year keys are not unique', id='6-null-year'),
+    pytest.param(lambda frame: pl.concat([frame, frame.slice(excluded_row(frame), 1)]),
+                 'facility-year keys are not unique', id='6-repeated-excluded-row'),
+    pytest.param(lambda frame: pl.concat([frame, frame.tail(1)]),
+                 'facility-year keys are not unique', id='6-repeated-last-row'),
+    pytest.param(lambda frame: set_row(frame, frame.height - 1, 'reporting_year', 2025),
+                 'reporting year outside the window', id='7-year-after-window'),
+    pytest.param(lambda frame: set_row(frame, excluded_row(frame), 'reporting_year', 2025),
+                 'reporting year outside the window', id='7-excluded-row-outside'),
+    pytest.param(lambda frame: set_row(frame, 0, 'reporting_year', 0),
+                 'reporting year outside the window', id='7-year-zero'),
+    pytest.param(lambda frame: set_row(frame, last_eligible(frame), 'owner_key', None),
+                 'an eligible facility-year lacks an owner or node', id='8-last-null-owner'),
+    pytest.param(lambda frame: set_row(frame, last_eligible(frame), 'naics_2022_node_id', None),
+                 'an eligible facility-year lacks an owner or node', id='8-last-null-node'),
+]
+
+
+@pytest.mark.parametrize(('change', 'reason'), FACILITY_SHAPES)
+def test_facility_year_shapes_are_refused(script, golden, change, reason):
+    pin = forge_table(golden, 'tri_facility_years', change)
+    assert refusal(script, golden, pin=pin) == reason
+
+
+def test_same_trifd_in_each_year_is_not_a_repeat(script, golden):
+    facility = pl.read_parquet(golden['directory'] / 'tri_facility_years.parquet')
+    assert facility.filter(pl.col('trifd') == 'T1').height == 3
+    assert checked(script, golden) is not None
+
+
+def test_excluded_rows_may_carry_an_owner_and_node(script, golden):
+    pin = forge_table(golden, 'tri_facility_years', lambda frame: frame.with_columns(
+        pl.when(pl.col('exclusion_reason').is_not_null()).then(pl.lit('parent:Tin'))
+        .otherwise(pl.col('owner_key')).alias('owner_key')))
+    assert checked(script, golden, pin=pin).eligible.height == 32
+
+
+def with_extra_distribution_key(report: dict) -> dict:
+    report['n_unweighted_distribution']['extra'] = 1
+    return report
+
+
+COUNT_SHAPES = [
+    pytest.param(on_report(edited('owner_key_changes', new=lambda old: old - 1)),
+                 'owner key changes differ from the report', id='9-fewer-changes'),
+    pytest.param(on_report(edited('n_owners', 'headline', new=lambda old: old - 1)),
+                 'owner counts differ from the report', id='10-fewer-pooled-owners'),
+    *(pytest.param(on_report(bump_report('owners_by_year', str(year), 'headline')),
+                   'owner counts differ from the report', id=f'10-{year}-owners')
+      for year in YEARS),
+    *(pytest.param(on_report(edited('owners_by_year', str(year), 'headline',
+                                    new=lambda old: old - 1)),
+                   'owner counts differ from the report', id=f'10-{year}-fewer-owners')
+      for year in YEARS),
+    pytest.param(on_table('tri_parent_link_support',
+                          lambda frame: frame.slice(0, frame.height - 1)),
+                 'recount differs from the support table', id='11-dropped-last-row'),
+    pytest.param(on_table('tri_parent_link_support',
+                          lambda frame: pl.concat([frame, frame.head(1)])),
+                 'recount differs from the support table', id='11-repeated-row'),
+    pytest.param(on_table('tri_parent_link_support', bump('j_2022')),
+                 'recount differs from the support table', id='11-2022-count'),
+    pytest.param(on_table('tri_parent_link_support', bump('j_2024')),
+                 'recount differs from the support table', id='11-2024-count'),
+    pytest.param(on_table('tri_parent_link_support', bump('j_owners', 5)),
+                 'recount differs from the support table', id='11-last-cell-count'),
+    pytest.param(on_table('tri_parent_link_support',
+                          lambda frame: set_row(frame, 0, 'unit_b', frame['unit_a'][0])),
+                 'recount differs from the support table', id='11-other-cell'),
+    pytest.param(on_table('tri_parent_links',
+                          lambda frame: frame.slice(0, frame.height - 1)),
+                 'target rows differ from the support table', id='12-dropped-last-row'),
+    pytest.param(on_table('tri_parent_links', lambda frame: pl.concat([frame, frame.head(1)])),
+                 'target rows differ from the support table', id='12-repeated-row'),
+    pytest.param(on_table('tri_parent_links', lambda frame: set_row(frame, 0, 'measure', None)),
+                 'target rows differ from the support table', id='12-null-measure'),
+    pytest.param(on_table('tri_parent_links',
+                          lambda frame: set_row(frame, frame.height - 1, 'measure', 'other')),
+                 'target rows differ from the support table', id='12-last-measure'),
+    pytest.param(on_table('tri_parent_links', bump('n_unweighted', 7)),
+                 'target rows differ from the support table', id='12-last-count'),
+    pytest.param(on_table('tri_parent_links',
+                          lambda frame: set_row(frame, 0, 'unit_b', frame['unit_a'][0])),
+                 'target rows differ from the support table', id='12-other-cell'),
+    pytest.param(on_report(bump_report('n_unweighted_distribution', 'count')),
+                 'report distribution differs from the targets', id='13-count'),
+    pytest.param(on_report(bump_report('n_unweighted_distribution', 'p90')),
+                 'report distribution differs from the targets', id='13-percentile'),
+    pytest.param(on_report(bump_report('n_unweighted_distribution', 'ge_10')),
+                 'report distribution differs from the targets', id='13-threshold'),
+    pytest.param(on_report(dropped('n_unweighted_distribution', 'ge_5')),
+                 'report distribution differs from the targets', id='13-key-missing'),
+    pytest.param(on_report(with_extra_distribution_key),
+                 'report distribution differs from the targets', id='13-extra-key'),
+    pytest.param(on_report(edited('n_unweighted_distribution', 'min', new=lambda old: None)),
+                 'report distribution differs from the targets', id='13-null-field'),
+    pytest.param(on_report(edited('n_unweighted_distribution', new=lambda old: {})),
+                 'report distribution differs from the targets', id='13-empty-distribution'),
+]
+
+
+@pytest.mark.parametrize(('forge', 'reason'), COUNT_SHAPES)
+def test_count_shapes_are_refused(script, golden, forge, reason):
+    assert refusal(script, golden, pin=forge(golden)) == reason
+
+
+CHAIN = [
+    ('4', on_table('tri_facility_years',
+                   lambda frame: frame.with_columns(pl.col('reporting_year').cast(pl.Int32))),
+     'tri_facility_years.parquet columns differ from the contract'),
+    ('5', on_report(dropped('n_unweighted_distribution')), 'report is malformed'),
+    ('6', on_table('tri_facility_years', lambda frame: pl.concat([frame, frame.head(1)])),
+     'facility-year keys are not unique'),
+    ('7', on_table('tri_facility_years', lambda frame: set_row(frame, 0, 'reporting_year', 2021)),
+     'reporting year outside the window'),
+    ('8', on_table('tri_facility_years',
+                   lambda frame: set_row(frame, first_eligible(frame), 'owner_key', None)),
+     'an eligible facility-year lacks an owner or node'),
+    ('9', on_report(bump_report('owner_key_changes')),
+     'owner key changes differ from the report'),
+    ('10', on_report(bump_report('n_owners', 'headline')), 'owner counts differ from the report'),
+    ('11', on_table('tri_parent_link_support', bump('j_owners')),
+     'recount differs from the support table'),
+    ('12', on_table('tri_parent_links', bump('n_unweighted')),
+     'target rows differ from the support table'),
+    ('13', on_report(bump_report('n_unweighted_distribution', 'max')),
+     'report distribution differs from the targets'),
+]
+
+
+@pytest.mark.parametrize('index', range(len(CHAIN) - 1),
+                         ids=[f'{a[0]}-before-{b[0]}' for a, b in zip(CHAIN, CHAIN[1:])])
+def test_the_earlier_check_refuses_first(script, golden, index):
+    (_, earlier, reason), (_, later, _) = CHAIN[index], CHAIN[index + 1]
+    later(golden)
+    pin = earlier(golden)
+    assert refusal(script, golden, pin=pin) == reason
