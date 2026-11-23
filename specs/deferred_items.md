@@ -269,10 +269,11 @@
       `specs/findings/stage-5-tri-parent-links.md`, "Corrections to earlier text".
       Size: quick-fix. Done when: the docstring names the retired path, in the same commit
       as the next change to the script.
-- [ ] Stale TRI row in the deliverable map: the row "EPA TRI parent links" of
+- [x] Stale TRI row in the deliverable map: the row "EPA TRI parent links" of
       `specs/deliverable-map.md` (line 13 at plan 18) still says "Not built. Roadmap Stage 5,
       ready". Stage 5 completed on 2026-11-21, and plan 18 recorded its replay (run
       `stage5_tri_parent_links_20261121_r1_replay`, `specs/findings/stage-5-tri-parent-links.md`).
       Plan 18 did not edit the file, because plan 17 edits another line of it (Settled
       Default 7). Size: quick-fix. Done when: the row says that Stage 5 is built and replayed
       and names the two runs, in the commit that next edits `specs/deliverable-map.md`.
+      Done in PR 52 (`11fcf80`, 2026-11-22), which names both runs in the row.
