@@ -75,7 +75,7 @@ def test_industry_reader_keeps_the_military_and_unemployed_rows(tmp_path):
     military = ['9670', '9680', '9690', '9770', '9780', '9790', '9870']
     rows = industry_rows(tmp_path / 'list.xlsx', [
         *[industry_row(code, 'pt. 92811') for code in military],
-        industry_row('9920', None, 'Unemployed, last worked 5 years ago')])
+        industry_row('9920', '  ', 'Unemployed, last worked 5 years ago')])
     by_code = {row.code: row for row in rows}
     assert [by_code[code].expression for code in military] == ['pt. 92811'] * 7
     assert by_code['9920'].expression is None
@@ -304,6 +304,7 @@ def test_membership_types_cover_each_marker_and_separator():
     assert membership_types('Pts. 311811, 311812', naics) == ['part', 'several']
     assert membership_types('311811 and 311812', naics) == ['several']
     assert membership_types('311811,311812', naics) == ['several']
+    assert membership_types('311811 , 311812', naics) == ['several']
     assert membership_types('311811, pt. 311812', naics) == ['part', 'several']
     assert membership_types('Part of 31, 32, 33', naics) == ['group', 'part']
     assert membership_types(' 311811 ', naics) == ['whole']
