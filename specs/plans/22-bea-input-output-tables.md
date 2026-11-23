@@ -90,7 +90,7 @@ subagent cannot ask the owner for a go-ahead.
 - **Reused interfaces, imported unchanged.** `target_contract.TARGET_SCHEMA`,
   `TARGET_KEY_COLUMNS`, `valid_unit` (never `validate_targets` or `write_targets`);
   `target_io.stage`, `relative_file`, `file_record`, `inventory`, `verify_inventory`,
-  `write_json`; `manifest.describe_file`, `append_entries`, `check_appendable`,
+  `verify_raw`, `write_json`; `manifest.describe_file`, `append_entries`, `check_appendable`,
   `entry_for`, `read_manifest`, `sha256_file`; `paths`;
   `geography_references.safe_path`, `occupied`. Tests may also import, never edit,
   `tests/tri_fixtures.py` (`seed_codes_bundle`, `subprocess_modules`, `module_file`),
@@ -121,7 +121,9 @@ subagent cannot ask the owner for a go-ahead.
 - **Commit protocol.** Before every commit and every full `pytest` run, run the Stage 9
   `pgrep` check above. If it prints anything, stop, leave the files uncommitted and tell
   the owner. Never skip a hook. `git add` only the task's files. The full suite hashes
-  every `.py` file, so edit no `.py` file while it runs (about 20 minutes).
+  every `.py` file, so edit no `.py` file while it runs (about 20 minutes). Plans 9 and
+  21 (Stage 9) also edit `CLAUDE.md` and `README.md`: rebase onto `main` before the
+  Task 10 and Task 14 commits.
 - **Production root.** Write to `/Users/lowell/Projects/embedding-data/data` only at the
   owner-gated steps of Tasks 5 and 13. Every production command passes
   `--data-dir /Users/lowell/Projects/embedding-data/data`. Tests use `tmp_path` roots
@@ -215,7 +217,7 @@ None.
 8. **Codes selector.** Own literals in `bea_io_selection`. Tests compare them with
    `target_inputs.CODE_SCHEMAS`, `classification_tables.NODE_SCHEMA`,
    `naics_relationships.RELATION_SCHEMA` and `code_build.SCHEMA_VERSION`.
-9. **Reuse beyond the spec's list.** `target_contract.valid_unit`,
+9. **Reuse beyond the spec's list.** `target_contract.valid_unit`, `target_io.verify_raw`,
    `geography_references.safe_path` and `occupied`, and `manifest.check_appendable` and
    `read_manifest`, each imported unchanged. `target_io` already loads them. Test helpers
    are listed under Global Constraints.
@@ -228,8 +230,9 @@ None.
 12. **Totals table.** It keeps every non-commodity × industry cell of the block whose text
     is not empty. A zero-marker cell that is not empty is kept with value 0.0.
 13. **Exact gap arithmetic.** Gaps are `decimal.Decimal(total) − Σ Decimal(cell)` from the
-    cell strings, never Float64. The report records each gap as a fixed-point string
-    (`format(gap, 'f')`) and counts lines by `ceil(|gap|)`.
+    cell strings, never Float64. The report records each gap as the fixed-point string
+    `format(gap.normalize(), 'f')`, so cell texts `'1234'` and `'1234.0'` give one string.
+    It counts lines by `ceil(|gap|)`.
 14. **`naics_shared`.** Computed on the published codes with the partial marker removed,
     as the spec's "listed" says, not on the expanded candidates.
 15. **Title of a dual-role code.** The commodity row's title. The report counts codes whose
@@ -257,7 +260,8 @@ None.
 22. **Preservation baseline.** Task 5 records the manifest's byte length and SHA-256 in
     the findings file. `/private/tmp` is not durable, so no copy is kept there.
 23. **Reconciler reader.** It reads XLSX with `zipfile` and `xml.etree`, not fastexcel,
-    so that it is independent of the build's reader.
+    so that it is independent of the build's reader. It reads code, title and NAICS cells
+    by their raw text, and applies `repr(float(v))` only to value cells.
 24. **E3 read first.** The E3 page read runs in Task 1 Step 1, before any data file is
     fetched, so a released 2022 benchmark stops the stage before any 2017 file lands.
     Task 5 records it in the findings file.
@@ -620,7 +624,7 @@ ones.
     `unexplained_rows`, `blank_naics_cells`.
   - `line_gaps(scan: UseScan, layout: UseLayout) -> pl.DataFrame` with `line`
     (`commodity` or `industry`), `code`, `cells` (Int64: nonzero cells summed), `total`
-    (String, the published total text), `gap` (String, fixed-point Decimal) and
+    (String, the published total text), `gap` (String, Settled Default 13) and
     `within_bound` (Boolean), sorted by `line`, `code` (Settled Defaults 10 and 13)
 - Produces in `tests/bea_fixtures.py`: `TEST_LAYOUT: bea_io_layout.Layout`, a small
   synthetic layout with codes like `T005`, `T001`, `V00100`, `F01000`, and
@@ -1304,8 +1308,10 @@ Message: `feat: add BEA build, verify and compare commands`.
 NAICS code; a NAICS code shared by two BEA codes; a 2017 code with a `1:m` link to 2022; a
 diagonal cell; a negative cell; a zero total; a rounding gap inside the bound. Also a
 partial marker if the production layout registers one, and a continuation row if it allows
-them. Every registered total, final-demand and value-added line appears. Use real 2017
-codes from the fixture bundle, chosen in the helper from `crosswalk` and `nodes_2017`.
+them. Every registered total, final-demand and value-added line appears. One BEA code
+cell and one single-code NAICS cell are written as `int`, as real files may store them.
+Use real 2017 codes from the fixture bundle, chosen in the helper from `crosswalk` and
+`nodes_2017`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1362,10 +1368,11 @@ Message: `test: add the BEA V12 raw-to-replay fixture chain`.
 SHA-256, and checks each raw file's hash. It reads `derived/codes/<run>/outputs.json`,
 checks it against the recorded codes pin and the three Parquets' records, and reads them
 with Polars. It reads the workbooks with `zipfile` and `xml.etree` (Settled Default 23):
-shared strings (every `<t>` of an `<si>`), inline strings and numeric `<v>` cells, read as
-`repr(float(v))` for numbers. From the spec's text, with plain Python, it recomputes the
-code table, the three measures, the totals table, the gaps with `decimal.Decimal`, and the
-report counts. It compares them exactly with the bundle's three tables and
+shared strings (every `<t>` of an `<si>`), inline strings and numeric `<v>` cells. A
+numeric value cell reads as `repr(float(v))`. A numeric code, title or NAICS cell reads as
+its raw `<v>` text. From the spec's text, with plain Python, it recomputes the code table,
+the three measures, the totals table, the gaps with `decimal.Decimal` (formatted as in
+Settled Default 13), and the report counts. It compares them exactly with the bundle's three tables and
 `report.json`'s counts and distributions.
 
 - [ ] **Step 1: Write the failing tests**
@@ -1378,6 +1385,8 @@ def test_reconciler_imports_no_embedding_data_module():
     assert not [n for n in ast.walk(tree) if isinstance(n, (ast.Import, ast.ImportFrom))
                 and 'embedding_data' in ast.unparse(n)]
 def test_reconciler_reports_equal_on_the_v12_bundle(tmp_path, monkeypatch, cli_runner): ...
+def test_reconciler_gap_strings_equal_the_build_on_whole_number_cells(tmp_path, ...):
+    # a line of int cells (1 + 1, total 3): the reconciler's gap string == report's == '1'
 def test_reconciler_detects_a_changed_share(tmp_path, monkeypatch, cli_runner): ...
     # copy the bundle, change one input_share, rewrite outputs.json; new pin: exit 1
 def test_reconciler_refuses_a_wrong_pin(tmp_path, monkeypatch, cli_runner): ...   # exit 2
@@ -1549,10 +1558,10 @@ with
 After the "TRI parent links (roadmap Stage 5)" section, add a section
 `**BEA input-output tables (roadmap Stage 15).**` like it: the five commands and which
 one uses the network, `--data-dir`, the failure line and exit codes, the bundle path and
-files, the layout JSON and its hash in `bea_io_bundle.SOFTWARE_FILES`, the selected run
-ID, pin, snapshot and commit, `verify` and the reconciler outcome, the findings file, the
-non-headline status, no `size_gate_pending`, and the R8.4 exclusion. Name no replay and no
-run pin beyond that one run.
+files, the layout JSON and its hash in `bea_io_bundle.SOFTWARE_FILES`, a link to the
+findings file for the run, the non-headline status, no `size_gate_pending`, and the R8.4
+exclusion. Name no run ID, pin, snapshot or commit: run pins wait for the owner's
+decision on hardening (spec "Out of scope" and "Left to the builder").
 
 - [ ] **Step 4: Commit**
 
