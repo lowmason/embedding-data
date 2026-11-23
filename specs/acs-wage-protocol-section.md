@@ -41,6 +41,7 @@ scores.
 | Q1 | What may the selecting part choose? | "b": the panel's own settings and also which embedder candidate goes forward. A sealed part judges and is opened once |
 | Q2 | Where is the split itself fixed? | "a": in naics-embedder's wage panel spec, under limits that this section sets |
 | Q3 | The drafted assignment and conditions, shown in chat as W1 to W8 | Not corrected. The owner said "write the spec". The spec numbers them W1 to W9, because roles split out of the headline-rows condition. W9 (fixtures) is the chat's W8 |
+| Q4 | Three texts say the file only judges (R8.1's owner paragraph, the `CLAUDE.md` Stage 17 paragraph and the retired Stage 17 spec's anti-goal). Record an exception for Q1, or rely on the section alone? | "a": record the exception in R8.1, R8.4 and `CLAUDE.md`, as the ITA exception was recorded |
 
 **My calls.** Choices made while writing, which the owner has not ruled on, are marked
 (my call). The proposals that the owner did not correct in Q3 are marked (proposal, Q3).
@@ -77,7 +78,8 @@ must stay on this machine and what makes a read allowed.
 - The wage panel: its split, regimes, comparators, metrics, margin and decision. These
   belong to naics-embedder's wage panel spec (Stage 17 spec, Non-goals).
 - A section for any other family. Stages 16, 23 and 25 write those.
-- Any change to R8.4's text, to the Stage 19 minimum or to a Stage 17 bundle.
+- Any change to R8.4's text beyond the exception sentence of Q4. Any change to the Stage 19
+  minimum or to a Stage 17 bundle.
 - Any source, test or data change, and any full-data command.
 
 **Anti-goals.** The design fails, even if it merges, when it:
@@ -148,7 +150,7 @@ matches on the delivered strings.
 The file has a **selecting part** and a **judging part** *(owner, Q1, 2026-11-23)*.
 
 - The selecting part chooses the panel's own settings and which embedder candidate goes
-  forward.
+  forward. This is the exception that R8.1 and R8.4 record *(owner, Q4, 2026-11-23)*.
 - The judging part is sealed. It judges and is opened once.
 
 naics-embedder's wage panel spec, when the owner names it in this section (W7), decides
@@ -238,8 +240,8 @@ the order of reads.
 
 ## Edits on approval
 
-One docs commit applies these, with the section above. Each edit outside the section is a
-pointer, not a rule change.
+One docs commit applies these, with the section above. Edits 4 to 7 record the owner's
+exception of Q4. The others are pointers.
 
 1. **`specs/evaluation-protocol.md`, introduction.** "It has one section for each evidence
    family" gains "or analysis file". "No other family has a section yet" becomes a sentence
@@ -248,17 +250,26 @@ pointer, not a rule change.
    The ACS wage microdata are not a family, so they were not in it.
 3. **Source spec, Out of scope, "Evaluation protocol".** After "It covers the ITA text–code
    pairs", add: "Section 2 covers the ACS wage microdata. *(owner, 2026-11-23)*"
-4. **Source spec, R8.4 owner paragraph.** Add a link: the section is
-   [Section 2 of the evaluation protocol](evaluation-protocol.md).
-5. **`CLAUDE.md`, Stage 17 paragraph.** Replace "No protocol section (O24) exists yet, so no
-   panel result is claimed." with a sentence that points to Section 2 and says that no
-   panel result is claimed until the owner names the panel spec there (W7).
-6. **`README.md`, Stage 17 section.** Replace "No protocol section (O24) exists yet." with
-   the same pointer.
-7. **`specs/naics-evaluation-data-stage-24-findings.md`.** New. It records the owner
+4. **Source spec, R8.4 owner paragraph** (Q4). Add, tagged *(owner, 2026-11-23)*: "One
+   exception: the selecting part of the ACS wage microdata may select which embedder
+   candidate goes forward. No row trains, builds a curriculum or mines examples. The
+   section is [Section 2 of the evaluation protocol](evaluation-protocol.md)."
+5. **Source spec, R8.1 owner paragraph** (Q4). "to judge an economic candidate of
+   naics-embedder" becomes "to judge an economic candidate of naics-embedder or, on its
+   selecting part, to select one", with the tag *(owner, 2026-11-23)* after the sentence.
+6. **`CLAUDE.md`, Stage 17 paragraph** (Q4). "It only judges and never trains (R8.4)."
+   gains the exception, as the Stage 10 paragraph's "One exception" line does. "No
+   protocol section (O24) exists yet, so no panel result is claimed." becomes a sentence
+   that points to Section 2 and says that no panel result is claimed until the owner names
+   the panel spec there (W7).
+7. **`README.md`, Stage 17 section** (Q4). "Under R8.4 the file only judges and never
+   trains." gains the same exception. "No protocol section (O24) exists yet." becomes the
+   same pointer.
+8. **`specs/naics-evaluation-data-stage-24-findings.md`.** New. It records the owner
    decisions, the measured cost in sessions and what is not claimed.
-8. **Roadmap.** Tick Stage 24 and add its completion note, as Stage 2's was added.
-9. **This file.** Status becomes "COMPLETE (date)", and the file moves to
+9. **Roadmap.** Tick Stage 24 and add its completion note, as Stage 2's was added. Track H
+   has no later stage, so the re-validation of the Rollout line finds nothing to change.
+10. **This file.** Status becomes "COMPLETE (date)", and the file moves to
    `specs/completed/`.
 
 Findings, retired specs and retired plans are records and are not edited.
@@ -266,8 +277,8 @@ Findings, retired specs and retired plans are records and are not edited.
 ## Constraints
 
 - No source file, test or data file changes. The Stage 17 software hashes stay as recorded.
-- No full-data command. The only data reads are the hash of `outputs.json` and the
-  aggregate keys of `report.json`. No person row is read.
+- No full-data command. The only data reads are the hash of `outputs.json`, the hash of
+  `report.json` and its aggregate keys. No person row is read.
 - The commit hook skips the test suites for changes under `specs/` and root-level Markdown.
   No flag is used to skip a hook.
 - Before each commit, run `pgrep -fl 'embedding_data\.acs_targets|stage9_independent|reconcile_stage9'`
