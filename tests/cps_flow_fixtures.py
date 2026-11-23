@@ -82,7 +82,8 @@ def write_workbook(file: Path, sheets: dict[str, list[list[str | None]]]) -> Pat
         for i, rows in enumerate(sheets.values(), 1):
             body = ''.join(
                 f'<row r="{r}">' + ''.join(
-                    f'<c r="{chr(65 + c)}{r}" t="inlineStr"><is><t>{escape(value)}</t></is></c>'
+                    f'<c r="{chr(65 + c)}{r}" t="inlineStr"><is>'
+                    f'<t xml:space="preserve">{escape(value)}</t></is></c>'
                     for c, value in enumerate(row) if value is not None) + '</row>'
                 for r, row in enumerate(rows, 1))
             archive.writestr(f'xl/worksheets/sheet{i}.xml',
