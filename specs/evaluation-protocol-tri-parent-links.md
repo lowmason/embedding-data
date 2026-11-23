@@ -1,6 +1,9 @@
 # Evaluation protocol: TRI parent links
 
-Status: PROPOSED (2026-11-23). Written in a brainstorming session with the owner.
+Status: PROPOSED (2026-11-23). Written in a brainstorming session with the owner. A builder check
+raised three points. Two were the owner's to rule (P10, P11). The third is folded in as my call:
+TR6 states the overlap with co-ownership. The check also found that the parallel Stage 23 branch
+uses the same section number and decision ids (see Constraints).
 
 Roadmap: `specs/naics-evaluation-data-roadmap.md`, Stage 25 (Track B, O17). The design adds
 Section 5 to [the evaluation protocol](evaluation-protocol.md). This file holds its provenance, the
@@ -36,9 +39,10 @@ Two read-only measurements were made on the selected run. Neither reads an embed
 | --- | --- | --- |
 | P8 | naics-embedder's relatedness spec lets TRI join as a second judge (§4.1). Its join path reads TRI's validation part: a margin record with fresh reference reads, and a validation test of the forward candidate (§4.6). The TRI spec and the Stage 5 findings exclude TRI from model selection. May TRI's validation part select? | "Allow selection": for naics-embedder's relatedness artifact only, as CO3 allows for co-ownership |
 | P9 | How is it written? | "Approach 1": one thin section in the protocol, with the design history in this file, applied in this session in one docs-only PR |
+| P10 | At `2b2029c` the relatedness spec gives TRI no role. What holds reads until it admits TRI? | "Owner names commit": before any real read, the owner amends Section 5 to name the relatedness spec's commit that admits TRI (TR8). This is W7's pattern, and Stage 23's VL4 uses it for the USAspending family, so both judges of the panel have one rule |
+| P11 | The retired TRI spec's anti-goal says no table may feed model selection. Does it get a dated pointer, as P7 gave the retired Stage 10 spec? | "Add pointer" (edit 7) |
 
 **My calls.** Choices made while writing, which the owner has not ruled on, are marked (my call).
-Points marked (proposal) wait for the owner's ruling on this design.
 
 ## Intent
 
@@ -64,7 +68,7 @@ TRI's protocol section, with selection on TRI's validation part allowed (P8).
    relatedness spec.
 2. Let selection read TRI's validation part, under the limits of CO3 (P8).
 3. Name the run, the pin and the table hashes that a read uses.
-4. State what holds reads until the relatedness spec admits TRI.
+4. State what holds reads until the relatedness spec admits TRI (P10).
 5. Answer by name each place where the TRI spec and the V9 TRI decision defer to the protocol.
 
 **Non-goals.**
@@ -156,11 +160,11 @@ describe the evidence and set no rule.
   sensitivity labels; the references, the margin and the decision rule; the logging of reads and
   the one opening of the sealed part. This section does not say how the co-ownership gain carries
   over to TRI, because at `2b2029c` the relatedness spec does not say it either.
-- **What holds reads until TRI is admitted** (proposal, see "Open for the owner", Q-A). Condition
-  TR8 asks the owner to amend Section 5 to name the relatedness spec's commit that admits TRI,
-  before any real read. This repeats W7's pattern for the wage panel spec. The alternative is to
-  rely on the relatedness spec's own rule (§4.1), which already forbids a read before its
-  amendment.
+- **What holds reads until TRI is admitted** (P10). Condition TR8 asks the owner to amend
+  Section 5 to name the relatedness spec's commit that admits TRI, before any real read. This
+  repeats W7's pattern for the wage panel spec and Stage 23's VL4. The relatedness spec's own rule
+  (§4.1) also forbids a read before its amendment, but then this repository would learn of the join
+  only from the other repository.
 
 The assignment answers these deferrals by name:
 
@@ -197,10 +201,12 @@ Condition ids carry the prefix TR (my call, as CO and AM).
 - **TR5, same relation.** CO7 names TRI as a family that measures the relation co-ownership judges.
   TR5 states the rule in both directions: neither family trains an embedding that the other judges.
   Neither trains at all today, so the rule binds only a later R8.4 amendment. TRI does not measure
-  the area mix's relation (co-location in a county), so AM4 does not apply to it (my call). Whether
-  the USAspending shares measure TRI's relation is Stage 23's to say.
+  the area mix's relation (co-location in a county), so AM4 does not apply to it (my call). Stage
+  23's VL6 says that the USAspending vendor links measure another relation.
 - **TR6, universe.** Built from the `universe` string of `report.json`, the E8 time basis and the
-  TRI spec's Limits (my call).
+  TRI spec's Limits (my call). It also states the overlap with co-ownership, so that no published
+  score hides it (my call, from the builder check: the anti-goal asks for it, and the Evidence
+  table alone would not reach a reader of a score).
 
 ## Edits
 
@@ -231,8 +237,7 @@ rule change.
    TRI table may feed embedder training, curriculum, hard-negative mining or model selection."
 6. **`specs/deliverable-map.md`**, the TRI row (line 13): replace "Its section in the evaluation
    protocol (O17)" with the assigned role and a pointer to Section 5. Keep "R8.4, if it trains".
-7. **Retired TRI spec** `specs/completed/tri-parent-links.md` (proposal, see "Open for the
-   owner", Q-B): one dated pointer line after its anti-goal "Lets any table feed embedder training,
+7. **Retired TRI spec** `specs/completed/tri-parent-links.md` (P11): one dated pointer line after its anti-goal "Lets any table feed embedder training,
    curriculum, hard-negative mining or model selection (R8.4)" (line 124). The line says that
    Section 5 of the protocol lets selection for naics-embedder's relatedness artifact read the
    parent links' validation part (owner, P8, 2026-11-23). The anti-goal is not reworded.
@@ -244,23 +249,6 @@ Findings and retired plans are records and are not edited. The Stage 5 findings 
 "no TRI table feeds embedder training, curriculum, hard-negative mining or model selection". The
 V9 TRI decision keeps its "Not claimed" section. R8.4's text is unchanged.
 
-## Open for the owner
-
-- **Q-A. What holds reads until the relatedness spec admits TRI?** (TR8)
-  - *Owner names the commit here (proposal).* Before any real read, the owner amends Section 5 to
-    name the relatedness spec's commit that admits TRI. This is W7's pattern. This repository keeps
-    the gate, and the protocol names the exact text that governs TRI. The cost is one more docs
-    amendment here when naics-embedder amends its spec.
-  - *Rely on the relatedness spec.* Its §4.1 already forbids a read before its amendment. No second
-    amendment is needed, but this repository then learns of the join only from the other repository.
-- **Q-B. Does the retired TRI spec get a dated pointer?** (edit 7)
-  - *Add pointer (proposal).* Stage 16's P7 gave the retired Stage 10 spec the same kind of
-    pointer, because naics-embedder reads its gates from that text. The TRI spec's anti-goal says
-    no table may feed model selection, so a reader of that file alone would see a rule that P8 has
-    narrowed.
-  - *No pointer.* The retired spec stays untouched. The protocol, `CLAUDE.md`, the README and the
-    deliverable map carry the exception.
-
 ## Constraints
 
 - No source file, test or data file changes. Every software hash recorded by a selected run stays
@@ -268,9 +256,13 @@ V9 TRI decision keeps its "Not claimed" section. R8.4's text is unchanged.
 - The commit hooks skip the test suites for changes under `specs/` and root-level Markdown. No flag
   is used to skip a hook. Before each commit, run the Stage 9 `pgrep` check.
 - R8.4's text is unchanged.
-- Stage 23 also edits `specs/evaluation-protocol.md`. Keep the edits outside Section 5 small and
-  local. If Stage 23's section merges first, renumber at the merge and keep this design's content
-  (my call).
+- Stage 23 also edits `specs/evaluation-protocol.md`. Its branch
+  `docs/stage-23-usaspending-protocol` (`374634f`) also proposes a "Section 5" and an owner
+  decision "P8" (there "Judge only"). Whichever stage merges second takes the next free section
+  number and decision ids, and the next free condition wording where the two touch "Families with
+  no section" and the Handoff. It keeps its content. Its edits on approval are written only after a
+  rebase onto `main`, so that no wrong number reaches the retired TRI spec (edit 7) or the findings
+  file, which are not edited later (my call, from the builder check).
 
 ## Verification: observable outcomes
 
@@ -282,6 +274,7 @@ V9 TRI decision keeps its "Not claimed" section. R8.4's text is unchanged.
 - [ ] A reader can answer from the protocol alone: who decides TRI's split, null model and scores;
       which part selects and which judges; what holds reads until TRI is admitted; which run, pin
       and tables to read.
+- [ ] The retired TRI spec's only change is the dated pointer of edit 7.
 - [ ] "Families with no section" names Section 5 for TRI.
 - [ ] `CLAUDE.md`, `README.md`, the source spec and the deliverable map point to Section 5.
 - [ ] R8.4's text is unchanged.
@@ -299,7 +292,9 @@ V9 TRI decision keeps its "Not claimed" section. R8.4's text is unchanged.
   read on TRI (§4.6), and the superiority level becomes 97.5%. TR4 asks for the same mirror-pair
   report as CO4.
 - **Stage 23.** Section 5 is a second worked case of Section 3's shape. If Stage 23 merges first,
-  renumber at the merge. Stage 23 says whether the USAspending shares measure TRI's relation (TR5).
+  this stage renumbers (Constraints). Stage 23's VL6 states that the vendor links measure a
+  different relation from TRI's, so TR5 needs no USAspending clause. If Stage 23 merges first, TR5
+  may cite VL6 by its merged number.
 - **R8.4.** Unchanged. TRI has no training role, and none is proposed.
 
 ## Rollout note
