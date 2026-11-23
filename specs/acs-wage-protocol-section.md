@@ -40,7 +40,7 @@ scores.
 | --- | --- | --- |
 | Q1 | What may the selecting part choose? | "b": the panel's own settings and also which embedder candidate goes forward. A sealed part judges and is opened once |
 | Q2 | Where is the split itself fixed? | "a": in naics-embedder's wage panel spec, under limits that this section sets |
-| Q3 | The drafted assignment and conditions W1 to W8 | Not corrected. The owner said "write the spec" |
+| Q3 | The drafted assignment and conditions, shown in chat as W1 to W8 | Not corrected. The owner said "write the spec". The spec numbers them W1 to W9, because roles split out of the headline-rows condition. W9 (fixtures) is the chat's W8 |
 
 **My calls.** Choices made while writing, which the owner has not ruled on, are marked
 (my call). The proposals that the owner did not correct in Q3 are marked (proposal, Q3).
@@ -125,7 +125,7 @@ Stage 17 built the file and Stage 19 set its minimum. The design is in
 
 ### Evidence
 
-A read uses the first run *(owner, 2026-11-23)*. The replay
+A read uses the first run (my call). The replay
 `stage17_acs_wage_microdata_20261119_r1_replay` has a byte-identical Parquet and
 `report.json`, but its own pin. The Stage 19 decision read the first run.
 
@@ -168,8 +168,8 @@ bind nothing.
 ### Conditions this repository keeps
 
 - **W1. Check the hashes before the first read.** The reader computes the SHA-256 of
-  `outputs.json` and of `acs_wage_persons.parquet` and compares each with the Evidence
-  table. A mismatch stops the read. This comparison is the required form. `verify` is not
+  `outputs.json`, `acs_wage_persons.parquet` and `report.json` and compares each with the
+  Evidence table. `report.json` is checked because W4's gate reads its counts (my call). A mismatch stops the read. This comparison is the required form. `verify` is not
   required, because it refuses both runs after any change to a file in
   `acs_wage_inputs.SOFTWARE_FILES` (my call, as Section 1's C1).
 - **W2. Read in place (R8.1).** The read runs on the machine that built the file, this Mac.
@@ -179,10 +179,12 @@ bind nothing.
 - **W3. Publish scores, not wage tables** (proposal, Q3). A published result holds no mean
   wage, wage quantile or wage distribution of a category. Such a table is evaluation data
   that could later tune a model (R8.4). The Stage 19 decision follows the same rule.
-- **W4. Headline rows and the gate.** A score reads only rows with `flag_headline = true`
-  whose category has at least 400 headline rows in the row's own year. Category-years
-  below 400 stay out of the headline score. A panel may report them apart, labeled as below
-  the gate (proposal, Q3). The count gate is the only size gate. The Stage 19 decision found
+- **W4. Headline rows and the gate.** Every row that the panel reads, to fit or to score,
+  has `flag_headline = true`. A headline score counts only rows whose category has at
+  least 400 headline rows in the row's own year. Category-years below 400 stay out of the
+  headline score. A panel may report them apart, labeled as below the gate (proposal, Q3).
+  Whether rows of a category-year below 400 may enter a fit is the panel spec's choice
+  (Assignment), because the gate is a floor for headline use, not for fitting (my call). The count gate is the only size gate. The Stage 19 decision found
   categories where the count gate and the category's own SE disagree: 23 in 2023 and 29 in
   2024 (its section 6). These are a disclosure, not a second gate, because the per-category
   SEs stay on this machine and are not pinned evidence (proposal, Q3). The 31 categories
@@ -214,7 +216,11 @@ bind nothing.
   - IPUMS USA is cited as its terms require (R8.2).
 - **W7. No read until the owner names the panel spec here** (proposal, Q3). A read is
   allowed only after the owner amends this section to name naics-embedder's approved wage
-  panel spec at a commit. Until then the file is not scored. A new bundle, such as a
+  panel spec and the commit read. Until then the file is not scored. After that, the
+  assignment is to that spec as its owner amends it, not to a frozen copy, as in Section 1
+  (my call). The conditions here bind every version. If a later version conflicts with a
+  condition, the condition governs until the owner amends this section. W5 still fixes the
+  split once a read has happened. A new bundle, such as a
   rebuild or a file with ACS 2025, also needs an amendment of the Evidence table before
   any read of it.
 - **W8. No candidate trained on ACS 2023–2024 is judged on this file.** This is the
