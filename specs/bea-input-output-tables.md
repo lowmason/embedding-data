@@ -6,8 +6,10 @@
 
 Status: draft for owner review. Stage 15 design session of
 [the roadmap](naics-evaluation-data-roadmap.md), 2026-11-23. The owner made the
-three decisions below in this session. Calls marked "My call" were made while
-writing this file. No BEA file was fetched for this design. Facts come from
+four decisions below in this session. Calls marked "My call" were made while
+writing this file. A builder check by a separate reviewer raised six questions
+on 2026-11-23. One became owner decision 4. The other five are answered in
+place as calls. No BEA file was fetched for this design. Facts come from
 public HTML pages read on 2026-11-23, or are marked *unverified*.
 
 ## Scope and governing contracts
@@ -35,6 +37,7 @@ the commands, the preflight and the acceptance steps.
 | 1 | What the bundle holds | **Direct shares only** (option A). Industry buyers are target rows. Final demand stays in a side table as published totals. No total-requirements table. |
 | 2 | Table design | **Accepted as proposed** ("Nothing missing"). The 2017 detail Use table, before redefinitions, at producer prices. Three measures. Rows keyed by BEA code. NAICS 2022 candidate sets in a code table. Special codes and the diagonal kept and flagged. Missing statistics null and flagged. See [Use targets](#use-targets-o9-and-o10). |
 | 3 | Build approach | **New BEA modules and a new contract module for published aggregates** (approach 1). See [Approaches](#approaches). |
+| 4 | What passes E2 | **An explicit BEA statement, or else 17 U.S.C. § 105 with no BEA restriction.** See [the preflight](#preflight-open-checks-e1e3). |
 
 ### Out of scope
 
@@ -273,7 +276,7 @@ alternate, and the Stage 2 spec's verdict table is amended.
 | Check | Measures and records | Stops the stage when |
 |---|---|---|
 | **E1** concordance and layout | The concordance's sheets, header row and NAICS edition. Its depth: NAICS codes by digit count. Its markers, if any, for partial membership. Its rows for special codes, and which have no NAICS member. NAICS codes listed under more than one BEA code. The Use table's sheet name, header rows, commodity and industry code lists, final-demand columns, value-added rows and total codes. The zero marker. Negative cells. For each commodity row and industry column, the gap between the published total and the sum of the published cells. Whether every Use table code is in the concordance. Whether every NAICS 2017 code in the concordance is in `naics_native_nodes.parquet`. | The concordance names a NAICS edition other than 2017. A concordance entry has a form other than a plain code or a plain code with a partial marker (see [Code table](#code-table)). A concordance NAICS code is not an official NAICS 2017 code. More than 5% of BEA codes have no NAICS member (**my call:** a trigger to ask the owner, not an acceptance threshold). The largest total gap exceeds the rounding bound of [Validation](#validation). No 2017 detail Use table before redefinitions at producer value with about 402 industries exists. |
-| **E2** terms | BEA's reuse terms or public-domain statement for the tables and its date (read). Its citation guidance (read). | A BEA statement restricts publishing aggregates. A failed terms check never becomes "build it but keep the aggregates local" (Stage 2 rule). |
+| **E2** terms | BEA's reuse terms or public-domain statement for the tables and its date (read). Its citation guidance (read). Which basis passes E2: a BEA statement, or 17 U.S.C. § 105 (owner decision 4). | E2 passes on an explicit BEA reuse or public-domain statement. With none, it passes on 17 U.S.C. § 105, because BEA is a federal agency and its tables are U.S. government works, provided that no BEA statement restricts reuse (owner, 2026-11-23). It stops the stage when a BEA statement restricts publishing aggregates. A failed terms check never becomes "build it but keep the aggregates local" (Stage 2 rule). |
 | **E3** 2022 benchmark | BEA's published schedule for the 2022 benchmark, if any (read). Whether any 2022 detail table has been released. | BEA has released 2022 detail Use tables. The owner then chooses between 2017 and 2022. **My call:** a scheduled but unreleased date is recorded and does not stop the stage. |
 
 ## Code table
@@ -641,7 +644,8 @@ its own rows.
 
 - **My call:** after R8.3, add: "BEA input–output tables are public. Tables
   derived from them may contain every published cell. They cite BEA." The plan
-  adds this only if E2 passes.
+  adds this only if E2 passes, and names the basis that passed it: BEA's
+  statement or 17 U.S.C. § 105.
 - `CLAUDE.md`: name the BEA family in "What this repo is", and add a section
   for its command group like the TRI section.
 
