@@ -385,6 +385,10 @@ real runs read the four files of section 3.
 These are the nine Limits of the spec, copied as written. Section 6 gives the measured
 leniency.
 
+The seventh Limit says the gate is "a little lenient". The measurement shows more than that. 525 of
+the 2,315 kept `supplier_share` rows (0.2268) meet the minimum in no single fiscal year. So do 437
+of the 2,234 kept `buyer_share` rows (0.1956).
+
 - Recurrence measures whether a relation between two industries persists among firms that
   still contract in their roles. It does not measure truth. A firm with a wrong SAM code that
   keeps the same contract recurs every year.
