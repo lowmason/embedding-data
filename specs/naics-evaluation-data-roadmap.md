@@ -310,7 +310,7 @@ and Stage 25 from Track B's after Stage 22 (see Choices made).
       Leaves out: the scores, their intervals, the margin and the adoption decision, if they stay with naics-embedder (protocol, "What this repository does not decide"). A changed D2 rule and the live `acquire-sam-extract` request → `specs/deferred_items.md`. The R8.4 training-role amendment → a separate owner decision after naics-embedder's spec (reset prompt, Leave alone)
       ROUTING: brainstorming
 
-- [ ] Stage 24: Evaluation-protocol section for the ACS wage microdata
+- [x] Stage 24: Evaluation-protocol section for the ACS wage microdata
       Objective: The evaluation protocol gets a section for the ACS wage microdata, framed like Section 1.
       Outcomes: O24
       Track: H
@@ -319,6 +319,9 @@ and Stage 25 from Track B's after Stage 22 (see Choices made).
       Exit: O24: the committed protocol has a section for the ACS wage microdata that states the evidence (which runs, pins and Stage 19 minimum to read), the assignment (which part selects and which part judges, R8.4) and the conditions this repository keeps, including the in-place read under R8.1, as Section 1 does. It names who decides the scores. The findings file records the stage's measured cost in sessions. No source file, test or data file changed
       Leaves out: the wage panel and its scores → naics-embedder's panel spec (spec `specs/completed/acs-wage-microdata.md`, Non-goals and "Handoff to naics-embedder")
       ROUTING: brainstorming
+
+> Stage 24: COMPLETE (2026-11-23) — implemented by spec specs/completed/acs-wage-protocol-section.md, approved by the owner (no plan). Its section is Section 2 of specs/evaluation-protocol.md. Findings in specs/naics-evaluation-data-stage-24-findings.md. The owner also recorded an exception in R8.1 and R8.4: the file's selecting part may select which embedder candidate goes forward (Q4). Track H has no later stage.
+> Next: resume the roadmap.
 
 - [ ] Stage 25: Evaluation-protocol section for the TRI parent links
       Objective: The evaluation protocol gets a section for the TRI parent links, framed like Stage 16's section for ITA co-ownership.

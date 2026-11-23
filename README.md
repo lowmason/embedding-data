@@ -709,10 +709,12 @@ The file is a person-level analysis file. Person rows never leave the machine th
 and never enter a repository. naics-embedder may read the file in place on that machine
 under its detached pin (R8.1). The reader's results for single persons are bound by the same
 rule. Only aggregate scores and decisions are shared. Under R8.4 the file only judges and
-never trains. The tests and the fixture chain show software readiness only. Fixture results
-are never benchmarks. [The V9 ACS wage decision](specs/findings/v9-acs-wage-minimum-earners.md)
-sets the minimum number of headline earners for each category (O23). No protocol section
-(O24) exists yet.
+never trains, with one exception (owner, 2026-11-23): its selecting part may select which
+embedder candidate goes forward. The tests and the fixture chain show software readiness
+only. Fixture results are never benchmarks. [The V9 ACS wage decision](specs/findings/v9-acs-wage-minimum-earners.md)
+sets the minimum number of headline earners for each category (O23). Reads of the file follow
+[the evaluation protocol](specs/evaluation-protocol.md), Section 2 (O24). No read is allowed
+until the owner names naics-embedder's wage panel spec there (W7).
 
 The measured production runs are `stage17_acs_wage_microdata_20261119_r1` (the first run)
 and `stage17_acs_wage_microdata_20261119_r1_replay`. Their detached pins, which `verify`

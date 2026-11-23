@@ -1,11 +1,8 @@
 # Evaluation protocol, Section 2: ACS wage microdata
 
-> Next step: on the owner's approval, apply "The section" and "Edits on approval" in one docs
-> commit, write the findings file, tick Stage 24 of the roadmap and retire this file to
-> `specs/completed/`. No plan is needed, because the stage changes no code (my call, after
-> Stage 2 and the protocol spec itself).
-
-Status: DRAFT (2026-11-23). Awaiting the owner's approval.
+**Status: COMPLETE (2026-11-23)** — approved by the owner on 2026-11-23 ("Approve") and applied as
+Section 2 of [the evaluation protocol](../evaluation-protocol.md). No plan. Findings in
+[the Stage 24 findings](../naics-evaluation-data-stage-24-findings.md).
 
 This is the stage spec for Stage 24 of `specs/naics-evaluation-data-roadmap.md` (Track H,
 outcome O24). It adds a section for the ACS wage microdata to `specs/evaluation-protocol.md`.
@@ -21,7 +18,7 @@ A brainstorming session with the owner on 2026-11-23. The inputs read were:
   R8.1, R8.4 and V9 paragraphs; the Stage 17 spec `specs/completed/acs-wage-microdata.md`
   (Owner decisions, Non-goals, Design, "Handoff to naics-embedder");
   `specs/naics-evaluation-data-stage-17-findings.md`; the
-  [V9 ACS wage decision](findings/v9-acs-wage-minimum-earners.md); the Handoffs of plan 14
+  [V9 ACS wage decision](../findings/v9-acs-wage-minimum-earners.md); the Handoffs of plan 14
   and plan 17;
 - the `outputs.json` and `report.json` of run `stage17_acs_wage_microdata_20261119_r1`,
   read on 2026-11-23. No person row was read;
@@ -138,7 +135,7 @@ A read uses the first run (my call). The replay
 | `acs_wage_persons.parquet` | 3,035,086 rows, SHA-256 `a94471492dc91aebe3a3436e8d738d399520791b0eace6f01a719fad10fd5ff2` |
 | `report.json` | SHA-256 `32ad9b698c9b940760d74eec0ae3b234abd14ba4c08ca07f04770a8f11e413bd` |
 | Headline rows | 1,278,878 rows with `flag_headline = true`: 639,002 in 2023 and 639,876 in 2024, over 233 categories in each year (Stage 17 finding) |
-| Count gate | Minimum 400 headline rows for each category (`INDNAICS`) in each year, applied to `headline_rows` of each `categories` entry of `report.json`, keyed by `INDNAICS` and `YEAR` ([V9 ACS wage decision](findings/v9-acs-wage-minimum-earners.md)) |
+| Count gate | Minimum 400 headline rows for each category (`INDNAICS`) in each year, applied to `headline_rows` of each `categories` entry of `report.json`, keyed by `INDNAICS` and `YEAR` ([V9 ACS wage decision](../findings/v9-acs-wage-minimum-earners.md)) |
 | Rows that meet the gate | 2023: 183 of 233 categories, 626,564 headline rows (98.05%). 2024: 178 of 233 categories, 625,828 headline rows (97.80%) |
 | Depth of the join node | 262,711 headline rows (20.5%) join at a six-digit node. The rest join at sector, subsector, industry-group or five-digit nodes (`report.json`, `node_levels`) |
 
