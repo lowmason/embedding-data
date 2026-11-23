@@ -19,7 +19,7 @@ controller runs the script twice on real data, and the decision record transcrib
 
 **Tech Stack:** Python 3.14, Polars, argparse, pytest, uv. No new dependency.
 
-**Spec:** `specs/usaspending-minimum-counts.md` (owner-approved 2026-11-22, merged in
+**Spec:** `specs/completed/usaspending-minimum-counts.md` (owner-approved 2026-11-22, merged in
 lowmason/embedding-data#49, `fd43236`).
 
 > Roadmap: specs/naics-evaluation-data-roadmap.md, Stage 21 — on plan
@@ -732,7 +732,7 @@ order:
    kept rows among the intra-group rows. Then `cells_meeting_both`.
 7. Deviations: this plan's two Deviation notes (Consumes and cost, and the singular Exit).
 8. Disclosure: quote the spec's Anti-goals disclosure
-   (`specs/usaspending-minimum-counts.md:109-123`) and state that planning read no data of the
+   (`specs/completed/usaspending-minimum-counts.md:109-123`) and state that planning read no data of the
    run.
 9. Limits: the spec's nine Limits.
 10. Not claimed: no Stage 14 bundle is rebuilt or relabeled, and `size_gate_pending` stays on

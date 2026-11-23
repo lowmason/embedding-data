@@ -4,7 +4,7 @@ Measured on 2026-11-22 with `scripts/measure_usaspending_minimum_counts.py` (pla
 at the rule commit in section 2. This record discharges spec R7.3 and V9 for one family only:
 the USAspending vendor links of roadmap Stage 14. R7.3 asks for a headline minimum count set by
 measurement. V9 sets it for each family after its first full build. Roadmap Stage 21 delivers
-it as outcome O26. The design is in `specs/usaspending-minimum-counts.md`. The record holds
+it as outcome O26. The design is in `specs/completed/usaspending-minimum-counts.md`. The record holds
 counts, rates, constants, run IDs and pins only. It holds no UEI (the SAM.gov unique entity ID
 of a firm), no amount, no node ID and no list of cells.
 
