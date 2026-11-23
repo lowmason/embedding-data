@@ -282,6 +282,10 @@ is detached. Cached replay must match ordered logical rows and canonical JSON
 apart from documented run IDs, creation times and consequential inventories.
 Physical Parquet hashes describe each particular serialization.
 
+Reads of the 2023 area mix follow [the evaluation protocol](specs/evaluation-protocol.md),
+Section 4. It may train only naics-embedder's relatedness embedding, never judges or
+selects it, and trains only after R8.4 is amended.
+
 ## ITA establishment targets (Stage 10)
 
 Stage 10 builds three products from data that is already on disk. The
@@ -427,7 +431,10 @@ of 2026-11-18 to the stage spec makes one exception. Selection may read the vali
 part of the text–code pairs, which are split by `description_key`. The sealed part
 only judges, and no pair trains. Reads of the text–code pairs follow
 [the evaluation protocol](specs/evaluation-protocol.md), Section 1. A family with no
-section there is not scored.
+section there is not scored. Selection for naics-embedder's relatedness artifact may
+also read the validation part of co-ownership, split by anchor industry (owner,
+2026-11-23). Reads of co-ownership follow Section 3 of the protocol. The link table keeps
+the full exclusion.
 
 The tests and the fixture chain show software readiness only. Fixture results are
 never benchmarks. The measured production runs are

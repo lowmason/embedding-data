@@ -24,7 +24,7 @@ This provenance, the Intent, the Goals, the Approaches and "Edits on approval"
 are Section 1's. Section 2 has its design in
 [acs-wage-protocol-section.md](completed/acs-wage-protocol-section.md). Sections 3
 and 4 have theirs in
-[evaluation-protocol-ita-relatedness.md](evaluation-protocol-ita-relatedness.md).
+[completed/evaluation-protocol-ita-relatedness.md](completed/evaluation-protocol-ita-relatedness.md).
 
 A brainstorming session with the owner on 2026-11-18. The inputs read were:
 
@@ -343,7 +343,7 @@ the order of reads.
 
 Status: APPROVED (2026-11-23, owner: "Approve the design"). Design, decisions P4–P7
 and measurements:
-[evaluation-protocol-ita-relatedness.md](evaluation-protocol-ita-relatedness.md).
+[completed/evaluation-protocol-ita-relatedness.md](completed/evaluation-protocol-ita-relatedness.md).
 
 ### Evidence
 
@@ -458,7 +458,7 @@ decision. It also does not check naics-embedder's selection log.
 
 Status: APPROVED (2026-11-23, owner: "Approve the design"). Design, decisions P4–P7
 and measurements:
-[evaluation-protocol-ita-relatedness.md](evaluation-protocol-ita-relatedness.md).
+[completed/evaluation-protocol-ita-relatedness.md](completed/evaluation-protocol-ita-relatedness.md).
 
 ### Evidence
 

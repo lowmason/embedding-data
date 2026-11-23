@@ -1,12 +1,16 @@
 # Evaluation protocol: ITA co-ownership and the 2023 ITA area mix
 
+**Status: COMPLETE (2026-11-23)** — approved by the owner on 2026-11-23 ("Approve the design")
+and applied as Sections 3 and 4 of [the evaluation protocol](../evaluation-protocol.md). No plan.
+Findings in [the Stage 16 findings](../naics-evaluation-data-stage-16-findings.md).
+
 Status: APPROVED (2026-11-23, owner: "Approve the design"). Written in a brainstorming session. A builder check raised three
 points. One was the owner's to rule (P7). The other two are folded in as my calls: CO3 and AM3
 are scoped to the relatedness artifact, and the Handoff notes that Stage 23 has no consuming
 spec yet.
 
 Roadmap: `specs/naics-evaluation-data-roadmap.md`, Stage 16 (Track E, O14). The design adds
-Sections 3 and 4 to [the evaluation protocol](evaluation-protocol.md). This file holds their
+Sections 3 and 4 to [the evaluation protocol](../evaluation-protocol.md). This file holds their
 provenance, the owner's decisions and the pointer edits. The protocol file holds the rules.
 
 ## Design provenance
@@ -109,7 +113,7 @@ G4 as open for co-ownership and the area mix, and G6 as open. G1 stays closed.
 
 ## Design
 
-The rules are Sections 3 and 4 of [the evaluation protocol](evaluation-protocol.md). They follow
+The rules are Sections 3 and 4 of [the evaluation protocol](../evaluation-protocol.md). They follow
 Section 1's frame: Evidence, Assignment, Conditions, and what this repository does not decide.
 The points below are the design choices behind them.
 

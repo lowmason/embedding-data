@@ -215,7 +215,7 @@ and Stage 25 from Track B's after Stage 22 (see Choices made).
       Leaves out: replay check, long-form acceptance finding and headline minimum count → not staged. BEA evidence stays non-headline. The owner decides at the resume after this stage reports, as for O12 and O13 in Track B. The BEA protocol section → O19. The R8.4 training-role amendment → a separate owner decision after naics-embedder's spec (reset prompt, Leave alone)
       ROUTING: brainstorming
 
-- [ ] Stage 16: Evaluation-protocol section for ITA co-ownership and the 2023 area mix
+- [x] Stage 16: Evaluation-protocol section for ITA co-ownership and the 2023 area mix
       Objective: The evaluation protocol gets a section for ITA co-ownership and the 2023 ITA area mix, framed like Section 1.
       Outcomes: O14
       Track: E
@@ -224,6 +224,8 @@ and Stage 25 from Track B's after Stage 22 (see Choices made).
       Exit: O14: the committed protocol has a section for each family that states the evidence (which run and pin to read), the assignment (who decides the split) and the conditions this repository keeps, as Section 1 does. It names who decides the scores. The findings file records the stage's measured cost in sessions. No source file, test or data file changed
       Leaves out: the scores, their intervals, the margin and the adoption decision, if they stay with naics-embedder (protocol, "What this repository does not decide"). Sections for the ACS and CPS families and each new evidence family → O17 to O21. The section for the ACS wage microdata → O24
       ROUTING: brainstorming
+> Stage 16: COMPLETE (2026-11-23) — implemented by spec specs/completed/evaluation-protocol-ita-relatedness.md, approved by the owner (no plan). Its sections are Sections 3 and 4 of specs/evaluation-protocol.md. Findings in specs/naics-evaluation-data-stage-16-findings.md. Selection for naics-embedder's relatedness artifact may read co-ownership's validation part (G6). R8.4 is unchanged, so the area mix trains nothing until the owner's separate R8.4 decision (G1). Stages 23 and 25 consume Section 3. At naics-embedder 2b2029c the relatedness spec lists USAspending subawards as unassigned, so Stage 23 finds no consuming spec yet.
+> Next: resume the roadmap.
 
 - [x] Stage 17: ACS wage microdata, first build
       Objective: One person-level file of ACS 2023–2024 wage earners is built from Stage 8 on real data, verified and replayed.
