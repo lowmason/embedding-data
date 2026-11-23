@@ -250,6 +250,7 @@ code. A flow with both ends single-leaf keeps about 4% of industry mass.
 | Stage 7 verification run | `stage7_ipums_verification_20261015_r2` | `db129a788daa312408f793df1b94fa3f211190a5541fc17ae87b96e84df913dc` |
 | Stage 7 references receipt | `stage7_ipums_references_20261015_r2` | `3163968dde603ba53f807976dd09b9e40d73235a98c6f36e4e02c67ec4239c9c` |
 | Stage 8 references receipt (v2/46) | `stage8_acs_references_20261018_r4` | `052135beb2e77d3cd14b4b800602be9ab36d54aaa43eaf05abffb4d5c14fd2d5` |
+| Stage 8 ACS mapping run | `stage8_acs_mapping_20261018_r7` | `1ec9701092f576b122b01464cdb6fa3fbee49db030e4ad3df7b64e621b8e75f4` *(owner, plan 23, 2026-11-23)* |
 | Stage 4 codes run | `stage4_v11_20261013_r2` | `15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a` |
 | Stage 11 references receipt | New, see below | Recorded at acquisition |
 
@@ -263,9 +264,7 @@ code. A flow with both ends single-leaf keeps about 4% of industry mass.
 - **Official lists.** `census_industry_2022` from the Stage 7 receipt and
   `census_occupation_2018` from the Stage 8 v2/46 receipt. These are the full
   Census lists that R4.6 names. They supply every candidate set.
-- **Cross-check evidence.** `pums_occupation_2018` from the Stage 8 v2/46
-  receipt, for the X-category cross-check only (decision 5). It supplies no
-  member.
+- **Cross-check evidence.** The PUMS member lists in `acs_code_lookup.parquet` of the Stage 8 mapping run, which parsed `pums_occupation_2018` of the v2/46 receipt, for the X-category cross-check only (decision 5). The run's `inputs.json` must record the receipt `stage8_acs_references_20261018_r4`. Nothing else of that run is read, and the lists supply no member. *(owner, plan 23, 2026-11-23)*
 - **Classification nodes.** `naics_nodes`, `soc_nodes` and `code_paths` of the
   Stage 4 codes run. Every candidate must be a NAICS 2022 national industry or a
   SOC 2018 detailed occupation node there.
@@ -309,11 +308,7 @@ evidence for the two specials that no earlier receipt holds:
 - Frozen modules stay frozen: Stage 6 `FROZEN_MODULES` and `TARGET_MODULES`,
   the Stage 7–9 software files, `cli.py` and `code_references.py`. Stage 11 adds
   modules only.
-- Reuse unchanged, where they serve: `ipums_references.parse_industry_list`,
-  the Stage 8 occupation-list and membership-expression parsers in
-  `acs_code_references`, `manifest.entry_for`,
-  `target_contract.validate_targets` and
-  `write_targets`, and `ipums_weights`'s Decimal scan. If a reused function
+- Reuse unchanged: `acs_code_references.parse_membership_expression` (NAICS expressions only), `manifest.entry_for`, `target_contract.validate_targets` and `write_targets`, and `ipums_weights`'s Decimal scan. Stage 11 reads the two Census list workbooks with its own readers: `ipums_references.parse_industry_list` returns no NAICS column and drops `9920`, and Stage 8's row readers are private and take Stage 8 snapshot types. `parse_industry_list` is a test cross-check only. *(owner, plan 23, 2026-11-23)* If a reused function
   cannot serve unchanged, stop and ask the owner. Never edit it.
 - Stage 8 accepts ACS schemes only, and its `559830` special grants nothing to
   CPS. Stage 11 states its own scheme and specials.
@@ -343,8 +338,7 @@ recoded because its job refers to the previous calendar year.
   the Stage 4 nodes and paths, never code prefixes.
 - Record the membership type: `whole` (one finest code), `part` (part of one
   code, a `P` marker), `several` (a list of codes) or `group` (a code above the
-  finest level, which expands to all its finest descendants). A row can carry
-  more than one type. Keep them all.
+  finest level, which expands to all its finest descendants). A row can carry more than one type. Keep them all. A row with an `exc.` clause takes its types from its positive clause and its candidates exclude the excepted codes. No type records the exclusion: the source expression stays beside the set. *(owner, plan 23, 2026-11-23)*
 - An expression the parser does not support fails the build. Never truncate,
   guess or pick one side.
 - Keep the source expression, the list locator and the reference ID beside each
@@ -386,7 +380,7 @@ data, with about 6.8% of employed weight.
 **Rows with SOC `none`.** **My call:** list rows whose SOC entry is `none`
 (`9830` and `9920`) are kept in the registry with status `no_soc_equivalent`
 and empty candidates. A delivered value with that status fails the build. None
-occurs in the selected deliveries.
+occurs in the selected deliveries. The industry list row `9920` has no NAICS entry. It is kept with status `no_naics_equivalent`, empty candidates and the same failing rule. *(owner, plan 23, 2026-11-23)*
 
 ### Specials
 
@@ -539,7 +533,7 @@ probability of moving, a population-wide rate or a reverse share.
   - B = 200 replicates. Each draws households with replacement from the sorted
     list of households that contribute any eligible link to the product, using
     the standard library's `random.Random` with a fixed integer seed recorded in
-    `inputs.json`. No new dependency is added.
+    `inputs.json`. No new dependency is added. A product covers both dimensions and both policies, so the list is the union over them, with positive weight, and one set of draws serves every variant of the product. *(owner, plan 23, 2026-11-23)*
   - A replicate's weight is `LNKFW1MWT` times the household's draw count.
   - SE is the standard deviation of the B replicate statistics (divisor B − 1).
     `se_method` is `bootstrap`, and every row carries `bootstrap_approximate`.
@@ -584,7 +578,7 @@ probability of moving, a population-wide rate or a reverse share.
 | `cps_flow_support.parquet` | Cell and denominator counts and masses, by period contribution, and undefined-point reasons |
 | `cps_flow_replicates.parquet` | Every replicate numerator, denominator, estimate and status, for 160 ASEC and 200 bootstrap replicates |
 | `cps_flow_diagnostics.parquet` | Aggregate funnels by product, period and reason: links on `CPSIDV` and `CPSIDP`, two-month links, null and zero weights, guard states, coding noise, usable-guard share, flag evidence, specials |
-| `cps_linked_pairs.parquet` | Person-level linked pairs, with codes, guards, flags, weight, link type and product membership |
+| `cps_linked_pairs.parquet` | Person-level monthly links (one-month and two-month), with codes, guards, flags, weight, link type and product membership. ASEC persons are not in it *(owner, plan 23, 2026-11-23)* |
 | `inputs.json` | Selected identities, pins, citations, frozen rules, registries, seed, divisors, software and dependencies |
 | `report.json` | V11 summary, counts by class, eligibility funnels, usable-guard shares, the `n_unweighted` distribution for V9 |
 | `outputs.json` | Detached inventory of the other eight files. Excludes itself |
@@ -612,7 +606,7 @@ from the frozen top-level CLI.
 | --- | --- | --- |
 | `acquire-references REFERENCE_ID` | Yes | Acquire the Stage 11 references |
 | `import-reference REFERENCE_ID KIND FILE` | No | Register an owner-downloaded original |
-| `build RUN_ID` with the four upstream IDs and pins | No | Build one immutable bundle |
+| `build RUN_ID` with the five upstream IDs and pins and the Stage 11 references receipt ID and pin *(owner, plan 23, 2026-11-23)* | No | Build one immutable bundle |
 | `verify RUN_ID --outputs-sha256 PIN` | No | Authenticate the pin, then recompute and compare every table |
 | `compare-runs FIRST SECOND` | No | Exact logical comparison, omitting run ID and time |
 
