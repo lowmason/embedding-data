@@ -417,8 +417,9 @@ anything. Each production write needs the owner's go-ahead and the owner's confi
 no Stage 9 freeze window is open: the freeze with the first build, the replay build and any
 cleanup of a failed run's leftover staging. The
 [Stage 17 finding](specs/naics-evaluation-data-stage-17-findings.md) records the commands,
-counts, cost and what is not claimed. No headline minimum count (O23) and no protocol section
-(O24) exist yet, so no panel result is claimed.
+counts, cost and what is not claimed. The minimum number of headline earners for each
+category (O23) is in `specs/findings/v9-acs-wage-minimum-earners.md`. No protocol section
+(O24) exists yet, so no panel result is claimed.
 
 **USAspending vendor links (roadmap Stage 14).** `python -m
 embedding_data.usaspending_vendor_links` exposes seven commands, separate from the frozen

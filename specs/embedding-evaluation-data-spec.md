@@ -543,6 +543,9 @@ here. The [V9 ITA NAICS decision](findings/v9-ita-naics-minimum-counts.md) sets
 it for ITA co-ownership, the 2023 ITA area mix and ITA text–code pairs. For every
 other family it stays *(open — resolved by measurement, not argument, discharged
 by V9)*. *(owner, plan 12, 2026-11-17)*
+The ACS wage microdata are not a target family. The
+[V9 ACS wage decision](findings/v9-acs-wage-minimum-earners.md) sets their minimum
+number of headline earners for each category. *(owner, plan 17, 2026-11-22)*
 
 **R7.4** Outputs are Parquet. Pairwise families share one long schema —
 `source`, `family`, `unit_a_type`, `unit_a`, `unit_b_type`, `unit_b`, `measure`,
@@ -641,6 +644,8 @@ bullet here.
   [V9 ITA NAICS decision](findings/v9-ita-naics-minimum-counts.md) covers ITA
   co-ownership, the 2023 ITA area mix and ITA text–code pairs. *(owner, plan 12,
   2026-11-17)*
+  The [V9 ACS wage decision](findings/v9-acs-wage-minimum-earners.md) covers the ACS
+  wage microdata after their first full build. *(owner, plan 17, 2026-11-22)*
 - **V10 — totals reproduction**. Compare ITA rows per year with OSHA's published
   submission counts, ACS pooled employment by state with published ACS
   estimates, and CPS monthly employment with BLS levels. CPS totals use
@@ -705,6 +710,8 @@ current window.
 
 V9 sets each family's cell-count gate after that family's first full build and
 before any embedder is scored on that family. *(owner, plan 12, 2026-11-17)*
+V9 sets the ACS wage microdata's minimum number of headline earners before any
+embedder is scored on that file. *(owner, plan 17, 2026-11-22)*
 
 XA and XC were tested offline (dry runs, a mocked sample catalog, and synthetic
 conversions) before their first live submissions on 2026-10-12. Those
