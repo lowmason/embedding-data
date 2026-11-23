@@ -188,7 +188,8 @@ section assigns no role to TRI, USAspending or ACS.
 3. In the introduction, replace "No other family has a section yet" with a sentence that names
    Sections 2 and 3.
 4. In Section 1's Assignment, replace "For co-ownership, those questions stay open (Families with
-   no section)" with a pointer to Section 2.
+   no section)" with a pointer to Section 2, and say that the retired Stage 10 spec gets only
+   Section 2's dated pointer (P7).
 5. In "Families with no section", remove co-ownership and the area mix. Say that Section 2 answers
    the shape questions by assignment.
 6. In the Handoff, say that G4 opens for co-ownership and the area mix with Sections 2 and 3, that

@@ -165,8 +165,8 @@ For the ITA pairs only, this assignment answers the places where the Stage 10
 spec defers to the protocol: its Out of scope line on data splits, scoring and
 acceptance thresholds, and its three lines on the use of the copied-text and
 other flags (Accepted proposals, Intent, and the note under the headline rule).
-For co-ownership, Section 2 answers them. That spec is retired and is not
-edited.
+For co-ownership, Section 2 answers them. That spec is retired. It gets only
+Section 2's dated pointer *(owner, 2026-11-23)*.
 
 A condition repeats a rule of text→code's spec in two places only, C2 and C3.
 Both are this repository's own limits: what counts as headline evidence, and
@@ -233,7 +233,7 @@ in industry a, the share that also operate in industry b in the same year,
 | `co_ownership_marginals.parquet` | 991 rows (industries), SHA-256 `7b4a832573ddf3f737f4146e04580dba325dffbb62259ea864ef038c7661e893` |
 | Employers | N = 155,436 EINs with an eligible record (Stage 10 finding, "Co-ownership"). 909 of the 991 industries appear in a target row (count of 2026-11-23) |
 | Count gate | Minimum 1 on `n_unweighted` (J) in `ita_co_ownership.parquet` (V9 decision). Every published row meets it |
-| Split, measured | Under naics-embedder's committed salt, 9,842 of the 19,576 co-owned industry pairs (50.3%) have one industry in each part. 5,159 have both in the sealed part *(owner, 2026-11-23)* |
+| Split, measured | Under naics-embedder's committed salt, 9,842 of the 19,576 co-owned industry pairs (50.3%) have one industry in each part. 5,159 have both in the sealed part (count of 2026-11-23) |
 
 The split counts come from one read-only count on the selected run on
 2026-11-23, at naics-embedder `2b2029c`. They describe the evidence and set no
