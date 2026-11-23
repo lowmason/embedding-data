@@ -547,6 +547,9 @@ The [V9 USAspending decision](findings/v9-usaspending-minimum-counts.md) sets it
 USAspending vendor-link family, with one value for `supplier_share` and one for
 `buyer_share`. That family is no longer among the families whose minimum stays open.
 *(owner, plan 19, 2026-11-22)*
+The ACS wage microdata are not a target family. The
+[V9 ACS wage decision](findings/v9-acs-wage-minimum-earners.md) sets their minimum
+number of headline earners for each category. *(owner, plan 17, 2026-11-22)*
 The [V9 TRI decision](findings/v9-tri-minimum-counts.md) sets it for the TRI parent-link
 family. That family is no longer among the families whose minimum stays open.
 *(owner, plan 20, 2026-11-23)*
@@ -650,6 +653,8 @@ bullet here.
   2026-11-17)*
   The [V9 USAspending decision](findings/v9-usaspending-minimum-counts.md) covers the
   USAspending vendor-link family after its first full build. *(owner, plan 19, 2026-11-22)*
+  The [V9 ACS wage decision](findings/v9-acs-wage-minimum-earners.md) covers the ACS
+  wage microdata after their first full build. *(owner, plan 17, 2026-11-22)*
   The [V9 TRI decision](findings/v9-tri-minimum-counts.md) covers the TRI parent-link family
   after its first full build. *(owner, plan 20, 2026-11-23)*
 - **V10 — totals reproduction**. Compare ITA rows per year with OSHA's published
@@ -716,6 +721,8 @@ current window.
 
 V9 sets each family's cell-count gate after that family's first full build and
 before any embedder is scored on that family. *(owner, plan 12, 2026-11-17)*
+V9 sets the ACS wage microdata's minimum number of headline earners before any
+embedder is scored on that file. *(owner, plan 17, 2026-11-22)*
 
 XA and XC were tested offline (dry runs, a mocked sample catalog, and synthetic
 conversions) before their first live submissions on 2026-10-12. Those
