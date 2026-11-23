@@ -7,15 +7,26 @@ band that misses `LEVEL` leaves the measure with no minimum. Rates use the point
 the Wilson interval is for readers only. The source is the spec section "From curves to a
 minimum" in `specs/usaspending-minimum-counts.md`. The band functions are copied from
 `scripts/measure_ita_minimum_counts.py` so that the Stage 21 constants govern.
+
+Before any curve, the script authenticates the pinned Stage 14 run by its detached pin and by
+the SHA-256 and size of the four files it reads. Then it checks a recount from the pair table
+against the bundle's own support table, targets and report. A refusal is a `Refused` whose
+message is one fixed reason.
 '''
 
+import hashlib
+import json
 import math
+import re
+from dataclasses import dataclass
+from pathlib import Path
 
 import polars as pl
 
+from embedding_data.target_contract import TARGET_SCHEMA
 from embedding_data.usaspending_raw import WINDOW
-from embedding_data.vendor_link_pairs import PAIR_STATUSES
-from embedding_data.vendor_link_targets import MEASURES  # noqa: F401 (read by later tasks)
+from embedding_data.vendor_link_pairs import PAIR_SCHEMA, PAIR_STATUSES
+from embedding_data.vendor_link_targets import MEASURES, SUPPORT_SCHEMA, _distribution
 
 LEVEL = 0.90
 TOP_BAND = 10
@@ -177,3 +188,158 @@ def cells(eligible: pl.LazyFrame, base: int) -> dict[str, pl.DataFrame]:
     return {measure: table.select(*_CELL, pl.col(count).alias('base_count'), 'testable',
                                   'recurs')
             for measure, count in _BASE_COUNTS.items()}
+
+
+# ---- authentication and self-checks
+
+RUN_ID = re.compile(r'[A-Za-z0-9][A-Za-z0-9_-]*')
+PIN = re.compile(r'[0-9a-f]{64}')
+RUNS = 'derived/usaspending/vendor-links'
+REPORT, PAIRS, SUPPORT, TARGETS = ('report.json', 'vendor_link_pairs.parquet',
+                                   'vendor_link_support.parquet', 'vendor_links.parquet')
+# The read files in check order.
+READ_FILES = (REPORT, PAIRS, SUPPORT, TARGETS)
+_FISCAL_YEARS = tuple(f'n_fy{year}' for year in WINDOW)
+_LINK_YEARS = tuple(f'l_fy{year}' for year in WINDOW)
+_SUPPORT_COUNTS = ('s_suppliers', 'b_buyers', 'l_pairs')
+# The read columns of each Parquet file, with their types from the frozen schemas.
+CONTRACT = {
+    PAIRS: {name: PAIR_SCHEMA[name] for name in (
+        'prime_uei', 'sub_uei', 'n_reports', *_FISCAL_YEARS, 'prime_node_id', 'sub_node_id',
+        'pair_status')},
+    SUPPORT: {name: SUPPORT_SCHEMA[name] for name in (*_CELL, *_SUPPORT_COUNTS, *_LINK_YEARS)},
+    TARGETS: {name: TARGET_SCHEMA[name] for name in ('measure', *_CELL, 'n_unweighted', 'flags')},
+}
+# Each measure's support count: `S` for `supplier_share` and `B` for `buyer_share`.
+_MEASURE_COUNTS = dict(zip(MEASURES, ('s_suppliers', 'b_buyers')))
+_DISTRIBUTION = 'n_unweighted_distribution'
+
+
+class Refused(Exception):
+    '''A refusal of the pinned run. Its message is one fixed reason and holds no value read
+    from the run.'''
+
+
+@dataclass(frozen=True)
+class Inputs:
+    '''An authenticated run: its directory, its detached pin and the SHA-256 of each read
+    file.'''
+    directory: Path
+    outputs_sha256: str
+    files: dict[str, str]
+
+
+@dataclass(frozen=True)
+class Checked:
+    '''A self-checked run: its eligible pairs `P`, their fiscal-year counts, the read target
+    columns, and the `n_unweighted_distribution` entry of each measure in `report.json`.'''
+    eligible: pl.LazyFrame
+    years: pl.DataFrame
+    targets: pl.DataFrame
+    distributions: dict[str, dict]
+
+
+def _sha256(file: Path) -> str:
+    with file.open('rb') as stream:
+        return hashlib.file_digest(stream, 'sha256').hexdigest()
+
+
+def _json(data: bytes):
+    '''The JSON value of `data`, or None when `data` is not JSON.'''
+    try:
+        return json.loads(data)
+    except ValueError:
+        return None
+
+
+def authenticate(data_dir: Path, run_id: str, pin: str) -> Inputs:
+    '''Checks 1 to 3: a safe run ID and pin, the detached pin of `outputs.json`, then the
+    SHA-256 and size of each read file, in `READ_FILES` order, against its record.
+
+    The pin covers the bytes of `outputs.json` that are parsed. No other file of the run is
+    read.
+    '''
+    if not (isinstance(run_id, str) and RUN_ID.fullmatch(run_id)
+            and isinstance(pin, str) and PIN.fullmatch(pin)):
+        raise Refused('unsafe run id or pin')
+    directory = Path(data_dir) / RUNS / run_id
+    outputs = directory / 'outputs.json'
+    data = outputs.read_bytes() if outputs.is_file() else None
+    if data is None or hashlib.sha256(data).hexdigest() != pin:
+        raise Refused('outputs pin differs')
+    records = _json(data)
+    records = records if isinstance(records, dict) else {}
+    files = {}
+    for name in READ_FILES:
+        file, record = directory / name, records.get(name)
+        if (not isinstance(record, dict) or not file.is_file()
+                or file.stat().st_size != record.get('size')
+                or _sha256(file) != record.get('sha256')):
+            raise Refused(f'{name} differs from its inventory')
+        files[name] = record['sha256']
+    return Inputs(directory=directory, outputs_sha256=pin, files=files)
+
+
+def _refuse_if(frame: pl.LazyFrame, condition: pl.Expr, reason: str) -> None:
+    '''Refuse with `reason` when `condition` holds, or is unknown, for any row.'''
+    if frame.select(condition.fill_null(True).any()).collect().item():
+        raise Refused(reason)
+
+
+def _scan(inputs: Inputs, name: str) -> pl.LazyFrame:
+    '''Check 4 for one Parquet file: every read column with its frozen type. Returns a lazy
+    scan of the read columns only.'''
+    scan = pl.scan_parquet(inputs.directory / name)
+    schema = scan.collect_schema()
+    if any(schema.get(column) != dtype for column, dtype in CONTRACT[name].items()):
+        raise Refused(f'{name} columns differ from the contract')
+    return scan.select(*CONTRACT[name])
+
+
+def self_check(inputs: Inputs) -> Checked:
+    '''Checks 4 to 12, in order. The first that fails refuses with its fixed reason.
+
+    The read columns, then the pair table (unique keys, and both nodes and consistent report
+    counts on each eligible pair), then the pooled and fiscal-year recounts against the
+    support table, the target rows against the support table, and last the report
+    distributions against the targets.
+    '''
+    pairs, support, targets = [_scan(inputs, name) for name in (PAIRS, SUPPORT, TARGETS)]
+    _refuse_if(pairs, pl.struct('prime_uei', 'sub_uei').is_duplicated(),
+               'pair keys are not unique')
+    listed = pairs.filter(pl.col('pair_status') == _ELIGIBLE)
+    _refuse_if(listed, pl.col('prime_node_id').is_null() | pl.col('sub_node_id').is_null(),
+               'an eligible pair lacks a node')
+    _refuse_if(listed, pl.col('n_reports') != pl.sum_horizontal(_FISCAL_YEARS, ignore_nulls=False),
+               'pair report counts differ from their fiscal years')
+    eligible = eligible_pairs(pairs).collect().lazy()
+    support = support.collect()
+    if not pooled_counts(eligible).equals(support.select(*_CELL, *_SUPPORT_COUNTS).sort(*_CELL)):
+        raise Refused('pooled recount differs from the support table')
+    years = year_counts(eligible)
+    recount = support.lazy().select(*_CELL, *_LINK_YEARS)
+    for year in WINDOW:
+        recount = recount.join(years.lazy().filter(pl.col('year') == year).select(
+            *_CELL, pl.col('l').alias(f'_l{year}')), on=list(_CELL), how='left')
+    _refuse_if(recount, pl.any_horizontal(pl.col(f'_l{year}').fill_null(0) != pl.col(f'l_fy{year}')
+                                          for year in WINDOW),
+               'fiscal-year recount differs from the support table')
+    targets = targets.collect()
+    _refuse_if(targets.lazy(), ~pl.col('measure').is_in(MEASURES),
+               'target rows differ from the support table')
+    for measure, count in _MEASURE_COUNTS.items():
+        rows = targets.filter(pl.col('measure') == measure).select(*_CELL, 'n_unweighted')
+        expected = support.select(*_CELL, pl.col(count).alias('n_unweighted'))
+        if not rows.sort(rows.columns).equals(expected.sort(expected.columns)):
+            raise Refused('target rows differ from the support table')
+    report = _json((inputs.directory / REPORT).read_bytes())
+    entries = report.get(_DISTRIBUTION) if isinstance(report, dict) else None
+    if not (isinstance(entries, dict) and set(entries) == set(MEASURES)
+            and all(isinstance(entries[measure], dict) for measure in MEASURES)):
+        raise Refused('report is malformed')
+    for measure in MEASURES:
+        series = targets.filter(pl.col('measure') == measure)['n_unweighted']
+        if json.loads(json.dumps(_distribution(series.alias('n_unweighted')))) != entries[measure]:
+            raise Refused('report distribution differs from the targets')
+    return Checked(eligible=eligible, years=years, targets=targets,
+                   distributions={measure: entries[measure] for measure in MEASURES})

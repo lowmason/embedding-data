@@ -4,7 +4,10 @@ Every pair table is a typed frame in `PAIR_SCHEMA` with made-up UEIs that passes
 `validate_pairs`, as in `tests/test_vendor_link_targets.py`.
 '''
 
+import dataclasses
 import importlib.util
+import json
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
@@ -12,8 +15,12 @@ import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
+from embedding_data.manifest import sha256_file
+from embedding_data.target_io import inventory, write_json
+from embedding_data.vendor_link_bundle import FILES, TABLES
 from embedding_data.vendor_link_codes import NODE_PREFIX
 from embedding_data.vendor_link_pairs import FIRM_STATUSES, PAIR_SCHEMA, validate_pairs
+from embedding_data.vendor_link_targets import INTRA_LABEL, estimate
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / 'scripts' / 'measure_usaspending_minimum_counts.py'
@@ -490,3 +497,559 @@ def test_intra_group_pair_of_the_same_cell_does_not_recur(script):
     found = base_cells(script, 2024, link('P1', 'U1', fy=(1, 0, 0)),
                        link('P2', 'U2', intra=True, fy=(0, 1, 0)))
     assert_cells(found, [(SD, 1, False, False)])
+
+
+# ---- small bundles, authentication and self-checks (Task 3)
+
+RUNS = Path('derived/usaspending/vendor-links')
+READ_FILES = ('report.json', 'vendor_link_pairs.parquet', 'vendor_link_support.parquet',
+              'vendor_links.parquet')
+PAIR_TABLE, SUPPORT_TABLE, TARGET_TABLE = ('vendor_link_pairs', 'vendor_link_support',
+                                           'vendor_links')
+READ_COLUMNS = {
+    PAIR_TABLE: ('prime_uei', 'sub_uei', 'n_reports', 'n_fy2024', 'n_fy2025', 'n_fy2026',
+                 'prime_node_id', 'sub_node_id', 'pair_status'),
+    SUPPORT_TABLE: ('unit_a', 'unit_b', 's_suppliers', 'b_buyers', 'l_pairs', 'l_fy2024',
+                    'l_fy2025', 'l_fy2026'),
+    TARGET_TABLE: ('measure', 'unit_a', 'unit_b', 'n_unweighted', 'flags'),
+}
+DIST = 'n_unweighted_distribution'
+SUPPLIER, BUYER = 'supplier_share', 'buyer_share'
+REFUSED_ROWS = 'target rows differ from the support table'
+
+
+def golden_links():
+    '''Cells SD and ED. Every base cell of both year pairs is testable and recurs. P2–X is
+    `sub_ineligible` with a null `sub_node_id`, and the intra-group P2–U1 puts `INTRA_LABEL`
+    on the `buyer_share` row of SD.'''
+    return [link('P1', 'U1', fy=(1, 1, 1)), link('P1', 'U2', fy=(1, 1, 0)),
+            link('P2', 'U3', fy=(2, 1, 1)), link('P2', 'X', fy=(1, 0, 0)),
+            link('P2', 'U1', intra=True, fy=(1, 0, 0))]
+
+
+def failing_links():
+    '''The one 2024 base cell, SD, is testable and does not recur. Both 2025 base cells, ED
+    and SE, are testable and recur.'''
+    return [link('P1', 'U1', fy=(1, 0, 0)), link('P1', 'U3', fy=(0, 1, 1)),
+            link('P3', 'U1', fy=(0, 1, 1))]
+
+
+def rehash(directory: Path) -> str:
+    '''Rewrite `outputs.json` from the inventory of the bundle files and return its SHA-256.'''
+    write_json(directory / 'outputs.json', inventory(directory, list(FILES)))
+    return sha256_file(directory / 'outputs.json')
+
+
+def publish(root: Path, links: list[dict], *, firms=FIRMS, run='fixture') -> dict:
+    '''A small Stage 14 bundle of `links` under `root/data`, built by the frozen `estimate`.'''
+    table = pair_frame(firms, *links)
+    result = estimate(table, snapshot=date(2026, 11, 19), month='2026-10')
+    data_dir = root / 'data'
+    directory = data_dir / RUNS / run
+    directory.mkdir(parents=True)
+    tables = {'vendor_links': result.targets, 'vendor_link_marginals': result.marginals,
+              'vendor_link_support': result.support, 'vendor_link_pairs': table}
+    for name in TABLES:
+        tables[name].write_parquet(directory / f'{name}.parquet')
+    write_json(directory / 'report.json', result.report)
+    write_json(directory / 'inputs.json', {})
+    return {'data_dir': data_dir, 'directory': directory, 'run': run, 'pin': rehash(directory)}
+
+
+def forge_table(bundle: dict, name: str, change) -> str:
+    '''Apply `change` to the table `name`, rehash the bundle and return the new pin.'''
+    file = bundle['directory'] / f'{name}.parquet'
+    change(pl.read_parquet(file)).write_parquet(file)
+    return rehash(bundle['directory'])
+
+
+def forge_report(bundle: dict, change) -> str:
+    '''Replace `report.json` by `change` of its value, rehash the bundle and return the pin.'''
+    file = bundle['directory'] / 'report.json'
+    write_json(file, change(json.loads(file.read_text(encoding='utf-8'))))
+    return rehash(bundle['directory'])
+
+
+@pytest.fixture
+def golden(tmp_path):
+    return publish(tmp_path, golden_links())
+
+
+def run_checks(script, bundle, *, run=None, pin=None):
+    '''`self_check` of the authenticated bundle, by default under its own run and pin.'''
+    inputs = script.authenticate(bundle['data_dir'], bundle['run'] if run is None else run,
+                                 bundle['pin'] if pin is None else pin)
+    return script.self_check(inputs)
+
+
+def assert_refused(script, bundle, reason, **names):
+    '''The checks refuse with exactly `reason`, and the exception holds nothing else.'''
+    with pytest.raises(script.Refused) as caught:
+        run_checks(script, bundle, **names)
+    assert caught.value.args == (reason,)
+
+
+def append(file: Path, data: bytes = b'\0') -> None:
+    with file.open('ab') as stream:
+        stream.write(data)
+
+
+def outputs_records(bundle: dict) -> dict:
+    return json.loads((bundle['directory'] / 'outputs.json').read_text(encoding='utf-8'))
+
+
+def is_pair(prime, sub):
+    return (pl.col('prime_uei') == uei(prime)) & (pl.col('sub_uei') == uei(sub))
+
+
+def is_cell(cell, measure=None):
+    where = (pl.col('unit_a') == cell[0]) & (pl.col('unit_b') == cell[1])
+    return where if measure is None else where & (pl.col('measure') == measure)
+
+
+def bump(column, where, by=1):
+    '''A table change that adds `by` to `column` on the rows where `where` holds.'''
+    changed = pl.col(column) + by if by >= 0 else pl.col(column) - -by
+    return lambda table: table.with_columns(
+        pl.when(where).then(changed).otherwise(pl.col(column)).alias(column))
+
+
+def replaced(column, value, where):
+    '''A table change that sets `column` to `value` on the rows where `where` holds.'''
+    return lambda table: table.with_columns(
+        pl.when(where).then(pl.lit(value)).otherwise(pl.col(column)).alias(column))
+
+
+def retyped(column, expression):
+    return lambda table: table.with_columns(expression.alias(column))
+
+
+def twice(where):
+    '''A table change that appends a copy of the rows where `where` holds.'''
+    return lambda table: pl.concat([table, table.filter(where)])
+
+
+def dropped(where):
+    return lambda table: table.filter(~where)
+
+
+def added(where, **columns):
+    '''A table change that appends a copy of the rows where `where` holds, with `columns`
+    replaced.'''
+    return lambda table: pl.concat([table, table.filter(where).with_columns(**columns)])
+
+
+def then(*changes):
+    '''One change that applies `changes` in order.'''
+    def change(value):
+        for each in changes:
+            value = each(value)
+        return value
+    return change
+
+
+def at(*path, change=None):
+    '''A report change that replaces the value at the key `path` by `change` of it, or deletes
+    the key when `change` is None.'''
+    def apply(report):
+        *parents, key = path
+        holder = report
+        for part in parents:
+            holder = holder[part]
+        if change is None:
+            del holder[key]
+        else:
+            holder[key] = change(holder.get(key))
+        return report
+    return apply
+
+
+def on(name, change):
+    '''A forge of the table `name`, or of `report.json` when `name` is `report`.'''
+    if name == 'report':
+        return lambda bundle: forge_report(bundle, change)
+    return lambda bundle: forge_table(bundle, name, change)
+
+
+def forges(*steps):
+    '''Several forges in order. The pin is that of the last.'''
+    return lambda bundle: [step(bundle) for step in steps][-1]
+
+
+def swapped_supplier_counts(table):
+    '''The golden `supplier_share` counts of SD (2) and ED (1), exchanged.'''
+    supplier = pl.col('measure') == SUPPLIER
+    return table.with_columns(n_unweighted=pl.when(supplier & is_cell(SD))
+                              .then(pl.lit(1, dtype=pl.UInt64))
+                              .when(supplier & is_cell(ED)).then(pl.lit(2, dtype=pl.UInt64))
+                              .otherwise(pl.col('n_unweighted')))
+
+
+def test_authenticate_returns_pinned_files(script, golden):
+    inputs = script.authenticate(golden['data_dir'], golden['run'], golden['pin'])
+    assert inputs.outputs_sha256 == golden['pin']
+    records = outputs_records(golden)
+    assert inputs.files == {name: records[name]['sha256'] for name in READ_FILES}
+
+
+@pytest.mark.parametrize('run, pin', [
+    ('../fixture', None), ('fixture/', None), ('-fixture', None), ('fixture\n', None),
+    (None, 'A' * 64), (None, '0' * 63),
+], ids=['parent', 'trailing-slash', 'leading-dash', 'newline', 'upper-pin', 'short-pin'])
+def test_unsafe_run_id_or_pin_refused(script, golden, run, pin):
+    assert_refused(script, golden, 'unsafe run id or pin', run=run, pin=pin)
+
+
+def test_wrong_or_missing_pin_refused(script, golden):
+    assert_refused(script, golden, 'outputs pin differs', pin='0' * 64)
+    (golden['directory'] / 'outputs.json').unlink()
+    assert_refused(script, golden, 'outputs pin differs')
+
+
+@pytest.mark.parametrize('name', READ_FILES)
+def test_changed_file_refused(script, golden, name):
+    append(golden['directory'] / name)
+    assert_refused(script, golden, f'{name} differs from its inventory')
+
+
+def test_size_is_checked(script, golden):
+    records = outputs_records(golden)
+    records['vendor_link_pairs.parquet']['size'] += 1
+    write_json(golden['directory'] / 'outputs.json', records)
+    assert_refused(script, golden, 'vendor_link_pairs.parquet differs from its inventory',
+                   pin=sha256_file(golden['directory'] / 'outputs.json'))
+
+
+def test_missing_record_refused(script, golden):
+    records = outputs_records(golden)
+    del records['vendor_link_support.parquet']
+    write_json(golden['directory'] / 'outputs.json', records)
+    assert_refused(script, golden, 'vendor_link_support.parquet differs from its inventory',
+                   pin=sha256_file(golden['directory'] / 'outputs.json'))
+
+
+def test_pin_is_checked_before_files(script, golden):
+    append(golden['directory'] / 'vendor_link_pairs.parquet')
+    assert_refused(script, golden, 'outputs pin differs', pin='0' * 64)
+
+
+def test_unread_files_are_never_read(script, golden):
+    append(golden['directory'] / 'inputs.json', b' ')
+    append(golden['directory'] / 'vendor_link_marginals.parquet')
+    assert isinstance(run_checks(script, golden), script.Checked)
+
+
+@pytest.mark.parametrize('name, change, reason', [
+    (PAIR_TABLE, retyped('n_fy2025', pl.col('n_fy2025').cast(pl.Int64)),
+     'vendor_link_pairs.parquet columns differ from the contract'),
+    (SUPPORT_TABLE, lambda table: table.drop('l_fy2026'),
+     'vendor_link_support.parquet columns differ from the contract'),
+], ids=['retyped', 'missing'])
+def test_retyped_or_missing_column_refused(script, golden, name, change, reason):
+    assert_refused(script, golden, reason, pin=forge_table(golden, name, change))
+
+
+def test_golden_passes_with_a_null_ineligible_node(script, golden):
+    assert isinstance(run_checks(script, golden), script.Checked)
+
+
+@pytest.mark.parametrize('forge, reason', [
+    (on(PAIR_TABLE, twice(is_pair('P1', 'U1'))), 'pair keys are not unique'),
+    (on(PAIR_TABLE, replaced('sub_node_id', None, is_pair('P1', 'U1'))),
+     'an eligible pair lacks a node'),
+    (on(PAIR_TABLE, bump('n_reports', is_pair('P1', 'U1'))),
+     'pair report counts differ from their fiscal years'),
+    (on(SUPPORT_TABLE, dropped(is_cell(SD))), 'pooled recount differs from the support table'),
+    (on(SUPPORT_TABLE, bump('s_suppliers', is_cell(SD))),
+     'pooled recount differs from the support table'),
+    (on(SUPPORT_TABLE, bump('l_fy2025', is_cell(SD))),
+     'fiscal-year recount differs from the support table'),
+    (on(TARGET_TABLE, bump('n_unweighted', is_cell(SD, SUPPLIER))), REFUSED_ROWS),
+    (on(TARGET_TABLE, dropped(is_cell(SD, BUYER))), REFUSED_ROWS),
+    (on(TARGET_TABLE, replaced('measure', 'other_share', is_cell(SD, SUPPLIER))), REFUSED_ROWS),
+    (on('report', at(DIST)), 'report is malformed'),
+    (on('report', at(DIST, BUYER)), 'report is malformed'),
+    (on('report', at(DIST, BUYER, 'max', change=lambda value: value + 1)),
+     'report distribution differs from the targets'),
+], ids=['duplicated-pair', 'null-sub-node', 'report-count', 'dropped-support-row',
+        'support-suppliers', 'support-fy2025', 'supplier-count', 'dropped-buyer-row',
+        'other-measure', 'no-distribution', 'no-buyer-entry', 'buyer-max'])
+def test_self_check_refusals(script, golden, forge, reason):
+    assert_refused(script, golden, reason, pin=forge(golden))
+
+
+# ---- Task 3 input shapes beyond the plan tests
+
+@pytest.mark.parametrize('run, pin', [
+    ('', None), ('_fixture', None), ('fix ture', None), (None, '0' * 65),
+    (None, '0' * 64 + '\n'), (None, 'g' * 64),
+], ids=['empty', 'leading-underscore', 'space', 'long-pin', 'pin-newline', 'pin-not-hex'])
+def test_unsafe_names_beyond_the_plan_refused(script, golden, run, pin):
+    assert_refused(script, golden, 'unsafe run id or pin', run=run, pin=pin)
+
+
+def test_run_id_may_hold_underscores_and_dashes(script, tmp_path):
+    bundle = publish(tmp_path, golden_links(), run='Stage14_run-2')
+    assert isinstance(run_checks(script, bundle), script.Checked)
+
+
+@pytest.mark.parametrize('name', READ_FILES)
+def test_missing_read_file_refused(script, golden, name):
+    (golden['directory'] / name).unlink()
+    assert_refused(script, golden, f'{name} differs from its inventory')
+
+
+@pytest.mark.parametrize('name', READ_FILES)
+def test_change_that_keeps_the_size_refused(script, golden, name):
+    file = golden['directory'] / name
+    data = bytearray(file.read_bytes())
+    data[-1] ^= 1
+    file.write_bytes(bytes(data))
+    assert_refused(script, golden, f'{name} differs from its inventory')
+
+
+@pytest.mark.parametrize('text', ['[]', 'not json', None],
+                         ids=['list', 'not-json', 'record-not-an-object'])
+def test_outputs_that_are_not_an_inventory_refused(script, golden, text):
+    outputs = golden['directory'] / 'outputs.json'
+    if text is None:
+        records = outputs_records(golden)
+        records['report.json'] = records['report.json']['sha256']
+        write_json(outputs, records)
+    else:
+        outputs.write_text(text, encoding='utf-8')
+    assert_refused(script, golden, 'report.json differs from its inventory',
+                   pin=sha256_file(outputs))
+
+
+@pytest.mark.parametrize('first', range(3), ids=READ_FILES[:3])
+def test_first_changed_file_is_named(script, golden, first):
+    '''Files `READ_FILES[first:]` change, and the refusal names the first in check order.'''
+    for name in READ_FILES[first:]:
+        append(golden['directory'] / name)
+    assert_refused(script, golden, f'{READ_FILES[first]} differs from its inventory')
+
+
+def test_inventory_is_checked_before_columns(script, golden):
+    file = golden['directory'] / 'vendor_link_pairs.parquet'
+    pl.read_parquet(file).with_columns(pl.col('n_fy2025').cast(pl.Int64)).write_parquet(file)
+    assert_refused(script, golden, 'vendor_link_pairs.parquet differs from its inventory')
+
+
+def test_every_read_file_is_hashed_before_any_column_check(script, golden):
+    pin = forge_table(golden, PAIR_TABLE, retyped('n_fy2025', pl.col('n_fy2025').cast(pl.Int64)))
+    append(golden['directory'] / 'vendor_links.parquet')
+    assert_refused(script, golden, 'vendor_links.parquet differs from its inventory', pin=pin)
+
+
+@pytest.mark.parametrize('name, column', [
+    (name, column) for name, columns in READ_COLUMNS.items() for column in columns])
+def test_every_read_column_is_required(script, golden, name, column):
+    pin = forge_table(golden, name, lambda table: table.drop(column))
+    assert_refused(script, golden, f'{name}.parquet columns differ from the contract', pin=pin)
+
+
+@pytest.mark.parametrize('name, column, expression', [
+    (PAIR_TABLE, 'pair_status', pl.col('pair_status').cast(pl.Categorical)),
+    (SUPPORT_TABLE, 'l_pairs', pl.col('l_pairs').cast(pl.Int64)),
+    (TARGET_TABLE, 'n_unweighted', pl.col('n_unweighted').cast(pl.Int64)),
+    (TARGET_TABLE, 'flags', pl.col('flags').list.join(',')),
+], ids=['pair-status', 'support-pairs', 'target-count', 'target-flags'])
+def test_retyped_column_of_each_table_refused(script, golden, name, column, expression):
+    pin = forge_table(golden, name, retyped(column, expression))
+    assert_refused(script, golden, f'{name}.parquet columns differ from the contract', pin=pin)
+
+
+@pytest.mark.parametrize('name, column', [
+    (PAIR_TABLE, 'amount_sum'), (PAIR_TABLE, 'flag_intra_group'), (SUPPORT_TABLE, 'n_reports'),
+    (SUPPORT_TABLE, 'amount_sum'), (TARGET_TABLE, 'value'), (TARGET_TABLE, 'universe'),
+])
+def test_unread_columns_are_not_required(script, golden, name, column):
+    pin = forge_table(golden, name, lambda table: table.drop(column))
+    assert isinstance(run_checks(script, golden, pin=pin), script.Checked)
+
+
+@pytest.mark.parametrize('name, change', [
+    (PAIR_TABLE, retyped('n_fy2025', pl.col('n_fy2025').cast(pl.Int64))),
+    (SUPPORT_TABLE, lambda table: table.drop('l_fy2026')),
+    (TARGET_TABLE, lambda table: table.drop('flags')),
+], ids=['pairs', 'support', 'targets'])
+def test_columns_of_every_table_are_checked_before_the_pair_keys(script, golden, name, change):
+    forge_table(golden, PAIR_TABLE, twice(is_pair('P2', 'X')))
+    pin = forge_table(golden, name, change)
+    assert_refused(script, golden, f'{name}.parquet columns differ from the contract', pin=pin)
+
+
+@pytest.mark.parametrize('forge, reason', [
+    (on(PAIR_TABLE, twice(is_pair('P2', 'X'))), 'pair keys are not unique'),
+    (on(PAIR_TABLE, added(is_pair('P1', 'U1'), n_reports=pl.col('n_reports') + 1,
+                          n_fy2024=pl.col('n_fy2024') + 1)), 'pair keys are not unique'),
+    (on(PAIR_TABLE, replaced('prime_node_id', None, is_pair('P1', 'U1'))),
+     'an eligible pair lacks a node'),
+    (on(PAIR_TABLE, bump('n_fy2025', is_pair('P1', 'U1'))),
+     'pair report counts differ from their fiscal years'),
+    (on(PAIR_TABLE, replaced('n_reports', None, is_pair('P1', 'U1'))),
+     'pair report counts differ from their fiscal years'),
+    (on(PAIR_TABLE, replaced('n_fy2026', None, is_pair('P1', 'U2'))),
+     'pair report counts differ from their fiscal years'),
+    (on(SUPPORT_TABLE, bump('b_buyers', is_cell(SD))),
+     'pooled recount differs from the support table'),
+    (on(SUPPORT_TABLE, bump('l_pairs', is_cell(SD))),
+     'pooled recount differs from the support table'),
+    (on(SUPPORT_TABLE, added(is_cell(SD), unit_b=pl.lit(node(E)))),
+     'pooled recount differs from the support table'),
+    (on(SUPPORT_TABLE, bump('l_fy2024', is_cell(SD))),
+     'fiscal-year recount differs from the support table'),
+    (on(SUPPORT_TABLE, bump('l_fy2026', is_cell(SD))),
+     'fiscal-year recount differs from the support table'),
+    (on(SUPPORT_TABLE, bump('l_fy2025', is_cell(ED))),
+     'fiscal-year recount differs from the support table'),
+    (on(SUPPORT_TABLE, bump('l_fy2024', is_cell(SD), by=-1)),
+     'fiscal-year recount differs from the support table'),
+    (on(TARGET_TABLE, bump('n_unweighted', is_cell(SD, BUYER))), REFUSED_ROWS),
+    (on(TARGET_TABLE, dropped(is_cell(SD, SUPPLIER))), REFUSED_ROWS),
+    (on(TARGET_TABLE, twice(is_cell(SD, SUPPLIER))), REFUSED_ROWS),
+    (on(TARGET_TABLE, added(is_cell(SD, SUPPLIER), measure=pl.lit('other_share'))),
+     REFUSED_ROWS),
+    (on(TARGET_TABLE, added(is_cell(SD, SUPPLIER), measure=pl.lit(None, dtype=pl.String))),
+     REFUSED_ROWS),
+    (on(TARGET_TABLE, swapped_supplier_counts), REFUSED_ROWS),
+    (on(TARGET_TABLE, replaced('unit_b', node(E), is_cell(SD, SUPPLIER))), REFUSED_ROWS),
+    (on('report', lambda report: [report]), 'report is malformed'),
+    (on('report', at(DIST, change=lambda entries: list(entries.values()))),
+     'report is malformed'),
+    (on('report', at(DIST, SUPPLIER)), 'report is malformed'),
+    (on('report', at(DIST, 'other_share', change=lambda _: {})), 'report is malformed'),
+    (on('report', at(DIST, SUPPLIER, change=lambda _: None)), 'report is malformed'),
+    (on('report', at(DIST, BUYER, change=lambda entry: list(entry.items()))),
+     'report is malformed'),
+    (on('report', at(DIST, SUPPLIER, 'median', change=lambda value: value + 0.5)),
+     'report distribution differs from the targets'),
+    (on('report', at(DIST, SUPPLIER, 'count', change=lambda value: value + 1)),
+     'report distribution differs from the targets'),
+    (on('report', at(DIST, BUYER, 'p90')), 'report distribution differs from the targets'),
+    (on('report', at(DIST, BUYER, 'mean', change=lambda _: 1)),
+     'report distribution differs from the targets'),
+], ids=['duplicated-ineligible-pair', 'duplicated-key-other-counts', 'null-prime-node',
+        'fiscal-year-count', 'null-report-count', 'null-fiscal-year-count', 'support-buyers',
+        'support-pairs', 'extra-support-cell', 'support-fy2024', 'support-fy2026',
+        'support-fy2025-other-cell', 'support-fy2024-lower', 'buyer-count',
+        'dropped-supplier-row', 'duplicated-supplier-row', 'extra-other-measure-row',
+        'extra-null-measure-row', 'swapped-supplier-counts', 'changed-target-cell',
+        'report-not-an-object', 'distribution-not-an-object', 'no-supplier-entry',
+        'extra-measure-entry', 'supplier-entry-null', 'buyer-entry-a-list', 'supplier-median',
+        'supplier-count-entry', 'buyer-entry-lacks-a-key', 'buyer-entry-extra-key'])
+def test_more_self_check_refusals(script, golden, forge, reason):
+    assert_refused(script, golden, reason, pin=forge(golden))
+
+
+def test_report_that_is_not_json_refused(script, golden):
+    (golden['directory'] / 'report.json').write_text('not json', encoding='utf-8')
+    assert_refused(script, golden, 'report is malformed', pin=rehash(golden['directory']))
+
+
+@pytest.mark.parametrize('forge', [
+    on(PAIR_TABLE, lambda table: table.reverse()),
+    on(SUPPORT_TABLE, lambda table: table.reverse()),
+    on(TARGET_TABLE, lambda table: table.reverse()),
+    on(PAIR_TABLE, bump('n_reports', is_pair('P2', 'X'))),
+    on(PAIR_TABLE, bump('n_reports', is_pair('P2', 'U1'))),
+    on('report', lambda report: {DIST: report[DIST]}),
+], ids=['reversed-pairs', 'reversed-support', 'reversed-targets',
+        'sub-ineligible-report-count', 'intra-group-report-count', 'report-distribution-only'])
+def test_valid_variants_pass(script, golden, forge):
+    assert isinstance(run_checks(script, golden, pin=forge(golden)), script.Checked)
+
+
+@pytest.mark.parametrize('status, extra', [
+    ('prime_ineligible', link('X', 'U1')), ('self_link', link('X', 'X')),
+    ('intra_group', link('P3', 'X', intra=True)), ('sub_ineligible', link('P3', 'X')),
+], ids=['prime-ineligible', 'self-link', 'intra-group', 'sub-ineligible'])
+def test_every_ineligible_status_may_lack_a_node(script, tmp_path, status, extra):
+    bundle = publish(tmp_path, [*golden_links(), extra])
+    pairs = pl.read_parquet(bundle['directory'] / 'vendor_link_pairs.parquet')
+    row = pairs.filter(is_pair(extra['prime'], extra['sub']))
+    assert row['pair_status'].to_list() == [status]
+    assert row.select(pl.col('prime_node_id').is_null() | pl.col('sub_node_id').is_null()).item()
+    assert isinstance(run_checks(script, bundle), script.Checked)
+
+
+def test_cell_with_more_pairs_than_subcontractors_passes(script, tmp_path):
+    '''One subcontractor with two primes: S is 1 while B and L are 2, pooled and in FY2024.'''
+    bundle = publish(tmp_path, [link('P1', 'U1', fy=(1, 0, 0)), link('P2', 'U1', fy=(1, 0, 0))])
+    assert isinstance(run_checks(script, bundle), script.Checked)
+
+
+def test_failing_bundle_shape(script, tmp_path):
+    checked = run_checks(script, publish(tmp_path, failing_links()))
+    assert_cells(script.cells(checked.eligible, 2024), [(SD, 1, True, False)])
+    assert_cells(script.cells(checked.eligible, 2025),
+                 [(ED, 1, True, True), (SE, 1, True, True)])
+
+
+@pytest.mark.parametrize('column, cell', [
+    ('l_fy2025', SD), ('l_fy2026', SD), ('l_fy2024', ED), ('l_fy2024', SE),
+], ids=['middle-year', 'last-year', 'first-year', 'first-year-last-cell'])
+def test_support_count_for_a_year_without_a_pair_refused(script, tmp_path, column, cell):
+    '''In the failing bundle, SD has a pair only in FY2024, and ED and SE none in FY2024.'''
+    bundle = publish(tmp_path, failing_links())
+    pin = forge_table(bundle, SUPPORT_TABLE, bump(column, is_cell(cell)))
+    assert_refused(script, bundle, 'fiscal-year recount differs from the support table', pin=pin)
+
+
+def test_golden_bundle_shape(script, golden):
+    pairs = pl.read_parquet(golden['directory'] / 'vendor_link_pairs.parquet')
+    assert pairs.filter(is_pair('P2', 'X')).select('pair_status', 'sub_node_id').rows() == [
+        ('sub_ineligible', None)]
+    checked = run_checks(script, golden)
+    for base in (2024, 2025):
+        assert_cells(script.cells(checked.eligible, base),
+                     [(ED, 1, True, True), (SD, 2, True, True)],
+                     [(ED, 1, True, True), (SD, 1, True, True)])
+    flagged = checked.targets.filter(pl.col('flags').list.contains(INTRA_LABEL))
+    assert flagged.select('measure', 'unit_a', 'unit_b').rows() == [(BUYER, *SD)]
+
+
+def test_checked_holds_the_checked_frames(script, golden):
+    inputs = script.authenticate(golden['data_dir'], golden['run'], golden['pin'])
+    assert inputs.directory == golden['directory']
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        inputs.outputs_sha256 = '0' * 64
+    checked = script.self_check(inputs)
+    table = pair_frame(FIRMS, *golden_links())
+    expected = script.eligible_pairs(table.lazy())
+    assert isinstance(checked.eligible, pl.LazyFrame)
+    assert_frame_equal(checked.eligible.collect(), expected.collect())
+    assert_frame_equal(checked.years, script.year_counts(expected))
+    targets = estimate(table, snapshot=date(2026, 11, 19), month='2026-10').targets
+    assert_frame_equal(checked.targets, targets.select(READ_COLUMNS[TARGET_TABLE]))
+    report = json.loads((golden['directory'] / 'report.json').read_text(encoding='utf-8'))
+    assert checked.distributions == report[DIST]
+    assert list(checked.distributions) == list(script.MEASURES)
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        checked.targets = None
+
+
+@pytest.mark.parametrize('forge, reason', [
+    (on(PAIR_TABLE, then(twice(is_pair('P1', 'U1')),
+                         replaced('sub_node_id', None, is_pair('P1', 'U1')))),
+     'pair keys are not unique'),
+    (on(PAIR_TABLE, then(replaced('sub_node_id', None, is_pair('P1', 'U1')),
+                         bump('n_reports', is_pair('P1', 'U1')))),
+     'an eligible pair lacks a node'),
+    (forges(on(PAIR_TABLE, bump('n_reports', is_pair('P1', 'U1'))),
+            on(SUPPORT_TABLE, dropped(is_cell(SD)))),
+     'pair report counts differ from their fiscal years'),
+    (on(SUPPORT_TABLE, then(bump('s_suppliers', is_cell(SD)), bump('l_fy2025', is_cell(SD)))),
+     'pooled recount differs from the support table'),
+    (forges(on(SUPPORT_TABLE, bump('l_fy2025', is_cell(SD))),
+            on(TARGET_TABLE, bump('n_unweighted', is_cell(SD, SUPPLIER)))),
+     'fiscal-year recount differs from the support table'),
+    (forges(on(TARGET_TABLE, bump('n_unweighted', is_cell(SD, SUPPLIER))),
+            on('report', at(DIST))), REFUSED_ROWS),
+    (on('report', then(at(DIST, BUYER), at(DIST, SUPPLIER, 'max', change=lambda v: v + 1))),
+     'report is malformed'),
+], ids=['5-before-6', '6-before-7', '7-before-8', '8-before-9', '9-before-10', '10-before-11',
+        '11-before-12'])
+def test_earlier_check_refuses_first(script, golden, forge, reason):
+    assert_refused(script, golden, reason, pin=forge(golden))
