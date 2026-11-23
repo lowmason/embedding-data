@@ -1,5 +1,7 @@
 # TRI Parent Links Hardening Implementation Plan
 
+**Status: COMPLETE (2026-11-22)** — executed via executing-plans; deferred items in specs/deferred_items.md
+
 > **For agentic workers:** REQUIRED SUB-SKILL: implement this plan task-by-task via subagent-driven-development (the default) — or executing-plans when your human partner chose inline execution at the handoff. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Give Stage 5's TRI parent-link bundle an exact replay check, a long-form acceptance
@@ -168,7 +170,7 @@ in the roadmap's Choices made, bullet "Resume after Stages 5 and 17". The run-pi
 
 **Files:** none in the repository. Evidence goes to `E`.
 
-- [ ] **Step 1: Create the worktree and the venv**
+- [x] **Step 1: Create the worktree and the venv**
 
 ```bash
 git -C /Users/lowell/Projects/embedding-data fetch origin
@@ -181,13 +183,13 @@ From `W`, with `UV_PROJECT_ENVIRONMENT` unset, run once:
 `uv sync --locked --python /Users/lowell/.local/share/uv/python/cpython-3.14.0-macos-aarch64-none/bin/python3.14`.
 Expected: `W/.venv` exists, and `git status --porcelain` in `W` prints nothing.
 
-- [ ] **Step 2: Software files unchanged since `786ebcc`**
+- [x] **Step 2: Software files unchanged since `786ebcc`**
 
 From `W`, list the 24 entries of `SOFTWARE_FILES` from `src/embedding_data/tri_bundle.py`
 and run `git diff --quiet 786ebcc HEAD -- <those files>`.
 Expected: exit 0. Any other exit: stop and ask the owner (Review Focus 1).
 
-- [ ] **Step 3: Snapshot (read-only)**
+- [x] **Step 3: Snapshot (read-only)**
 
 Copy `ROOT/raw/manifest.jsonl` to `E/manifest-baseline.jsonl`. Write to `E/snapshot.json`:
 - the SHA-256, byte size and line count of that copy
@@ -202,7 +204,7 @@ Each `R/<RY>/2025-11-05/` holds exactly `<RY>_us.csv`, with the SHA-256 in Globa
 Constraints, "Raw files". Any difference: stop and ask. A file under another snapshot date
 does not change the selection: show it to the owner and continue.
 
-- [ ] **Step 4: Live identity equals `r1`'s record**
+- [x] **Step 4: Live identity equals `r1`'s record**
 
 From `W`, run `uv run --offline --locked python` with a script that prints one JSON line to
 `E/identity-1.json`:
@@ -225,12 +227,16 @@ Expected: `project_root` is `W`, `python_full` is
 The Exit needs this, because `compare-runs` does not check software identity. A failure
 here blocks the replay.
 
-- [ ] **Step 1: Host rule**
+- [x] **Step 1: Host rule**
 
 Run both `pgrep` checks (Global Constraints, "Host rule") and show the owner the first one's
 full output.
 
-- [ ] **Step 2: Verify**
+> Deviation: the first list showed another session's pre-commit hook (pytest, 7 pytest-xdist
+> workers on temporary data directories). It reached the owner late, at the Task 3 gate, after
+> the `verify` had run. It was not an acquisition or a build, and `verify` writes nothing.
+
+- [x] **Step 2: Verify**
 
 From `W`, in the background, and write the exit code to `E/verify-r1.rc`:
 
@@ -250,12 +256,12 @@ set size from the `.err` file. Stage 5 recorded no `verify` cost, so this is the
 
 **Files:** none. Evidence goes to `E`. The bundle goes to `P/stage5_tri_parent_links_20261121_r1_replay/`.
 
-- [ ] **Step 1: Clean state and identity again**
+- [x] **Step 1: Clean state and identity again**
 
 In `W`, `git status --porcelain --untracked-files=normal` prints nothing. Repeat Task 1
 Steps 2 and 4, writing `E/identity-2.json`. Expected: as in Task 1.
 
-- [ ] **Step 2: Go-ahead**
+- [x] **Step 2: Go-ahead**
 
 Run both `pgrep` checks, show the owner the first one's full output and save it as
 `E/pgrep-build.txt`. Confirm that neither `P/stage5_tri_parent_links_20261121_r1_replay` nor
@@ -263,7 +269,7 @@ its `.part` exists. Ask the owner for the go-ahead, and for the confirmation tha
 stage's acquisition or build is running and that no Stage 9 freeze window is open. Wait for
 all three.
 
-- [ ] **Step 3: Build**
+- [x] **Step 3: Build**
 
 From `W`, in the background, and write the exit code to `E/build-replay.rc`:
 
@@ -279,13 +285,17 @@ Expected: exit 0 and one JSON line with `run_id`, `directory`
 time and maximum RSS, then `du -sk` of the replay directory and of `r1`, and the file count
 and byte total of each. A failure: stop, leave the `.part` in place, and ask the owner.
 
+> Deviation: the hook of Task 2 was still on the host at the gate. The owner chose "Go now
+> (loaded)" and confirmed the host check, so the build started without waiting. The finding
+> says which wall times the saved `pgrep` lists show as overlapped.
+
 ---
 
 ### Task 4: Verify, compare and preservation (read-only)
 
 **Files:** none. Evidence goes to `E`.
 
-- [ ] **Step 1: Verify the replay**
+- [x] **Step 1: Verify the replay**
 
 Run both `pgrep` checks and show the owner the first one's output. Repeat Task 1 Steps 2
 and 4 (`E/identity-3.json`). Then, from `W`, in the background (`E/verify-replay.rc`):
@@ -297,7 +307,7 @@ and 4 (`E/identity-3.json`). Then, from `W`, in the background (`E/verify-replay
 Expected: exit 0, `outputs_sha256` is `REPLAY_PIN`, and `processed_as_of` and `rows` equal
 Task 2's. Record wall time and maximum RSS.
 
-- [ ] **Step 2: Compare**
+- [x] **Step 2: Compare**
 
 Run both `pgrep` checks. Then, from `W`, in the background (`E/compare.rc`):
 
@@ -310,7 +320,11 @@ Expected: exit 0 and one JSON line with `"equal": true`, `"report_equal": true`,
 `schema_equal` and `values_equal` true with equal `first_rows` and `second_rows`. Exit 1 or
 any unequal table: stop and ask.
 
-- [ ] **Step 3: Compare the two `inputs.json` files**
+> Deviation: before `compare-runs` and before `audit`, the first `pgrep` list showed a Stage 19
+> session's pytest run of one test file. It was not an acquisition or a build, so neither
+> command waited.
+
+- [x] **Step 3: Compare the two `inputs.json` files**
 
 This covers what `compare-runs` skips. In `uv run --offline --locked python`, load both
 `inputs.json` files and write one JSON line to `E/inputs-compare.json`. It must hold:
@@ -325,7 +339,7 @@ This covers what `compare-runs` skips. In `uv run --offline --locked python`, lo
 Also record the SHA-256 of `inputs.json` and `report.json` of both runs. The two
 `report.json` hashes are equal. Any other result: stop and ask.
 
-- [ ] **Step 4: Preservation**
+- [x] **Step 4: Preservation**
 
 1. `ROOT/raw/manifest.jsonl` has the Task 1 SHA-256 and line count. If other stages appended
    lines in the meantime, its first bytes equal `E/manifest-baseline.jsonl` byte for byte.
@@ -355,7 +369,7 @@ Now merge `origin/main` into the branch (Task 4 has ended). Place each edit by i
 anchor text, not by line number, because Stage 19 edits both files in parallel. Fill
 `REPLAY_PIN`, `REPLAY_COMMIT` and the measured values from `E`.
 
-- [ ] **Step 1: Write the finding**
+- [x] **Step 1: Write the finding**
 
 Model it on `specs/findings/stage-14-usaspending-vendor-links.md`. Cite
 `specs/naics-evaluation-data-stage-5-findings.md` for the counts. Do not restate them.
@@ -403,7 +417,11 @@ Sections:
 8. **Where the evidence lives.** The bundles under `P`, the files in `E`, the Stage 5
    findings, plan 13 and this plan.
 
-- [ ] **Step 2: README pins**
+> Deviation: `origin/main` (`fd43236`, PR 49, one docs file) went in by fast-forward after Task 4
+> ended, and no software file changed. Correction 1 cites spec lines 474–479, not 472–480: the
+> owner-marked text is those six lines, and the Stage 5 findings still cite 470–474.
+
+- [x] **Step 2: README pins**
 
 In `README.md`, replace:
 
@@ -427,7 +445,7 @@ pass `verify`, and `compare-runs` finds them equal. The first run's counts are i
 commands, the cost and what is not claimed.
 ```
 
-- [ ] **Step 3: CLAUDE.md pins**
+- [x] **Step 3: CLAUDE.md pins**
 
 Append this paragraph to the end of `CLAUDE.md`, after one blank line. At planning the file
 ends with the USAspending section. Stage 21 may reword that section's last sentence, so do
@@ -459,7 +477,7 @@ model selection (R8.4). Every target keeps `size_gate_pending`, and no headline 
 (O13) exists yet.
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 Run the Stage 9 `pgrep` check. Then:
 
@@ -470,6 +488,10 @@ git commit -m "docs: record the Stage 18 replay of the TRI parent links"
 
 Expected: the coverage hooks print `Skipped`.
 
+> Deviation: the final review found that the finding's load claims went past the saved `pgrep`
+> lists, which show an overlap for the Task 2 `verify` only. Commit `f34a1af` reworded them and
+> changed no value.
+
 ---
 
 ### Task 6: Completion and integration
@@ -479,7 +501,7 @@ Expected: the coverage hooks print `Skipped`.
   `specs/history.md`
 - Move: this plan to `specs/plans/completed/`
 
-- [ ] **Step 1: Plan Completion Protocol**
+- [x] **Step 1: Plan Completion Protocol**
 
 Run the writing-plans Plan Completion Protocol, including step 3a. The new section
 `18-tri-parent-links` of `specs/deferred_items.md` gets two items: the reconciler docstring
@@ -497,10 +519,35 @@ Run the writing-plans Plan Completion Protocol, including step 3a. The new secti
 
 Leave the spec where it is: it is already in `specs/completed/`.
 
-- [ ] **Step 2: Integrate**
+- [x] **Step 2: Integrate**
 
 Run the Stage 9 `pgrep` check. Push the branch and open the PR under the owner's
 PR-lifecycle rule. No commit lands on the branch before the build, so `REPLAY_COMMIT` is
 the `origin/main` commit that Task 1 cut `W` from, and it stays reachable from `main`.
 Merge with a merge commit (`gh pr merge --merge`), as the repository's history does. Then
 run the post-merge cleanup for `W`.
+
+## Handoff to later stages
+
+- **O13 (TRI headline minimum count).** It reads `n_unweighted_distribution` in `report.json`
+  of `stage5_tri_parent_links_20261121_r1` (pin
+  `65159b8374d36beec136ae6a7779a5763bf8ced9360e2a365b67b138e10b7f8b`), as plan 13's Handoff
+  says. The replay `stage5_tri_parent_links_20261121_r1_replay` (pin
+  `555f6b58099da43c054d828d27048f31a9e992ee32719c7e1462c59b30919cfc`) has the same
+  `report.json` bytes (SHA-256 `dc002222…` for both, Task 4 Step 3). Every target keeps
+  `size_gate_pending`.
+- **O17 (TRI protocol section).** The selected runs and pins are above. The finding is
+  `specs/findings/stage-5-tri-parent-links.md`. `compare-runs` skips `inputs.json`, so its
+  equality says nothing about software or raw citations. The finding's Results ("The two
+  `inputs.json` files") shows that only `run_id` and `execution.commit`/`created_at` differ.
+  The partial-owner reading is settled: an excluded facility-year belongs to each standardized
+  parent name that it lists, else to `facility:<TRIFD>` (spec lines 474–479, owner, plan 13,
+  2026-11-21). How many `naics_*` facility-years name more than one parent is still not
+  measured. The independent reconciler ran on the first run only.
+- **Traps.** A change to any of the 24 files in `tri_bundle.SOFTWARE_FILES`, the Python build
+  or the installed distributions makes `verify` refuse both runs. Only uv's CPython 3.14.0
+  reproduces the record. `verify` still costs about 1.5 GB (4.64 s and 3.14 s), so it counts as
+  a full-data command under the Host rule. `compare-runs` costs 0.62 s and 352 MB. The saved
+  `pgrep` lists show an overlap with another session's test run for the Task 2 `verify` only.
+- **Still deferred.** The reconciler docstring and the stale TRI row of
+  `specs/deliverable-map.md` (`specs/deferred_items.md`, section `18-tri-parent-links`).

@@ -232,7 +232,7 @@ on 2026-11-22, and Stages 20 and 21 from Track C's later that day (see Choices m
 > Stage 17: COMPLETE (2026-11-19) — implemented by plan 14 (specs/plans/completed/14-acs-wage-microdata.md). Its Handoff section names what O23 and O24 consume.
 > Next: resume the roadmap.
 
-- [ ] Stage 18: TRI parent links, hardening
+- [x] Stage 18: TRI parent links, hardening
       Objective: Stage 5's TRI bundle gets its exact replay check, a long-form acceptance finding and README and CLAUDE.md run pins.
       Outcomes: O12
       Track: B
@@ -241,6 +241,8 @@ on 2026-11-22, and Stages 20 and 21 from Track C's later that day (see Choices m
       Exit: O12: `verify` of Stage 5's run with its detached pin passes from Stage 18's checkout and venv. The replay bundle's `verify` with its own detached pin passes, and `compare-runs` against Stage 5's run reports equal. The acceptance finding is committed and records the replay run ID, its pin, and the wall time, maximum RSS and bundle size of the replay. README and CLAUDE.md name the selected TRI runs and their pins
       Leaves out: the TRI headline minimum count → O13. The TRI protocol section → O17. The R8.4 training-role amendment → a separate owner decision after naics-embedder's spec (reset prompt, Leave alone)
       ROUTING: writing-plans
+> Stage 18: COMPLETE (2026-11-22) — implemented by plan 18 (specs/plans/completed/18-tri-parent-links.md). Its Handoff section names what O13 and O17 consume.
+> Next: resume the roadmap.
 
 - [ ] Stage 19: Minimum headline earners for the ACS wage microdata
       Objective: A minimum number of headline earners for each category is set from Stage 17's built counts.
