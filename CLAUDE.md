@@ -449,7 +449,13 @@ The selected run is `stage14_vendor_links_20261122_r2`, with detached pin
 `248943dc5603f8e035b0f1c49bf624a36ed702b70eb6b961a35b64ee97c7a2be`, snapshot `2026-11-19` and
 extract month `2026-10`, built at commit `1eddb3e` (`dirty: false`). `verify` exits 0, and the
 independent `scripts/reconcile_usaspending_vendor_links.py` (standard library and Polars, no
-`embedding_data` import) is equal on all 87 checks. The first run, `r1`, is superseded: the
+`embedding_data` import) is equal on all 87 checks.
+The replay `stage14_vendor_links_20261122_r2_replay`, with detached pin `d08ed4cb396fae172ebde8be65fe6dfc492cb4c2731ad4308cfcf7cd55fd6055`, was
+built at commit `3d0c63d` (`dirty: false`) with the same arguments. Both runs pass
+`verify`, `compare-runs` finds them equal, and their `inputs.json` files differ only in the
+run ID and the execution commit and time. The
+[Stage 14 finding](specs/findings/stage-14-usaspending-vendor-links.md) records the commands,
+the cost and the limits. The first run, `r1`, is superseded: the
 wrapped-ZIP check in `sam_raw.py` changed a hashed file, so `verify` refuses `r1`. Its
 `report.json` equals that of `r2`. The registration status and EVS source tallies of the
 preflight script close to a domain (`A`, `E`, `A~E`; `D&B`, `E&Y`). The
@@ -457,4 +463,29 @@ preflight script close to a domain (`A`, `E`, `A~E`; `D&B`, `E&Y`). The
 counts, cost and limits. `vendor_link_pairs.parquet` holds UEI pairs and stays on this
 machine. No output may feed embedder training, curriculum, hard-negative mining or model
 selection (R8.4). Every target keeps `size_gate_pending`, and no headline minimum count
-(O18) exists yet.
+(O26) exists yet.
+
+**TRI parent links (roadmap Stage 5).** `python -m embedding_data.tri_parent_links` exposes
+`acquire`, `import-file`, `build`, `verify` and `compare-runs`, separate from the frozen
+top-level CLI. Always pass an explicit `--data-dir`. Only `acquire` uses the network, and it
+refuses every EPA file because EPA's endpoint sends no `Content-Length`: the owner downloads
+in a browser and `import-file` records the exact bytes. The other four load no `.env`, read
+no credential and construct no HTTP client. Failure prints only `TRI parent links <command>
+failed: <reason>; run <run_id>; path <path>` and exits 2. An unequal `compare-runs` exits 1.
+A bundle lives in `derived/epa_tri/parent-links/<RUN_ID>/` (five Parquets, `inputs.json`,
+`report.json` and the detached `outputs.json`). Build scratch in `<RUN_ID>.part/.scratch/`
+holds transcoded raw copies with D&B numbers, and the outputs publish none. The selected runs
+are `stage5_tri_parent_links_20261121_r1` and `stage5_tri_parent_links_20261121_r1_replay`,
+with detached pins `65159b8374d36beec136ae6a7779a5763bf8ced9360e2a365b67b138e10b7f8b` and
+`555f6b58099da43c054d828d27048f31a9e992ee32719c7e1462c59b30919cfc`, built from snapshot
+`2025-11-05` and codes run `stage4_v11_20261013_r2` (pin
+`15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a`) at commits `786ebcc` and
+`0f517d7` (both `dirty: false`). Both pass `verify`, and `compare-runs` finds them
+equal. A change to any file in `tri_bundle.SOFTWARE_FILES` (24 files, including
+`pyproject.toml`, `uv.lock` and the shared Stage 4 to 6 modules), the Python build or the
+installed distributions makes `verify` refuse both runs. Each production write needs the
+owner's go-ahead under README's host rule. The
+[Stage 5 finding](specs/findings/stage-5-tri-parent-links.md) records the commands, the cost
+and the limits. No output may feed embedder training, curriculum, hard-negative mining or
+model selection (R8.4). Every target keeps `size_gate_pending`, and no headline minimum count
+(O13) exists yet.

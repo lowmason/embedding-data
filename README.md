@@ -595,10 +595,15 @@ co-ownership measure close relations, so neither should judge an embedding that 
 other trained.
 
 The tests and the fixture chain show software readiness only. Fixture results are never
-benchmarks. This README holds no run ID or pin yet. The owner-gated full-data run records
-its results in `specs/naics-evaluation-data-stage-5-findings.md`. The selected run IDs
-and detached pins wait for O12, the later TRI hardening step. O12 also runs the replay
-build and a full-data `compare-runs`.
+benchmarks. The measured production runs are `stage5_tri_parent_links_20261121_r1` (the
+first run) and `stage5_tri_parent_links_20261121_r1_replay`. Their detached pins, which
+`verify` needs as `--outputs-sha256`, are
+`65159b8374d36beec136ae6a7779a5763bf8ced9360e2a365b67b138e10b7f8b` and
+`555f6b58099da43c054d828d27048f31a9e992ee32719c7e1462c59b30919cfc`. Both
+pass `verify`, and `compare-runs` finds them equal. The first run's counts are in
+`specs/naics-evaluation-data-stage-5-findings.md`. The
+[Stage 5 finding](specs/findings/stage-5-tri-parent-links.md) records the replay, the exact
+commands, the cost and what is not claimed.
 
 ## ACS wage microdata (Stage 17)
 
@@ -822,8 +827,14 @@ Under R8.4, no table from this stage feeds embedder training, curriculum, hard-n
 mining or model selection. The tables only judge. `vendor_link_pairs.parquet` holds UEIs and
 amounts. Whether any table leaves the machine follows the E6 terms check of the stage spec.
 The tests and the fixture chain show software readiness only. Fixture results are never
-benchmarks. This section names no run pin. The selected run pins wait for a hardening stage,
-if the owner promotes one.
+benchmarks. The measured production runs are `stage14_vendor_links_20261122_r2` (the first
+run) and `stage14_vendor_links_20261122_r2_replay`. Their detached pins, which `verify` needs
+as `--outputs-sha256`, are
+`248943dc5603f8e035b0f1c49bf624a36ed702b70eb6b961a35b64ee97c7a2be` and `d08ed4cb396fae172ebde8be65fe6dfc492cb4c2731ad4308cfcf7cd55fd6055`. Both
+pass `verify`, and `compare-runs` finds them equal. The
+[Stage 14 finding](specs/findings/stage-14-usaspending-vendor-links.md) records the exact
+commands, the cost and what is not claimed. The superseded `stage14_vendor_links_20261121_r1`
+stays on disk and is not cited.
 
 ## Data sources
 

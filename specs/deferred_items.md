@@ -248,6 +248,36 @@
       Done when: the docstring names the retired path, in the same commit as the
       next change to the script.
 
+## 16-usaspending-vendor-links — 2026-11-22
+- [x] Stale outcome number in CLAUDE.md (final review, declined to judge, outside
+      the plan's Step 3 insert): the last sentence of the "USAspending vendor links
+      (roadmap Stage 14)" section (`CLAUDE.md`, line 465) says "no headline minimum
+      count (O18) exists yet". The roadmap's resume after Stage 14 (2026-11-22) made
+      the USAspending headline minimum count O26, and O18 is the protocol section
+      (`specs/naics-evaluation-data-roadmap.md`, outcome rows O18 and O26). The
+      frozen Stage 14 findings (line 584) use the old label and stay unedited.
+      Size: quick-fix. Done when: that CLAUDE.md sentence names O26 for the minimum
+      count, in the commit that records O26's decision or in an earlier docs commit.
+
+## 18-tri-parent-links — 2026-11-22
+- [ ] Stale spec path in the TRI reconciler: the docstring of
+      `scripts/reconcile_tri_parent_links.py` (line 3) names `specs/tri-parent-links.md`,
+      which moved to `specs/completed/tri-parent-links.md` when plan 13 retired. Carried
+      because plan 18 left the script unedited (Settled Default 3), and an edit would leave
+      the script in the tree differing from the one that reconciled the first run. The
+      script is not in `tri_bundle.SOFTWARE_FILES`, so `verify` does not hash it. See
+      `specs/findings/stage-5-tri-parent-links.md`, "Corrections to earlier text".
+      Size: quick-fix. Done when: the docstring names the retired path, in the same commit
+      as the next change to the script.
+- [x] Stale TRI row in the deliverable map: the row "EPA TRI parent links" of
+      `specs/deliverable-map.md` (line 13 at plan 18) still says "Not built. Roadmap Stage 5,
+      ready". Stage 5 completed on 2026-11-21, and plan 18 recorded its replay (run
+      `stage5_tri_parent_links_20261121_r1_replay`, `specs/findings/stage-5-tri-parent-links.md`).
+      Plan 18 did not edit the file, because plan 17 edits another line of it (Settled
+      Default 7). Size: quick-fix. Done when: the row says that Stage 5 is built and replayed
+      and names the two runs, in the commit that next edits `specs/deliverable-map.md`.
+      Done in PR 52 (`11fcf80`, 2026-11-22), which names both runs in the row.
+
 ## 17-acs-wage-minimum-earners — 2026-11-23
 - [ ] Stale spec path in the wage-minimum script: the docstring of
       `scripts/measure_acs_wage_minimum_earners.py` (line 8) names
