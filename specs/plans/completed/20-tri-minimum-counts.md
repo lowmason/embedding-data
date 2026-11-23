@@ -1,5 +1,7 @@
 # TRI Headline Minimum Count Implementation Plan
 
+**Status: COMPLETE (2026-11-23)** — executed via subagent-driven-development; deferred items in specs/deferred_items.md, or specs/completed/deferred_items.md once archived
+
 > **For agentic workers:** REQUIRED SUB-SKILL: implement this plan task-by-task via subagent-driven-development (the default) — or executing-plans when your human partner chose inline execution at the handoff. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Measure reporting-year recurrence of the Stage 5 TRI parent-link cells, set one
@@ -19,7 +21,7 @@ record transcribes the output.
 
 **Tech Stack:** Python 3.14, Polars, argparse, pytest, uv. No new dependency.
 
-**Spec:** `specs/tri-minimum-counts.md` (owner-approved 2026-11-22, merged in
+**Spec:** `specs/completed/tri-minimum-counts.md` (owner-approved 2026-11-22, merged in
 lowmason/embedding-data#54, `89949ef`).
 
 > Roadmap: specs/naics-evaluation-data-roadmap.md, Stage 22 — on plan
@@ -223,7 +225,7 @@ with `close_band(pending, None)`. It never averages two rates. `curve` runs `ban
 minimum None and `'too_few_testable_cells'`, and `pair_minimum` is not called. Otherwise
 `minimum` is `pair_minimum` of the merged bands, and None gives `'top_band_misses_level'`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add `load_script()` (copy `tests/test_measure_ita_minimum_counts.py:24-29`, script path
 `scripts/measure_tri_minimum_counts.py`, assertion message `'measurement script is missing'`),
@@ -275,12 +277,12 @@ def test_rule_constants_are_the_committed_values(script):
 - `test_family_minimum_is_largest_and_needs_both_pairs`: `[1, 3]` gives 3, `[2, None]` and
   `[]` give None.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_measure_tri_minimum_counts.py -v`
 Expected: FAIL with "measurement script is missing".
 
-- [ ] **Step 3: Implement the constants, the copied band functions, `merge_thin_top` and `curve`**
+- [x] **Step 3: Implement the constants, the copied band functions, `merge_thin_top` and `curve`**
 
 The module docstring states the rule in three sentences and cites
 `specs/tri-minimum-counts.md`. It says that the band functions are copied from the Stage 3
@@ -288,17 +290,22 @@ script so that the Stage 22 constants govern, and that the downward merge and th
 run after `bands`. The docstring of the copied `bands` keeps its Stage 3 meaning: the top band
 keeps its cells there, and `merge_thin_top` merges it later.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_measure_tri_minimum_counts.py -v`
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/measure_tri_minimum_counts.py tests/test_measure_tri_minimum_counts.py
 git commit -m "feat(scripts): add the Stage 22 band rule"
 ```
+
+> Deviation: the task review found one gap in the mutant step. No test and no mutant covered
+> untestable cells in the downward-merge threshold. A fix round added that test and its mutant
+> in a further commit `92cec82`
+> (`test(scripts): cover untestable cells in the Stage 22 band thresholds`).
 
 ### Task 2: Per-year counts, staying facility-years and testable cells
 
@@ -347,7 +354,7 @@ of that owner and node stays, before the self-join on `owner`. A cell is testabl
 owner has `staying` true at both of its nodes. `base_count` is `j_t` and `recurs` is
 `j_{t+1} ≥ 1`, both from `counts`.
 
-- [ ] **Step 1: Write the helpers and the failing tests**
+- [x] **Step 1: Write the helpers and the failing tests**
 
 `A–B` below means one facility-year each of `A` and `B`. "2022 Pine T1@N1, T2@N2" means
 `form(2022, 'T1', N1, 'Pine', PINE)` and `form(2022, 'T2', N2, 'Pine', PINE)`. Each test runs
@@ -385,23 +392,23 @@ owner has `staying` true at both of its nodes. `base_count` is `j_t` and `recurs
   each row of `year_cells` joined to its mirror `(unit_b, unit_a)` has equal `base_count`,
   `testable` and `recurs`, and every row has a mirror.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_measure_tri_minimum_counts.py -v`
 Expected: the Task 1 tests PASS. The new tests FAIL with
 `AttributeError: ... has no attribute 'eligible_facility_years'`.
 
-- [ ] **Step 3: Implement `eligible_facility_years`, `recount` and `year_cells`**
+- [x] **Step 3: Implement `eligible_facility_years`, `recount` and `year_cells`**
 
 Owner counts use `n_unique` cast to UInt64. Sort every result, so group order never reaches
 the output.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_measure_tri_minimum_counts.py -v`
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/measure_tri_minimum_counts.py tests/test_measure_tri_minimum_counts.py
@@ -485,7 +492,7 @@ refuses.
     `values` is the targets' `n_unweighted` as a list:
     `'report distribution differs from the targets'`.
 
-- [ ] **Step 1: Write the helpers and the failing tests**
+- [x] **Step 1: Write the helpers and the failing tests**
 
 Add a `golden` fixture, `publish(tmp_path, golden_records())`.
 
@@ -533,29 +540,37 @@ Add a `golden` fixture, `publish(tmp_path, golden_records())`.
     the first target's `n_unweighted` plus 1.
   - check 13: the distribution's `max` plus 1.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_measure_tri_minimum_counts.py -v`
 Expected: the earlier tests PASS. The new tests FAIL with
 `AttributeError: ... has no attribute 'authenticate'`.
 
-- [ ] **Step 3: Implement `Refused`, `Inputs`, `authenticate`, `Checked` and `self_check`**
+- [x] **Step 3: Implement `Refused`, `Inputs`, `authenticate`, `Checked` and `self_check`**
 
 Scan each Parquet lazily for its read columns only (`pl.scan_parquet(...).select(...)`), and
 check the types from `collect_schema()` before collecting. All three tables are small, so
 collect them once.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_measure_tri_minimum_counts.py -v`
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/measure_tri_minimum_counts.py tests/test_measure_tri_minimum_counts.py
 git commit -m "feat(scripts): authenticate and recount the Stage 5 TRI bundle"
 ```
+
+> Deviation: the task review found three gaps in the mutant step. No test covered a TRIFD that
+> is eligible in one year and excluded in another (self-check 9). Some test cases caught no
+> mutant, or only mutants that break every call. The rule "exits nonzero" had no
+> `Unreachable:` line. A fix round added the test, 14
+> mutants and the line in one further commit `1674f16`
+> (`test(scripts): count no owner key change for a refile that is excluded`). The script is
+> unchanged by it.
 
 ### Task 4: Kept counts, the result and the command line
 
@@ -604,7 +619,7 @@ with every curve printed (OC2). On `Refused`, print only `{"complete": false, "r
 "unexpected error"}` and exits 2. Its stderr holds the exception's type name and one
 `file:line in function` line per frame from `traceback.extract_tb`, never the message.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add `run_main(script, capsys, bundle, pin=None)`, which calls `main`, checks that stdout is
 one line equal to `json.dumps(json.loads(line), sort_keys=True)`, and returns the status, the
@@ -667,19 +682,19 @@ parsed line and stderr.
   `'too_few_testable_cells'`. The two outputs without `inputs` are equal, and
   `inputs.files['report.json']` equals the first run's inventory record.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_measure_tri_minimum_counts.py -v`
 Expected: the earlier tests PASS. The new tests FAIL with `AttributeError` on `published`,
 `kept`, `summarize` or `main`.
 
-- [ ] **Step 3: Implement `published`, `kept`, `summarize`, `measure` and `main`**
+- [x] **Step 3: Implement `published`, `kept`, `summarize`, `measure` and `main`**
 
 `measure` builds `year_cells(checked.eligible, checked.counts, base)` for each base year of
 `YEAR_PAIRS`, labeled `f'{base}-{later}'`. The `if __name__ == '__main__': sys.exit(main())`
 guard closes the file.
 
-- [ ] **Step 4: Run the tests and lint, and time the chain test**
+- [x] **Step 4: Run the tests and lint, and time the chain test**
 
 Run: `uv run --locked pytest tests/test_measure_tri_minimum_counts.py -v --durations=5`
 Expected: all PASS. If `test_genuine_chain_bundles_pass_the_checks` takes 60 s or more,
@@ -687,7 +702,7 @@ setup included, add its node ID to `SLOW_TESTS` in `tests/conftest.py`.
 Run: `uv run --locked ruff check scripts/measure_tri_minimum_counts.py tests/test_measure_tri_minimum_counts.py`
 Expected: `All checks passed!`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/measure_tri_minimum_counts.py tests/test_measure_tri_minimum_counts.py
@@ -696,26 +711,39 @@ git commit -m "feat(scripts): report the Stage 22 minimum count as one JSON line
 
 Add `tests/conftest.py` to the `git add` if Step 4 changed it.
 
+> Deviation: the task review found that `main` caught `Exception` only. A Polars panic is a
+> `BaseException`, so it escaped with its message on stderr and exit code 1, the code for an
+> incomplete result. A fix round changed the clause to
+> `except (Exception, pl.exceptions.PanicException)`, with a test that keeps `KeyboardInterrupt`
+> uncaught, and added mutants 50 to 55. It landed in `b282dd7`
+> (`fix(scripts): print only the reason when Polars panics in the Stage 22 measurement`). That
+> commit is the rule commit.
+
 ### Task 5: Rule commit and two real runs (controller only)
 
 The controller runs this task itself, not a subagent.
 
 **Files:** none in the repository. Outputs go to `$OUT`.
 
-- [ ] **Step 1: Full checks**
+- [x] **Step 1: Full checks**
 
 Run the freeze-window `pgrep` check (no output), then `uv run --locked pytest`,
 `uv run --locked behave` and `uv run --locked ruff check .`.
 Expected: all pass, the `network` canary deselected.
 
-- [ ] **Step 2: Review before data**
+> Deviation: the full suite ran through the repository's xdist overlay (the pre-push hook's
+> command), not a bare `uv run --locked pytest`, because a serial run takes close to an hour.
+> It ran while Step 2's review read the diff, with the tree kept quiet. Result at `b282dd7`:
+> ruff pass, behave 2 scenarios pass, pytest 8782 passed.
+
+- [x] **Step 2: Review before data**
 
 Run `git fetch origin`, then dispatch requesting-code-review over the branch
 (`origin/main...HEAD`). Review against the spec's "The rule" and "What gets built" item 1 and
 this plan's Review Focus. Resolve every finding and rerun Step 1. This review guards the
 Anti-goal "a rule picked after seeing its result".
 
-- [ ] **Step 3: Record the rule commit and check the pinned records**
+- [x] **Step 3: Record the rule commit and check the pinned records**
 
 Run: `git status --porcelain` (expected: no output), then `git rev-parse HEAD`. Keep the SHA as
 the rule commit. Every real run runs at this commit, on a clean tree. Then:
@@ -729,7 +757,7 @@ python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['report.json']['
 Expected: `65159b83…10b7f8b`, then `dc002222…ed98d6a6e` (the Pinned input table). Read nothing
 else of the run.
 
-- [ ] **Step 4: First real run**
+- [x] **Step 4: First real run**
 
 ```bash
 OUT=$HOME/.cache/embedding-data/stage22-minimum-counts/$(git rev-parse --short HEAD)
@@ -754,7 +782,11 @@ In a restricted workspace, prefix `UV_CACHE_DIR=/private/tmp/embedding-data-uv-c
 - Exit 2: stop (OC3). Read the reason. A fix toward the written rule restarts at Step 1 with a
   new rule commit, and the decision record discloses it.
 
-- [ ] **Step 5: Second real run and identity**
+> Deviation: the shell guard of this worktree refuses `$(git rev-parse ...)`, so `$OUT` was
+> written out as `/Users/lowell/.cache/embedding-data/stage22-minimum-counts/b282dd7`, and
+> each command ran as its own call.
+
+- [x] **Step 5: Second real run and identity**
 
 Repeat Step 4 with `run2` in place of `run1` in every file name. Then:
 
@@ -792,7 +824,7 @@ into `origin/main`, merge `origin/main` into this branch (never rebase) and appe
 If a sibling branch holds unmerged edits to the same passage, append after the last owner tag
 on `origin/main` and tell the owner at Task 7 that the later merge will need a manual join.
 
-- [ ] **Step 1: Write the decision record**
+- [x] **Step 1: Write the decision record**
 
 Plain technical English, beside `specs/findings/v9-ita-naics-minimum-counts.md`, with the
 same section style. All values come from `$OUT/run1.json`, `$OUT/run1.time` and the two
@@ -826,7 +858,7 @@ same section style. All values come from `$OUT/run1.json`, `$OUT/run1.time` and 
     sensitivity. No minimum for any other family. No embedder result. A row that meets the
     gate is not a true relation (spec "What recurrence measures here").
 
-- [ ] **Step 2: Amend the spec**
+- [x] **Step 2: Amend the spec**
 
 Use the execution date for `<date>`. In R7.3, after the last owner tag of the paragraph
 (`*(owner, plan 12, 2026-11-17)*`, or a later plan's tag if it has merged), append on the same
@@ -847,7 +879,7 @@ In V9, after the last owner tag of the item, append, indented as a list continua
 
 Rollout stays unchanged (spec "What gets built", item 4).
 
-- [ ] **Step 3: Change the stale lines**
+- [x] **Step 3: Change the stale lines**
 
 - `CLAUDE.md`, section "TRI parent links (roadmap Stage 5)": replace the sentence (it wraps
   after `count`) ``Every target keeps `size_gate_pending`, and no headline minimum count
@@ -864,7 +896,7 @@ Rollout stays unchanged (spec "What gets built", item 4).
   rows``, from `published`. Replace the "Still blocked by" cell with ``Its section in [the
   evaluation protocol](evaluation-protocol.md) (O17). R8.4, if it trains``.
 
-- [ ] **Step 4: Check that no frozen file changed**
+- [x] **Step 4: Check that no frozen file changed**
 
 ```bash
 git fetch origin
@@ -874,12 +906,20 @@ uv run --locked python -c "import subprocess; from embedding_data.tri_bundle imp
 Expected: `none frozen`, then only the files of this plan's File Structure (and the plan file
 itself, after the completion protocol).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add specs/findings/v9-tri-minimum-counts.md specs/embedding-evaluation-data-spec.md CLAUDE.md README.md specs/deliverable-map.md
 git commit -m "docs(specs): record the V9 TRI minimum count"
 ```
+
+> Deviation: `origin/main` held plan 19's edits to the same shared files, so a merge commit
+> `31a90b0` (`chore: merge origin/main into the Stage 22 branch`) came before Task 6 Step 2,
+> and no commit was rebased. The worktree guard refuses `git -C` on another worktree and the
+> one-line `python -c` of Task 6 Step 4. So the controller checked the sibling branches by
+> branch name from this worktree, and Step 4 ran as a script file. The branch
+> `worktree-stage-19-wage-minimum-earners` holds unmerged edits to the same four shared files,
+> so its later merge needs a manual join of those passages.
 
 ### Task 7: Pull request (after the Plan Completion Protocol)
 
@@ -889,6 +929,9 @@ retire commit. The spec's Rollout overrides step 1 of the standing PR rule
 (`~/Projects/agent-skills/rules/pr-lifecycle.md:17`), which turns on auto-merge as soon as a
 PR opens. This repository has no CI, so auto-merge would merge at once, before the owner sees
 the minimum.
+
+> Deviation: Task 7 runs after the Plan Completion Protocol, so a commit that precedes the PR
+> cannot tick its steps. The PR and its merge record them.
 
 - [ ] **Step 1: Bring in `main`**
 
@@ -922,3 +965,30 @@ Never `--squash` or `--rebase`, because the decision record cites the rule commi
 Follow steps 2 to 4 of the standing PR rule. With no CI checks, report exactly
 `PR merged, remote deleted`. Clean up the worktree by the case that matches how it was made,
 and end with the resume handoff, routing to no next stage.
+
+## Handoff to later stages
+
+- **O17 (TRI protocol section).** It reads the decision record
+  `specs/findings/v9-tri-minimum-counts.md` and the amended R7.3 and V9 of
+  `specs/embedding-evaluation-data-spec.md`. The decision gives one minimum, 1, for the
+  `n_unweighted` column of `tri_parent_links.parquet`. A row meets the gate when its
+  `n_unweighted` is at least 1. So the gate keeps all 14,204 rows, which are 7,102 industry
+  pairs, and all 22,686 of the support. Cells with a count of 1 recur at 96.7% from RY2022 to
+  RY2023 and at 98.4% from RY2023 to RY2024. Both rates are above the 0.90 level. The rule
+  commit is `b282dd7`, and the script is `scripts/measure_tri_minimum_counts.py`. Both real runs
+  printed the same bytes (SHA-256
+  `4a5cfd7b480e4076ebad14225685ba2fa969e5e210548477928e037fd9a85e53`) under
+  `$HOME/.cache/embedding-data/stage22-minimum-counts/b282dd7`, outside git. The measurement
+  read more than the roadmap's Consumes line names (this plan's Deviation note): the
+  facility-year, support and target Parquets of the run, besides `report.json`. The published
+  bundle keeps `size_gate_pending`. No output may feed embedder training (R8.4).
+- **Traps.** The script is frozen at `b282dd7`. A fix toward the written rule needs both real
+  runs again at the new commit, and the record then discloses it (Global Constraints, OC3). The
+  script refuses any run but the pinned one, so a new Stage 5 run needs a new pin and a new
+  measurement. A change to any file in `tri_bundle.SOFTWARE_FILES` makes the Stage 5 `verify`
+  refuse the run. A minimum of 1 is a measured outcome. A row that meets the gate is not a true
+  relation (record, sections 1 and 10). The lenient count is 0 (record, section 6).
+- **Still deferred.** The script's docstring names `specs/tri-minimum-counts.md`, which now sits
+  in `specs/completed/`. The frozen script keeps the old path until its next rule commit. Its
+  `main` also reads the help text from that docstring, so `python -OO` would fail at startup.
+  Both items are in `specs/deferred_items.md`, section `20-tri-minimum-counts`.

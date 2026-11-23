@@ -488,5 +488,5 @@ installed distributions makes `verify` refuse both runs. Each production write n
 owner's go-ahead under README's host rule. The
 [Stage 5 finding](specs/findings/stage-5-tri-parent-links.md) records the commands, the cost
 and the limits. No output may feed embedder training, curriculum, hard-negative mining or
-model selection (R8.4). Every target keeps `size_gate_pending`, and no headline minimum count
-(O13) exists yet.
+model selection (R8.4). Every target keeps `size_gate_pending`. The headline minimum count
+(O13) is in `specs/findings/v9-tri-minimum-counts.md`.
