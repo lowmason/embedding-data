@@ -303,7 +303,7 @@ and Stage 25 from Track B's after Stage 22 (see Choices made).
 > Stage 22: COMPLETE (2026-11-23) — implemented by plan 20 (specs/plans/completed/20-tri-minimum-counts.md). Its Deviation note records the wider Consumes and cost. Its Handoff section names what O17 consumes.
 > Next: resume the roadmap.
 
-- [ ] Stage 23: Evaluation-protocol section for the USAspending vendor links
+- [x] Stage 23: Evaluation-protocol section for the USAspending vendor links
       Objective: The evaluation protocol gets a section for the USAspending vendor links, framed like Stage 16's section for ITA co-ownership.
       Outcomes: O18
       Track: C
@@ -312,6 +312,9 @@ and Stage 25 from Track B's after Stage 22 (see Choices made).
       Exit: O18: the committed protocol has a section for the USAspending family that states the evidence (which runs, pins and Stage 21 minimums to read), the assignment (who decides the split) and the conditions this repository keeps, as Section 1 and Stage 16's section do. It names who decides the scores. The findings file records the stage's measured cost in sessions. No source file, test or data file changed
       Leaves out: the scores, their intervals, the margin and the adoption decision, if they stay with naics-embedder (protocol, "What this repository does not decide"). A changed D2 rule and the live `acquire-sam-extract` request → `specs/deferred_items.md`. The R8.4 training-role amendment → a separate owner decision after naics-embedder's spec (reset prompt, Leave alone)
       ROUTING: brainstorming
+
+> Stage 23: COMPLETE (2026-11-23) — implemented by spec specs/completed/evaluation-protocol-usaspending-vendor-links.md, approved by the owner (no plan). Its section is Section 5 of specs/evaluation-protocol.md. Findings in specs/naics-evaluation-data-stage-23-findings.md. The family judges only (P10), and the reference and the margin are set inside its one opening (P11). No read is allowed until the owner names the consuming spec in the section (VL4). Track C has no later stage.
+> Next: resume the roadmap.
 
 - [x] Stage 24: Evaluation-protocol section for the ACS wage microdata
       Objective: The evaluation protocol gets a section for the ACS wage microdata, framed like Section 1.

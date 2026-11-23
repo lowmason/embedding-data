@@ -471,7 +471,9 @@ counts, cost and limits. `vendor_link_pairs.parquet` holds UEI pairs and stays o
 machine. No output may feed embedder training, curriculum, hard-negative mining or model
 selection (R8.4). Every target keeps `size_gate_pending`. The headline minimum counts (O26),
 one for `supplier_share` and one for `buyer_share`, are in
-`specs/findings/v9-usaspending-minimum-counts.md`.
+`specs/findings/v9-usaspending-minimum-counts.md`. Reads of the vendor links follow
+`specs/evaluation-protocol.md`, Section 5: they judge only, with the reference and the margin
+set inside one opening, and no read is allowed until the owner names the consuming spec there.
 
 **TRI parent links (roadmap Stage 5).** `python -m embedding_data.tri_parent_links` exposes
 `acquire`, `import-file`, `build`, `verify` and `compare-runs`, separate from the frozen

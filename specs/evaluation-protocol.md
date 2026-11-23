@@ -8,7 +8,8 @@
 Status: APPROVED (2026-11-18, owner: "Approve the spec"). Written 2026-11-18. Section 2
 added with the owner's approval of its design (2026-11-23, owner: "Approve"). Sections 3
 and 4 added with the owner's approval of their design (2026-11-23, owner: "Approve the
-design").
+design"). Section 5 added with the owner's approval of its design (2026-11-23,
+owner: "Approve").
 
 This is the successor evaluation-protocol spec that the
 [source spec](embedding-evaluation-data-spec.md) requires "before any embedder
@@ -16,7 +17,8 @@ is scored" (Out of scope, "Evaluation protocol"). It has one section for each
 evidence family or analysis file. A family with no section here is not scored. The first
 section covers the ITA text–code pairs. Section 2 covers the ACS wage microdata, a
 person-level analysis file *(owner, 2026-11-23)*. Sections 3 and 4 cover ITA
-co-ownership and the 2023 ITA area mix (roadmap Stage 16).
+co-ownership and the 2023 ITA area mix (roadmap Stage 16). Section 5 covers the
+USAspending vendor links (roadmap Stage 23).
 
 ## Design provenance
 
@@ -25,6 +27,8 @@ are Section 1's. Section 2 has its design in
 [acs-wage-protocol-section.md](completed/acs-wage-protocol-section.md). Sections 3
 and 4 have theirs in
 [completed/evaluation-protocol-ita-relatedness.md](completed/evaluation-protocol-ita-relatedness.md).
+Section 5 has its design in
+[completed/evaluation-protocol-usaspending-vendor-links.md](completed/evaluation-protocol-usaspending-vendor-links.md).
 
 A brainstorming session with the owner on 2026-11-18. The inputs read were:
 
@@ -516,11 +520,145 @@ its owner amends it. The conditions below bind every version.
 The training use, the model and its selection, which read co-ownership's
 validation part. The R8.4 decision is the owner's, apart from this section.
 
+## Section 5: USAspending vendor links
+
+Status: APPROVED (2026-11-23, owner: "Approve"). Design, decisions P10 and P11 and measurements:
+[completed/evaluation-protocol-usaspending-vendor-links.md](completed/evaluation-protocol-usaspending-vendor-links.md).
+
+### Evidence
+
+The R7.2 family "Vendor links", built by Stage 14 and replayed by Stage 20. A cell
+is an ordered pair (s, d) of NAICS 2022 national industries: s is the supplier
+industry (the subcontractor's) and d is the buyer industry (the prime's). Each
+cell has two rows. `supplier_share` is S(s,d) / n_sup(s): of the subcontractors
+in s with an eligible pair, the share linked to a prime in d. `buyer_share` is
+B(s,d) / n_buy(d): of the primes in d with an eligible pair, the share linked to
+a subcontractor in s. `n_unweighted` is S(s,d) or B(s,d). Fiscal years 2024 to
+2026 are pooled. A read uses the first run (my call: the replay's tables have the
+same bytes, and the V9 decision and the reconciler read the first run).
+
+| Item | Value |
+| --- | --- |
+| Run | `stage14_vendor_links_20261122_r2` in `data/derived/usaspending/vendor-links/` |
+| Detached pin (SHA-256 of `outputs.json`) | `248943dc5603f8e035b0f1c49bf624a36ed702b70eb6b961a35b64ee97c7a2be` |
+| `vendor_links.parquet` | 16,614 rows (8,307 cells, two rows each), SHA-256 `a1e22e7321b82df9a6db84348da087502f0424eb999c35e0679a326d30bddfbd` |
+| `vendor_link_marginals.parquet` | 689 rows (industries), SHA-256 `33c269a035b2bf450692d6f5941ab649bfdc94348db2823e965f9cc92045fc0a` |
+| Firms | 28,410 subcontractors in 686 industries and 2,215 primes in 195 industries, in eligible pairs (`report.json`; marginals, count of 2026-11-23) |
+| Count gates | `supplier_share`: minimum 4 on `n_unweighted`, met by 2,315 of 8,307 rows. `buyer_share`: minimum 3, met by 2,234 of 8,307 rows. 1,785 cells keep both rows ([V9 USAspending decision](findings/v9-usaspending-minimum-counts.md)) |
+| Diagonal | 88 cells have s = d. 47 `supplier_share` rows and 40 `buyer_share` rows of them meet their gates |
+| Split, measured | Under naics-embedder's committed salt at `2b2029c`, the 689 industries split 339 validation and 350 sealed. 1,165 of the 2,268 kept off-diagonal `supplier_share` rows have one industry in each part (count of 2026-11-23) |
+
+The diagonal and split counts come from one read-only count on the selected run
+on 2026-11-23. They describe the evidence and set no rule. Every row carries
+`size_gate_pending`, so a reader applies the gates from this table. No other
+table of the bundle is part of a read.
+
+### Assignment
+
+The family **judges only** *(owner, P10, 2026-11-23)*. No part of it selects.
+It counts in the consuming spec's decision through one opening, in which the
+reference, the margin and the test all run *(owner, P11, 2026-11-23)*.
+
+naics-embedder's relatedness spec `specs/completed/relatedness-artifact.md`, or
+the spec to which it assigns the family, as the owner names it in this section
+(VL4), decides within VL3:
+
+- which of the two measures it reads, and whether its reports split the family,
+  for example by its anchor rule and salt. A split only divides what the one
+  opening reports;
+- the null model and the choice of scores: the candidates, the relevance rule,
+  the gain, the headline and every other report;
+- the treatment of diagonal cells and of absent (zero) cells, which the bundle
+  does not emit;
+- the use of the marginals and of the intra-group sensitivity;
+- the reference arms, the rule that picks the reference, the margin rule and the
+  decision rule;
+- the logging of the one opening.
+
+At `2b2029c` the relatedness spec lists USAspending subawards as unassigned
+(§4.1). Its panel reads co-ownership only and refuses a pair emitted in one
+direction (§4.2), and vendor-link cells are directed. So the consuming spec may
+be a new panel spec that the relatedness spec points to (my call). After the
+owner names it, the assignment is to that spec as its owner amends it, not to a
+frozen copy, as in Section 3 (my call). The conditions below bind every
+version. If a later version conflicts with a condition, the condition governs
+until the owner amends this section.
+
+### Conditions this repository keeps
+
+- **VL1. Check the pin before the first read.** The reader computes the SHA-256
+  of `outputs.json` and of the two tables and compares each with the Evidence
+  table. A mismatch stops the read. `verify` is not required (as Section 1, C1).
+- **VL2. Headline evidence and the gates.** A row is headline evidence when its
+  `n_unweighted` is at least its measure's minimum: 4 for `supplier_share` and 3
+  for `buyer_share`. The two rows of a cell are gated apart. A headline score
+  counts only headline rows. Rows below the gate may be reported apart, labeled
+  as below the gate (my call, as Section 2, W4). `n_unweighted` excludes
+  intra-group pairs. A count that admits them, such as the rows labeled
+  `numerator:intra_group_sensitivity:true` or the marginals' `_including_intra_group`
+  columns, is a sensitivity. It never replaces `n_unweighted` and never adds a
+  cell. The 7 cells that exist only under that sensitivity are not published
+  and are never scored.
+- **VL3. Roles (P10).**
+  - Every read judges. No row, part or score of the family selects a model,
+    checkpoint, configuration or candidate.
+  - Before it reads any target value of the family, the consuming spec fixes
+    which measures it reads, its null model, its scores, its reference arms, the
+    rule that picks the reference and the margin rule (my call).
+  - **All at the opening (P11).** No part of the family is read before the
+    opening, by any arm, and no candidate is tested on it before then. Inside the
+    opening, the reference arms are scored first. The fixed rules then pick the
+    reference and set the margin from those scores. Only then is a candidate
+    scored, and no candidate result changes the reference or the margin.
+  - The family is opened once. "Opened once" means one logged opening. Several
+    arms and seeds may be scored inside it. A second opening needs a recorded
+    reason. No development measurement is published (my call).
+  - No row, and no quantity derived from one, enters training, curriculum
+    construction or hard-negative mining. R8.4 is unchanged, and this role stays
+    until the owner amends this section, whatever R8.4 later allows.
+  - The role covers naics-embedder's relatedness artifact only. For any other
+    embedder, the family has no role until the owner amends this section (my
+    call; Rule 1).
+- **VL4. No read until the owner names the consuming spec here.** A read is
+  allowed only after the owner amends this section to name naics-embedder's spec
+  that assigns the family, and the commit read (as Section 2, W7). Until then
+  the family is not scored.
+- **VL5. State the universe with every published score.** The statement names
+  the run and the pin, and gives the `universe` text of the target rows. It also
+  says at least this: the minimums are 4 for `supplier_share` and 3 for
+  `buyer_share`, on counts pooled over fiscal years 2024 to 2026; one SAM.gov
+  extract (`2026-10`) gives each firm one industry for the whole window; join
+  coverage is 0.810 for primes and 0.662 for subcontractors (Stage 14 findings);
+  FY2026 is short in the `2026-11-19` snapshot; and subaward reporting moved from
+  FSRS.gov to SAM.gov on 2025-03-08, inside FY2025.
+- **VL6. Same relation.** Vendor links measure a supplier-to-buyer relation. It
+  differs from the relation of ITA co-ownership and TRI parent links, and intra-
+  group pairs are excluded to keep it apart from ownership (Stage 14 spec,
+  Limits). It also differs from the co-location that the area mixes measure. BEA
+  input–output tables, which are not built, measure the same relation (Stage 2
+  spec, Direction). So a BEA family never trains an embedding that the vendor
+  links judge (my call, as CO7 and AM4).
+- **VL7. A new bundle or another table needs an amendment.** A rebuild, a later
+  snapshot or a new SAM.gov extract has a new pin. The owner amends the Evidence
+  table before any read of it. A read of another table of the bundle also needs
+  an amendment that adds its hash. `vendor_link_pairs.parquet` holds UEI pairs
+  and stays on this machine.
+- **VL8. Fixtures are not evidence.** A score from fixture tables shows software
+  readiness. It is never reported as a result.
+
+### What this repository does not decide
+
+The measures read, the null model, the scores, their intervals, the reference,
+the margin and the adoption decision. It also does not check naics-embedder's
+log of the opening.
+
 ## Families with no section
 
 These are not scored until a section exists: every other ACS family, every CPS
 family, and each new family of
-`specs/uncovered-uses-evidence-sources.md`. For a directional relatedness
+`specs/uncovered-uses-evidence-sources.md` other than the USAspending vendor
+links. Those have Section 5 and stay unscored until the owner names their
+consuming spec there (VL4). For a directional relatedness
 share, Section 3 answers the open design questions, null-model normalization
 and the choice of scores, by assignment to the consuming spec.
 
@@ -578,7 +716,9 @@ Findings, retired specs and retired plans are records and are not edited.
   lowmason/embedding-data#21), G3 and G5 (the V9 decision of 2026-11-17) and G4
   (this file) at one commit of this repository. G4 opens for the ITA pairs
   through Section 1. With Sections 3 and 4, it opens for co-ownership and the
-  2023 area mix, and G6 opens under CO3 and CO4 *(Stage 16)*.
+  2023 area mix, and G6 opens under CO3 and CO4 *(Stage 16)*. Section 5 opens
+  nothing yet: G4 opens for the USAspending vendor links only after the owner
+  names their consuming spec there (VL4) *(Stage 23)*.
 - **Later families.** Each adds a section here through its own design session,
   after its build and its count gate.
 - **R8.4.** A separate owner decision, after naics-embedder's relatedness spec
