@@ -289,3 +289,18 @@
       belongs to plan 20. Size: quick-fix. Done when: the docstring names the retired
       path, in the same commit as the next change that already requires a new rule
       commit and both real runs.
+
+## 20-tri-minimum-counts — 2026-11-23
+- [ ] Stale spec path in the Stage 22 measurement script: the docstring of
+      `scripts/measure_tri_minimum_counts.py` (line 6) names `specs/tri-minimum-counts.md`,
+      which moved to `specs/completed/tri-minimum-counts.md` when plan 20 retired. Carried
+      because the script is frozen at rule commit `b282dd7`: any edit breaks that tie and,
+      under OC3, forces both real runs again. The fix is a one-line docstring edit. Size:
+      quick-fix. Done when: the docstring names the retired path, in the same commit as the
+      next change that already requires a new rule commit and both real runs.
+- [ ] The Stage 22 measurement script builds the help text of `main` from
+      `__doc__.splitlines()[0]` (`scripts/measure_tri_minimum_counts.py`, in `main`). Python
+      strips docstrings under `-OO`, so the command would fail at startup there. Nothing runs
+      it that way today. Carried because the script is frozen at rule commit `b282dd7`. Size:
+      quick-fix. Revisit if: a later fix to the script requires a new rule commit and both
+      real runs.

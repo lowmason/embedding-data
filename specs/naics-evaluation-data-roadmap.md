@@ -282,7 +282,7 @@ after Stage 18 (see Choices made).
 > Stage 21: COMPLETE (2026-11-23) — implemented by plan 19 (specs/plans/completed/19-usaspending-minimum-counts.md). Its two Deviation notes record the wider Consumes and cost and the two minimums. Its Handoff section names what O18 consumes.
 > Next: resume the roadmap.
 
-- [ ] Stage 22: Headline minimum count for the TRI family
+- [x] Stage 22: Headline minimum count for the TRI family
       Objective: A headline minimum count for the TRI parent-link targets is set from their observed counts.
       Outcomes: O13
       Track: B
@@ -291,6 +291,9 @@ after Stage 18 (see Choices made).
       Exit: O13: a committed decision sets the headline minimum count from the observed `n_unweighted` distribution of the `tri_parent_links` target. It reports how many cells meet it. The published bundles keep `size_gate_pending`
       Leaves out: the TRI protocol section → O17. The R8.4 training-role amendment → a separate owner decision after naics-embedder's spec (reset prompt, Leave alone)
       ROUTING: brainstorming
+
+> Stage 22: COMPLETE (2026-11-23) — implemented by plan 20 (specs/plans/completed/20-tri-minimum-counts.md). Its Deviation note records the wider Consumes and cost. Its Handoff section names what O17 consumes.
+> Next: resume the roadmap.
 
 ## Ranked list — Track B
 
