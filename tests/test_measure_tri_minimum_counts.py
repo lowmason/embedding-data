@@ -1723,6 +1723,8 @@ def test_published_takes_the_largest_single_year_count(script):
     assert dict(rows.select('unit_a', 'largest_year_count').rows()) == {
         'a': 7, 'c': 8, 'e': 9, 'g': 3}
     assert rows['count'].to_list() == [9] * 4
+    cells_found = rows.select('unit_a', 'unit_b').rows()
+    assert cells_found == sorted(cells_found)
 
 
 def test_published_reads_the_labels_from_flags(script):
@@ -1768,6 +1770,9 @@ def test_kept_labels_are_counted_separately(script):
     both = script.kept(rows_of((2, 2, T, T), (2, 2, F, F)), 2)
     assert (both['dnb_rows'], both['federal_rows']) == (1, 1)
     assert (both['kept_dnb_rows'], both['kept_federal_rows'], both['kept_rows']) == (1, 1, 2)
+    uneven = script.kept(rows_of((1, 1, F, T), (2, 2, T, F), (2, 2, T, F), (3, 3, F, F)), 2)
+    assert (uneven['dnb_rows'], uneven['federal_rows']) == (2, 1)
+    assert (uneven['kept_dnb_rows'], uneven['kept_federal_rows']) == (2, 0)
 
 
 def test_summarize_takes_the_larger_year_pair_minimum(script):
