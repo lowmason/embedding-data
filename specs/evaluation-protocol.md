@@ -9,7 +9,7 @@ Status: APPROVED (2026-11-18, owner: "Approve the spec"). Written 2026-11-18. Se
 added with the owner's approval of its design (2026-11-23, owner: "Approve"). Sections 3
 and 4 added with the owner's approval of their design (2026-11-23, owner: "Approve the
 design"). Section 5 added with the owner's approval of its design (2026-11-23,
-owner: "Approve").
+owner: "Approve"). Section 6 PROPOSED (2026-11-23).
 
 This is the successor evaluation-protocol spec that the
 [source spec](embedding-evaluation-data-spec.md) requires "before any embedder
@@ -18,7 +18,8 @@ evidence family or analysis file. A family with no section here is not scored. T
 section covers the ITA text–code pairs. Section 2 covers the ACS wage microdata, a
 person-level analysis file *(owner, 2026-11-23)*. Sections 3 and 4 cover ITA
 co-ownership and the 2023 ITA area mix (roadmap Stage 16). Section 5 covers the
-USAspending vendor links (roadmap Stage 23).
+USAspending vendor links (roadmap Stage 23). Section 6, proposed, covers the TRI
+parent links (roadmap Stage 25).
 
 ## Design provenance
 
@@ -29,6 +30,8 @@ and 4 have theirs in
 [completed/evaluation-protocol-ita-relatedness.md](completed/evaluation-protocol-ita-relatedness.md).
 Section 5 has its design in
 [completed/evaluation-protocol-usaspending-vendor-links.md](completed/evaluation-protocol-usaspending-vendor-links.md).
+Section 6 has its design in
+[evaluation-protocol-tri-parent-links.md](evaluation-protocol-tri-parent-links.md).
 
 A brainstorming session with the owner on 2026-11-18. The inputs read were:
 
@@ -652,13 +655,135 @@ The measures read, the null model, the scores, their intervals, the reference,
 the margin and the adoption decision. It also does not check naics-embedder's
 log of the opening.
 
+## Section 6: TRI parent links
+
+Status: PROPOSED (2026-11-23). Design, decisions P8, P9, P12 and P13 and measurements:
+[evaluation-protocol-tri-parent-links.md](evaluation-protocol-tri-parent-links.md).
+
+### Evidence
+
+The family "TRI parent links" of `specs/uncovered-uses-evidence-sources.md`, built
+by roadmap Stage 5 (outcome O7). For two NAICS 2022 industries a and b, the
+target value `owner_share` is J(a,b) / n(a): of the owners with an eligible TRI
+facility in industry a, the share that also operate one in industry b in the
+same reporting year, 2022 to 2024. An owner is EPA's standardized U.S. parent, or
+the facility itself when it reports none. A read uses the first run. The
+replay's tables have the same bytes, so the run is named for its pin only (my
+call).
+
+| Item | Value |
+| --- | --- |
+| Run | `stage5_tri_parent_links_20261121_r1` in `data/derived/epa_tri/parent-links/` |
+| Detached pin (SHA-256 of `outputs.json`) | `65159b8374d36beec136ae6a7779a5763bf8ced9360e2a365b67b138e10b7f8b` |
+| `tri_parent_links.parquet` | 14,204 rows (directed cells, 7,102 industry pairs), SHA-256 `331392fe80e8688cbd0230e7fb6abe44d06d7d047851fbedf0a84462e60efab5` |
+| `tri_parent_link_marginals.parquet` | 405 rows (industries), SHA-256 `fe0e83e5c371a52ee4d80063de5e358f00aa941aadc6fd9afdafbef89f2bd261` |
+| Owners | 8,684 headline owners (Stage 5 findings, "Counts"). 359 of the 405 industries appear in a target row |
+| Count gate | Minimum 1 on `n_unweighted` (J) in `tri_parent_links.parquet` ([V9 TRI decision](findings/v9-tri-minimum-counts.md)). Every published row meets it |
+| Split, measured | Under naics-embedder's committed salt, 3,557 of the 7,102 pairs (50.1%) have one industry in each part. 2,048 have both in the sealed part (count of 2026-11-23) |
+| Overlap with Section 3 | 2,497 of the 7,102 TRI pairs are also co-owned pairs in `ita_co_ownership.parquet`, and 354 of the 359 industries also appear there (count of 2026-11-23) |
+
+The split and overlap counts come from one read-only count on the selected runs
+on 2026-11-23, at naics-embedder `2b2029c`. They describe the evidence and set no
+rule. No other table of the bundle is part of a read.
+
+### Assignment
+
+For this family, naics-embedder's `specs/completed/relatedness-artifact.md`
+decides what it decides for co-ownership (Section 3):
+
+- the split into a validation part and a sealed part, and the handling of
+  mirror pairs. At `2b2029c`, TRI uses the same rule and salt as co-ownership,
+  so an industry is in the same part in both families (§4.1);
+- the null-model normalization and the choice of scores: the candidates, the
+  relevance rule, the gain, the headline, the treatment of absent (zero) cells
+  and every other report;
+- the use of the marginals, including `n_multi_industry_owners` and
+  `n_owners_partial`, and of the D&B-key and federal sensitivity labels;
+- the references, TRI's own margin record, the margin and the decision rule;
+- the logging of reads and the one opening of the sealed part.
+
+The version read for this assignment is naics-embedder `2b2029c`. There TRI has
+no role yet. That spec admits TRI as a second judge only through its own
+amendment, made before the sealed opening (§4.1). The assignment is to that spec
+as its owner amends it, not to a frozen copy (my call). The conditions below
+bind every version. If a later version conflicts with a condition, the
+condition governs until the owner amends this section.
+
+This assignment answers, for TRI, the places where the TRI spec and the V9 TRI
+decision defer to the protocol: the decision's "Not claimed" line on scoring,
+null models, splits and absent cells, and the TRI spec's Handoff line on the
+counts and marginals for a null model and the two sensitivity labels. The
+universe statement and the E8 time basis of that line enter TR6.
+
+### Conditions this repository keeps
+
+- **TR1. Check the pin before the first read.** The reader computes the SHA-256
+  of each of the two tables and compares it with the value above. A mismatch
+  stops the read. `verify` is not required (as Section 1, C1).
+- **TR2. Read the published cells as headline evidence.** Every row of
+  `tri_parent_links.parquet` meets the count gate. J is `n_unweighted`, which
+  counts owners under EPA's standardized parent name, with federal facilities
+  out. The count under the D&B key and the count with federal facilities in are
+  sensitivities. They never replace J and never add a pair. 8,050 rows carry the
+  D&B label and 40 the federal label.
+- **TR3. Roles.** The validation part selects, for naics-embedder's relatedness
+  artifact only *(owner, P8, 2026-11-23)*. The sealed part judges and is opened
+  once. No TRI row, and no quantity derived from one, enters training,
+  curriculum construction or hard-negative mining. The split comes first, and a
+  part depends on the industry code alone. Only the sealed part is reported as
+  evaluation. This extends CO3's selection exception to TRI, on the same basis:
+  R8.4's second sentence. R8.4 itself is unchanged. As in CO3:
+  - "Opened once" means one logged opening. Several arms and seeds may be
+    scored inside it. A second opening needs a recorded reason.
+  - A validation-part score may be published as a development measurement. It
+    is labeled as not evaluation, and TR6 applies to it.
+- **TR4. Report the mirror pairs**, as CO4. Every published sealed score states
+  the share of its relevant pairs that cross the parts. It also gives, labeled
+  as a sensitivity, a sealed score that rests only on pairs with both industries
+  in the sealed part. How the restricted score is computed is the relatedness
+  spec's.
+- **TR5. Neither TRI nor co-ownership trains what the other judges.** They
+  measure close relations (`specs/completed/tri-parent-links.md`, lines
+  705–706; CO7). TRI does not measure the relation of the area mix, so AM4 does
+  not apply to it (my call). The USAspending vendor links measure another
+  relation (Section 5, VL6).
+- **TR6. State the universe with every published score.** The statement names
+  the run and the pin, and says at least this: TRI is a program-selected
+  population of facilities that meet its reporting criteria, mostly industrial.
+  It is not a frame of establishments or firms, and its pairs cover 359
+  industries. Codes are self-reported primary NAICS 2022 codes, one per
+  facility, from EPA's complete files for reporting years 2022 to 2024, processed
+  as of 2025-11-05. An owner is EPA's standardized U.S. parent as of that
+  snapshot, not as of each reporting year (E8), or the facility itself when it
+  reports none. EPA's standardization can split one parent or merge two, and
+  this project cannot measure either. Federal facilities are out. n(a) pools
+  presence over three years, and J needs both industries in the same year.
+  About a third of the pairs (2,497 of 7,102) are also co-owned pairs in
+  Section 3, so a TRI score is not independent of a co-ownership score.
+- **TR7. A new bundle needs an amendment.** A new snapshot or rebuild has a new
+  pin. The owner amends the Evidence table before any read of it. A read of
+  another table of the bundle also needs an amendment that adds its hash.
+- **TR8. No read until the owner names the admitting commit here**
+  *(owner, P12, 2026-11-23)*. A real read is allowed only after the owner amends this section
+  to name the relatedness spec's commit that admits TRI as a judge. Fixture
+  tables may be read before it.
+- **TR9. Fixtures are not evidence.** A score from fixture tables shows
+  software readiness. It is never reported as a result.
+
+### What this repository does not decide
+
+The scores, their intervals, the reference, the margin and the adoption
+decision. It also does not check naics-embedder's selection log.
+
 ## Families with no section
 
 These are not scored until a section exists: every other ACS family, every CPS
 family, and each new family of
 `specs/uncovered-uses-evidence-sources.md` other than the USAspending vendor
-links. Those have Section 5 and stay unscored until the owner names their
-consuming spec there (VL4). For a directional relatedness
+links and the TRI parent links. The vendor links have Section 5 and stay
+unscored until the owner names their consuming spec there (VL4). The TRI parent
+links have Section 6 and stay unscored until the owner names there the
+relatedness spec's commit that admits them (TR8). For a directional relatedness
 share, Section 3 answers the open design questions, null-model normalization
 and the choice of scores, by assignment to the consuming spec.
 
@@ -719,6 +844,10 @@ Findings, retired specs and retired plans are records and are not edited.
   2023 area mix, and G6 opens under CO3 and CO4 *(Stage 16)*. Section 5 opens
   nothing yet: G4 opens for the USAspending vendor links only after the owner
   names their consuming spec there (VL4) *(Stage 23)*.
+- **TRI parent links.** An amendment of naics-embedder's relatedness spec admits
+  TRI as a second judge (its §4.1) and cites Section 6. Under TR8 the owner then
+  names that commit in Section 6 before any real read. G6's limits extend to TRI
+  under TR3 *(Stage 25)*.
 - **Later families.** Each adds a section here through its own design session,
   after its build and its count gate.
 - **R8.4.** A separate owner decision, after naics-embedder's relatedness spec
