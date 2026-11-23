@@ -1,6 +1,6 @@
 # Headline minimum counts for the USAspending vendor links
 
-> Next step: writing-plans, in a fresh session, against this file.
+**Status: COMPLETE (2026-11-23)** — implemented by plan 19 (`specs/plans/completed/19-usaspending-minimum-counts.md`); decision in `specs/findings/v9-usaspending-minimum-counts.md`.
 
 Status: APPROVED (2026-11-22, owner: "Approve"). Written 2026-11-22. The owner's approval of
 this spec approves every constant and rule in it, the designer's calls included. So the plan
