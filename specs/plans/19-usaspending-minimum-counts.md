@@ -1,5 +1,7 @@
 # USAspending Headline Minimum Counts Implementation Plan
 
+**Status: COMPLETE (2026-11-23)** — executed via subagent-driven-development; deferred items in specs/deferred_items.md, or specs/completed/deferred_items.md once archived
+
 > **For agentic workers:** REQUIRED SUB-SKILL: implement this plan task-by-task via subagent-driven-development (the default) — or executing-plans when your human partner chose inline execution at the handoff. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Measure fiscal-year recurrence of the Stage 14 vendor-link cells, set one headline
@@ -192,7 +194,7 @@ the stage and puts this stamp under its entry, which cites both Deviation notes:
     per base cell. A **band** is `{'low', 'high', 'base_cells', 'testable_cells',
     'recurring_cells', 'rate', 'wilson_low', 'wilson_high'}`, as in Stage 3.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add `load_script()` (copy `tests/test_measure_ita_minimum_counts.py:24-29`, script path
 `scripts/measure_usaspending_minimum_counts.py`, assertion message
@@ -226,29 +228,34 @@ def test_rule_constants_are_the_committed_values(script):
   above, `script.bands(frame) == stage3.bands(frame)` and the two `pair_minimum` results are
   equal. `script.measure_minimum(m) == stage3.family_minimum(m)` for the three lists above.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_measure_usaspending_minimum_counts.py -v`
 Expected: FAIL with "measurement script is missing".
 
-- [ ] **Step 3: Implement the constants and the band functions**
+- [x] **Step 3: Implement the constants and the band functions**
 
 The module docstring states the rule in three sentences, cites
 `specs/usaspending-minimum-counts.md` and says that the band functions are copied from the
 Stage 3 script so that the Stage 21 constants govern. Define
 `YEAR_PAIRS = tuple(zip(WINDOW, WINDOW[1:]))`.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_measure_usaspending_minimum_counts.py -v`
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/measure_usaspending_minimum_counts.py tests/test_measure_usaspending_minimum_counts.py
 git commit -m "feat(scripts): add the Stage 21 band rule"
 ```
+
+> Deviation: the task review found three gaps in the mutant step (no `WILSON_Z` mutant, none
+> for "the interval does not enter the rule", no `[None, 3]` shape). A fix round added mutants
+> 31 to 33 and one test, in a second commit `ce029e0`
+> (`test(scripts): cover a missing minimum in either year pair`).
 
 ### Task 2: Per-year counts, testable cells and recurrence
 
@@ -284,7 +291,7 @@ one of its `P_t` pairs has a subcontractor that is the subcontractor of some `P_
 and a prime that is the prime of some `P_{t+1}` pair. Mark each `P_t` pair active with two
 semi-joins against the distinct `sub_uei` and `prime_uei` of `P_{t+1}`, then group by cell.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Use `S, D, E = '541512', '541511', '236220'` and `FIRMS = {'P1': D, 'P2': D, 'P3': E,
 'U1': S, 'U2': S, 'U3': E, 'X': 'not_in_sam'}`. A cell `(node(S), node(D))` is written `SD`.
@@ -317,24 +324,24 @@ intra-group `A–B`" adds `intra=True`.
 
 Each test builds `eligible_pairs(pair_frame(firms, *links).lazy())`.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_measure_usaspending_minimum_counts.py -v`
 Expected: the Task 1 tests PASS. The new tests FAIL with
 `AttributeError: ... has no attribute 'eligible_pairs'`.
 
-- [ ] **Step 3: Implement `eligible_pairs`, `pooled_counts`, `year_counts` and `cells`**
+- [x] **Step 3: Implement `eligible_pairs`, `pooled_counts`, `year_counts` and `cells`**
 
 Firm counts use `n_unique` of the UEI cast to UInt64, as `vendor_link_targets._support`
 (`src/embedding_data/vendor_link_targets.py:103-112`) counts them. Sort every result, so group
 order never reaches the output.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_measure_usaspending_minimum_counts.py -v`
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/measure_usaspending_minimum_counts.py tests/test_measure_usaspending_minimum_counts.py
@@ -414,7 +421,7 @@ refuses.
     `'report distribution differs from the targets'`. The round trip makes a float median
     compare equal to its JSON form.
 
-- [ ] **Step 1: Write the helpers and the failing tests**
+- [x] **Step 1: Write the helpers and the failing tests**
 
 Add a `golden` fixture, `publish(tmp_path, golden_links())`.
 
@@ -447,23 +454,23 @@ Add a `golden` fixture, `publish(tmp_path, golden_links())`.
   row's `measure` set to `'other_share'`; `n_unweighted_distribution` deleted; the
   `buyer_share` entry deleted; `buyer_share` `max` plus 1.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_measure_usaspending_minimum_counts.py -v`
 Expected: the earlier tests PASS. The new tests FAIL with
 `AttributeError: ... has no attribute 'authenticate'`.
 
-- [ ] **Step 3: Implement `Refused`, `Inputs`, `authenticate`, `Checked` and `self_check`**
+- [x] **Step 3: Implement `Refused`, `Inputs`, `authenticate`, `Checked` and `self_check`**
 
 Scan each Parquet lazily for its read columns only. Collect the support and target tables,
 which are small, and keep the pair table lazy until `eligible_pairs`.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run --locked pytest tests/test_measure_usaspending_minimum_counts.py -v`
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/measure_usaspending_minimum_counts.py tests/test_measure_usaspending_minimum_counts.py
@@ -522,7 +529,7 @@ not, with every curve printed (OC2). On `Refused`, print only `{"complete": fals
 "unexpected error"}` and exits 2. Its stderr holds the exception's type name and one
 `file:line in function` line per frame from `traceback.extract_tb`, never the message.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add `run_main(script, capsys, bundle, pin=None)`, which calls `main`, checks that stdout is
 one line equal to `json.dumps(json.loads(line), sort_keys=True)`, and returns the status, the
@@ -587,18 +594,18 @@ parsed line and stderr.
   two outputs without `inputs` are equal, and `inputs.files['report.json']` equals the first
   run's inventory record.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run --locked pytest tests/test_measure_usaspending_minimum_counts.py -v`
 Expected: the earlier tests PASS. The new tests FAIL with `AttributeError` on `published`,
 `kept`, `summarize` or `main`.
 
-- [ ] **Step 3: Implement `published`, `kept`, `curve`, `summarize`, `measure` and `main`**
+- [x] **Step 3: Implement `published`, `kept`, `curve`, `summarize`, `measure` and `main`**
 
 `measure` calls `cells(checked.eligible, base)` for each base year of `YEAR_PAIRS`. The
 `if __name__ == '__main__': sys.exit(main())` guard closes the file.
 
-- [ ] **Step 4: Run the tests and lint, and time the chain test**
+- [x] **Step 4: Run the tests and lint, and time the chain test**
 
 Run: `uv run --locked pytest tests/test_measure_usaspending_minimum_counts.py -v --durations=5`
 Expected: all PASS. If `test_genuine_chain_bundles_pass_the_checks` takes 60 s or more,
@@ -606,7 +613,7 @@ setup included, add its node ID to `SLOW_TESTS` in `tests/conftest.py`.
 Run: `uv run --locked ruff check scripts/measure_usaspending_minimum_counts.py tests/test_measure_usaspending_minimum_counts.py`
 Expected: `All checks passed!`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/measure_usaspending_minimum_counts.py tests/test_measure_usaspending_minimum_counts.py
@@ -621,20 +628,25 @@ The controller runs this task itself, not a subagent.
 
 **Files:** none in the repository. Outputs go to `$OUT`.
 
-- [ ] **Step 1: Full checks**
+- [x] **Step 1: Full checks**
 
 Run the freeze-window `pgrep` check (no output), then `uv run --locked pytest`,
 `uv run --locked behave` and `uv run --locked ruff check .`.
 Expected: all pass, the `network` canary deselected.
 
-- [ ] **Step 2: Review before data**
+> Deviation: the full suite ran through the repository's xdist overlay (the commit hook's
+> command), not a bare `uv run --locked pytest`, because a serial run takes hours. It ran
+> at the same time as Step 2's pre-data review, with the tree kept quiet. Result at
+> `588ae5a`: ruff pass, behave 2 scenarios pass, pytest 8666 passed.
+
+- [x] **Step 2: Review before data**
 
 Run `git fetch origin`, then dispatch requesting-code-review over the branch
 (`origin/main...HEAD`). Review against the spec's
 "The rule" and "What gets built" item 1 and this plan's Review Focus. Resolve every finding
 and rerun Step 1. This review guards the Anti-goal "a rule picked after seeing its result".
 
-- [ ] **Step 3: Record the rule commit and check the pinned records**
+- [x] **Step 3: Record the rule commit and check the pinned records**
 
 Run: `git status --porcelain` (expected: no output), then `git rev-parse HEAD`. Keep the SHA as
 the rule commit. Every real run runs at this commit, on a clean tree. Then:
@@ -648,7 +660,7 @@ python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['report.json']['
 Expected: `248943dc…a7a2be`, then `040127fb…01f913d2` (the Pinned input table). Read nothing
 else of the run.
 
-- [ ] **Step 4: First real run**
+- [x] **Step 4: First real run**
 
 ```bash
 OUT=$HOME/.cache/embedding-data/stage21-minimum-counts/$(git rev-parse --short HEAD)
@@ -672,7 +684,7 @@ In a restricted workspace, prefix `UV_CACHE_DIR=/private/tmp/embedding-data-uv-c
 - Exit 2: stop (OC3). Read the reason. A fix toward the written rule restarts at Step 1 with a
   new rule commit, and the decision record discloses it.
 
-- [ ] **Step 5: Second real run and identity**
+- [x] **Step 5: Second real run and identity**
 
 Repeat the run command of Step 4 with `run2.json` and `run2.time`. Then:
 
@@ -698,7 +710,7 @@ R7.3 and V9 in `git show origin/main:specs/embedding-evaluation-data-spec.md`. I
 sentences have merged, merge `origin/main` into the branch (never rebase) and append after
 them.
 
-- [ ] **Step 1: Write the decision record**
+- [x] **Step 1: Write the decision record**
 
 Plain technical English, beside `specs/findings/v9-ita-naics-minimum-counts.md`, with the
 same section style. All values come from `$OUT/run1.json` and `$OUT/run1.time`. Sections in
@@ -728,7 +740,7 @@ order:
     tables, for the 7 cells only under the sensitivity, or for any other family (TRI is O13).
     No embedder result.
 
-- [ ] **Step 2: Amend the spec**
+- [x] **Step 2: Amend the spec**
 
 Use the execution date for `<date>`. In R7.3, after the last owner tag of the paragraph
 (`*(owner, plan 12, 2026-11-17)*`, or plan 17's tag if it has merged), append on the same
@@ -750,7 +762,7 @@ In V9, after the last owner tag of the item, append, indented as a list continua
 
 Rollout stays unchanged (spec "What gets built", item 4).
 
-- [ ] **Step 3: Change the stale lines**
+- [x] **Step 3: Change the stale lines**
 
 - `CLAUDE.md`, section "USAspending vendor links (roadmap Stage 14)": replace the sentence
   (it wraps after `count`)
@@ -771,7 +783,11 @@ Rollout stays unchanged (spec "What gets built", item 4).
   "Still blocked by" cell with ``Its section in [the evaluation protocol](evaluation-protocol.md)
   (O18). R8.4, if it trains``.
 
-- [ ] **Step 4: Check that no frozen file changed**
+> Deviation: `origin/main` had rewritten the map's USAspending Status cell (Stage 20 replay),
+> so the edit kept that text and added the Stage 21 sentence after it, in place of the
+> `Not replayed. No count gate yet` swap. The map's as-of header stays unchanged.
+
+- [x] **Step 4: Check that no frozen file changed**
 
 ```bash
 git fetch origin
@@ -781,9 +797,42 @@ uv run --locked python -c "import subprocess; from embedding_data.vendor_link_bu
 Expected: `none frozen`, then only the files of this plan's File Structure (and the plan file
 itself, after the completion protocol).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add specs/findings/v9-usaspending-minimum-counts.md specs/embedding-evaluation-data-spec.md CLAUDE.md README.md specs/deliverable-map.md
 git commit -m "docs(specs): record the V9 USAspending minimum counts"
 ```
+
+> Deviation: `origin/main` moved during execution (plans 18 and 20 merged), so a merge commit
+> `bde4be0` (`chore: merge origin/main into the Stage 21 branch`) came before this commit,
+> and no commit was rebased. The task review then found that the copied seventh Limit
+> understated the measured leniency. A hand fix added one sentence with the two measured
+> shares in a second commit `9fa10c0`
+> (`docs(specs): state the measured leniency in the V9 USAspending record`).
+
+## Handoff to later stages
+
+- **O18 (USAspending protocol section).** It reads the decision record
+  `specs/findings/v9-usaspending-minimum-counts.md` and the amended R7.3 and V9 of
+  `specs/embedding-evaluation-data-spec.md`. The decision gives two minimums, not the one that
+  the roadmap's Exit names (this plan's second Deviation note). `supplier_share` has minimum 4
+  and `buyer_share` has minimum 3. A row meets its gate when its `n_unweighted` is at least its
+  measure's minimum. The gate keeps 2,315 and 2,234 of 8,307 rows, and 1,785 cells have both
+  rows kept. The rule commit is `588ae5a`, and the script is
+  `scripts/measure_usaspending_minimum_counts.py`. Both real runs printed the same bytes
+  (SHA-256 `8b2e0e82719d37cf92c7f5de5b7e5de911e5408771df5ee45db1bf46d2c57ee6`) under
+  `$HOME/.cache/embedding-data/stage21-minimum-counts/588ae5a`, outside git. The measurement
+  read more than the roadmap's Consumes line names (this plan's first Deviation note): the pair,
+  support and target Parquets of the run, besides `report.json`. The published bundles keep
+  `size_gate_pending`. No output may feed embedder training (R8.4).
+- **Traps.** The script is frozen at `588ae5a`. A fix toward the written rule needs both real
+  runs again at the new commit, and the record then discloses it (Global Constraints, OC3). The
+  script refuses any run but the pinned one, so a new Stage 14 run needs a new pin and a new
+  measurement. A change to any file in `vendor_link_bundle.SOFTWARE_FILES` makes the Stage 14
+  `verify` refuse the run. The gate is lenient: 525 of the 2,315 kept `supplier_share` rows and
+  437 of the 2,234 kept `buyer_share` rows meet their minimum in no single fiscal year (record,
+  section 9).
+- **Still deferred.** The script's docstring names `specs/usaspending-minimum-counts.md`, which
+  now sits in `specs/completed/`. The frozen script keeps the old path until its next rule
+  commit (`specs/deferred_items.md`, section `19-usaspending-minimum-counts`).
