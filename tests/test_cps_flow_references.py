@@ -734,8 +734,10 @@ def test_staging_state_with_an_unregistered_kind_is_refused(tmp_path, monkeypatc
     state = json.loads(state_file.read_text())
     state['kinds']['cps_basic_2027_codes'] = state['kinds'][KINDS[0]]
     state_file.write_text(json.dumps(state))
+    calls = serve(monkeypatch, tmp_path / 'served2')
     with pytest.raises(ValueError, match='unknown identity'):
         module.acquire(data_dir, 'refs')
+    assert calls == []
 
 
 @pytest.mark.parametrize('change', ['naive time', 'invalid time', 'proxy not boolean',
@@ -752,8 +754,10 @@ def test_staging_request_records_must_be_exact(tmp_path, monkeypatch, change):
         'other method': {'method': 'POST'},
     }[change])
     state_file.write_text(json.dumps(state))
+    calls = serve(monkeypatch, tmp_path / 'served2')
     with pytest.raises(ValueError):
         module.acquire(data_dir, 'refs')
+    assert calls == []  # the staged records are refused before any request is made
 
 
 def test_a_publication_copy_that_differs_from_staging_is_refused(tmp_path, monkeypatch):
