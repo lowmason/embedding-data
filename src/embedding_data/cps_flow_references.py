@@ -383,6 +383,8 @@ def acquire(data_dir: Path, reference_id: str) -> Path:
 
     A refused kind stays missing in the shared staging directory. The owner can import it with
     `import_reference`, or a later call can try again. An occupied final is verified, not replaced.
+    A transport failure (DNS, connection, timeout, a broken body) is not a refusal: it removes
+    that kind's partial file and raises the `httpx` error. The kinds already staged stay staged.
     '''
     data_dir = Path(data_dir)
     final, staging = _snapshot_paths(data_dir, reference_id)
@@ -400,6 +402,10 @@ def acquire(data_dir: Path, reference_id: str) -> Path:
                 try:
                     _download(client, REGISTRY[kind], file)
                     validate_original(kind, file)
+                except httpx.TransportError:
+                    # A network failure is not a refusal: stop, and report it as network.
+                    file.unlink(missing_ok=True)
+                    raise
                 except (httpx.HTTPError, ValueError):
                     file.unlink(missing_ok=True)
                     refused.append(kind)

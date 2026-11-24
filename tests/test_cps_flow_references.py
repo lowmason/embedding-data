@@ -775,15 +775,64 @@ def test_a_publication_copy_that_differs_from_staging_is_refused(tmp_path, monke
     assert not manifest_entries(tmp_path)
 
 
-def test_a_transport_error_refuses_only_its_kind(tmp_path, monkeypatch):
+def staged_before(kind: str) -> list[str]:
+    '''The registered kinds that `acquire` tries before `kind`.'''
+    kinds = list(module.REGISTRY)
+    return kinds[:kinds.index(kind)]
+
+
+def test_a_transport_error_stops_acquire_and_keeps_the_staged_kinds(tmp_path, monkeypatch):
     def broken(request):
         raise httpx.ConnectError('unreachable', request=request)
 
-    serve(monkeypatch, tmp_path / 'served', overrides={REFUSED_URL: broken})
-    with pytest.raises(ValueError, match=REFUSED_KIND):
+    calls = serve(monkeypatch, tmp_path / 'served', overrides={REFUSED_URL: broken})
+    with pytest.raises(httpx.ConnectError):
         module.acquire(tmp_path / 'data', 'refs')
+    assert [str(call.url) for call in calls] == [
+        module.REGISTRY[kind].url for kind in [*staged_before(REFUSED_KIND), REFUSED_KIND]]
     staging = tmp_path / 'data/raw/references/cps-job-flows/refs.part'
-    assert len(list(staging.iterdir())) == 7  # six originals and the state file
+    earlier = staged_before(REFUSED_KIND)
+    assert sorted(file.name for file in staging.iterdir()) == sorted(
+        [module.REGISTRY[kind].filename for kind in earlier] + ['staging-state.json'])
+    state = json.loads((staging / 'staging-state.json').read_text())
+    assert set(state['kinds']) == set(earlier)
+    assert not (tmp_path / 'data/raw/references/cps-job-flows/refs').exists()
+    assert not manifest_entries(tmp_path)
+
+
+class BrokenBody(httpx.SyncByteStream):
+    '''A body that delivers its first bytes, then loses the connection.'''
+
+    def __init__(self, head: bytes):
+        self.head = head
+
+    def __iter__(self):
+        yield self.head
+        raise httpx.ReadError('connection reset')
+
+
+def test_a_transport_error_inside_a_body_removes_its_partial(tmp_path, monkeypatch):
+    body = reference_originals(tmp_path / 'probe')[REFUSED_KIND].read_bytes()
+    staging = tmp_path / 'data/raw/references/cps-job-flows/refs.part'
+    partial_file = staging / module.REGISTRY[REFUSED_KIND].filename
+    written = []
+    real_download = module._download
+
+    def watched(client, reference, file):
+        try:
+            real_download(client, reference, file)
+        finally:
+            written.append(file.exists())
+
+    monkeypatch.setattr(module, '_download', watched)
+    serve(monkeypatch, tmp_path / 'served', overrides={REFUSED_URL: lambda request: (
+        httpx.Response(200, headers={'content-length': str(len(body))},
+                       stream=BrokenBody(body[:64])))})
+    with pytest.raises(httpx.ReadError):
+        module.acquire(tmp_path / 'data', 'refs')
+    assert written[-1] is True  # the partial existed when the connection broke
+    assert not partial_file.exists()
+    assert len(list(staging.iterdir())) == len(staged_before(REFUSED_KIND)) + 1
 
 
 def test_a_filesystem_error_is_not_a_refusal(tmp_path, monkeypatch):

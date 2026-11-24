@@ -295,6 +295,25 @@ def test_acquire_failure_is_a_network_line_only_when_the_client_raises_http_erro
     assert result.stdout == ''
 
 
+def test_a_connection_failure_in_the_real_acquire_prints_the_network_line(
+        cli_runner, data_directory, monkeypatch, tmp_path):
+    failing = cps_flow_references.REGISTRY['bls_cps_industry_2022']
+
+    def unreachable(request):
+        raise httpx.ConnectError(SECRET, request=request)
+
+    calls = serve(monkeypatch, tmp_path / 'served', {failing.url: unreachable})
+    result = invoke(cli_runner, 'acquire-references', data_directory, 'refs')
+    assert result.exit_code == 2
+    assert result.stderr == reference_failure('acquire-references', 'network')
+    assert result.stdout == ''
+    assert SECRET not in result.output
+    assert str(calls[-1].url) == failing.url
+    staging = data_directory / RAW / 'refs.part'
+    assert not (staging / failing.filename).exists()
+    assert not (data_directory / RAW / 'refs').exists()
+
+
 def test_import_reference_failure_prints_only_the_fixed_line(cli_runner, data_directory,
                                                              tmp_path):
     file = tmp_path / 'original.csv'
