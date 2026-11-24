@@ -778,3 +778,287 @@ def job_flow_rows(changes: dict[str, dict] | None = None) -> tuple[list[dict], l
                      **{**fields, **changes.get(name, {})})
             for number, (name, (year, fields)) in enumerate(JOB_FLOW_ASEC.items(), start=1)]
     return monthly, asec
+
+
+# ---- The V12 fixture chain (Task 13): raw files to replay-equal bundles, offline
+
+# Made-up identifiers with their own prefixes, long enough that no count, code or hash of a
+# bundle contains them.
+V12_CPSID = 5_544_000_000_000
+V12_CPSIDV = 6_655_000_000_000_000
+V12_CPSIDP = 4_433_000_000_000
+# The IDs of the chain. The Stage 7 run and receipt IDs are the ones that
+# `acs_mapping_fixtures._authenticated_deliveries` and `seed_reconciliation_inputs` use, and
+# `build_fixture_mapping` names the Stage 8 receipt `<mapping run>_references`.
+V12_IDS = {
+    'stage7_run': 'fixture_ipums', 'stage7_receipt': 'references', 'codes_run': 'fixture_codes',
+    'geography_run': 'fixture_geography', 'stage8_mapping_run': 'fixture_mapping',
+    'stage8_receipt': 'fixture_mapping_references', 'cps_receipt': 'stage11_fixture_references'}
+V12_RUNS = {'first': 'v12_first', 'replay': 'v12_replay'}
+# `_authenticated_deliveries` numbers the deliveries in profile order: `usa_1` to `usa_3`, then
+# the two CPS deliveries.
+V12_DELIVERIES = {'monthly': 4, 'asec': 5}
+_V12_JAN, _V12_FEB = (2025, 1, 1), (2025, 2, 2)
+# Each person: (YEAR, MONTH, MISH) at t and at t+1, the fields at t, the fields at t+1. An
+# earlier-month row answers EMPSAME and ACTSAME 99. Every September 2025 row has a null
+# LNKFW1MWT, as delivered: October 2025 is absent.
+V12_PEOPLE = {
+    # An employer change: EMPSAME 1, both codes differ.
+    'P1': (_V12_JAN, _V12_FEB, dict(LNKFW1MWT='1500.1234'),
+           dict(IND='0180', OCC='0020', EMPSAME=1, ACTSAME=99)),
+    # A duty change at the same employer: both codes differ.
+    'P2': (_V12_JAN, _V12_FEB, dict(LNKFW1MWT='1200.5000'),
+           dict(IND='0180', OCC='0040', EMPSAME=2, ACTSAME=2)),
+    # Coding noise: same employer and duties, the industry differs.
+    'P3': (_V12_JAN, _V12_FEB, dict(LNKFW1MWT='1100.2500'),
+           dict(IND='1190', EMPSAME=2, ACTSAME=1)),
+    # An unusable guard: EMPSAME 99, both codes differ.
+    'P4': (_V12_JAN, _V12_FEB, dict(LNKFW1MWT='1300.7500'),
+           dict(IND='0180', OCC='0020', EMPSAME=99, ACTSAME=99)),
+    # Unemployed (21) with last job 0170/0010, then employed.
+    'P5': (_V12_JAN, _V12_FEB, dict(EMPSTAT=21, LNKFW1MWT='1400.0001'),
+           dict(IND='0180', OCC='0020', EMPSAME=99, ACTSAME=99)),
+    # Unemployed (21) with last job 9890/9840, then employed.
+    'P6': (_V12_JAN, _V12_FEB, dict(EMPSTAT=21, IND='9890', OCC='9840', LNKFW1MWT='1600.0002'),
+           dict(EMPSAME=99, ACTSAME=99)),
+    # September to November 2025 with MISH 1 to 3: the two-month link, an employer change.
+    'P7': ((2025, 9, 1), (2025, 11, 3), dict(IND='1190', OCC='0040'),
+           dict(IND='0180', OCC='0010', EMPSAME=1, ACTSAME=99)),
+    # An employer change whose later industry is allocated (QIND 6, 'Blank to allocated value').
+    'P8': (_V12_JAN, _V12_FEB, dict(LNKFW1MWT='1700.0003'),
+           dict(IND='0180', OCC='0020', EMPSAME=1, ACTSAME=99, QIND=6)),
+    # September MISH 3 to November MISH 4: no link.
+    'P9': ((2025, 9, 3), (2025, 11, 4), dict(), dict()),
+}
+# ASEC persons: YEAR and fields. A1 is the difference, with replicate weights that differ from
+# its full weight. Its occupation differs too, so that both ASEC variants have a cell.
+V12_ASEC = {
+    'A1': (2025, dict(INDLY='0170', IND='0180', OCCLY='0010', OCC='0020', ASECWT='2500.1234',
+                      **{f'REPWTP{number}': f'{2500 + number}.1234' for number in range(1, 161)})),
+    'A2': (2026, dict(INDLY='0170', IND='0170', ASECWT='2100.0000')),
+    'A3': (2026, dict(INDLY='0000', OCCLY='0000', ASECWT='2200.0000')),
+    'A4': (2025, dict(INDLY='9890', OCCLY='9840', ASECWT='2300.0000')),
+}
+
+
+def cps_flow_case() -> dict:
+    '''Return the monthly and ASEC rows of the V12 chain and each monthly person's CPSIDV.
+
+    Monthly rows are in delivery order, by sample. Every value is on the committed Census lists,
+    `0000` or a special.
+    '''
+    monthly, cpsidv = [], {}
+    for number, (name, (start, end, earlier, later)) in enumerate(V12_PEOPLE.items(), start=1):
+        person = dict(CPSID=V12_CPSID + number, CPSIDV=V12_CPSIDV + number,
+                      CPSIDP=V12_CPSIDP + number)
+        cpsidv[name] = person['CPSIDV']
+        for (year, month, mish), fields, defaults in (
+                (start, earlier, dict(EMPSAME=99, ACTSAME=99)), (end, later, {})):
+            unlinked = dict(LNKFW1MWT=None) if (year, month) == (2025, 9) else {}
+            monthly.append(monthly_row(YEAR=year, MONTH=month, MISH=mish,
+                                       **{**person, **defaults, **fields, **unlinked}))
+    monthly.sort(key=lambda row: (row['YEAR'], row['MONTH']))
+    asec = [asec_row(YEAR=year, CPSID=V12_CPSID + 100 + number,
+                     CPSIDV=V12_CPSIDV + 100 + number, CPSIDP=V12_CPSIDP + 100 + number, **fields)
+            for number, (year, fields) in enumerate(V12_ASEC.values(), start=1)]
+    return {'monthly': monthly, 'asec': asec, 'cpsidv': cpsidv}
+
+
+def _v12_delivery(data_dir: Path, set_name: str, rows: list[dict]) -> dict:
+    '''Write one CPS raw triple in the layout of `_authenticated_deliveries` and convert it.
+
+    The triple is recorded in the manifest of `data_dir` before the unchanged converter runs.
+    The definition requests every column, with the monthly LABFORCE case selection of the
+    Stage 7 profile. Returns the delivery's `selection.json` entry.
+    '''
+    import gzip
+
+    from embedding_data import ipums_conversion
+
+    columns = MONTHLY_COLUMNS if set_name == 'monthly' else ASEC_COLUMNS
+    suffix = 'b' if set_name == 'monthly' else 's'
+    samples = sorted({f'cps{row["YEAR"]}_{row["MONTH"]:02d}{suffix}' for row in rows})
+    number = V12_DELIVERIES[set_name]
+    name = f'cps_{number}'
+    directory = data_dir / 'raw/cps' / set_name / name
+    directory.mkdir(parents=True)
+    selections = {'LABFORCE': {'general': ['2']}} if set_name == 'monthly' else {}
+    definition = {
+        'collection': 'cps', 'version': None, 'dataFormat': 'csv',
+        'dataStructure': {'rectangular': {'on': 'P'}}, 'description': 'Synthetic CPS fixture',
+        'samples': {sample: {} for sample in samples}, 'dataQualityFlags': True,
+        'variables': {column: {'preselected': False,
+                               'caseSelections': selections.get(column, {}),
+                               'attachedCharacteristics': [], 'dataQualityFlags': False,
+                               'adjustMonetaryValues': False} for column in columns}}
+    (directory / 'extract.json').write_text(json.dumps(definition))
+    (directory / f'{name}.xml').write_text(cps_ddi_xml(set_name, samples), encoding='utf-8')
+    csv_gz = directory / f'{name}.csv.gz'
+    lines = [','.join(columns), *(','.join('' if value is None else str(value)
+                                           for value in row.values()) for row in rows)]
+    with gzip.open(csv_gz, 'wt', encoding='utf-8', newline='') as stream:
+        stream.write('\n'.join(lines) + '\n')
+    for file in (directory / 'extract.json', directory / f'{name}.xml', csv_gz):
+        _record(data_dir, file, client='fixture', client_version='1', collection='cps',
+                extract_number=number, samples=samples)
+    relative = f'derived/cps/{set_name}/{name}.parquet'
+    (data_dir / relative).parent.mkdir(parents=True, exist_ok=True)
+    ipums_conversion.convert(csv_gz, data_dir / relative, 'cps')
+    return {'delivery': name, 'parquet': relative}
+
+
+@dataclass(frozen=True)
+class SeededChain:
+    '''The real upstream bundles of the V12 chain and the Stage 11 request that selects them.'''
+    data_dir: Path
+    request: 'cps_flow_inputs.InputRequest'  # noqa: F821
+    stage7: Path
+    codes: Path
+    mapping: Path
+    originals: dict[str, Path]
+
+
+# Step 1 probe of the existing chain helpers (2026-11-24), before this code was written:
+# (a) `acs_mapping_fixtures._authenticated_deliveries` writes its two CPS deliveries from
+#     constants only: EMPSTAT 10, IND `0170` and OCC `0010` in both, WTFINL `123.5` monthly,
+#     INDLY `0180` and OCCLY `0010` in ASEC. Its `prepare_acs` hook runs for ACS profiles only,
+#     so it has no CPS hook. `seed_cps_chain` narrows `test_ipums_acceptance.PROFILES` to the
+#     three ACS profiles and writes the two CPS triples itself, in the same raw layout.
+# (b) The chain's Stage 4 bundle (`_authenticated_codes`, built from the genuine originals in
+#     `fixtures/acs_mapping/upstream/stage4-originals.zip`) holds the full NAICS 2022 and
+#     SOC 2018 trees: `naics_nodes` has 2,125 rows and `soc_nodes` 1,447 (measured).
+# (c) The `census_industry_2022.xlsx` of the chain's Stage 7 receipt and the
+#     `census_occupation_2018.xlsx` of its Stage 8 receipt have the SHA-256 of the committed
+#     workbooks in `fixtures/acs_mapping/classification/` (measured on a built chain).
+#     `build_fixture_mapping` imports an `acs-mapping-references-v1` receipt, the default of
+#     `seed_mapping_references`; production selects a v2 receipt. The Stage 11 selector reads
+#     only the occupation workbook of that receipt and does not check its version.
+def seed_cps_chain(tmp_path: Path, monkeypatch) -> SeededChain:
+    '''Seed real Stage 4, 7 and 8 bundles, the two CPS deliveries and the Stage 11 receipt.
+
+    This follows `seed_reconciliation_inputs`, then builds the Stage 8 mapping run with
+    `build_fixture_mapping` and imports the Stage 11 references from `reference_originals`
+    through `import_reference`. Everything is under `tmp_path`, with `tmp_path / 'data'` as
+    the data directory.
+    '''
+    import acs_mapping_fixtures as mapping
+    import test_ipums_acceptance
+
+    from embedding_data import cps_flow_inputs, ipums_verification_run, manifest
+    from embedding_data.acs_mapping_contract import SelectionRequest
+    from embedding_data.acs_mapping_inputs import select_inputs
+
+    mapping.forbid_external_access(monkeypatch)
+    data_dir = tmp_path / 'data'
+    directory = tmp_path / 'authenticated-setup'
+    directory.mkdir()
+    with pytest.MonkeyPatch.context() as profiles:
+        profiles.setattr(test_ipums_acceptance, 'PROFILES', [
+            profile for profile in test_ipums_acceptance.PROFILES if profile[0] == 'acs'])
+        selection = mapping._authenticated_deliveries(
+            data_dir, directory, monkeypatch, prepare_acs=mapping._reconciliation_delivery)
+    case = cps_flow_case()
+    selected = json.loads(selection.read_text())
+    for set_name in V12_DELIVERIES:
+        selected[f'cps/{set_name}'] = _v12_delivery(data_dir, set_name, case[set_name])
+    selection.write_text(json.dumps(selected))
+    codes = mapping._authenticated_codes(data_dir, directory)
+    geography = mapping._authenticated_geography(data_dir, directory)
+    stage7 = ipums_verification_run.measure(data_dir, V12_IDS['stage7_run'],
+                                            V12_IDS['stage7_receipt'], selection)
+    pins = {name: manifest.sha256_file(path / 'outputs.json') for name, path in (
+        ('codes', codes), ('geography', geography), ('ipums', stage7))}
+    stage7_receipt = (data_dir / 'raw/references/ipums-verification'
+                      / V12_IDS['stage7_receipt'] / 'receipt.json')
+    stage8_request = SelectionRequest(
+        V12_IDS['codes_run'], pins['codes'], V12_IDS['geography_run'], pins['geography'],
+        V12_IDS['stage7_run'], pins['ipums'], manifest.sha256_file(stage7_receipt))
+    select_inputs(data_dir, stage8_request).verify()
+    fixture = mapping.FixtureInputs(
+        data_dir, stage8_request,
+        json.loads((stage7 / 'inputs.json').read_text())['deliveries'], pins)
+    built = mapping.build_fixture_mapping(fixture, V12_IDS['stage8_mapping_run'], monkeypatch)
+    stage8_receipt = (data_dir / 'raw/references/acs-mapping' / V12_IDS['stage8_receipt']
+                      / 'receipt.json')
+    originals = reference_originals(tmp_path / 'stage11-originals')
+    for kind, file in originals.items():
+        cps_flow_references.import_reference(data_dir, V12_IDS['cps_receipt'], kind, file)
+    cps_receipt = (data_dir / cps_flow_references.SNAPSHOT_ROOT / V12_IDS['cps_receipt']
+                   / 'receipt.json')
+    request = cps_flow_inputs.InputRequest(
+        stage7_run=V12_IDS['stage7_run'], stage7_outputs_sha256=pins['ipums'],
+        stage7_receipt=V12_IDS['stage7_receipt'],
+        stage7_receipt_sha256=manifest.sha256_file(stage7_receipt),
+        stage8_receipt=V12_IDS['stage8_receipt'],
+        stage8_receipt_sha256=manifest.sha256_file(stage8_receipt),
+        stage8_mapping_run=V12_IDS['stage8_mapping_run'],
+        stage8_mapping_outputs_sha256=built['outputs_sha256'],
+        codes_run=V12_IDS['codes_run'], codes_outputs_sha256=pins['codes'],
+        cps_receipt=V12_IDS['cps_receipt'], cps_receipt_sha256=manifest.sha256_file(cps_receipt))
+    return SeededChain(data_dir, request, stage7, codes, Path(built['directory']), originals)
+
+
+def _count_external_access(monkeypatch, counts: dict[str, int]) -> list:
+    '''Install the counted guards on `counts` and count the Stage 11 client too.
+
+    `offline_guards` does the same with a new dict; the chain needs one dict across the
+    reinstalls of the upstream helpers. Returns the probes of every counted seam.
+    '''
+    from functools import partial
+
+    from acs_target_fixtures import install_counted_guards
+
+    probes = install_counted_guards(monkeypatch, counts)
+
+    def deny(*args, **kwargs):
+        counts['live_client'] += 1
+        raise AssertionError('offline CPS job flows attempted a live client')
+
+    monkeypatch.setattr(cps_flow_references, 'make_client', deny)
+    return [*probes, ('live_client', partial(deny, 'guard-probe'))]
+
+
+def run_cps_flow_v12(data_dir: Path, monkeypatch) -> dict:
+    '''Seed the chain under counted guards, then build, verify, build again and compare.
+
+    Returns the `SeededChain`, the converter calls, each build response and its verification,
+    the comparison, the external-access counts and the probes of the counting guards.
+    '''
+    import acs_mapping_fixtures as mapping
+
+    from embedding_data import cps_flow_bundle, ipums_conversion
+
+    counts = {'network': 0, 'environment_file': 0, 'live_client': 0}
+    probes = []
+    original_guard = mapping.forbid_external_access
+
+    def counted_guard(patch):
+        original_guard(patch)
+        probes[:] = _count_external_access(patch, counts)
+
+    # The upstream seed and build helpers reinstall their guards: layer the counters after.
+    monkeypatch.setattr(mapping, 'forbid_external_access', counted_guard)
+    counted_guard(monkeypatch)
+    conversions = []
+    convert = ipums_conversion.convert
+
+    def recorded_convert(csv_gz, parquet, source):
+        conversions.append((Path(csv_gz), Path(parquet), source))
+        return convert(csv_gz, parquet, source)
+
+    monkeypatch.setattr(ipums_conversion, 'convert', recorded_convert)
+    chain = seed_cps_chain(data_dir.parent, monkeypatch)
+    if chain.data_dir != data_dir:
+        raise ValueError('the chain seeded another data directory')
+    counted_guard(monkeypatch)
+    result = {'chain': chain, 'conversions': conversions, 'external_access_counts': counts,
+              'probes': probes}
+    for key, run_id in V12_RUNS.items():
+        response = cps_flow_bundle.build(data_dir, run_id, chain.request)
+        result[key] = response
+        result[key + '_verification'] = cps_flow_bundle.verify_bundle(
+            Path(response['directory']), data_dir,
+            expected_outputs_sha256=response['outputs_sha256'])
+    result['compared'] = cps_flow_bundle.compare_runs(
+        Path(result['first']['directory']), Path(result['replay']['directory']))
+    return result
