@@ -112,14 +112,21 @@ project would write. A company-name match never establishes a link.
 
 | Use | Roadmap outcome | Verdict | Source |
 |---|---|---|---|
-| Supply-chain dependency | O9 | Covered, partial, non-headline | BEA input–output tables |
-| Look-alike prospecting | O10 | Covered, partial, non-headline | BEA input–output tables |
+| Supply-chain dependency | O9 | **Uncovered** (owner, 2026-11-23; was covered, partial, non-headline) | none; the BEA tables stopped the Stage 15 preflight |
+| Look-alike prospecting | O10 | **Uncovered** (owner, 2026-11-23; was covered, partial, non-headline) | none; the BEA tables stopped the Stage 15 preflight |
 | KYB and anomaly detection | O6 | Covered, partial | USAspending subawards with SAM.gov entity NAICS |
 | Peer and competitor detection | O7 | Covered, partial | EPA TRI facility parent links |
 | Holding-company classification | O8 | Covered, partial | EPA TRI facility parent links |
 | Co-visitation and foot traffic | O11 | **Uncovered** | none |
 
-Two pairs of uses share one source. Supply chain and look-alike read the same BEA
+The two BEA rows were amended on 2026-11-23, as the rule "Verdicts are conditional"
+requires. The Stage 15 preflight read the real files and stopped on three measured
+mismatches with the layout this spec assumed (a repeated concordance code on 93 rows,
+two uncoded Use columns, and one commodity outside the rounding bound). The record is
+`specs/naics-evaluation-data-stage-15-findings.md`. Source 1 below stays as the plan
+of record. It does not describe a build that exists. Checks E1 to E3 were not read.
+
+Two pairs of uses shared one source. Supply chain and look-alike read the same BEA
 table in two directions. Peer and holding-company read the same TRI parent links.
 For held-out judging, each pair is one evidence family, not two. If one use's
 table trains the embedding, the other use's table cannot judge it.
