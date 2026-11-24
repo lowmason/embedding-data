@@ -1,5 +1,7 @@
 '''Tests for the CPS value classes, the monthly panel and the person-month links.'''
 
+import json
+
 import polars as pl
 import pytest
 
@@ -131,9 +133,13 @@ def test_value_class_counts_by_field_file_and_year():
 
 
 def test_special_years_are_listed_in_order():
-    frame = codes(['9890', '9890', '0170'], year=[2026, 2025, 2025])
+    years = list(range(2035, 2019, -1))
+    frame = codes(['9890'] * len(years) + ['0170'], year=[*years, 2025])
     found = count_value_classes(frame, 'asec', {'IND': 'industry'}, units())
-    assert list(found['asec/IND']['special_by_year']) == ['2025', '2026']
+    expected = [str(year) for year in sorted(years)]
+    assert list(found['asec/IND']['special_by_year']) == expected
+    assert json.dumps(found['asec/IND']['special_by_year']) == json.dumps(
+        dict.fromkeys(expected, 1))
 
 
 def test_value_class_counts_with_no_special_are_zero():
