@@ -556,6 +556,18 @@ def test_inputs_record_the_selection_rules_divisors_and_bootstrap(built):
     assert set(inputs['execution']) == {'commit', 'dirty', 'created_at'}
 
 
+def test_inputs_are_recorded_in_the_form_json_reads_back(built):
+    selected = cps_flow_inputs.select_inputs(built.data_dir, built.request)
+    ddi = {'monthly': cps_flow_inputs.check_ddi('monthly', selected.monthly.ddi),
+           'asec': cps_flow_inputs.check_ddi('asec', selected.asec.ddi)}
+    assert 1 in ddi['monthly']['EMPSAME']
+    recorded = read(built.directory, 'inputs.json')
+    inputs = cps_flow_bundle._inputs(FIRST, selected, ddi, freeze_software(),
+                                     recorded['execution'])
+    assert inputs == recorded
+    assert '1' in inputs['rules']['ddi']['monthly']['EMPSAME']
+
+
 def test_tables_have_their_contract_schemas(built):
     targets = table(built.directory, 'cps_job_flows')
     assert list(targets.schema.items()) == list(target_contract.TARGET_SCHEMA.items())
