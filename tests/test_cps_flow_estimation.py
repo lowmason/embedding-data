@@ -340,6 +340,26 @@ def test_a_share_divides_the_two_published_totals():
     assert published in hand
 
 
+def test_a_household_draw_count_applies_to_each_of_its_links():
+    records = monthly([(7, '0170', '0180', P1, '10'), (7, '0170', '0180', P2, '20'),
+                       (7, '0170', '0190', P2, '4'), (8, '0170', '0180', P1, '5'),
+                       (9, '0170', '0190', P1, '3')])
+    draws = draws_for(records)
+    counts = draw_counts(draws)
+    found = estimate_monthly(records, EE, draws)
+    assert target(found, '0170', '0180', 'average_total')['value'] == 35 / MONTHLY_K
+    for unit_b in ('0180', '0190'):
+        rows = cell_replicates(found, '0170', unit_b)
+        numerators = [hand_replicate(records, counts, '0170', unit_b, replicate)
+                      for replicate in REPLICATES]
+        assert rows['numerator'].to_list() == numerators
+        assert rows['denominator'].to_list() == [
+            hand_replicate(records, counts, '0170', None, replicate) for replicate in REPLICATES]
+        total = target(found, '0170', unit_b, 'average_total')
+        assert total['se'] == pytest.approx(statistics.stdev(numerators), rel=1e-12)
+    assert any(counts[replicate, 7] > 1 for replicate in REPLICATES)
+
+
 def test_monthly_ses_are_the_bootstrap_sd_of_the_replicate_statistics():
     rows = [(cpsid, '0170', '0180' if cpsid <= 10 else '0190', P1 if cpsid % 2 else P2,
              str(cpsid * 3)) for cpsid in range(1, 31)]
