@@ -285,9 +285,22 @@ def test_target_rows_refuse_a_wrong_unit_or_label(estimates):
                     units)
     with pytest.raises(ValueError, match='labels'):
         target_rows({EE_STRICT: estimates[EE_SENS]}, units)
+    with pytest.raises(ValueError, match='labels'):
+        target_rows({Variant('monthly_ue', 'industry', 'sensitivity'): estimates[UE_SENS]},
+                    units)
+    with pytest.raises(ValueError, match='labels'):
+        target_rows({Variant('monthly_ee', 'occupation', 'sensitivity'): estimates[UE_SENS]},
+                    units)
 
 
 # The companion tables.
+
+def assert_sorted(table: pl.DataFrame, columns: list[str]) -> None:
+    '''Check, with Python's ordering and nulls first, that rows follow `columns` in order.'''
+    keys = [tuple((value is not None, value) for value in row)
+            for row in table.select(columns).iter_rows()]
+    assert keys == sorted(keys)
+
 
 def test_companion_tables_have_the_fixed_ordered_schemas(estimates, rows):
     assert {name: list(schema.items()) for name, schema in COMPANION_SCHEMAS.items()} == {
@@ -300,6 +313,15 @@ def test_companion_tables_have_the_fixed_ordered_schemas(estimates, rows):
         'cps_linked_pairs']
     assert unit_frame().schema == COMPANION_SCHEMAS['cps_category_units']
     assert list(support_table(estimates).schema) == list(SCHEMAS['cps_flow_support'])
+    # Rows sort as the Schemas section says, whatever order the inputs arrive in.
+    assert_sorted(support_table(estimates), ['product', 'dimension', 'policy', 'kind',
+                                             'unit_a', 'unit_b', 'period'])
+    assert_sorted(replicates_table(estimates), ['product', 'dimension', 'policy', 'unit_a',
+                                                'unit_b', 'replicate'])
+    diagnostics = diagnostics_table(diagnostic_parts())
+    assert_sorted(diagnostics, list(SCHEMAS['cps_flow_diagnostics']))
+    assert_sorted(linked_pairs_table(pair_frame(PAIR_ROWS)),
+                  ['month_a', 'link_type', 'CPSIDV'])
 
 
 def test_support_rows_sort_by_every_column_in_order(estimates):
@@ -588,6 +610,8 @@ def test_distribution_percentiles_use_the_nearest_rank():
     seven = n_unweighted_distribution(counts_frame([70, 10, 20, 30, 40, 50, 60]))
     assert [seven[name] for name in ('p10', 'p25', 'p50', 'p75', 'p90')] == [
         10, 20, 40, 60, 70]
+    twenty = n_unweighted_distribution(counts_frame(list(range(20, 0, -1))))
+    assert [twenty[name] for name in ('p10', 'p25', 'p50', 'p75', 'p90')] == [2, 5, 10, 15, 18]
     one = n_unweighted_distribution(counts_frame([7]))
     assert [one[name] for name in ('p10', 'p25', 'p50', 'p75', 'p90')] == [7] * 5
     assert (one['cells'], one['min'], one['max']) == (1, 7, 7)
