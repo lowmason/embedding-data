@@ -289,6 +289,37 @@ def test_a_total_is_the_float_of_the_exact_sum_over_k():
     assert exact != 3 * float(big) / MONTHLY_K
     assert target(found, '0170', '0190', 'average_total')['value'] == exact
     assert target(found, '0170', '0180', 'average_total')['value'] == 1 / 18
+    origin = float(Decimal(3 * (2 ** 53 + 1) + 1)) / MONTHLY_K
+    assert origin != (3 * float(big) + 1) / MONTHLY_K
+    assert target(found, '0170', '0190', 'forward_share')['value'] == exact / origin
+
+
+def test_replicate_sums_are_exact_decimal_sums():
+    big = str(2 ** 53 + 1)
+    records = monthly([(1, '0170', '0180', P1, '1'), (2, '0170', '0190', P1, big),
+                       (3, '0170', '0190', P1, big), (4, '0170', '0190', P1, big)])
+    draws = draws_for(records)
+    counts = draw_counts(draws)
+    rows = cell_replicates(estimate_monthly(records, EE, draws), '0170', '0190')
+    numerators = [hand_replicate(records, counts, '0170', '0190', replicate)
+                  for replicate in REPLICATES]
+    denominators = [hand_replicate(records, counts, '0170', None, replicate)
+                    for replicate in REPLICATES]
+    floating = [float(big) * sum(counts[replicate, cpsid] for cpsid in (2, 3, 4)) / MONTHLY_K
+                for replicate in REPLICATES]
+    assert numerators != floating
+    assert rows['numerator'].to_list() == numerators
+    assert rows['denominator'].to_list() == denominators
+
+    found = estimate_asec(asec([('0010', '0020', Y1, big, None)] * 3
+                               + [('0010', '0030', Y2, '1', None)]), ASEC)
+    exact = float(Decimal(3 * (2 ** 53 + 1))) / ASEC_K
+    origin = float(Decimal(3 * (2 ** 53 + 1) + 1)) / ASEC_K
+    assert (exact, origin) != (3 * float(big) / ASEC_K, (3 * float(big) + 1) / ASEC_K)
+    rows = cell_replicates(found, '0010', '0020')
+    assert rows['numerator'].to_list() == [exact] * ASEC_R
+    assert rows['denominator'].to_list() == [origin] * ASEC_R
+    assert target(found, '0010', '0020', 'average_total')['value'] == exact
 
 
 def test_a_share_divides_the_two_published_totals():
@@ -467,6 +498,7 @@ def test_standard_errors_sum_with_fsum():
     assert bootstrap_se(values) == math.sqrt(math.fsum((value - mean) ** 2
                                                        for value in values) / 2)
     assert bootstrap_se(values) == 5773502691896258.0
+    assert bootstrap_se([1e-08, 3.0, -3.0, -1e8, 1e8, -1e-08]) == 63245553.20336762
     deviations = [1e8, 1.0, 1e-8] + [0.0] * (ASEC_R - 3)
     assert replicate_se(0.0, deviations) == 15811388.300841898
 
