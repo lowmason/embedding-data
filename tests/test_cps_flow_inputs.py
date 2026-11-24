@@ -128,6 +128,12 @@ def flip(file: Path) -> None:
     file.write_bytes(bytes(data))
 
 
+def truncate(file: Path) -> None:
+    '''Cut a file to half its size, so that a Parquet reader cannot open it.'''
+    data = file.read_bytes()
+    file.write_bytes(data[:len(data) // 2])
+
+
 def repin(directory: Path) -> str:
     '''Rewrite every present file's record in `outputs.json`, keeping its keys; return the pin.'''
     outputs_file = directory / 'outputs.json'
@@ -294,7 +300,8 @@ def test_changed_parquet_raw_csv_or_manifest_entry_fails(upstreams):
 
 
 @pytest.mark.parametrize('case', ['asec_parquet', 'asec_xml', 'monthly_extract',
-                                  'unrecorded_csv', 'parquet_part_of_record'])
+                                  'unrecorded_csv', 'parquet_part_of_record',
+                                  'truncated_parquet'])
 def test_each_delivery_file_is_authenticated(upstreams, case):
     data_dir = upstreams.data_dir
     stage7 = run_directory(upstreams, 'stage7_run')
@@ -312,12 +319,25 @@ def test_each_delivery_file_is_authenticated(upstreams, case):
     elif case == 'unrecorded_csv':
         edit_manifest(data_dir, 'cps_00002/cps_00002.csv.gz', lambda entry: None)
         message = 'raw file is not recorded'
+    elif case == 'truncated_parquet':
+        truncate(data_dir / 'derived/cps/monthly/cps_00001.parquet')
+        message = 'monthly: Parquet differs from its Stage 7 record'
     else:
         pin = edit_json(stage7, 'inputs.json', lambda value: value['deliveries']['cps/monthly'][
             'parquet_record'].update(rows=99))
         message = 'monthly: Parquet differs from its Stage 7 record'
     with pytest.raises(ValueError, match=message):
         select(upstreams, stage7_outputs_sha256=pin)
+
+
+@pytest.mark.parametrize('upstream, name', [
+    ('stage7_run', 'inputs.json'), ('stage8_mapping_run', 'inputs.json'),
+    ('codes_run', 'inputs.json'), ('codes_run', 'report.json')])
+def test_a_used_file_that_differs_from_its_inventory_fails(upstreams, upstream, name):
+    file = run_directory(upstreams, upstream) / name
+    file.write_text(file.read_text() + '\n')
+    with pytest.raises(ValueError, match=f'{name}: inventory hash or size differs'):
+        cps_flow_inputs.select_inputs(upstreams.data_dir, upstreams.request)
 
 
 @pytest.mark.parametrize('case', ['stage7_reference_id', 'stage7_receipt_citation',
@@ -365,7 +385,7 @@ def test_only_the_used_files_are_read(upstreams):
 @pytest.mark.parametrize('case', ['industry_workbook', 'occupation_workbook',
                                   'documentary_original', 'original_manifest_entry',
                                   'receipt_manifest_entry', 'unrecorded_receipt',
-                                  'citation_of_another_file'])
+                                  'citation_of_another_file', 'stage11_original'])
 def test_each_used_receipt_original_is_authenticated(upstreams, case):
     data_dir = upstreams.data_dir
     stage7 = run_directory(upstreams, 'stage7_receipt')
@@ -391,6 +411,9 @@ def test_each_used_receipt_original_is_authenticated(upstreams, case):
     elif case == 'unrecorded_receipt':
         edit_manifest(data_dir, f'{stage8.name}/receipt.json', lambda entry: None)
         message = 'raw file is not recorded'
+    elif case == 'stage11_original':
+        flip(run_directory(upstreams, 'cps_receipt') / 'cps_industry_codes.csv')
+        message = 'reference inventory hash or size differs'
     else:
         other = stage7 / 'asec_2026_documentation.pdf'
         changes['stage7_receipt_sha256'] = rewrite_receipt(
@@ -503,7 +526,8 @@ def test_delivery_records_must_name_their_own_files(upstreams, case):
 
 @pytest.mark.parametrize('case', ['report_rows', 'report_schema', 'reordered_columns',
                                   'path_type', 'missing_record', 'record_without_size',
-                                  'changed_table', 'mapping_rows', 'mapping_record_keys'])
+                                  'changed_table', 'truncated_table', 'mapping_rows',
+                                  'mapping_record_keys'])
 def test_used_tables_must_match_their_records(upstreams, case):
     codes = run_directory(upstreams, 'codes_run')
     mapping = run_directory(upstreams, 'stage8_mapping_run')
@@ -543,6 +567,10 @@ def test_used_tables_must_match_their_records(upstreams, case):
         flip(codes / 'naics_nodes.parquet')
         pin = upstreams.request.codes_outputs_sha256
         message = 'naics_nodes.parquet: inventory hash or size differs'
+    elif case == 'truncated_table':
+        truncate(codes / 'soc_nodes.parquet')
+        pin = upstreams.request.codes_outputs_sha256
+        message = 'soc_nodes.parquet: inventory hash or size differs'
     else:
         field = 'stage8_mapping_outputs_sha256'
         if case == 'mapping_rows':
