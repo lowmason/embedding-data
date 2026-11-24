@@ -1,8 +1,9 @@
 '''Independent reconciliation of one published CPS job-flow bundle with its upstream files.
 
-Written from the Stage 11 spec (`specs/cps-job-change-flows.md`) and the plan's Schemas and
-Settled Defaults (`specs/plans/23-cps-job-change-flows.md`), not from the build modules, and
-importing none of them: only the standard library, Polars and fastexcel. After the detached
+Written from the Stage 11 spec (`specs/completed/cps-job-change-flows.md`) and the plan's
+Schemas and Settled Defaults (`specs/plans/completed/23-cps-job-change-flows.md`), not from
+the build modules, and importing none of them: only the standard library, Polars and
+fastexcel. After the detached
 `outputs.json` pin and the bundle inventory pass, it takes from `inputs.json` only where each
 upstream file lives and the hash recorded for it, and checks every file it reads against that
 hash. It reads the two CPS Parquets, the literal weights of their raw CSV files with

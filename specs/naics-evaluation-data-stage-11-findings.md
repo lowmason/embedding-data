@@ -1,7 +1,7 @@
 # Stage 11 findings: CPS job-change flows, first build
 
 This file records facts from the first full-data build of the CPS job-change flows.
-The design is in [the stage spec](cps-job-change-flows.md). The plan was
+The design is in [the stage spec](completed/cps-job-change-flows.md). The plan was
 `specs/plans/23-cps-job-change-flows.md`. Every number here comes from the published
 `report.json`, the published tables, the command logs or the checks listed below. Fixture
 results are software readiness and never benchmarks. Nothing here validates the

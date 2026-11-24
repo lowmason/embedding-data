@@ -1,5 +1,7 @@
 # CPS job-change flows
 
+**Status: COMPLETE (2026-11-24)** — implemented by [plan 23](../plans/completed/23-cps-job-change-flows.md); the measured run is in the [Stage 11 findings](../naics-evaluation-data-stage-11-findings.md).
+
 > Next step: writing-plans in a fresh session against this file. Do not acquire
 > or import a reference, and do not build, before the plan exists and the owner
 > gives the go-ahead for each write.
@@ -7,7 +9,7 @@
 Status: the owner approved this committed spec on 2026-11-23 ("Approve the
 spec"), including every call marked "My call" and the proposed refinement of
 decision 5. Stage 11 design session of
-[the roadmap](naics-evaluation-data-roadmap.md), 2026-11-23. The owner made the
+[the roadmap](../naics-evaluation-data-roadmap.md), 2026-11-23. The owner made the
 seven decisions below in this session. Calls marked "My call" were made while
 writing this file. A builder check by a separate reviewer read the draft before
 the owner did. It raised three questions, which the owner answered as decisions
@@ -28,12 +30,12 @@ Stage 11 builds the CPS job-change flows once on real data and verifies them
    the monthly panel and the ASEC, with weights and standard errors.
 
 R4.3, R4.6–R4.9, R4.11, R5.1, R7.1, R7.4, R8, R9 and V11 of
-[the source spec](embedding-evaluation-data-spec.md) govern this stage. Its
+[the source spec](../embedding-evaluation-data-spec.md) govern this stage. Its
 amendments are listed under [Source spec amendment](#source-spec-amendment).
-Section K8 of [the methodology](evaluation-targets-methodology.md) gives the
-estimands. The ACS targets spec ([Stage 9](acs-targets.md)) is the model for
+Section K8 of [the methodology](../evaluation-targets-methodology.md) gives the
+estimands. The ACS targets spec ([Stage 9](../acs-targets.md)) is the model for
 category units, evidence policies, the support and replicate tables, and the
-undefined-SE rules. The TRI spec ([Stage 5](completed/tri-parent-links.md)) is
+undefined-SE rules. The TRI spec ([Stage 5](tri-parent-links.md)) is
 the model for the commands, the bundle, the host rule and acceptance.
 
 ### Owner decisions (2026-11-23)
@@ -87,7 +89,8 @@ owner approved them with this file.
 
 - Worker profiles, the CPS staffing check and CPS state migration (old
   Stage 12). The size gate, comparators and full eight-family V12 (old
-  Stage 13). Both stay deferred until Stages 9 and 11 tick.
+  Stage 13). Both stay deferred until Stages 9 and 11 tick. → item:
+  embedding-evaluation-data-spec-roadmap
 - The CPS protocol section (O21). No flow is scored here.
 - A replay build and the long-form acceptance finding. They belong to a later
   hardening outcome, as O12 and O25 did for TRI and USAspending.
@@ -726,8 +729,8 @@ No replay build runs in this stage.
 
 ## Source spec amendment
 
-The plan applies these to [the source spec](embedding-evaluation-data-spec.md),
-`CLAUDE.md` and [the methodology](evaluation-targets-methodology.md) when the
+The plan applies these to [the source spec](../embedding-evaluation-data-spec.md),
+`CLAUDE.md` and [the methodology](../evaluation-targets-methodology.md) when the
 stage ships, each marked *(owner, Stage 11 design, 2026-11-23;
 [stage spec](cps-job-change-flows.md))*:
 

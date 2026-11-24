@@ -418,7 +418,7 @@ rates. `LNKFW1MWT` is missing for September 2025 months-in-sample 1–7.
 *(verified; CPS)* `LNKFW1MWT` sits on the earlier month of a link. September
 2025 has none, so September-to-November 2025 links are unweighted and enter no
 weighted flow. *(owner, Stage 11 design, 2026-11-23;
-[stage spec](cps-job-change-flows.md))*
+[stage spec](completed/cps-job-change-flows.md))*
 
 **R4.8** **A code change is a transition only when the respondent says the job
 changed.** Under dependent interviewing, last month's industry and occupation
@@ -428,7 +428,7 @@ a different employer or `ACTSAME` reports changed duties; code differences
 without either are flagged as coding noise and excluded. An industry move
 counts only when `EMPSAME` reports a different employer. A same-employer duty
 change admits an occupation move only. *(owner, Stage 11 design, 2026-11-23;
-[stage spec](cps-job-change-flows.md))* `EMPSAME` is undefined
+[stage spec](completed/cps-job-change-flows.md))* `EMPSAME` is undefined
 in months-in-sample 1 and 5 and has documented not-in-universe gaps, so every
 transition target reports the share of linked pairs with a usable flag.
 Unemployment-to-employment transitions use the industry and occupation the
@@ -443,7 +443,7 @@ support the 2022 scheme. `9890` is the CPS Armed Forces code. Census settles it
 for the 2026 basic monthly files. No 2026 ASEC document defines it, so its ASEC
 2026 meaning stays unresolved by owner decision. *(verified V6, plan 7, 2026-10-15;
 [measured field/year matrix](findings/stage-7-ipums-extract-verification.md#v6-field--and-year-specific-asec-industry-evidence);
-owner, Stage 11 design, 2026-11-23; [stage spec](cps-job-change-flows.md))*
+owner, Stage 11 design, 2026-11-23; [stage spec](completed/cps-job-change-flows.md))*
 
 **R4.10** Migration targets are state-to-state flows from `MIGSTA1` to
 `STATEFIP`, with a job-related subset defined by `WHYMOVE`: new job or transfer,
@@ -493,7 +493,7 @@ A CPS occupation category whose SOC entry is an X token takes as candidates the
 detailed codes matching the token minus those that other list rows and narrower
 X rows claim. Each set must be a subset of the ACS PUMS member list, whose extra
 members other Census rows claim. A failed check fails the build. *(owner,
-Stage 11 design, 2026-11-23; [stage spec](cps-job-change-flows.md))*
+Stage 11 design, 2026-11-23; [stage spec](completed/cps-job-change-flows.md))*
 
 **R5.4** Vintage concordances — ITA's 2012 and 2017 codes, and the 2022 ACS
 comparator's 2017-based codes — carry one-to-many and many-to-many relationships
@@ -695,7 +695,7 @@ bullet here.
   candidates empty and nodes null, and report them separately from mapped and
   unparseable codes. They enter no headline product and admit no other
   unsupported value. *(owner, Stage 11 design, 2026-11-23;
-  [stage spec](cps-job-change-flows.md))*
+  [stage spec](completed/cps-job-change-flows.md))*
 - **V12 — offline contract test**. From fixture raw files through Parquet
   conversion, code parsing, geography allocation, one target per family, and the
   manifest, with no network and no credentials.

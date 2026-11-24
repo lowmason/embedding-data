@@ -870,7 +870,7 @@ product `asec_retro`. It runs from last year's longest job to the current job an
 unguarded, so it is an upper bound on job change. Each category keeps its Census code and
 its official NAICS 2022 or SOC 2018 candidate set. The codes `9890` and `9840` are the
 Armed Forces special categories. They have no candidates and never enter a headline
-product. The [stage spec](specs/cps-job-change-flows.md) defines every rule.
+product. The [stage spec](specs/completed/cps-job-change-flows.md) defines every rule.
 
 The one `targets-v1` family is `cps_job_flows`. The measures are `average_total` and
 `forward_share`, under the policies `strict` (monthly only) and `sensitivity`. Standard
