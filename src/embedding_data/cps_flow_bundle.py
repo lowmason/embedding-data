@@ -384,8 +384,13 @@ def _guard_states(links: pl.DataFrame) -> dict:
     return states
 
 
+def _eligible(frame: pl.DataFrame) -> pl.DataFrame:
+    '''The rows of a product frame that the product admits.'''
+    return frame.filter(pl.col('reason') == 'eligible')
+
+
 def _reason_counts(frame: pl.DataFrame) -> dict[str, int]:
-    '''Count each entry of the `inclusion_reasons` lists over every row of a product frame.'''
+    '''Count each entry of the `inclusion_reasons` lists over every row of `frame`.'''
     entries = frame.select(pl.col('inclusion_reasons').explode().drop_nulls()).to_series()
     return dict(sorted(entries.value_counts().iter_rows()))
 
@@ -498,12 +503,14 @@ def _products(selected: cps_flow_inputs.SelectedInputs, scratch: Path,
                 pl.col('MISH').alias('mish_b'), pl.col('EMPSAME').alias('empsame_b'))),
             'usable_share': cps_flow_guards.usable_guard_share(one_month.lazy()),
         },
+        # The inclusion reasons and special ends of the records each product admits.
         'evidence': {
-            'monthly': {f'{product}:{dimension}': _reason_counts(frame)
+            'monthly': {f'{product}:{dimension}': _reason_counts(_eligible(frame))
                         for (product, dimension), frame in monthly.items()},
             'asec_flags': cps_flow_guards.asec_flag_counts(persons.lazy()),
         },
-        'specials': {name: int(frame['special'].sum()) for name, frame in frames.items()},
+        'specials': {name: int(_eligible(frame)['special'].sum())
+                     for name, frame in frames.items()},
     }
     pairs = links.join(_memberships(monthly), on=LINK_KEYS, how='left', validate='1:1',
                        maintain_order='left').with_columns(

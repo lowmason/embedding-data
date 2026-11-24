@@ -21,12 +21,11 @@ never holds a `CPSIDV`, a `CPSID`, a household or a row.
   `guard_source_exceptions` count over the monthly panel rows renamed to `mish_b` and
   `empsame_b`; and `usable_share`, the `usable_guard_share` result.
 - `evidence`: `monthly` (`<product>:<dimension>` to inclusion reason to count), the count of
-  each entry of the `inclusion_reasons` list column of that monthly `product_frame`, over
-  every row of the frame whatever its `reason` or `strict` status; `asec_flags` (the
-  `asec_flag_counts` result, over every ASEC row).
+  each entry of the `inclusion_reasons` list column of that monthly `product_frame`, over the
+  eligible rows of the frame (`reason == 'eligible'`), so it counts the reasons a record is
+  admitted; `asec_flags` (the `asec_flag_counts` result, over every ASEC row).
 - `specials`: `<product>:<dimension>` to the number of rows of that `product_frame` whose
-  `special` column is true, over every row of the frame, not only eligible or sensitivity
-  rows.
+  `special` column is true, over the eligible rows of the frame (`reason == 'eligible'`).
 
 The functions here count what they are given and check no population: the populations above
 are the contract that the caller (Task 11) must meet.

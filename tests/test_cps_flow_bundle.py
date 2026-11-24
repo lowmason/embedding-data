@@ -721,26 +721,39 @@ def test_guards_evidence_and_specials_are_counted_over_their_populations(built):
         ('monthly_ee', 'occupation', 'unusable'): 3,
         ('monthly_ee', 'industry', 'noise_after_duty_change'): 1,
         (None, None, 'empsame_in_mish_1_or_5'): 2}
+    # Evidence and specials count the eligible rows only: the reasons a record is admitted.
+    # E6's edited QOCC (an unusable guard), E14's special ends (an unusable guard) and the
+    # specials of U3 and U8 (unemployed origins) never reach monthly_ee; E8's allocated QIND
+    # (employed origin) never reaches monthly_ue.
     evidence = {key: count for key, count in diagnostics(built, 'evidence').items()
                 if key[0] != 'asec_retro'}
     assert evidence == {
         ('monthly_ee', 'industry', 'flag:QIND:allocated'): 1,
-        ('monthly_ee', 'industry', 'special_military'): 2,
-        ('monthly_ee', 'occupation', 'flag:QOCC:edited'): 1,
-        ('monthly_ee', 'occupation', 'special_military'): 3,
-        ('monthly_ue', 'industry', 'flag:QIND:allocated'): 1,
-        ('monthly_ue', 'industry', 'special_military'): 2,
-        ('monthly_ue', 'occupation', 'flag:QOCC:edited'): 1,
-        ('monthly_ue', 'occupation', 'special_military'): 3}
+        ('monthly_ue', 'industry', 'special_military'): 1,
+        ('monthly_ue', 'occupation', 'special_military'): 2}
     assert diagnostics(built, 'special') == {
-        ('monthly_ee', 'industry', 'special_end'): 2,
-        ('monthly_ee', 'occupation', 'special_end'): 3,
-        ('monthly_ue', 'industry', 'special_end'): 2,
-        ('monthly_ue', 'occupation', 'special_end'): 3,
+        ('monthly_ee', 'industry', 'special_end'): 0,
+        ('monthly_ee', 'occupation', 'special_end'): 0,
+        ('monthly_ue', 'industry', 'special_end'): 1,
+        ('monthly_ue', 'occupation', 'special_end'): 2,
         ('asec_retro', 'industry', 'special_end'): 1,
         ('asec_retro', 'occupation', 'special_end'): 1}
     assert diagnostics(built, 'weight') == {(None, None, 'null'): 1, (None, None, 'zero'): 1,
                                             (None, None, 'positive'): 19}
+
+
+def test_an_excluded_asec_special_end_is_not_counted(tmp_path):
+    # Not employed now, Armed Forces last year: excluded as not_employed, never admitted.
+    seeded = seed(tmp_path, asec=[asec_row(YEAR=2026, EMPSTAT=21, INDLY='9890',
+                                           OCCLY='9840')])
+    directory = Path(build(seeded.data_dir, FIRST, seeded.request)['directory'])
+    report = read(directory, 'report.json')
+    assert report['funnels']['asec_retro:industry']['not_employed'] == 2
+    assert report['specials']['asec/INDLY/2026'] == 2
+    rows = table(directory, 'cps_flow_diagnostics').filter(
+        (pl.col('topic') == 'special') & (pl.col('product') == 'asec_retro'))
+    assert dict(rows.select('dimension', 'count').iter_rows()) == {
+        'industry': 1, 'occupation': 1}
 
 
 def test_linked_pairs_hold_the_monthly_links_and_their_products(built):
