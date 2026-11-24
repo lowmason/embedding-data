@@ -13,13 +13,23 @@ never holds a `CPSIDV`, a `CPSID`, a household or a row.
 - `links`: the `link_counts` frame.
 - `weights`: the one-month link counts `{'null': n, 'zero': n, 'positive': n}`.
 - `funnels`: `<product>:<dimension>` to the `funnel` frame of that product frame.
-- `guards`: `states` (`<dimension>` to `{'changed': n, 'same': n, 'unusable': n}`),
-  `noise_after_duty_change` (a count), `source_exceptions` (the `guard_source_exceptions` count
-  over the monthly panel rows renamed to `mish_b` and `empsame_b`) and `usable_share` (the
-  `usable_guard_share` result).
-- `evidence`: `monthly` (`<product>:<dimension>` to inclusion reason to count) and `asec_flags`
-  (the `asec_flag_counts` result).
-- `specials`: `<product>:<dimension>` to the number of rows with a special end.
+- `guards`: `states` (`<dimension>` to `{'changed': n, 'same': n, 'unusable': n}`), counted
+  over the employed-to-employed one-month links with a positive weight (the population of
+  `usable_guard_share`), by `guard_expr` of that dimension; `noise_after_duty_change`, the
+  number of rows of the `monthly_ee:industry` `product_frame` whose `noise_after_duty_change`
+  column is true, counted over every row of that frame; `source_exceptions`, the
+  `guard_source_exceptions` count over the monthly panel rows renamed to `mish_b` and
+  `empsame_b`; and `usable_share`, the `usable_guard_share` result.
+- `evidence`: `monthly` (`<product>:<dimension>` to inclusion reason to count), the count of
+  each entry of the `inclusion_reasons` list column of that monthly `product_frame`, over
+  every row of the frame whatever its `reason` or `strict` status; `asec_flags` (the
+  `asec_flag_counts` result, over every ASEC row).
+- `specials`: `<product>:<dimension>` to the number of rows of that `product_frame` whose
+  `special` column is true, over every row of the frame, not only eligible or sensitivity
+  rows.
+
+The functions here count what they are given and check no population: the populations above
+are the contract that the caller (Task 11) must meet.
 
 Only first-exclusion funnels are `exclusive`: they partition a source total. Every other
 diagnostic count may overlap another and is labeled so.
