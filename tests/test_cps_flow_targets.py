@@ -373,12 +373,12 @@ ASEC_DEFAULTS = {
     'QEMPSTAT': 0, 'QIND': 0, 'QOCC': 0, 'QOCCLY': 0, 'weight_status': 'positive'}
 ASEC_SCHEMA = {name: pl.String if isinstance(value, str) else pl.Int64
                for name, value in ASEC_DEFAULTS.items()}
-# Ten one-month links: every first-exclusion reason of the employer-change product occurs.
+# Eleven one-month links: every first-exclusion reason of the employer-change product occurs.
 LINK_CHANGES = [
     {}, {'weight_status': 'null'}, {'weight_status': 'zero'}, {'empstat_b': 21},
     {'empsame_b': 99}, {'empsame_b': 2, 'actsame_b': 1, 'ind_b': '0170', 'occ_b': '0010'},
     {'empsame_b': 2, 'actsame_b': 1}, {'empstat_a': 21}, {'ind_b': '9890', 'occ_b': '9840'},
-    {'ind_a': '0000', 'occ_a': '0000', 'mish_b': 5}]
+    {'ind_a': '0000', 'occ_a': '0000', 'mish_b': 5}, {'empsame_b': 2, 'actsame_b': 99}]
 PERSON_CHANGES = [
     {}, {'weight_status': 'null'}, {'EMPSTAT': 21}, {'INDLY': '0000', 'OCCLY': '0000'},
     {'IND': '0170', 'OCC': '0010', 'INDLY': '0170', 'OCCLY': '0010'}]
@@ -700,7 +700,7 @@ def test_report_counts_linkage_weights_and_guards(estimates, rows):
     assert report['usable_guard_share'] == {
         'monthly_ee:industry': share['industry'], 'monthly_ee:occupation': share['occupation'],
         'monthly_ue': 'not_applicable', 'asec_retro': 'not_applicable'}
-    assert 0 < share['industry'] <= 1 and 0 < share['occupation'] <= 1
+    assert (share['industry'], share['occupation']) == (6 / 7, 5 / 7)
     assert report['guard_source_exceptions'] == {'empsame_in_mish_1_or_5': 1}
     assert report['asec_flags_by_empstat'] == asec_flag_counts(people())
     assert set(report['asec_flags_by_empstat']) == {'QIND', 'QOCC', 'QOCCLY', 'QEMPSTAT'}
