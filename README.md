@@ -928,9 +928,13 @@ exception text or row content.
 The production commands select the five upstream runs and receipts below. Replace
 `REFERENCE_ID` with a fresh reference ID and `KIND` with one of the seven kinds. Replace
 `RUN_ID` and `REPLAY_ID` with fresh run IDs. Both IDs and `REFERENCE_ID` must match
-`[A-Za-z0-9][A-Za-z0-9_-]*`. Replace `<STAGE11_RECEIPT_ID>` and `<STAGE11_RECEIPT_PIN>` with
-the ID and the `receipt.json` SHA-256 of the snapshot that the acquisition records. Replace
-`RUN_PIN` and `REPLAY_PIN` with the `outputs_sha256` values that the two builds print.
+`[A-Za-z0-9][A-Za-z0-9_-]*`. The Stage 11 references snapshot is
+`stage11_cps_references_20261124_r1`. It was acquired on 2026-11-24 with the owner's
+go-ahead. Five kinds came from the network, and the owner imported the two BLS workbooks
+from a browser download. Its `receipt.json` SHA-256 is
+`89c59cfa3fa8b4d70bc726b00628db23287b5cc998b05fc8ee71910fafff6c2d`, and the build command
+below uses that ID and pin. Replace `RUN_PIN` and `REPLAY_PIN` with the `outputs_sha256`
+values that the two builds print.
 
 1. Get the seven reference originals. Download them:
 
@@ -949,7 +953,7 @@ the ID and the `receipt.json` SHA-256 of the snapshot that the acquisition recor
 2. Build one bundle, and a second one for the replay:
 
    ```bash
-   uv run --offline --locked python -m embedding_data.cps_job_flows build RUN_ID --stage7-run stage7_ipums_verification_20261015_r2 --stage7-outputs-sha256 db129a788daa312408f793df1b94fa3f211190a5541fc17ae87b96e84df913dc --stage7-receipt stage7_ipums_references_20261015_r2 --stage7-receipt-sha256 3163968dde603ba53f807976dd09b9e40d73235a98c6f36e4e02c67ec4239c9c --stage8-receipt stage8_acs_references_20261018_r4 --stage8-receipt-sha256 052135beb2e77d3cd14b4b800602be9ab36d54aaa43eaf05abffb4d5c14fd2d5 --stage8-mapping-run stage8_acs_mapping_20261018_r7 --stage8-mapping-outputs-sha256 1ec9701092f576b122b01464cdb6fa3fbee49db030e4ad3df7b64e621b8e75f4 --codes-run stage4_v11_20261013_r2 --codes-outputs-sha256 15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a --cps-receipt <STAGE11_RECEIPT_ID> --cps-receipt-sha256 <STAGE11_RECEIPT_PIN> --data-dir /Users/lowell/Projects/embedding-data/data
+   uv run --offline --locked python -m embedding_data.cps_job_flows build RUN_ID --stage7-run stage7_ipums_verification_20261015_r2 --stage7-outputs-sha256 db129a788daa312408f793df1b94fa3f211190a5541fc17ae87b96e84df913dc --stage7-receipt stage7_ipums_references_20261015_r2 --stage7-receipt-sha256 3163968dde603ba53f807976dd09b9e40d73235a98c6f36e4e02c67ec4239c9c --stage8-receipt stage8_acs_references_20261018_r4 --stage8-receipt-sha256 052135beb2e77d3cd14b4b800602be9ab36d54aaa43eaf05abffb4d5c14fd2d5 --stage8-mapping-run stage8_acs_mapping_20261018_r7 --stage8-mapping-outputs-sha256 1ec9701092f576b122b01464cdb6fa3fbee49db030e4ad3df7b64e621b8e75f4 --codes-run stage4_v11_20261013_r2 --codes-outputs-sha256 15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a --cps-receipt stage11_cps_references_20261124_r1 --cps-receipt-sha256 89c59cfa3fa8b4d70bc726b00628db23287b5cc998b05fc8ee71910fafff6c2d --data-dir /Users/lowell/Projects/embedding-data/data
    ```
 
    Run the same command with `REPLAY_ID` in place of `RUN_ID` for the replay.
