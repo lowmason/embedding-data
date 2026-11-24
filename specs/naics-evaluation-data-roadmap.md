@@ -60,8 +60,8 @@ Choices made:
 | O6 | Evidence for KYB and anomaly detection | C | 1 | USAspending subawards with SAM.gov entity NAICS. Needs a SAM.gov account that the owner creates. Terms risk E6. Size unknown (`specs/uncovered-uses-evidence-sources.md`) |
 | O7 | Evidence for peer and competitor detection | B | 2 | EPA TRI parent links: one CSV per year, no account. One build gives O7 and O8. Size unknown (`specs/uncovered-uses-evidence-sources.md`) |
 | O8 | Evidence for holding-company classification | B | 3 | Same build as O7 |
-| O9 | Evidence for supply-chain dependency | D | 1 | BEA 2017 benchmark input–output tables: a few tables, no account, non-headline. One build gives O9 and O10. Small (estimate) (`specs/uncovered-uses-evidence-sources.md`) |
-| O10 | Evidence for look-alike prospecting | D | 2 | Same build as O9 |
+| O9 | Evidence for supply-chain dependency | D | parked | Uncovered (owner, 2026-11-23): the Stage 15 preflight stopped on the real BEA files (`specs/naics-evaluation-data-stage-15-findings.md`). No build. Was: BEA 2017 benchmark input–output tables, non-headline |
+| O10 | Evidence for look-alike prospecting | D | parked | Same as O9 |
 | O11 | Evidence for co-visitation | B | parked | None: uncovered, no free source (`specs/uncovered-uses-evidence-sources.md`). No build |
 | O12 | TRI hardening: Stage 5's TRI bundle gets an exact replay check and a long-form acceptance finding (owner, 2026-11-16) | B | 4 | One replay build plus `compare-runs`. Estimate from Stage 5's measured run cost |
 | O13 | A headline minimum count for the TRI family, set from its observed counts (owner, 2026-11-16) | B | 5 | Small: one pass over the TRI family's `n_unweighted` counts, like O4 |
@@ -217,6 +217,9 @@ and Stage 25 from Track B's after Stage 22 (see Choices made).
       Exit: Preflight: open checks E1–E3 are settled before any data is trusted. A failed check stops the stage for an owner decision (Stage 2 spec, Rules for every new family). O9 and O10: the bundle holds the evidence that Source 1 of the Stage 2 spec names for supply chain and look-alike. Each BEA value is taken as published, with the fields BEA does not supply null and flagged. `verify` with the detached pin passes. The stage adds amendment item 5 (R7.5 published aggregates) and its rows under items 3 and 6. The findings file records the run ID, the pin, and the wall time, maximum RSS and bundle size of the real run
       Leaves out: replay check, long-form acceptance finding and headline minimum count → not staged. BEA evidence stays non-headline. The owner decides at the resume after this stage reports, as for O12 and O13 in Track B. The BEA protocol section → O19. The R8.4 training-role amendment → a separate owner decision after naics-embedder's spec (reset prompt, Leave alone)
       ROUTING: brainstorming
+
+> Stage 15: STOPPED at Task 5 of plan 22 (2026-11-23, owner). Not complete, so the box stays open. The preflight `measure` run on the real BEA files listed three stops (93 repeated concordance codes, two uncoded Use columns, one commodity outside the rounding bound) and one ask (two zero forms). The owner chose to stop and record O9 and O10 as uncovered. No bundle exists. E1 to E3 were not read. Tasks 1 to 4 of plan 22 are on branch `feat/stage-15-bea-io` (reader, layout, selection and preflight script, with tests). Findings in specs/naics-evaluation-data-stage-15-findings.md. The Stage 2 spec's verdict table is amended. Do not resume this stage without an owner-written amendment of plan 22 on the four mismatches. O19 has no build to design on until then.
+> Next: resume the roadmap.
 
 - [x] Stage 16: Evaluation-protocol section for ITA co-ownership and the 2023 area mix
       Objective: The evaluation protocol gets a section for ITA co-ownership and the 2023 ITA area mix, framed like Section 1.

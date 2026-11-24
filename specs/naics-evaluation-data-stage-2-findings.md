@@ -16,6 +16,11 @@ stage settles its checks in a preflight before it trusts any data.
 | Look-alike prospecting | O10 | Covered, partial, non-headline | Same BEA tables, read downstream | E1–E3 |
 | Co-visitation and foot traffic | O11 | Uncovered | None. ATUS is the nearest miss. | — |
 
+**Amended 2026-11-23 (owner).** The Stage 15 preflight stopped on the real BEA files.
+The owner recorded O9 and O10 as uncovered. The rows above keep the Stage 2 verdicts as
+they stood on 2026-11-16. The spec's verdict table carries the amendment, and
+`specs/naics-evaluation-data-stage-15-findings.md` records the stops.
+
 **Owner decisions this stage.** The coverage rule: partial coverage counts, but a
 mapping this project writes disqualifies a source. Approach: fewest sources. BEA is
 non-headline. TRI parent links are a new family, not part of co-ownership.

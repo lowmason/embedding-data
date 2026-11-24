@@ -315,3 +315,19 @@
       it that way today. Carried because the script is frozen at rule commit `b282dd7`. Size:
       quick-fix. Revisit if: a later fix to the script requires a new rule commit and both
       real runs.
+
+## 22-bea-input-output-tables — 2026-11-23
+- [ ] BEA input–output evidence (Track D, O9 and O10): the Stage 15 preflight read the
+      real 2017 detail Use table and concordance and stopped the stage. The concordance
+      repeats a detail code on every row of a multi-code entry (93 rows). The Use sheet
+      has two columns with a title and no code ("Total Final Uses (GDP)" and "Total
+      Commodity Output"). Commodity `448000` has a gap of 4 against a bound of 2. Zero
+      appears as an empty cell and as the number 0. The owner recorded both uses as
+      uncovered on 2026-11-23. See `specs/naics-evaluation-data-stage-15-findings.md`
+      and the amended verdict table of `specs/uncovered-uses-evidence-sources.md`.
+      Size: design plus a plan amendment. Revisit if: the owner writes an amendment of
+      plan 22 that settles the four mismatches (the layout model, the bound and the zero
+      form), or names an alternate source such as the BLS input–output matrices
+      (a Stage 2 alternate, route to NAICS unconfirmed). Not done: checks E1 to E3 and
+      Tasks 6 to 14 of plan 22. Tasks 1 to 4 (reader, layout, selection, preflight script
+      and tests) sit on branch `feat/stage-15-bea-io`, unmerged.
