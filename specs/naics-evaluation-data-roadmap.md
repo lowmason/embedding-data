@@ -49,6 +49,7 @@ Choices made:
 - Resume after Stage 22 (owner, 2026-11-23, "Approve as drafted"): Track B keeps its ranking. O17 becomes Stage 25, so Track B's Ranked list is empty. Stage 22 set a minimum of 1 for `owner_share`. All 14,204 rows (7,102 industry pairs) and all 22,686 of the support meet it. Run 1 took 0.18 s and 0.19 GB (`specs/findings/v9-tri-minimum-counts.md`, sections 1 and 4). Stage 25 consumes Stage 16's section. TRI's `owner_share` is a directional relatedness share like ITA co-ownership (`specs/completed/tri-parent-links.md:27-29`), and Stage 16 settles the open questions for that shape (protocol, "Families with no section"). Stage 25 is therefore not ready until Stage 16 ticks. Stages 16, 23, 24 and 25 all edit `specs/evaluation-protocol.md`, so parallel sessions on them can conflict in that file. Plan 20 names only O17 in its Handoff, so no other stage entry changed.
 - Resume after Stages 16 and 24 (owner, 2026-11-23, "Approve"): neither stage has a plan, so no Handoff amends a later stage. Stage 16's section for ITA co-ownership is Section 3 of the protocol, so Stages 23 and 25 are ready. At naics-embedder `2b2029c` the relatedness spec lists USAspending subawards as unassigned (Stage 16 stamp). That spec is not a Stage 23 Consumes, as Stage 24 settled for the wage panel spec: Stage 23's section names it as the place that will assign and score the family, which stays unscored until the owner names that spec at a commit. The protocol now has Sections 1 to 4. Stages 23 and 25 each add one, and whichever merges later renumbers its section (Stage 24 findings, "For later work"). Tracks A, E and H are complete.
 - Resume after Stages 23 and 25 (owner, 2026-11-23, "Approve as drafted"): neither stage has a plan, so no Handoff amends a later stage. The protocol now has Sections 1 to 6. Section 5 judges only (P10). It allows no read until the owner names its consuming spec there (VL4, `specs/evaluation-protocol.md:626`). Section 6's validation part selects for the relatedness artifact only (P8). It allows no read until the owner names there the commit of naics-embedder's relatedness spec that admits TRI (TR8, `specs/evaluation-protocol.md:768-771`, P12). Both gates are naics-embedder's work, not stages of this roadmap. Line 54 of the Stage 23 findings still calls the TRI section Section 5. The protocol numbers it Section 6 (`specs/evaluation-protocol.md:659`). Tracks A, B, C, E and H are complete. Stages 9, 11 and 15 now have owner-approved specs of 2026-11-23, and each spec names writing-plans as its next step. Their entries cite the specs in Consumes and keep their ROUTING lines, as the entries of Stages 5, 14, 19, 21 and 22 did. Stage 9's spec moves replay, `compare-runs`, the independent reconciliation and the freeze and preservation gate out of the stage (its owner decision 1). They become O27, ranked before O20 in Track F (`specs/acs-targets-first-build.md:371-373`). The Stage 11 and Stage 15 specs also leave hardening to a later outcome (each spec, "Out of scope"). The resume after each of those stages decides it, so nothing is staged for it now.
+- Resume after the Stage 15 stop (owner, 2026-11-24, "Approve"): Track D stops. O19 parks as one deferred item (`specs/deferred_items.md`, section `naics-evaluation-data-roadmap — 2026-11-24`), so Track D's Ranked list is empty. Stage 15 stays open with its STOPPED stamp. Branch `feat/stage-15-bea-io`, its worktree and plan 22 stay as they are until the owner decides on an amendment of plan 22. No stage has a COMPLETE stamp since the last resume, so no Handoff amends a later entry. Plan 24 (Stage 9, PR #72) and plan 23 (Stage 11) are merged. The `ROUTING` lines of Stages 9 and 11 stay, and their receivers run those plans and do not brainstorm. Stage 11 already runs in its own execution session, so Stage 9 is the one stage handed off. Stage 9's guarded build (plan 24, Task 8) must not overlap Stage 11's acquisition or full-data build (plan 23, Tasks 15 and 16), because "Shared resources" allows one of each at a time.
 
 | # | Outcome | Track | Rank | Cost (estimate; basis) |
 |---|---|---|---|---|
@@ -70,7 +71,7 @@ Choices made:
 | O16 | CPS job-change flows on real data: linked person-months with CPS codes mapped to NAICS and SOC, then industry and occupation flows (owner, 2026-11-18) | G | 1 | Unknown: not started. The `9890` question comes first. Measured by Stage 11 |
 | O17 | A protocol section for the TRI parent links (owner, 2026-11-18) | B | 6 | Design sessions only, after Stage 5's real build |
 | O18 | A protocol section for the USAspending family (owner, 2026-11-18) | C | 4 | Design sessions only, after Stage 14's real build |
-| O19 | A protocol section for the BEA family (owner, 2026-11-18) | D | 3 | Design sessions only, after Stage 15's real build |
+| O19 | A protocol section for the BEA family (owner, 2026-11-18) | D | parked | Parked (owner, 2026-11-24): no BEA build exists, because Stage 15 stopped (`specs/deferred_items.md`, section `naics-evaluation-data-roadmap — 2026-11-24`). Was: design sessions only, after Stage 15's real build |
 | O20 | A protocol section for the ACS targets (owner, 2026-11-18) | F | 3 | Design sessions only, after Stage 9's real build |
 | O21 | A protocol section for the CPS job-change flows (owner, 2026-11-18) | G | 2 | Design sessions only, after Stage 11's real build |
 | O22 | A person-level file of ACS 2023–2024 wage earners for naics-embedder's wage panel: the wage outcome, person covariates, survey weights, each person's NAICS node, flags and a headline column (owner, 2026-11-18) | H | 1 | Moderate (estimate): a lazy scan of 3,035,086 rows and about 120 of the 261 columns of the 910 MB Stage 8 core table, run twice for the replay. Stage 8's `verify_bundle` took about 6 minutes for each run in Stage 9. Peak memory measured by Stage 17 |
@@ -98,7 +99,8 @@ Track order: none (owner, 2026-11-18). The owner's ranking of 2026-11-16 within 
 old Track B (O7 and O8 first, then O6, then O9 and O10, then O12 and O13) holds
 inside each track and sets the numbers of Stages 14 and 15. Ranks restart within each
 track, and their relative order is unchanged.
-O11 is uncovered and parked in `specs/deferred_items.md`.
+O11 is uncovered and parked in `specs/deferred_items.md`. O19 is parked there too (owner,
+2026-11-24). Track D stops, and Stage 15 stays open and stopped.
 
 ## Stages
 
@@ -361,7 +363,8 @@ as Stage 21 (owner, 2026-11-22). O18 left it as Stage 23 (owner, 2026-11-23). Th
 
 ## Ranked list — Track D
 
-1. O19 — BEA protocol section. Design sessions only, after Stage 15's real build
+O19 left the list as a deferred item at the resume after the Stage 15 stop (owner,
+2026-11-24). The list is empty. Stage 15 stays open and stopped.
 
 ## Ranked list — Track F
 

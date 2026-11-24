@@ -331,3 +331,13 @@
       (a Stage 2 alternate, route to NAICS unconfirmed). Not done: checks E1 to E3 and
       Tasks 6 to 14 of plan 22. Tasks 1 to 4 (reader, layout, selection, preflight script
       and tests) sit on branch `feat/stage-15-bea-io`, unmerged.
+
+## naics-evaluation-data-roadmap — 2026-11-24
+- [ ] BEA protocol section (Track D, O19): a section in `specs/evaluation-protocol.md`
+      for the BEA input–output family, framed like Section 1. Parked at the resume after
+      the Stage 15 stop (owner, 2026-11-24), because it has no build to design on: Stage 15
+      stopped at Task 5 of plan 22 and no BEA bundle exists. See the O19 row and the
+      Stage 15 stamp of `specs/naics-evaluation-data-roadmap.md` and
+      `specs/naics-evaluation-data-stage-15-findings.md`. The BEA data work itself (O9 and
+      O10) is the item in section `22-bea-input-output-tables`. Size: design. Revisit if:
+      Stage 15 ticks in `specs/naics-evaluation-data-roadmap.md` with a verified BEA bundle.
