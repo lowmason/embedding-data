@@ -859,6 +859,175 @@ gate when its `n_unweighted` is at least its measure's minimum. The published ta
 reference and the margin set inside one opening, and no read is allowed until the owner names
 the consuming spec there.
 
+## CPS job-change flows (roadmap Stage 11)
+
+Stage 11 builds the evidence for use case O16, job-change flows. A flow runs from one
+Census industry category to another, or from one Census occupation category to another.
+The monthly CPS (Current Population Survey) panel gives two products. `monthly_ee` links
+a person who is employed in two adjacent months. `monthly_ue` links a person who is
+unemployed and then employed. The ASEC (Annual Social and Economic Supplement) gives the
+product `asec_retro`. It runs from last year's longest job to the current job and is
+unguarded, so it is an upper bound on job change. Each category keeps its Census code and
+its official NAICS 2022 or SOC 2018 candidate set. The codes `9890` and `9840` are the
+Armed Forces special categories. They have no candidates and never enter a headline
+product. The [stage spec](specs/cps-job-change-flows.md) defines every rule.
+
+The one `targets-v1` family is `cps_job_flows`. The measures are `average_total` and
+`forward_share`, under the policies `strict` (monthly only) and `sensitivity`. Standard
+errors come from 200 bootstrap draws (monthly) or the 160 `REPWTP` replicates (ASEC). The
+weights are the literal CSV values at factor 1.
+
+The standalone module `embedding_data.cps_job_flows` has five commands. It is separate
+from the top-level `embedding-data` CLI. Every command requires an explicit `--data-dir`.
+
+| Command | Network | Purpose |
+| --- | --- | --- |
+| `acquire-references REFERENCE_ID` | Yes | Download the seven Stage 11 reference originals |
+| `import-reference REFERENCE_ID KIND FILE` | No | Register an original that the owner downloaded |
+| `build RUN_ID` and twelve pin options | No | Build one immutable bundle |
+| `verify RUN_ID --outputs-sha256 PIN` | No | Authenticate the pin, then recompute and compare every table |
+| `compare-runs FIRST SECOND` | No | Exact logical comparison of two bundles, omitting run ID and time |
+
+Only `acquire-references` uses the network. No command reads `IPUMS_API_KEY`, loads a
+`.env` file or constructs an IPUMS client. The four offline commands also construct no
+HTTP client and run no upstream builder. Importing the module loads the `dotenv` and
+`ipumspy` packages, because the reused Stage 7 and Stage 8 modules import them. Loading
+a package reads no file and builds no client. A test proves that no offline command calls
+`dotenv.load_dotenv` or constructs a client.
+
+`build` takes six pairs of options. Each pair names an upstream run or receipt and the
+SHA-256 pin of its `outputs.json` or `receipt.json`:
+
+| Upstream | Options |
+| --- | --- |
+| Stage 7 run | `--stage7-run`, `--stage7-outputs-sha256` |
+| Stage 7 receipt | `--stage7-receipt`, `--stage7-receipt-sha256` |
+| Stage 8 receipt | `--stage8-receipt`, `--stage8-receipt-sha256` |
+| Stage 8 mapping run | `--stage8-mapping-run`, `--stage8-mapping-outputs-sha256` |
+| Stage 4 codes run | `--codes-run`, `--codes-outputs-sha256` |
+| Stage 11 receipt | `--cps-receipt`, `--cps-receipt-sha256` |
+
+Success prints one JSON line with sorted keys and exits 0. `acquire-references` and
+`import-reference` print the data-relative path of the snapshot directory. That path ends
+in `.part` until all seven originals are staged. `build` prints the run ID, the
+data-relative run directory and the detached `outputs_sha256`. That value is the SHA-256
+of the bundle's `outputs.json`. Save it outside the bundle. `compare-runs` exits 1 when
+the bundles differ. Any failure prints one fixed line to stderr and exits 2:
+
+```text
+CPS job flows <command> failed: <reason>; run <run_id>; path <path>
+```
+
+The reason is `validation`, `filesystem`, `network` or `unexpected`. For
+`acquire-references` and `import-reference`, the run ID is `-` and the path is
+`raw/references/cps-job-flows`. For `build` and `verify`, the path is
+`derived/cps/job-flows/<run_id>`. For `compare-runs`, the line names both run IDs and both
+paths, separated by a comma. Every path is relative to `--data-dir`. The line never holds
+exception text or row content.
+
+The production commands select the five upstream runs and receipts below. Replace
+`REFERENCE_ID` with a fresh reference ID and `KIND` with one of the seven kinds. Replace
+`RUN_ID` and `REPLAY_ID` with fresh run IDs. Both IDs and `REFERENCE_ID` must match
+`[A-Za-z0-9][A-Za-z0-9_-]*`. Replace `<STAGE11_RECEIPT_ID>` and `<STAGE11_RECEIPT_PIN>` with
+the ID and the `receipt.json` SHA-256 of the snapshot that the acquisition records. Replace
+`RUN_PIN` and `REPLAY_PIN` with the `outputs_sha256` values that the two builds print.
+
+1. Get the seven reference originals. Download them:
+
+   ```bash
+   uv run --locked python -m embedding_data.cps_job_flows acquire-references REFERENCE_ID --data-dir /Users/lowell/Projects/embedding-data/data
+   ```
+
+   BLS refuses non-browser clients. A refused kind stays missing in `<REFERENCE_ID>.part`.
+   Register each missing original that the owner downloaded in a browser. `import-reference`
+   keeps the exact bytes and records the local import time as a flagged retrieval-time proxy:
+
+   ```bash
+   uv run --offline --locked python -m embedding_data.cps_job_flows import-reference REFERENCE_ID KIND /path/to/exact-original --data-dir /Users/lowell/Projects/embedding-data/data
+   ```
+
+2. Build one bundle, and a second one for the replay:
+
+   ```bash
+   uv run --offline --locked python -m embedding_data.cps_job_flows build RUN_ID --stage7-run stage7_ipums_verification_20261015_r2 --stage7-outputs-sha256 db129a788daa312408f793df1b94fa3f211190a5541fc17ae87b96e84df913dc --stage7-receipt stage7_ipums_references_20261015_r2 --stage7-receipt-sha256 3163968dde603ba53f807976dd09b9e40d73235a98c6f36e4e02c67ec4239c9c --stage8-receipt stage8_acs_references_20261018_r4 --stage8-receipt-sha256 052135beb2e77d3cd14b4b800602be9ab36d54aaa43eaf05abffb4d5c14fd2d5 --stage8-mapping-run stage8_acs_mapping_20261018_r7 --stage8-mapping-outputs-sha256 1ec9701092f576b122b01464cdb6fa3fbee49db030e4ad3df7b64e621b8e75f4 --codes-run stage4_v11_20261013_r2 --codes-outputs-sha256 15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a --cps-receipt <STAGE11_RECEIPT_ID> --cps-receipt-sha256 <STAGE11_RECEIPT_PIN> --data-dir /Users/lowell/Projects/embedding-data/data
+   ```
+
+   Run the same command with `REPLAY_ID` in place of `RUN_ID` for the replay.
+
+3. Verify each run with its detached pin:
+
+   ```bash
+   uv run --offline --locked python -m embedding_data.cps_job_flows verify RUN_ID --outputs-sha256 RUN_PIN --data-dir /Users/lowell/Projects/embedding-data/data
+   uv run --offline --locked python -m embedding_data.cps_job_flows verify REPLAY_ID --outputs-sha256 REPLAY_PIN --data-dir /Users/lowell/Projects/embedding-data/data
+   ```
+
+4. Compare the two published runs exactly:
+
+   ```bash
+   uv run --offline --locked python -m embedding_data.cps_job_flows compare-runs RUN_ID REPLAY_ID --data-dir /Users/lowell/Projects/embedding-data/data
+   ```
+
+Raw reference files live in `raw/references/cps-job-flows/<REFERENCE_ID>/`, with one
+manifest entry for each original and one for `receipt.json`. A completed snapshot is
+immutable. Each run lives in `data/derived/cps/job-flows/<RUN_ID>/`. A bundle holds six
+Parquet tables and three JSON files:
+
+| File | Contents |
+| --- | --- |
+| `cps_job_flows.parquet` | `targets-v1` rows, written by the shared target writer |
+| `cps_category_units.parquet` | One row for each category unit, with its candidates and specials |
+| `cps_flow_support.parquet` | Cell and denominator counts and masses |
+| `cps_flow_replicates.parquet` | Every bootstrap and ASEC replicate value |
+| `cps_flow_diagnostics.parquet` | Aggregate funnels, guard states and flag evidence |
+| `cps_linked_pairs.parquet` | Person-level monthly links. IPUMS microdata |
+| `inputs.json` | Selection, rules and provenance |
+| `report.json` | Counts, shares and distributions |
+| `outputs.json` | Detached inventory of the other eight files |
+
+`outputs.json` records the byte size and SHA-256 of each file and the row count and exact
+schema of each Parquet. It excludes itself, so its checksum is the detached pin. `verify`
+requires the executing software to equal the recorded software. A change to any file in
+`cps_flow_bundle.SOFTWARE_FILES` (this includes `pyproject.toml` and `uv.lock`) makes
+`verify` refuse the run. `compare-runs` shows exact replay only. It does not establish
+trust, so verify each run with its own pin.
+
+`cps_linked_pairs.parquet` is IPUMS microdata. It stays on this machine and never enters
+git. Every other file is aggregate. `report.json`, logs and failure lines hold counts and
+shares, never a `CPSIDV`, a `CPSID`, a household or a row.
+
+`build` stages into an exclusive `<RUN_ID>.part` directory. Its scratch files hold
+decompressed copies of the raw CSV files. They stay in `<RUN_ID>.part/.scratch/` and are
+removed before the JSON files are written. `build` rechecks its pinned inputs and its
+software just before it renames the directory. An existing final or `.part` name fails the
+run. A later run never reuses, overwrites or deletes it. A failed build removes only its own
+staging directory. A killed build can leave a `<RUN_ID>.part` directory. Choose a fresh run
+ID. Get the owner's go-ahead before you clean up any leftover staging.
+
+Production writes share this host and this data root with other stages. The host rule has
+five parts:
+
+1. Run one acquisition at a time, because the manifest append has no lock. Run one
+   full-data build at a time.
+2. Before each acquisition, each import and each full-data build, run
+   `pgrep -fl 'embedding_data|embedding-data'` and show the owner its full output. It can
+   match editors or agents whose command line holds the project path. The owner judges.
+   Stop if it shows another acquisition or build.
+3. Also run `pgrep -fl 'embedding_data\.acs_targets|stage9_independent|reconcile_stage9'`.
+   Stop if it prints anything, after you read the hit. Another session's shell wrapper can
+   match.
+4. The owner confirms that no other stage's acquisition or build is running. The owner
+   also confirms that no Stage 9 freeze window is open.
+5. Each production write needs the owner's go-ahead first. That covers each reference
+   acquisition or import, the build, and any cleanup of a failed run's staging.
+
+Code, tests and fixture runs use temporary data roots and need no go-ahead.
+
+Under R8.4, no table from this stage feeds embedder training, curriculum, hard-negative
+mining or model selection. Every target keeps `size_gate_pending`. The tests and the
+fixture chain show software readiness only. Fixture results are never benchmarks. No
+production reference snapshot or run exists yet. The measured runs and their pins go into
+the Stage 11 finding when the owner approves the acquisition and the build.
+
 ## Data sources
 
 | Source | Samples or coverage | Purpose |

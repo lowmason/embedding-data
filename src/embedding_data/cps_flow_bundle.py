@@ -77,6 +77,7 @@ SOFTWARE_FILES = (
     'src/embedding_data/cps_flow_targets.py',
     'src/embedding_data/cps_flow_units.py',
     'src/embedding_data/cps_flow_weights.py',
+    'src/embedding_data/cps_job_flows.py',
     'src/embedding_data/filing_rules.py',
     'src/embedding_data/geography_build.py',
     'src/embedding_data/geography_hud.py',
