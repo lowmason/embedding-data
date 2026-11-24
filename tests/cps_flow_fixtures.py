@@ -661,3 +661,120 @@ def seed_upstreams(tmp_path: Path, *, monthly: list[dict], asec: list[dict]) -> 
         codes_run=SEED_IDS['codes_run'], codes_outputs_sha256=codes_outputs_sha256,
         cps_receipt=reference_id, cps_receipt_sha256=cps_receipt_sha256)
     return SeededUpstreams(data_dir, request, reference_id)
+
+
+# ---- A hand-made monthly and ASEC case for the job-flow bundle (Task 11)
+
+# Made-up identifiers, long enough that no count, code or hash of the bundle contains them.
+JOB_FLOW_CPSID = 7_711_000_000_000
+JOB_FLOW_CPSIDV = 8_822_000_000_000_000
+JOB_FLOW_CPSIDP = 9_933_000_000_000
+# The weight of every later-month row, so that a link weighted at its later month shows.
+JOB_FLOW_LATER_WEIGHT = '7.0000'
+_JAN, _FEB = (2025, 1, 1), (2025, 2, 2)
+_SEP, _NOV = (2025, 9, 1), (2025, 11, 3)
+_MAR26, _APR26 = (2026, 3, 5), (2026, 4, 6)
+# Each person: household, (YEAR, MONTH, MISH) at t and at t+1, the fields at t, the fields at
+# t+1. An earlier-month row answers EMPSAME and ACTSAME 99 unless its fields say otherwise.
+# `E` people test monthly_ee, `U` people monthly_ue and `L` people the linkage rules.
+JOB_FLOW_PEOPLE = {
+    # An employer change, eligible and strict in both dimensions.
+    'E1': (101, _JAN, _FEB, dict(LNKFW1MWT='1500.1234'),
+           dict(IND='1370', OCC='0020', EMPSAME=1, ACTSAME=99)),
+    # A duty change: occupation eligible, industry coding noise after the duty change.
+    'E2': (102, _JAN, _FEB, dict(LNKFW1MWT='1200.5000'),
+           dict(IND='1380', OCC='2200', EMPSAME=2, ACTSAME=2)),
+    # Coding noise in industry, no change in occupation. Its CPSIDP changes, so the CPSIDP
+    # count of its month pair is one lower.
+    'E3': (103, _JAN, _FEB, dict(IND='1370', OCC='0020', LNKFW1MWT='1100.0000'),
+           dict(IND='0170', OCC='0020', EMPSAME=2, ACTSAME=1, CPSIDP=JOB_FLOW_CPSIDP + 999)),
+    # A stayer. Its earlier row (MISH 1) answers EMPSAME 2: a source exception.
+    'E4': (104, _JAN, _FEB, dict(LNKFW1MWT='1000.0000', EMPSAME=2, ACTSAME=1),
+           dict(EMPSAME=2, ACTSAME=1)),
+    # Coding noise in occupation, no change in industry.
+    'E5': (105, _JAN, _FEB, dict(IND='3070', LNKFW1MWT='1300.0000'),
+           dict(IND='3070', OCC='0020', EMPSAME=2, ACTSAME=1)),
+    # An unusable guard in both dimensions, with an edited occupation flag.
+    'E6': (106, _JAN, _FEB, dict(LNKFW1MWT='1400.0000'),
+           dict(IND='1370', OCC='0020', EMPSAME=97, ACTSAME=99, QOCC=2)),
+    # An unusable occupation guard; the industry guard is `same`.
+    'E7': (107, _JAN, _FEB, dict(LNKFW1MWT='1600.0000'),
+           dict(OCC='0020', EMPSAME=2, ACTSAME=96)),
+    # An employer change with an allocated industry (sensitivity only) and an occupation
+    # outside the universe.
+    'E8': (108, _JAN, _FEB, dict(OCC='0000', LNKFW1MWT='2400.5000'),
+           dict(IND='3070', OCC='7000', EMPSAME=1, ACTSAME=99, QIND=6)),
+    'E9': (109, _JAN, _FEB, dict(LNKFW1MWT=''),
+           dict(IND='1370', OCC='0020', EMPSAME=1, ACTSAME=99)),
+    'E10': (110, _JAN, _FEB, dict(LNKFW1MWT='0.0000'),
+            dict(IND='1370', OCC='0020', EMPSAME=1, ACTSAME=99)),
+    'E11': (111, _JAN, _FEB, dict(LNKFW1MWT='1700.0000'),
+            dict(EMPSTAT=30, IND='0000', OCC='0000', EMPSAME=99, ACTSAME=99)),
+    'E12': (112, _JAN, _FEB, dict(EMPSTAT=12, IND='0000', OCC='0000', LNKFW1MWT='1800.0000'),
+            dict(EMPSAME=1, ACTSAME=99)),
+    # Special ends on a link that no product admits.
+    'E14': (114, _JAN, _FEB, dict(IND='9890', LNKFW1MWT='1900.0000'),
+            dict(OCC='9840', EMPSAME=96, ACTSAME=99)),
+    # An employer change in 2026, in the household of E1.
+    'E15': (101, _MAR26, _APR26, dict(IND='1370', OCC='0020', LNKFW1MWT='2100.2500'),
+            dict(EMPSAME=1, ACTSAME=99)),
+    # Unemployed (21) to employed: a move, a diagonal stay and a 9890/9840 origin.
+    'U1': (201, _JAN, _FEB, dict(EMPSTAT=21, LNKFW1MWT='1250.0000'),
+           dict(IND='3070', OCC='7000', EMPSAME=99, ACTSAME=99)),
+    'U2': (202, _JAN, _FEB, dict(EMPSTAT=21, IND='1370', OCC='0020', LNKFW1MWT='1350.0000'),
+           dict(IND='1370', OCC='0020', EMPSAME=99, ACTSAME=99)),
+    'U3': (203, _JAN, _FEB, dict(EMPSTAT=21, IND='9890', OCC='9840', LNKFW1MWT='1450.0000'),
+           dict(EMPSAME=99, ACTSAME=99)),
+    'U4': (204, _JAN, _FEB, dict(EMPSTAT=22, IND='0000', OCC='0000', LNKFW1MWT='1550.0000'),
+           dict(EMPSAME=99, ACTSAME=99)),
+    'U5': (205, _JAN, _FEB, dict(EMPSTAT=21, LNKFW1MWT='1650.0000'),
+           dict(EMPSTAT=21, EMPSAME=99, ACTSAME=99)),
+    'U6': (206, _JAN, _FEB, dict(EMPSTAT=21, IND='0000', OCC='0000', LNKFW1MWT='1750.0000'),
+           dict(EMPSAME=99, ACTSAME=99)),
+    'U8': (208, _MAR26, _APR26, dict(EMPSTAT=21, IND='1370', OCC='9840', LNKFW1MWT='1850.0000'),
+           dict(IND='1370', OCC='0020', EMPSAME=99, ACTSAME=99)),
+    # September to November 2025 with MISH 1 to 3: the two-month link, with a nonnull weight.
+    'L1': (301, _SEP, _NOV, dict(LNKFW1MWT='900.0000'),
+           dict(IND='1370', OCC='0020', EMPSAME=1, ACTSAME=99)),
+    # September MISH 3 to November MISH 4: no link.
+    'L2': (302, (2025, 9, 3), (2025, 11, 4), dict(), dict()),
+    # January MISH 4 to February MISH 5: no link. The later row (MISH 5) answers EMPSAME 1, a
+    # source exception.
+    'L3': (303, (2025, 1, 4), (2025, 2, 5), dict(), dict(EMPSAME=1, ACTSAME=99)),
+}
+# ASEC persons: YEAR and fields. A1 has replicate weights that differ from its full weight.
+JOB_FLOW_ASEC = {
+    'A1': (2025, dict(IND='1370', OCC='0020', ASECWT='3000.5000',
+                      **{f'REPWTP{number}': f'{3000 + number}.5000' for number in range(1, 161)})),
+    'A2': (2025, dict(ASECWT='2000.0000')),
+    'A3': (2026, dict(INDLY='0000', OCCLY='0000', ASECWT='2100.0000')),
+    'A4': (2026, dict(INDLY='9890', OCCLY='9840', ASECWT='2200.0000')),
+    'A5': (2026, dict(EMPSTAT=21, ASECWT='2300.0000')),
+    'A6': (2025, dict(IND='1370', OCC='0020', ASECWT='0.0000')),
+    'A7': (2025, dict(EMPSTAT=12, IND='0000', OCC='0000', ASECWT='2500.0000')),
+    'A8': (2026, dict(INDLY='1370', OCCLY='0020', OCC='2200', ASECWT='2600.0000', QOCCLY=1)),
+}
+
+
+def job_flow_rows(changes: dict[str, dict] | None = None) -> tuple[list[dict], list[dict]]:
+    '''Return the monthly and ASEC rows of the job-flow case, in person order.
+
+    `changes` maps a person to fields that replace those of its earlier-month row (monthly)
+    or of its row (ASEC).
+    '''
+    changes = changes or {}
+    monthly = []
+    for number, (name, (household, start, end, earlier, later)) in enumerate(
+            JOB_FLOW_PEOPLE.items(), start=1):
+        person = dict(CPSID=JOB_FLOW_CPSID + household, CPSIDV=JOB_FLOW_CPSIDV + number,
+                      CPSIDP=JOB_FLOW_CPSIDP + number)
+        for (year, month, mish), fields, defaults in (
+                (start, {**earlier, **changes.get(name, {})}, dict(EMPSAME=99, ACTSAME=99)),
+                (end, later, dict(LNKFW1MWT=JOB_FLOW_LATER_WEIGHT))):
+            monthly.append(monthly_row(YEAR=year, MONTH=month, MISH=mish,
+                                       **{**person, **defaults, **fields}))
+    asec = [asec_row(YEAR=year, CPSID=JOB_FLOW_CPSID + 400 + number,
+                     CPSIDV=JOB_FLOW_CPSIDV + 400 + number, CPSIDP=JOB_FLOW_CPSIDP + 400 + number,
+                     **{**fields, **changes.get(name, {})})
+            for number, (name, (year, fields)) in enumerate(JOB_FLOW_ASEC.items(), start=1)]
+    return monthly, asec
