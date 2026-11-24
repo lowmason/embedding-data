@@ -126,7 +126,7 @@
       Done when: each gap has a test or a recorded decision to accept it.
 
 ## 7-ipums-extract-verification — 2026-10-15
-- [ ] Clarify the 2026 ASEC industry code `9890` before Stage 11 mapping. The
+- [x] Clarify the 2026 ASEC industry code `9890` before Stage 11 mapping. The
       actual IND/INDLY counts are 13/286 in 2026 and 7/339 in 2025. The frozen
       2025 source appendix labels it Military, while both full Census lists,
       the 2025-onward IPUMS codebook and the 2026 appendix omit it. Do not infer
@@ -139,6 +139,7 @@
       regression-tested explicit special/mapping behavior retaining original
       values and provenance, with no silent leaf assignment or headline inclusion.
       → planned 2026-11-18: specs/naics-evaluation-data-roadmap.md
+      → done 2026-11-24 (plan 23): `9890` and `9840` are explicit specials, with original values and every row kept and no node, in `specs/naics-evaluation-data-stage-11-findings.md`; the ASEC 2026 meaning stays unresolved by owner decision
 
 ## embedding-evaluation-data-spec-roadmap — 2026-11-16
 - [ ] ACS targets (old Stage 9): ACS staffing-pattern, workplace area-mix,
@@ -158,7 +159,7 @@
       allocation-flag helpers, is published and verified on real data, or the
       owner retires plan 9.
       → planned 2026-11-18: specs/naics-evaluation-data-roadmap.md
-- [ ] CPS panel linkage and job-change flows (old Stage 11): CPS codes mapped
+- [x] CPS panel linkage and job-change flows (old Stage 11): CPS codes mapped
       to NAICS and SOC, linked person-month pairs, and occupation→occupation and
       industry→industry job-change flows (spec R4.3, R4.6–R4.9, R4.11, R5.1, the
       job-change row of R7.2 and V11 for CPS). Parked on 2026-11-16, because the
@@ -169,6 +170,7 @@
       pairs and the CPS weight and SE helpers exist, and job-change flows are
       built on real data.
       → planned 2026-11-18: specs/naics-evaluation-data-roadmap.md
+      → done 2026-11-24 (plan 23): `specs/naics-evaluation-data-stage-11-findings.md`; the code mapping, linked pairs, weights, standard errors and job-change flows are built on real data
 - [ ] Worker profiles and CPS cross-sections (old Stage 12): worker profiles,
       the CPS staffing check and CPS state-migration targets (spec R4.4,
       R4.10–R4.12 and the worker-profile, staffing and migration rows of R7.2).
@@ -315,6 +317,38 @@
       it that way today. Carried because the script is frozen at rule commit `b282dd7`. Size:
       quick-fix. Revisit if: a later fix to the script requires a new rule commit and both
       real runs.
+
+## 23-cps-job-change-flows — 2026-11-24
+- [ ] Per-period funnels for the CPS job-change flows (final review, Declined to judge;
+      owner ruled defer). The stage spec asks for diagnostics funnels by product, period and
+      reason. Every funnel row of `cps_flow_diagnostics.parquet` carries period `all` and a
+      null policy, because `cps_flow_guards.funnel` has no period input. The plan schema
+      allows `all`. See `specs/naics-evaluation-data-stage-11-findings.md` and the Stage 11
+      spec "Outputs". Touches `src/embedding_data/cps_flow_guards.py`,
+      `cps_flow_targets.py` and `cps_flow_bundle.py`, which are in `SOFTWARE_FILES`, so a
+      change needs a fresh run ID and the owner's go-ahead for a new build. Size: plan.
+      Revisit if: the O21 protocol section or a reader of the flows asks for per-period
+      funnels.
+- [ ] `cps_flow_bundle._refuse_outside` checks only that every link month is inside the 18
+      frozen months. It does not require all 18 to appear (final review, Declined to judge;
+      owner ruled defer). It cannot trip on the pinned delivery, which holds exactly 18
+      one-month pairs and 19,498 two-month links. Touches
+      `src/embedding_data/cps_flow_bundle.py`. Size: quick-fix. Revisit if: a later CPS
+      delivery adds or drops a month.
+- [ ] The independent reconciler `scripts/reconcile_cps_job_flows.py` does not compare the
+      `evidence` and `special` diagnostics, `asec_flags_by_empstat`, the industry candidate
+      sets or `n_unweighted_distribution`. It also does not re-check the Stage 7 run pin or the
+      two receipt pins, and it does not restate the rule that a repeated `CPSIDV` in a month
+      fails the build (final review and Task 14 review, Declined to judge; owner ruled defer).
+      The build and its tests check these items. See
+      `specs/naics-evaluation-data-stage-11-findings.md`, "Not claimed". Size: plan. Done
+      when: the reconciler compares those items and a new full-data run shows it equal, or the
+      owner accepts the current reach.
+- [ ] The Codex second-opinion seat of the Stage 11 final whole-branch review was not run,
+      because it sends the diff to OpenAI and no approval was given. Only the opus
+      code-reviewer seat ran. Size: quick-fix. Done when: the owner approves a Codex review of
+      the Stage 11 commit range (`143adfb` to the merge) and its findings are triaged, or
+      the owner drops the seat.
 
 ## 22-bea-input-output-tables — 2026-11-23
 - [ ] BEA input–output evidence (Track D, O9 and O10): the Stage 15 preflight read the

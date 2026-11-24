@@ -1253,7 +1253,8 @@ Estimands:
 - **Cross-checks:** a staffing pattern compared with the resident survey's,
   and earner profiles.
 
-The measure for flows (counts or rates) is not designed.
+The measure for flows (counts or rates) is designed in the
+[Stage 11 spec](completed/cps-job-change-flows.md) *(owner, Stage 11 design, 2026-11-23)*.
 
 #### Estimation / inference procedure
 
@@ -1280,7 +1281,11 @@ The measure for flows (counts or rates) is not designed.
    codes are mid-transition between delineations until the phase-in completes.
 7. **Codes** from K1 (Census categories to candidate sets). Industry code 9890,
    labeled military in 2025 documentation and undocumented in 2026, remains
-   unresolved and is never mapped by assumption.
+   unresolved and is never mapped by assumption. The
+   [Stage 11 spec](completed/cps-job-change-flows.md) settles it: `9890` and occupation
+   `9840` are documented armed-forces specials, kept out of every headline
+   product, and its ASEC 2026 meaning stays unresolved *(owner, Stage 11 design,
+   2026-11-23)*.
 8. **Standard errors:** supplement by replication; monthly by a
    household-cluster bootstrap, labeled approximate (K9).
 

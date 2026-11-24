@@ -187,15 +187,17 @@ and Stage 25 from Track B's after Stage 22 (see Choices made).
       Leaves out: worker profiles and CPS cross-sections (old Stage 12), and the full build, size gate and comparators (old Stage 13) → deferred items, parked until Stages 9 and 11 tick. The ACS protocol section → O20. Replay, `compare-runs`, the six-group independent reconciliation and the freeze and preservation gate → O27 (Stage 9 spec, owner decision 1)
       ROUTING: brainstorming
 
-- [ ] Stage 11: CPS job-change flows, first build
+- [x] Stage 11: CPS job-change flows, first build
       Objective: CPS codes are mapped, person-months are linked and job-change flows are built once on real data and verified, after the 2026 meaning of ASEC industry code `9890` is settled.
       Outcomes: O16
       Track: G
-      Consumes: the IPUMS deliveries verified by Stage 7 (`stage7_ipums_verification_20261015_r2`, `specs/findings/stage-7-ipums-extract-verification.md`, V6) and the Handoff to Stage 11 of `specs/plans/completed/7-ipums-extract-verification.md`. The `9890` item in `specs/deferred_items.md`, section `7-ipums-extract-verification`, and the deferred item for old Stage 11. Spec R4.3, R4.6–R4.9, R4.11, R5.1 and V11 for CPS in `specs/embedding-evaluation-data-spec.md`. The official concordances of codes run `stage4_v11_20261013_r2`. The owner's go-ahead for each production write. The owner-approved stage spec `specs/cps-job-change-flows.md`, whose next step is writing-plans (Resolved at resume, 2026-11-23: owner)
+      Consumes: the IPUMS deliveries verified by Stage 7 (`stage7_ipums_verification_20261015_r2`, `specs/findings/stage-7-ipums-extract-verification.md`, V6) and the Handoff to Stage 11 of `specs/plans/completed/7-ipums-extract-verification.md`. The `9890` item in `specs/deferred_items.md`, section `7-ipums-extract-verification`, and the deferred item for old Stage 11. Spec R4.3, R4.6–R4.9, R4.11, R5.1 and V11 for CPS in `specs/embedding-evaluation-data-spec.md`. The official concordances of codes run `stage4_v11_20261013_r2`. The owner's go-ahead for each production write. The owner-approved stage spec `specs/completed/cps-job-change-flows.md`, whose next step is writing-plans (Resolved at resume, 2026-11-23: owner)
       Produces: one verified CPS job-change bundle under `data/derived/` with its detached pin, and the settled meaning of `9890`. `specs/naics-evaluation-data-stage-11-findings.md`
       Exit: O16: the 2026 meaning of `9890` is settled from an authoritative source, or recorded as unresolved with the owner's decision on its mapping, with no silent leaf assignment and no headline inclusion (the `9890` item's Done when). Then CPS codes are mapped to NAICS and SOC as candidate sets, linked person-month pairs and the CPS weight and SE helpers exist, the job-change flows are built on real data, and `verify` with the detached pin passes. The findings file records the run ID, the pin, and the wall time, maximum RSS and bundle size of the real run
       Leaves out: worker profiles and CPS cross-sections (old Stage 12), and the full build, size gate and comparators (old Stage 13) → deferred items, parked until Stages 9 and 11 tick. The CPS protocol section → O21. Replay check and long-form acceptance finding → not staged. The owner decides at the resume after this stage reports (Stage 11 spec, "Out of scope")
       ROUTING: brainstorming
+> Stage 11: COMPLETE (2026-11-24) — implemented by plan 23 (specs/plans/completed/23-cps-job-change-flows.md). Its Handoff section names what O21, the V9 headline minimum and old Stage 12 consume. Findings in specs/naics-evaluation-data-stage-11-findings.md.
+> Next: resume the roadmap.
 
 - [x] Stage 14: USAspending subawards with SAM.gov NAICS, first build
       Objective: USAspending subawards with SAM.gov entity NAICS are built once on real data as a new evidence family and verified.

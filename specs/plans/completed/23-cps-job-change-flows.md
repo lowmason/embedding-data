@@ -1,5 +1,7 @@
 # CPS Job-Change Flows Implementation Plan
 
+**Status: COMPLETE (2026-11-24)** — executed via subagent-driven-development; deferred items in specs/deferred_items.md, or specs/completed/deferred_items.md once archived
+
 > **For agentic workers:** REQUIRED SUB-SKILL: implement this plan task-by-task via subagent-driven-development (the default) — or executing-plans when your human partner chose inline execution at the handoff. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build one verified bundle of CPS industry→industry and occupation→occupation job-change flows (monthly and ASEC) from the Stage 7 CPS deliveries, with every CPS code mapped to NAICS 2022 or SOC 2018 candidate sets, and settle how `9890` and `9840` are treated (O16).
@@ -8,7 +10,7 @@
 
 **Tech Stack:** Python 3.14, Polars (lazy), Typer, httpx (reference acquisition only), fastexcel (workbook reads), standard `decimal`, `math`, `random`; pytest, hypothesis; uv.
 
-**Spec:** `specs/cps-job-change-flows.md` (owner-approved 2026-11-23; approved text at `ac549b7`, on `main` at merge `52728aa`).
+**Spec:** `specs/completed/cps-job-change-flows.md` (owner-approved 2026-11-23; approved text at `ac549b7`, on `main` at merge `52728aa`).
 
 Roadmap: specs/naics-evaluation-data-roadmap.md, Stage 11 — on plan completion, tick the stage and re-validate later stages against what shipped.
 
@@ -168,13 +170,13 @@ All new, under `src/embedding_data/` unless stated. Each test file sits in `test
 ### Task 1: Stage spec amendment (owner-approved at plan review)
 
 **Files:**
-- Modify: `specs/cps-job-change-flows.md` (the spec's status line, lines 1–15, stays untouched)
+- Modify: `specs/completed/cps-job-change-flows.md` (the spec's status line, lines 1–15, stays untouched)
 
 **Interfaces:**
 - Consumes: the owner's answers to OD1–OD4, OD6 and OD7. OD5 changes no spec text.
 - Produces: a spec that matches Tasks 3–10. The owner approved OD1–OD7 as written on 2026-11-23, so every tag reads that date.
 
-- [ ] **Step 1: Apply the eight edits.** Each replaces the Old text with the New text in `specs/cps-job-change-flows.md`.
+- [x] **Step 1: Apply the eight edits.** Each replaces the Old text with the New text in `specs/completed/cps-job-change-flows.md`.
 
   **A1 (OD1), Inputs table.** After the row that starts `| Stage 8 references receipt (v2/46) |`, insert
   `| Stage 8 ACS mapping run | `stage8_acs_mapping_20261018_r7` | `1ec9701092f576b122b01464cdb6fa3fbee49db030e4ad3df7b64e621b8e75f4` *(owner, plan 23, 2026-11-23)* |`
@@ -193,8 +195,8 @@ All new, under `src/embedding_data/` unless stated. Each test file sits in `test
 
   **A8 (OD7), Bundle table.** Old: "| `cps_linked_pairs.parquet` | Person-level linked pairs, with codes, guards, flags, weight, link type and product membership |" New: "| `cps_linked_pairs.parquet` | Person-level monthly links (one-month and two-month), with codes, guards, flags, weight, link type and product membership. ASEC persons are not in it *(owner, plan 23, 2026-11-23)* |"
 
-- [ ] **Step 2: Verify.** Run `grep -c 'owner, plan 23' specs/cps-job-change-flows.md`. Expected: `8`. Run `git diff -U0 specs/cps-job-change-flows.md | grep '^@@'`. Expected: no hunk starts before line 240.
-- [ ] **Step 3: Commit** `docs(specs): amend the Stage 11 spec after plan 23 review`. The hook skips tests for a `specs/`-only commit.
+- [x] **Step 2: Verify.** Run `grep -c 'owner, plan 23' specs/cps-job-change-flows.md`. Expected: `8`. Run `git diff -U0 specs/cps-job-change-flows.md | grep '^@@'`. Expected: no hunk starts before line 240.
+- [x] **Step 3: Commit** `docs(specs): amend the Stage 11 spec after plan 23 review`. The hook skips tests for a `specs/`-only commit.
 
 ### Task 2: Stage 11 references (acquire, import, validate, receipt)
 
@@ -215,7 +217,7 @@ All new, under `src/embedding_data/` unless stated. Each test file sits in `test
   - `offline_guards(monkeypatch) -> dict[str, int]`: calls `acs_target_fixtures.install_counted_guards(monkeypatch, counts)` with `counts = {'network': 0, 'environment_file': 0, 'live_client': 0}`, and also replaces `cps_flow_references.make_client` with a denier that adds 1 to `live_client` first. It counts at the real seams (sockets, `httpx`, `dotenv`, `IpumsApiClient`, the module `make_client` functions, and opens of the production `.env` and `data/`), which a package-level `patch` of one name would miss. Every in-process offline test (Tasks 11, 12, 13) installs it and asserts that all three counts are zero at the end. It also denies `httpx.Client`, so never install it in an `acquire-references` test.
   - `reference_originals(directory: Path) -> dict[str, Path]`, which writes small valid synthetic originals for the seven kinds.
 
-- [ ] **Step 1: Write the failing tests** in `tests/test_cps_flow_references.py` (import `no_live_clients` with `# noqa: F401`; patch `make_client` with `patch.object` and a `partial` that injects `httpx.MockTransport`, whose responses use `stream=httpx.ByteStream(...)`):
+- [x] **Step 1: Write the failing tests** in `tests/test_cps_flow_references.py` (import `no_live_clients` with `# noqa: F401`; patch `make_client` with `patch.object` and a `partial` that injects `httpx.MockTransport`, whose responses use `stream=httpx.ByteStream(...)`):
   - `test_registry_holds_the_seven_kinds_with_the_spec_urls`: the keys and URLs equal the spec table exactly.
   - `test_each_original_must_carry_its_anchor` (parametrized over the kinds): a valid synthetic original passes. Anchors: industry CSV (read as `utf-8-sig`, header `ROW_TYPE`, `Industry 2025 Description`, `2022 Industry Code`, `2022 NAICS Code`) needs a `detail` row with code `9890`, description `Armed Forces` and an empty NAICS cell, and no row with a code in `9670 9680 9690 9770 9780 9790 9870`. Occupation CSV (header `ROW_TYPE`, `2020 Census Public Use Occupation Code`, `2018 SOC Code`, `Description (2020 Census Occupation Code)`) needs a `detail` row with code `9840`, empty SOC and `Armed Forces`, and no code in `9800`–`9830`. The layout text needs a line matching `Armed Forces\t+9890` and a line matching `^9840\t+Armed Forces`. Each BLS workbook (all sheets, every string cell) needs one sheet row holding the code and a cell starting `Armed Forces (last job)`, plus `Part of 92811` (industry) or `55-0000` (occupation). Each IPUMS page needs `<dt>9890</dt>` or `<dt>9840</dt>` followed by `<dd>Armed Forces</dd>`. A changed label (`Military`) raises `ValueError`.
   - `test_acquire_publishes_a_manifested_snapshot_and_receipt`: seven GETs with `User-Agent` equal to `USER_AGENT`, a final directory with seven originals and `receipt.json`, eight new manifest entries (receipt entry has `client` `embedding-data` and no `source_url`), `retrieved_at_is_proxy` false, and `check_references` returns the receipt.
@@ -223,10 +225,10 @@ All new, under `src/embedding_data/` unless stated. Each test file sits in `test
   - `test_import_of_a_staged_kind_and_an_occupied_final_fail`: importing a kind twice raises. An occupied final is verified, not replaced (`acquire` returns it). An occupied `.part` without state raises.
   - `test_changed_original_fails_check_and_needs_a_fresh_id`: rewriting one byte of a published original makes `check_references` raise.
   - `test_special_evidence_statuses`: `'9840'` is `settled` in `asec_current` and `asec_last_year`, `'9890'` is `unresolved_owner_decision` in both, and both are `settled` in `monthly`.
-- [ ] **Step 2: Run** `uv run --offline --locked pytest tests/test_cps_flow_references.py -v`. Expected: FAIL (`ModuleNotFoundError: embedding_data.cps_flow_references`).
-- [ ] **Step 3: Implement the module.** Copy the lifecycle of `ipums_references.py` (`_publish`, `check_references`, the manifest entries with `describe_file`, the receipt keys `reference_id`, `parser_version`, `originals`, `files`, `raw_citations`), but with this registry and root `raw/references/cps-job-flows/`. Differences (SD6): `acquire` and `import_reference` share one `.part` and one `staging-state.json` (per kind: `request` record and file record), so an import can finish what `acquire` began. `acquire` tries every missing kind, then raises `ValueError('refused: <kinds>')` if any failed. The snapshot publishes when all seven kinds are present. Originals above `MAX_ORIGINAL_BYTES`, a `Content-Length` mismatch and a redirect fail. Read workbooks with `fastexcel` (all sheets, string dtype).
-- [ ] **Step 4: Run** the same command. Expected: all pass. Run `uv run --offline --locked ruff check src tests`.
-- [ ] **Step 5: Commit** `feat(cps-flows): register, validate and receipt the Stage 11 references`.
+- [x] **Step 2: Run** `uv run --offline --locked pytest tests/test_cps_flow_references.py -v`. Expected: FAIL (`ModuleNotFoundError: embedding_data.cps_flow_references`).
+- [x] **Step 3: Implement the module.** Copy the lifecycle of `ipums_references.py` (`_publish`, `check_references`, the manifest entries with `describe_file`, the receipt keys `reference_id`, `parser_version`, `originals`, `files`, `raw_citations`), but with this registry and root `raw/references/cps-job-flows/`. Differences (SD6): `acquire` and `import_reference` share one `.part` and one `staging-state.json` (per kind: `request` record and file record), so an import can finish what `acquire` began. `acquire` tries every missing kind, then raises `ValueError('refused: <kinds>')` if any failed. The snapshot publishes when all seven kinds are present. Originals above `MAX_ORIGINAL_BYTES`, a `Content-Length` mismatch and a redirect fail. Read workbooks with `fastexcel` (all sheets, string dtype).
+- [x] **Step 4: Run** the same command. Expected: all pass. Run `uv run --offline --locked ruff check src tests`.
+- [x] **Step 5: Commit** `feat(cps-flows): register, validate and receipt the Stage 11 references`.
 
 ### Task 3: Census list readers and NAICS candidate sets
 
@@ -244,17 +246,17 @@ All new, under `src/embedding_data/` unless stated. Each test file sits in `test
   - NAICS: `21`>`211`>`2111`>`21112`>`211120`; `31-33`>`311`>`3118`>`31181`>{`311811`,`311812`,`311813`}; `3118`>`31183`>`311830`; `311`>`3114`>`31141`>`311411`; `333`>`3332`>`33324`>`333242`, and `3334`>`33341`>`333415`. Levels `sector`, `subsector`, `industry_group`, `industry`, `national_industry`.
   - SOC: `13-0000`>`13-2000`>{`13-2050`>{`13-2051`,`13-2052`,`13-2054`}, `13-2090`>`13-2099`}; `25-0000`>`25-1000`>{`25-1010`>`25-1011`, `25-1020`>`25-1021`}; `51-0000`>`51-4000`>{`51-4030`>{`51-4031`,`51-4032`}, `51-4040`>`51-4041`, `51-4090`>`51-4099`}. Levels `major`, `minor`, `broad`, `detailed`.
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - `test_industry_reader_collapses_section_and_whitespace_duplicates`: rows in the real shape for `0770` (a section row with the title in column A and an empty column B, then a detail row with the title in column B) and `7570` (two rows whose titles differ by trailing whitespace) give one `ListRow` each with the stripped column-B title. A fixture of 268 data rows with 266 distinct codes returns 266 rows. Two rows of one code with different expressions raise `ValueError`. `9920` has `expression is None`, and the seven military codes carry `pt. 92811`.
   - `test_industry_reader_requires_the_exact_sheet_name`: a workbook whose sheet is `Fixture` raises.
   - `test_industry_reader_agrees_with_parse_industry_list`: on `tests/fixtures/acs_mapping/classification/census_industry_2022.xlsx`, the reader's `(code, title)` pairs minus `9920` equal `ipums_references.parse_industry_list(file, 2022)`. This import is for the test only.
   - `test_occupation_reader_reads_x_and_none_tokens`: tokens `13-20XX`, `51-4XXX`, `none` come back unchanged and the locator reads `census_occupation_2018:2018 Census Occ Code List!B:D:row=<n>`. A duplicate code or a token such as `13-2X54` raises.
   - `test_naics_candidates_expand_each_membership_type`: `311811` gives `['311811']`; `Part of 311` gives every 311 national industry; `3118 exc. 311811` gives `['311812', '311813', '311830']`; `Part of 31, 32, 33` gives every national industry under `31-33`; `3332, 3334` gives `['333242', '333415']`; `not a code` raises `ValueError`.
   - `test_membership_types_keep_every_type`: `311811` → `['whole']`; `311` → `['group']`; `Part of 311` → `['group', 'part']`; `3332, 3334, Part of 333` → `['group', 'part', 'several']`; `311811, 311812` → `['several']`; `3118 exc. 311811` → `['group']`.
-- [ ] **Step 2: Run** `uv run --offline --locked pytest tests/test_cps_flow_lists.py -v`. Expected: FAIL (module missing).
-- [ ] **Step 3: Implement.** A row is data when its code cell, stripped, matches `^\d{4}$`. The industry title is the stripped column B of a row that has one. Rows of one code must agree on the stripped expression (null equals null) and on the title after whitespace collapse, else `ValueError`. Token shapes accepted for occupation: `^(?:\d{2}-\d{4}|\d{2}-\d{3}X|\d{2}-\d{2}XX|\d{2}-\dXXX|none)$`. `membership_types`: split the clause before ` exc. ` on commas and `and`, strip the `Part of`, `Pts.` and `pt.` markers; `part` if a marker was present, `several` if two or more tokens, `whole` if exactly one unmarked token that is a `national_industry` node, `group` if any token is not one. Return sorted.
-- [ ] **Step 4: Run** the tests, then `ruff check`. Expected: pass.
-- [ ] **Step 5: Commit** `feat(cps-flows): read the Census industry and occupation lists`.
+- [x] **Step 2: Run** `uv run --offline --locked pytest tests/test_cps_flow_lists.py -v`. Expected: FAIL (module missing).
+- [x] **Step 3: Implement.** A row is data when its code cell, stripped, matches `^\d{4}$`. The industry title is the stripped column B of a row that has one. Rows of one code must agree on the stripped expression (null equals null) and on the title after whitespace collapse, else `ValueError`. Token shapes accepted for occupation: `^(?:\d{2}-\d{4}|\d{2}-\d{3}X|\d{2}-\d{2}XX|\d{2}-\dXXX|none)$`. `membership_types`: split the clause before ` exc. ` on commas and `and`, strip the `Part of`, `Pts.` and `pt.` markers; `part` if a marker was present, `several` if two or more tokens, `whole` if exactly one unmarked token that is a `national_industry` node, `group` if any token is not one. Return sorted.
+- [x] **Step 4: Run** the tests, then `ruff check`. Expected: pass.
+- [x] **Step 5: Commit** `feat(cps-flows): read the Census industry and occupation lists`.
 
 ### Task 4: SOC candidates, X residuals, PUMS cross-check and the unit registry
 
@@ -271,7 +273,7 @@ All new, under `src/embedding_data/` unless stated. Each test file sits in `test
   - `cross_check(residuals: dict[str, list[str]], pums: dict[str, list[str]], claimed_elsewhere: dict[str, set[str]], delivered: set[str]) -> dict[str, str]`. Outcomes `equal`, `strict_subset`, `not_delivered_no_pums_list`. Fixed failure messages (`ValueError`): `x residual is empty`, `x residual is not within the PUMS list`, `x PUMS extra member is not claimed by another row`, `x category has no PUMS list`. A delivered X category with no PUMS list fails. An undelivered one with no list passes.
   - `build_units(industry: list[ListRow], occupation: list[ListRow], *, naics_nodes, soc_nodes, paths, pums: dict, delivered: dict[str, set[str]], evidence: dict[str, dict], references: dict[str, str]) -> pl.DataFrame`: the `cps_category_units.parquet` frame with the ordered schema of the Schemas section. `delivered` has keys `industry` and `occupation`. `references` has `industry`, `occupation` and `special` receipt IDs.
 
-- [ ] **Step 1: Write the failing tests** (fixture tree; the occupation rows are `ListRow`s):
+- [x] **Step 1: Write the failing tests** (fixture tree; the occupation rows are `ListRow`s):
   - `test_x_matches_use_detailed_nodes_only`: `51-403X` matches `['51-4031', '51-4032']` and `51-4XXX` matches all of `51-4031`, `51-4032`, `51-4041`, `51-4099`.
   - `test_residuals_order_narrow_before_wide_and_subtract_claims`: rows `8025` `51-403X`, `8225` `51-4XXX`, and a non-X row `7000` `51-4040` claim. Residual `8025` is `['51-4031', '51-4032']` and residual `8225` is `['51-4099']`. The two sets and the claim are disjoint.
   - `test_broad_and_minor_tokens_claim_all_detailed_descendants`: a non-X row with `25-1000` claims `25-1011` and `25-1021`, so an X row `25-10XX` leaves an empty residual and fails the check with `x residual is empty`.
@@ -281,10 +283,10 @@ All new, under `src/embedding_data/` unless stated. Each test file sits in `test
   - `test_registry_statuses_and_specials`: `9830` and `9920` (occupation) are `no_soc_equivalent` with empty candidates, industry `9920` is `no_naics_equivalent` (OD2), and the two extra rows (`9890` industry, `9840` occupation) are `special_military` with label `Armed Forces`, empty candidates, `evidence_monthly` `settled`, ASEC evidence per `special_evidence` and `bls_evidence` `pt. 92811` or `55-0000`.
   - `test_registry_schema_order_and_unit_strings`: columns and dtypes equal the Schemas section exactly. `unit` is `feature:cps_industry_category:0170` style. Rows are sorted by `unit_type`, `code`. A non-X SOC token for a detailed node has types `['whole']`, a broad one `['group']`, an X row `['x_residual']` with `x_token` set.
   - `test_candidates_must_be_stage4_nodes`: an expression that expands to a code missing from the nodes raises `ValueError`.
-- [ ] **Step 2: Run** `uv run --offline --locked pytest tests/test_cps_flow_units.py -v`. Expected: FAIL (module missing).
-- [ ] **Step 3: Implement.** Claims of non-X rows come from `soc_candidates`. Never use arithmetic on code digits for membership: X matching tests the Stage 4 detailed node codes. `candidate_node_ids` come from the node frames by code. Industry rows use `naics_candidates` and `membership_types` (OD4). A candidate must be a `national_industry` or `detailed` node.
-- [ ] **Step 4: Run** the tests, then `ruff check`. Expected: pass.
-- [ ] **Step 5: Commit** `feat(cps-flows): derive category candidates, X residuals and the unit registry`.
+- [x] **Step 2: Run** `uv run --offline --locked pytest tests/test_cps_flow_units.py -v`. Expected: FAIL (module missing).
+- [x] **Step 3: Implement.** Claims of non-X rows come from `soc_candidates`. Never use arithmetic on code digits for membership: X matching tests the Stage 4 detailed node codes. `candidate_node_ids` come from the node frames by code. Industry rows use `naics_candidates` and `membership_types` (OD4). A candidate must be a `national_industry` or `detailed` node.
+- [x] **Step 4: Run** the tests, then `ruff check`. Expected: pass.
+- [x] **Step 5: Commit** `feat(cps-flows): derive category candidates, X residuals and the unit registry`.
 
 ### Task 5: Select and authenticate the upstreams; freeze the DDI rules
 
@@ -305,7 +307,7 @@ All new, under `src/embedding_data/` unless stated. Each test file sits in `test
   - A Stage 7 run directory with `inputs.json` (`format_version` `ipums-verification-v1`, `run_id`, `references` with `reference_id`/`receipt`/`receipt_citation`, `deliveries` for `cps/monthly` and `cps/asec` with `delivery_id`, `parquet`, `parquet_record`, `raw_citations`, `ddi`), `report.json` and `outputs.json`.
   - Stage 7 and Stage 8 receipts (`receipt.json` with `files` and `raw_citations`) that hold a small industry and occupation workbook, a Stage 8 mapping run with `acs_code_lookup.parquet`, `inputs.json` (`run_id`, `references` with `reference_id`/`receipt_sha256`), `report.json`, `outputs.json`, a Stage 4 directory with `naics_nodes.parquet`, `soc_nodes.parquet`, `code_paths.parquet`, `inputs.json`, `report.json`, `outputs.json`, and a Stage 11 receipt built from `reference_originals`.
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - `test_select_inputs_authenticates_all_six_pins`: `select_inputs` returns a `SelectedInputs` whose `provenance` names the six IDs and pins, and `verify()` passes.
   - `test_a_wrong_pin_for_each_upstream_fails` (parametrized over the six pins): `ValueError` containing `checksum differs`.
   - `test_changed_parquet_raw_csv_or_manifest_entry_fails`: flipping one byte of a Parquet, of a raw CSV, or editing a manifest line each raise `ValueError`.
@@ -314,10 +316,10 @@ All new, under `src/embedding_data/` unless stated. Each test file sits in `test
   - `test_ddi_labels_are_frozen`: `check_ddi` returns int-keyed maps for the delivered labels, and raises for a changed `EMPSAME` label, a `QEMPSTAT` set that has a `Value to allocated value`, an ASEC `QOCCLY` with a third category, and an unknown flag label.
   - `test_stage4_schemas_and_pins_match_tri_codes`: the repeated constants (`CODES_SCHEMA_VERSION`, `NODE_SCHEMA`) equal `tri_codes`'s.
   - `test_provenance_cites_the_frozen_documentary_originals`: `provenance` holds a verified manifest citation for each of `asec_2025_documentation`, `asec_2026_documentation`, `cps_jan2025_industry_documentation`, `cps_lnkfw1mwt`, `cps_empsame`, `cps_actsame` and `ind_2025_codes` of the Stage 7 receipt. Stage 11 cites these frozen copies, not the online ones.
-- [ ] **Step 2: Run** `uv run --offline --locked pytest tests/test_cps_flow_inputs.py -v`. Expected: FAIL (module missing).
-- [ ] **Step 3: Implement.** Authentication is the `outputs.json` SHA-256 against the pin, then a partial inventory check: for the Stage 7 run only `inputs.json`; for the mapping run `acs_code_lookup.parquet` and `inputs.json`; for Stage 4 the three node tables, `inputs.json` and `report.json`. The record in `outputs.json` must equal the file (SHA-256, size, rows and schema for a Parquet). A receipt is authenticated by its `receipt.json` hash, then each used original against `receipt['files']` and `target_io.verify_raw` on its citation. Each CPS delivery is authenticated by `parquet_record` equal to `target_io.file_record(parquet)` and `verify_raw` on its three raw citations. Do not run Stage 7's `verify_bundle`. `verify()` reselects and compares by `==`. Repeat the Stage 4 constants as `tri_codes.py` does.
-- [ ] **Step 4: Run** the tests, then `ruff check`. Expected: pass.
-- [ ] **Step 5: Commit** `feat(cps-flows): authenticate the five upstreams and freeze the DDI rules`.
+- [x] **Step 2: Run** `uv run --offline --locked pytest tests/test_cps_flow_inputs.py -v`. Expected: FAIL (module missing).
+- [x] **Step 3: Implement.** Authentication is the `outputs.json` SHA-256 against the pin, then a partial inventory check: for the Stage 7 run only `inputs.json`; for the mapping run `acs_code_lookup.parquet` and `inputs.json`; for Stage 4 the three node tables, `inputs.json` and `report.json`. The record in `outputs.json` must equal the file (SHA-256, size, rows and schema for a Parquet). A receipt is authenticated by its `receipt.json` hash, then each used original against `receipt['files']` and `target_io.verify_raw` on its citation. Each CPS delivery is authenticated by `parquet_record` equal to `target_io.file_record(parquet)` and `verify_raw` on its three raw citations. Do not run Stage 7's `verify_bundle`. `verify()` reselects and compares by `==`. Repeat the Stage 4 constants as `tri_codes.py` does.
+- [x] **Step 4: Run** the tests, then `ruff check`. Expected: pass.
+- [x] **Step 5: Commit** `feat(cps-flows): authenticate the five upstreams and freeze the DDI rules`.
 
 ### Task 6: Value classes, the monthly panel and links
 
@@ -335,7 +337,7 @@ All new, under `src/embedding_data/` unless stated. Each test file sits in `test
   - `link_counts(panel: pl.LazyFrame) -> pl.DataFrame` (`month_a`, `month_b`, `link_type`, `cpsidv`, `cpsidp`, `other_gap_matches`).
 - A **one-month link** has the same `CPSIDV` in calendar months `m` and `m + 1`, `MISH` rising by one, and the earlier `MISH` not 4 or 8. The **two-month link** is only September 2025 → November 2025 with `MISH` rising by two. `other_gap_matches` counts `CPSIDV` matches for those same month pairs that fail the `MISH` rule. The `CPSIDP` count applies the same rules on `CPSIDP`.
 
-- [ ] **Step 1: Write the failing tests** (small typed frames):
+- [x] **Step 1: Write the failing tests** (small typed frames):
   - `test_each_value_class_per_field`: monthly `IND` values `0170` (mapped), `0000` (not in universe), `9890` (special); `OCC` `9840` special. `9840` in an `IND` field and `1234` in any field raise.
   - `test_unpadded_code_is_unparseable` (Review Focus 4): `'170'`, `' 170'` and `'0170 '` raise.
   - `test_delivered_no_equivalent_statuses_fail`: a delivered industry `9920` and occupation `9830` raise.
@@ -347,10 +349,10 @@ All new, under `src/embedding_data/` unless stated. Each test file sits in `test
   - `test_duplicate_cpsidv_within_a_month_fails` (Review Focus 3).
   - `test_asecflag_one_is_refused_and_null_or_two_pass`.
   - `test_link_counts_report_cpsidv_and_cpsidp_by_month_pair`: two persons whose `CPSIDV` match but `CPSIDP` differ count once in `cpsidv` and zero in `cpsidp`.
-- [ ] **Step 2: Run** `uv run --offline --locked pytest tests/test_cps_flow_linkage.py -v`. Expected: FAIL (module missing).
-- [ ] **Step 3: Implement** lazily with Polars (join of the panel to itself on `CPSIDV` and the month rule). Validation of the panel collects only aggregates. The value-class check collects a count of failing rows and raises a fixed message with no value in it.
-- [ ] **Step 4: Run** the tests, then `ruff check`. Expected: pass.
-- [ ] **Step 5: Commit** `feat(cps-flows): classify codes and link adjacent person-months`.
+- [x] **Step 2: Run** `uv run --offline --locked pytest tests/test_cps_flow_linkage.py -v`. Expected: FAIL (module missing).
+- [x] **Step 3: Implement** lazily with Polars (join of the panel to itself on `CPSIDV` and the month rule). Validation of the panel collects only aggregates. The value-class check collects a count of failing rows and raises a fixed message with no value in it.
+- [x] **Step 4: Run** the tests, then `ruff check`. Expected: pass.
+- [x] **Step 5: Commit** `feat(cps-flows): classify codes and link adjacent person-months`.
 
 ### Task 7: Guards, product eligibility and evidence policies
 
@@ -368,7 +370,7 @@ All new, under `src/embedding_data/` unless stated. Each test file sits in `test
   - `asec_flag_counts(asec: pl.LazyFrame) -> dict` (`<variable>` → `<EMPSTAT>` → `<value>` → count, for `QIND`, `QOCC`, `QOCCLY`, `QEMPSTAT`).
 - `inclusion_reasons` entries: `special_military`, `flag_unavailable:<VARIABLE>`, `flag:<VARIABLE>:<class>` for a non-`nonallocation` class at either end (variables `QEMPSTAT` and `QIND` or `QOCC`), and `asec_no_flag_evidence` for every ASEC row. `strict` is true only for a `monthly_*` row with reason `eligible` and no inclusion reason.
 
-- [ ] **Step 1: Write the failing tests:**
+- [x] **Step 1: Write the failing tests:**
   - `test_guard_table_for_both_dimensions`: all 25 `(EMPSAME, ACTSAME)` pairs over `{1, 2, 96, 97, 99}` give the Global Constraints table for occupation and industry.
   - `test_monthly_ee_admits_only_a_changed_guard_with_positive_weight`.
   - `test_duty_change_moves_occupation_but_industry_difference_is_noise`: `EMPSAME` 2 and `ACTSAME` 2 with both codes different is `eligible` for occupation and `coding_noise` for industry, with `noise_after_duty_change` true.
@@ -380,10 +382,10 @@ All new, under `src/embedding_data/` unless stated. Each test file sits in `test
   - `test_an_unknown_flag_value_fails_rule_validation`: `QIND` 9 raises. An `EMPSAME` or `ACTSAME` that is null or outside the delivered set raises too. A null `QIND` does not raise (it is `unavailable`).
   - `test_usable_guard_share_and_mish_exceptions`: the share equals `(changed + same) / total` on a fixed frame, and the three delivered `EMPSAME` values in `MISH` 1 or 5 are counted as source exceptions by `guard_source_exceptions(links) -> int` and stay in the frame.
   - `test_asec_flag_counts_cover_every_empstat`.
-- [ ] **Step 2: Run** `uv run --offline --locked pytest tests/test_cps_flow_guards.py -v`. Expected: FAIL (module missing).
-- [ ] **Step 3: Implement** with Polars expressions. Add `guard_source_exceptions(links: pl.LazyFrame) -> int` (links whose `mish_b` is 1 or 5 and whose `empsame_b` is 1 or 2).
-- [ ] **Step 4: Run** the tests, then `ruff check`. Expected: pass.
-- [ ] **Step 5: Commit** `feat(cps-flows): guards, product eligibility and evidence policies`.
+- [x] **Step 2: Run** `uv run --offline --locked pytest tests/test_cps_flow_guards.py -v`. Expected: FAIL (module missing).
+- [x] **Step 3: Implement** with Polars expressions. Add `guard_source_exceptions(links: pl.LazyFrame) -> int` (links whose `mish_b` is 1 or 5 and whose `empsame_b` is 1 or 2).
+- [x] **Step 4: Run** the tests, then `ruff check`. Expected: pass.
+- [x] **Step 5: Commit** `feat(cps-flows): guards, product eligibility and evidence policies`.
 
 ### Task 8: Decimal weights aligned to the Parquets
 
@@ -397,17 +399,17 @@ All new, under `src/embedding_data/` unless stated. Each test file sits in `test
   - `weighted_sources(selected: SelectedInputs, scratch: Path)`, a context manager yielding a `WeightedSource`. It calls `selected.verify()` on entry and on exit, and removes the decompressed CSV copies on exit.
   - `weight_status_expr(weight: pl.Expr, link_type: pl.Expr) -> pl.Expr`: `not_linkable` for `two_month`, else `null`, `zero` or `positive`.
 
-- [ ] **Step 1: Write the failing tests** (`seed_upstreams` with small frames):
+- [x] **Step 1: Write the failing tests** (`seed_upstreams` with small frames):
   - `test_weights_are_the_literal_csv_text`: ten weights `0.1` sum to exactly `Decimal('1.0')` in the monthly frame. The Float64 Parquet sum is not `1.0`, which shows the recovery is needed.
   - `test_positional_alignment_failure_is_refused`: with `ipums_parity.compare_ordered` patched to report `values_equal` false, entering the context raises `ValueError`.
   - `test_required_weight_names_are_exact`: ASEC needs `ASECWT` and exactly `REPWTP1`–`REPWTP160`. A CSV with `REPWTP161` or without `REPWTP160` raises. The unnumbered `REPWTP` is ignored.
   - `test_negative_full_weight_fails_but_a_negative_replicate_is_kept`: a negative `ASECWT` or `LNKFW1MWT` raises, a negative `REPWTP7` is returned unchanged, and a null `LNKFW1MWT` stays null.
   - `test_link_weight_status_values`: `positive`, `zero`, `null`, `not_linkable`.
   - `test_scratch_is_empty_after_exit_and_verify_runs_twice`: the scratch directory holds nothing after the block, and `verify` was called on entry and on exit.
-- [ ] **Step 2: Run** `uv run --offline --locked pytest tests/test_cps_flow_weights.py -v`. Expected: FAIL (module missing).
-- [ ] **Step 3: Implement** the Stage 9 pattern (`acs_target_weights.py`): decompress each CSV into `scratch`, measure, scan with `with_row_index('source_row')`, and prove all non-weight columns equal to the Parquet row by row before any join. The frames stay lazy, so a caller filters to eligible rows before it collects the 160 replicate columns.
-- [ ] **Step 4: Run** the tests, then `ruff check`. Expected: pass.
-- [ ] **Step 5: Commit** `feat(cps-flows): recover literal Decimal weights from the raw CSVs`.
+- [x] **Step 2: Run** `uv run --offline --locked pytest tests/test_cps_flow_weights.py -v`. Expected: FAIL (module missing).
+- [x] **Step 3: Implement** the Stage 9 pattern (`acs_target_weights.py`): decompress each CSV into `scratch`, measure, scan with `with_row_index('source_row')`, and prove all non-weight columns equal to the Parquet row by row before any join. The frames stay lazy, so a caller filters to eligible rows before it collects the 160 replicate columns.
+- [x] **Step 4: Run** the tests, then `ruff check`. Expected: pass.
+- [x] **Step 5: Commit** `feat(cps-flows): recover literal Decimal weights from the raw CSVs`.
 
 ### Task 9: Totals, shares, replicate SEs, the seeded bootstrap and undefined cases
 
@@ -426,7 +428,7 @@ All new, under `src/embedding_data/` unless stated. Each test file sits in `test
   - `replicate_se(point: float, replicates: list[float | None]) -> float | None` (the ASEC formula), `bootstrap_se(replicates: list[float | None]) -> float | None`.
 - Arithmetic (SD4, SD5): `S` is the exact Decimal sum of weights over a cell, `total = float(S) / k`, `share = total_ab / total_a`. The monthly replicate weight is `weight × draws` for the record's household, exact in Decimal. Every full-sample cell gets all `B` (or 160) replicate rows, zero-filled.
 
-- [ ] **Step 1: Write the failing tests:**
+- [x] **Step 1: Write the failing tests:**
   - `test_pooled_totals_and_shares_with_fixed_divisors`: cells `a→b` weight 36, `a→c` weight 72 with `k = 18` give totals 2.0 and 4.0 and shares `1/3` and `2/3`, `n_weighted` 2.0 and 4.0, and `n_unweighted` as the record counts (not divided by `k`).
   - `test_share_is_the_ratio_of_pooled_totals`: two periods with different denominators. The share equals pooled `S_ab / S_a`, not the mean of the two period shares.
   - `test_decimal_sums_do_not_drift`: ten records of weight `0.1`, `k = 1`, give `average_total` exactly `1.0`.
@@ -438,10 +440,10 @@ All new, under `src/embedding_data/` unless stated. Each test file sits in `test
   - `test_nonpositive_denominator_publishes_no_share`: records with weights `+1` and `-1` for one origin give the `average_total` row, no `forward_share` row, and a support row of kind `undefined_share` with reason `nonpositive_denominator`.
   - `test_undefined_replicate_ratio_keeps_the_point_with_null_se`: an ASEC replicate whose origin total is not positive gives the share row with `se` null and `se_method` `none`, a support row with reason `replicate_share_undefined` and the replicate numbers, and a replicate row with `status` `denominator_nonpositive` and `estimate` null. `average_total` keeps its SE.
   - `test_unobserved_cells_are_absent`.
-- [ ] **Step 2: Run** `uv run --offline --locked pytest tests/test_cps_flow_estimation.py -v`. Expected: FAIL (module missing).
-- [ ] **Step 3: Implement.** The monthly replicate frame joins `records` to `draws` on `CPSID`, so memory is replicates × eligible records. The bootstrap SE is `sqrt(fsum((x - mean)**2) / (B - 1))` with `mean = fsum(x) / B`. The ASEC SE is `sqrt((4 / 160) * fsum((x_r - x)**2))`. `se_method` is `bootstrap` or `replicate` when `se` is not null and `none` otherwise.
-- [ ] **Step 4: Run** the tests, then `ruff check`. Expected: pass.
-- [ ] **Step 5: Commit** `feat(cps-flows): estimate flows, replicate SEs and the seeded bootstrap`.
+- [x] **Step 2: Run** `uv run --offline --locked pytest tests/test_cps_flow_estimation.py -v`. Expected: FAIL (module missing).
+- [x] **Step 3: Implement.** The monthly replicate frame joins `records` to `draws` on `CPSID`, so memory is replicates × eligible records. The bootstrap SE is `sqrt(fsum((x - mean)**2) / (B - 1))` with `mean = fsum(x) / B`. The ASEC SE is `sqrt((4 / 160) * fsum((x_r - x)**2))`. `se_method` is `bootstrap` or `replicate` when `se` is not null and `none` otherwise.
+- [x] **Step 4: Run** the tests, then `ruff check`. Expected: pass.
+- [x] **Step 5: Commit** `feat(cps-flows): estimate flows, replicate SEs and the seeded bootstrap`.
 
 ### Task 10: Target rows, companion tables and the report
 
@@ -459,7 +461,7 @@ All new, under `src/embedding_data/` unless stated. Each test file sits in `test
   - `n_unweighted_distribution(targets: pl.DataFrame) -> dict` (keys of the Schemas section).
   - `build_report(*, run_id: str, parts: dict, tables: dict[str, pl.DataFrame]) -> dict` (the `report.json` keys).
 
-- [ ] **Step 1: Write the failing tests:**
+- [x] **Step 1: Write the failing tests:**
   - `test_target_rows_pass_the_contract_with_frozen_metadata`: `write_targets` accepts the frame. Exact strings: `source` `cps`, `family` `job_change_flow`, `unit_a` `feature:cps_industry_category:0170`, `vintage` `census-industry-2022`, `universe` `monthly_ee:strict`, `sample_set` `cps-basic-2025-01-to-2026-09` (monthly) or `cps-asec-2025-2026` (ASEC).
   - `test_flags_follow_the_registry`: monthly rows carry `bootstrap_approximate` and `size_gate_pending`, ASEC rows carry `unguarded_upper_bound`, a row with a `9890` or `9840` end carries `special_military` and exists only in `sensitivity`. Flags are sorted and distinct.
   - `test_se_method_follows_the_se`: `bootstrap` or `replicate` when `se` is set, `none` when it is null.
@@ -467,10 +469,10 @@ All new, under `src/embedding_data/` unless stated. Each test file sits in `test
   - `test_diagnostics_label_exclusive_funnels_and_overlaps`: funnel rows are `exclusive` true and sum to the source total of their product and dimension. Evidence, guard-noise and special rows are `exclusive` false.
   - `test_n_unweighted_distribution_has_the_fixed_keys`: `cells`, `min`, `max`, `p10`, `p25`, `p50`, `p75`, `p90`, and `at_least` with keys `1`, `2`, `5`, `10`, `20`, `30`, `50`, `100`.
   - `test_report_has_the_fixed_keys_and_no_row_content`: the keys equal the Schemas list, `v11['unparseable_values']` is 0, and `json.dumps(report)` contains no fixture `CPSIDV` or `CPSID`.
-- [ ] **Step 2: Run** `uv run --offline --locked pytest tests/test_cps_flow_targets.py -v`. Expected: FAIL (module missing).
-- [ ] **Step 3: Implement.** Pure functions over the computed pieces. `n_weighted` of a `forward_share` row is the cell's mass divided by `k`, the same as its `average_total` value. Percentiles use the nearest-rank method on the sorted `n_unweighted` of the `average_total` rows.
-- [ ] **Step 4: Run** the tests, then `ruff check`. Expected: pass.
-- [ ] **Step 5: Commit** `feat(cps-flows): assemble the target rows, companion tables and report`.
+- [x] **Step 2: Run** `uv run --offline --locked pytest tests/test_cps_flow_targets.py -v`. Expected: FAIL (module missing).
+- [x] **Step 3: Implement.** Pure functions over the computed pieces. `n_weighted` of a `forward_share` row is the cell's mass divided by `k`, the same as its `average_total` value. Percentiles use the nearest-rank method on the sorted `n_unweighted` of the `average_total` rows.
+- [x] **Step 4: Run** the tests, then `ruff check`. Expected: pass.
+- [x] **Step 5: Commit** `feat(cps-flows): assemble the target rows, companion tables and report`.
 
 ### Task 11: Build, verify and compare the bundle
 
@@ -490,7 +492,7 @@ All new, under `src/embedding_data/` unless stated. Each test file sits in `test
 - `verify_bundle` copies `tri_bundle.verify_bundle`: authenticate the pin, the exact file set and the inventory, read the six IDs and pins from `inputs.json`, require recorded `software` equal to `freeze_software()`, recompute every table in a temporary directory outside `data_dir`, compare each in physical order with an `ordered_equal` of its own, then compare `report.json` and `inputs.json` (with the recorded `execution`).
 - `compare_runs` checks each bundle against its own `outputs.json`, then compares the six tables in order and `report.json` without its `run_id`. It does not compare `inputs.json`, as TRI. Equality establishes replay, not trust.
 
-- [ ] **Step 1: Write the failing tests** (`seed_upstreams` with a fixture that holds at least one guarded employer change, one duty change, one coding-noise pair, one unusable guard, one unemployed→employed move, one `9890` and `9840` origin, one September→November link and one ASEC difference):
+- [x] **Step 1: Write the failing tests** (`seed_upstreams` with a fixture that holds at least one guarded employer change, one duty change, one coding-noise pair, one unusable guard, one unemployed→employed move, one `9890` and `9840` origin, one September→November link and one ASEC difference):
   - `test_build_publishes_exactly_the_bundle_files`: the final directory holds the eight files plus `outputs.json`, `outputs.json` lists the other eight and not itself, and the returned pin equals its SHA-256.
   - `test_occupied_final_or_partial_name_fails_before_writing`.
   - `test_failure_cleans_only_its_own_staging`: a forced failure removes `<run>.part` and leaves another run's `.part` alone.
@@ -502,10 +504,11 @@ All new, under `src/embedding_data/` unless stated. Each test file sits in `test
   - `test_two_builds_compare_equal_and_a_changed_weight_compares_unequal`: `compare_runs` of a build and a replay is `equal` true. A replay from a seed that differs by one weight gives `equal` false.
   - `test_the_fixture_exercises_every_spec_case`: the report shows each reason of SD3 at least once for the cases the fixture holds, and the monthly Parquet's two specials appear only with `special_military`.
   - `test_software_files_equal_the_measured_import_closure`: `subprocess_modules('embedding_data.cps_flow_bundle')` mapped with `module_file` (both from `vendor_link_fixtures`), plus `pyproject.toml` and `uv.lock`, equals `set(SOFTWARE_FILES)`.
-- [ ] **Step 2: Run** `uv run --offline --locked pytest tests/test_cps_flow_bundle.py -v`. Expected: FAIL (module missing).
-- [ ] **Step 3: Implement** as described. Stage every row-level intermediate under `.scratch` or in memory, never under `ROOT` outside the staging directory. Release the decompressed CSVs before the rename.
-- [ ] **Step 4: Run** the tests, then `ruff check`. Expected: pass.
-- [ ] **Step 5: Commit** `feat(cps-flows): build, verify and compare the job-flow bundle`.
+- [x] **Step 2: Run** `uv run --offline --locked pytest tests/test_cps_flow_bundle.py -v`. Expected: FAIL (module missing).
+- [x] **Step 3: Implement** as described. Stage every row-level intermediate under `.scratch` or in memory, never under `ROOT` outside the staging directory. Release the decompressed CSVs before the rename.
+- [x] **Step 4: Run** the tests, then `ruff check`. Expected: pass.
+- [x] **Step 5: Commit** `feat(cps-flows): build, verify and compare the job-flow bundle`.
+  > Deviation: `test_software_files_equal_the_measured_import_closure` uses `<=` (Task 11 ruling), because Task 12 adds the command module to `SOFTWARE_FILES`. `build` also refuses a one-month link month outside the 18 frozen months and an ASEC year outside 2025 and 2026, and a two-month link has a null `weight_a`. The final review (fix wave F1, commits 40d24fb, 59dc5a6, 43c8ce3) changed the evidence and special diagnostics to count eligible rows only.
 
 ### Task 12: Command group, README and the offline guarantees
 
@@ -517,7 +520,7 @@ All new, under `src/embedding_data/` unless stated. Each test file sits in `test
 - Consumes: `cps_flow_bundle`, `cps_flow_references`, `cps_flow_inputs.InputRequest`.
 - Produces: `python -m embedding_data.cps_job_flows` with exactly the commands `acquire-references REFERENCE_ID`, `import-reference REFERENCE_ID KIND FILE`, `build RUN_ID`, `verify RUN_ID --outputs-sha256 PIN`, `compare-runs FIRST SECOND`. Every command takes `--data-dir`. `build` takes `--stage7-run`, `--stage7-outputs-sha256`, `--stage7-receipt`, `--stage7-receipt-sha256`, `--stage8-receipt`, `--stage8-receipt-sha256`, `--stage8-mapping-run`, `--stage8-mapping-outputs-sha256`, `--codes-run`, `--codes-outputs-sha256`, `--cps-receipt`, `--cps-receipt-sha256`. Module constants `NO_RUN = '-'`, `RAW = 'raw/references/cps-job-flows'`, `BUNDLES = 'derived/cps/job-flows'`. Copy `tri_parent_links.py` (`_invoke`, `_reason`, the failure line, `typer.Exit(1)` outside the guard).
 
-- [ ] **Step 1: Write the failing tests** (model: `tests/test_tri_cli.py`; use `typer.testing.CliRunner`, the `no_live_clients` fixture and `data_directory`):
+- [x] **Step 1: Write the failing tests** (model: `tests/test_tri_cli.py`; use `typer.testing.CliRunner`, the `no_live_clients` fixture and `data_directory`):
   - `test_the_five_commands_are_exactly_these`.
   - `test_acquire_and_import_print_one_sorted_json_line` (patched `make_client`).
   - `test_build_verify_compare_round_trip`: `build` prints `run_id`, `directory` (data-relative) and `outputs_sha256`. `verify` with that pin exits 0. `compare-runs` of a build and a replay exits 0 with `equal` true.
@@ -526,10 +529,11 @@ All new, under `src/embedding_data/` unless stated. Each test file sits in `test
   - `test_no_offline_command_reads_env_or_builds_a_client`: with `offline_guards` installed, a full `import-reference`, `build`, `verify`, `compare-runs` round trip succeeds and all three counts are zero. Only `acquire-references` reaches `make_client`, and its test does not install `offline_guards`.
   - `test_import_closure_is_the_recorded_one` (OD5): in a subprocess, importing `embedding_data.cps_job_flows` gives `('dotenv' in modules, 'ipumspy' in modules) == (True, True)`. If the owner chose the alternative, the expected value is `(False, True)`.
   - `test_software_files_equal_the_measured_import_closure`: the closure of `embedding_data.cps_job_flows` plus `pyproject.toml` and `uv.lock` equals `set(SOFTWARE_FILES)`.
-- [ ] **Step 2: Run** `uv run --offline --locked pytest tests/test_cps_job_flows_cli.py -v`. Expected: FAIL (module missing).
-- [ ] **Step 3: Implement** the command module, update `SOFTWARE_FILES`, and write the README section with the production invocations. Use `--data-dir /Users/lowell/Projects/embedding-data/data` and the pins of Global Constraints, leave the Stage 11 receipt and run pins as `<...>` until Tasks 15 and 16, and state the host rule.
-- [ ] **Step 4: Run** `uv run --offline --locked pytest tests/test_cps_job_flows_cli.py tests/test_cps_flow_bundle.py -v`, then `ruff check`. Expected: pass.
-- [ ] **Step 5: Commit** `feat(cps-flows): add the command group and the README contract`.
+- [x] **Step 2: Run** `uv run --offline --locked pytest tests/test_cps_job_flows_cli.py -v`. Expected: FAIL (module missing).
+- [x] **Step 3: Implement** the command module, update `SOFTWARE_FILES`, and write the README section with the production invocations. Use `--data-dir /Users/lowell/Projects/embedding-data/data` and the pins of Global Constraints, leave the Stage 11 receipt and run pins as `<...>` until Tasks 15 and 16, and state the host rule.
+- [x] **Step 4: Run** `uv run --offline --locked pytest tests/test_cps_job_flows_cli.py tests/test_cps_flow_bundle.py -v`, then `ruff check`. Expected: pass.
+- [x] **Step 5: Commit** `feat(cps-flows): add the command group and the README contract`.
+  > Deviation: fix wave F1 made a transport failure in `acquire-references` stop the acquisition and print `network`, and replaced the patched-away network test with one that drives the real `acquire`.
 
 ### Task 13: The V12 fixture chain (raw files to a replay-equal bundle, offline)
 
@@ -541,17 +545,18 @@ All new, under `src/embedding_data/` unless stated. Each test file sits in `test
 - Consumes: the existing chain helpers, imported and never edited: `acs_mapping_fixtures` (`_authenticated_deliveries`, `_authenticated_codes`, `seed_reconciliation_inputs`, `build_fixture_mapping`, `forbid_external_access`), `acs_target_fixtures.install_counted_guards`, `ipums_fixtures` (definition, DDI and CSV writers), `vendor_link_fixtures.subprocess_modules`.
 - Produces: `cps_flow_case() -> dict` (the synthetic persons below), `seed_cps_chain(tmp_path, monkeypatch) -> SeededChain` (real Stage 4, Stage 7 and Stage 8 bundles, the two CPS deliveries, the Stage 11 receipt) and `run_cps_flow_v12(data_dir, monkeypatch) -> dict` (the build, `verify`, replay build, `compare_runs` results and the external-access counts).
 
-- [ ] **Step 1: Probe the existing helpers (no code yet).** Read `tests/acs_mapping_fixtures.py` lines 728–872 and 969–1023. Confirm and write down as a comment above `seed_cps_chain`: (a) `_authenticated_deliveries` writes the two CPS deliveries from constants (`EMPSTAT` 10, `IND` `0170`, `OCC` `0010`) and has no CPS hook, (b) the chain's Stage 4 bundle holds the full NAICS 2022 and SOC 2018 trees (`naics_nodes` 2,125 rows, `soc_nodes` 1,447). At plan time `tests/fixtures/acs_mapping/upstream/stage4-originals.zip` held the genuine 2022 NAICS and 2018 SOC structure files, so this is expected, (c) the chain's Stage 7 and Stage 8 receipts hold the committed Census list workbooks in `tests/fixtures/acs_mapping/classification/`. If (b) or (c) is false, stop and ask the owner: a CPS build then needs a different list source.
-- [ ] **Step 2: Write the failing test** `test_raw_to_job_flows_is_offline_and_replayable` with `@pytest.mark.slow` (the marker is registered, and `tests/conftest.py` stays untouched). It runs `run_cps_flow_v12` and asserts:
+- [x] **Step 1: Probe the existing helpers (no code yet).** Read `tests/acs_mapping_fixtures.py` lines 728–872 and 969–1023. Confirm and write down as a comment above `seed_cps_chain`: (a) `_authenticated_deliveries` writes the two CPS deliveries from constants (`EMPSTAT` 10, `IND` `0170`, `OCC` `0010`) and has no CPS hook, (b) the chain's Stage 4 bundle holds the full NAICS 2022 and SOC 2018 trees (`naics_nodes` 2,125 rows, `soc_nodes` 1,447). At plan time `tests/fixtures/acs_mapping/upstream/stage4-originals.zip` held the genuine 2022 NAICS and 2018 SOC structure files, so this is expected, (c) the chain's Stage 7 and Stage 8 receipts hold the committed Census list workbooks in `tests/fixtures/acs_mapping/classification/`. If (b) or (c) is false, stop and ask the owner: a CPS build then needs a different list source.
+- [x] **Step 2: Write the failing test** `test_raw_to_job_flows_is_offline_and_replayable` with `@pytest.mark.slow` (the marker is registered, and `tests/conftest.py` stays untouched). It runs `run_cps_flow_v12` and asserts:
   - The chain is genuine: raw CSV, `.xml` and `extract.json` triples recorded in a temporary manifest, converted by the unchanged `ipums_conversion.convert`, a real Stage 7 run (`ipums_verification_run.measure`), Stage 4 and Stage 8 bundles, and the Stage 11 references imported through `import_reference` from `reference_originals`.
   - `build`, `verify` with the detached pin, a second `build` and `compare_runs` all succeed, with `equal` true and `trust_established` false.
   - The counted guards (`install_counted_guards`) show zero network, environment-file and live-client attempts.
   - The fixture cases appear in the report: a guarded employer change (`monthly_ee` industry and occupation), a duty change (occupation eligible, industry `coding_noise` with `noise_after_duty_change`), a coding-noise pair, an unusable guard, an unemployed→employed move, a `9890`/`9840` origin that exists only in `sensitivity` with `special_military`, a September→November 2025 link counted in `linkage.two_month` and in no flow, and an ASEC difference that carries `unguarded_upper_bound`.
   - Only `cps_linked_pairs.parquet` has a `CPSIDV` column. `report.json` and `inputs.json` hold no fixture `CPSIDV`.
   - Mutations fail: a wrong pin, and a changed `SOFTWARE_FILES` entry, make `verify` raise.
-- [ ] **Step 3: Implement the fixtures.** `cps_flow_case` returns monthly and ASEC rows built with `monthly_row` and `asec_row`. Use only industry and occupation codes that the committed lists hold (`0170` crop production, `0180`, `1190`; `0020`, `0040`, `0010`) plus `0000`, `9890` and `9840`. Persons: P1 employer change January→February 2025 (`EMPSAME` 1, both codes differ); P2 duty change (`EMPSAME` 2, `ACTSAME` 2, occupation and industry differ); P3 coding noise (`EMPSAME` 2, `ACTSAME` 1, industry differs); P4 unusable guard (`EMPSAME` 99); P5 unemployed (`EMPSTAT` 21, last-job `0170`) → employed; P6 `EMPSTAT` 21 with `9890` and `9840` → employed; P7 September→November 2025 with `MISH` 1→3; P8 employer change with `QIND` 6 (sensitivity only); P9 September `MISH` 3 → November `MISH` 4 (no link); ASEC rows with `INDLY` `0170` and `IND` `0180`, one with equal codes, one with `INDLY` `0000`, and one armed-forces row with `9890`. Weights are decimal text such as `1500.1234`. September 2025 rows have a null `LNKFW1MWT`. `seed_cps_chain` copies the structure of `seed_reconciliation_inputs`: it calls `_authenticated_deliveries` with `test_ipums_acceptance.PROFILES` monkeypatched to the three ACS profiles, writes the two CPS deliveries itself in the same raw layout, adds their two keys to `selection.json`, then continues as the original.
-- [ ] **Step 4: Run** `uv run --offline --locked pytest tests/test_cps_flow_v12.py -v`. Expected: pass. Record the wall time. Run `ruff check`.
-- [ ] **Step 5: Commit** `test(cps-flows): add the V12 fixture chain`.
+- [x] **Step 3: Implement the fixtures.** `cps_flow_case` returns monthly and ASEC rows built with `monthly_row` and `asec_row`. Use only industry and occupation codes that the committed lists hold (`0170` crop production, `0180`, `1190`; `0020`, `0040`, `0010`) plus `0000`, `9890` and `9840`. Persons: P1 employer change January→February 2025 (`EMPSAME` 1, both codes differ); P2 duty change (`EMPSAME` 2, `ACTSAME` 2, occupation and industry differ); P3 coding noise (`EMPSAME` 2, `ACTSAME` 1, industry differs); P4 unusable guard (`EMPSAME` 99); P5 unemployed (`EMPSTAT` 21, last-job `0170`) → employed; P6 `EMPSTAT` 21 with `9890` and `9840` → employed; P7 September→November 2025 with `MISH` 1→3; P8 employer change with `QIND` 6 (sensitivity only); P9 September `MISH` 3 → November `MISH` 4 (no link); ASEC rows with `INDLY` `0170` and `IND` `0180`, one with equal codes, one with `INDLY` `0000`, and one armed-forces row with `9890`. Weights are decimal text such as `1500.1234`. September 2025 rows have a null `LNKFW1MWT`. `seed_cps_chain` copies the structure of `seed_reconciliation_inputs`: it calls `_authenticated_deliveries` with `test_ipums_acceptance.PROFILES` monkeypatched to the three ACS profiles, writes the two CPS deliveries itself in the same raw layout, adds their two keys to `selection.json`, then continues as the original.
+- [x] **Step 4: Run** `uv run --offline --locked pytest tests/test_cps_flow_v12.py -v`. Expected: pass. Record the wall time. Run `ruff check`.
+- [x] **Step 5: Commit** `test(cps-flows): add the V12 fixture chain`.
+  > Deviation: `noise_after_duty_change` is asserted in `cps_flow_diagnostics`, because `report.json` has no such key. The chain's Stage 8 receipt is v1 and the selector does not check the receipt version.
 
 ### Task 14: The independent reconciler
 
@@ -563,51 +568,52 @@ All new, under `src/embedding_data/` unless stated. Each test file sits in `test
 - Produces: `python scripts/reconcile_cps_job_flows.py --data-dir ROOT --run RUN_ID --outputs-sha256 PIN` printing one sorted JSON line `{'checks': {...}, 'equal': bool}` and exiting 0 (equal), 1 (unequal) or 2 (error). It imports no `embedding_data` module. Only the standard library (`json`, `gzip`, `csv`, `decimal`, `math`, `hashlib`), `polars` and `fastexcel`. It restates the spec's rules (guard table, funnel order, flag classes, `k`, SE formula) itself.
 - Checks: `value_classes`, `x_residuals` (against `cps_category_units`), `links` (the pairs and the link counts against `cps_linked_pairs` and the diagnostics), `guards` (both dimensions), `eligibility` (the funnel counts), `targets` (every `average_total` and `forward_share` value, `n_unweighted` and `n_weighted`, from exact Decimal sums with `float(S) / k`) and `asec_se` (the replicate SE of every ASEC row). It never recomputes a bootstrap SE.
 
-- [ ] **Step 1: Write the failing tests:**
+- [x] **Step 1: Write the failing tests:**
   - `test_script_imports_no_embedding_data_module`: parse the script with `ast` and assert that no import names `embedding_data`.
   - `test_reconciler_is_equal_on_a_seeded_build`: build with `seed_upstreams`, run the script, and expect exit 0 and every check true.
   - `test_each_check_detects_its_mutation` (parametrized): in a copy of the bundle, change one `average_total` value (`targets`), one `guard_industry` (`guards`), one X candidate (`x_residuals`), one `link_type` (`links`) and one ASEC `se` (`asec_se`). The matching check is false and the exit code is 1. A changed bootstrap `se` leaves the result equal.
   - `test_exit_codes_for_equal_unequal_and_error`: a wrong pin or a missing run exits 2.
-- [ ] **Step 2: Run** `uv run --offline --locked pytest tests/test_reconcile_cps_job_flows.py -v`. Expected: FAIL (script missing).
-- [ ] **Step 3: Implement** the script as a standalone module with a `main(argv)` function, written from the spec and not from the build modules. Read weights from the raw CSV text with `decimal.Decimal`, aligned to the Parquet by row number.
-- [ ] **Step 4: Run** the tests, then `ruff check scripts tests`. Expected: pass.
-- [ ] **Step 5: Commit** `feat(cps-flows): add the independent reconciler`.
+- [x] **Step 2: Run** `uv run --offline --locked pytest tests/test_reconcile_cps_job_flows.py -v`. Expected: FAIL (script missing).
+- [x] **Step 3: Implement** the script as a standalone module with a `main(argv)` function, written from the spec and not from the build modules. Read weights from the raw CSV text with `decimal.Decimal`, aligned to the Parquet by row number.
+- [x] **Step 4: Run** the tests, then `ruff check scripts tests`. Expected: pass.
+- [x] **Step 5: Commit** `feat(cps-flows): add the independent reconciler`.
+  > Deviation: follow-up commit `e082800` reconciled the guard source exceptions after the controller ruled how to count them (monthly panel rows with `MISH` 1 or 5 and `EMPSAME` 1 or 2).
 
 ### Task 15: Acquire or import the Stage 11 references (controller, owner-gated)
 
 **Files:** none in git. Raw originals under `ROOT/raw/references/cps-job-flows/<REFERENCE_ID>/` and manifest lines.
 
-- [ ] **Step 1: Software readiness.** On the execution branch, run `uv run --locked pytest` and `uv run --locked behave`, after the `pgrep` checks of the Host rule. Expected: every test and scenario passes. Stop if anything fails.
-- [ ] **Step 2: Owner go-ahead.** Show the owner the full output of both `pgrep` commands and ask for the go-ahead to acquire, which also confirms that no Stage 9 freeze window is open. Choose a fresh ID `stage11_cps_references_<YYYYMMDD>_r1` and check that `ROOT/raw/references/cps-job-flows/` holds no such name. Record the baseline: `wc -c < ROOT/raw/manifest.jsonl` and `shasum -a 256 ROOT/raw/manifest.jsonl`.
-- [ ] **Step 3: Acquire.**
+- [x] **Step 1: Software readiness.** On the execution branch, run `uv run --locked pytest` and `uv run --locked behave`, after the `pgrep` checks of the Host rule. Expected: every test and scenario passes. Stop if anything fails.
+- [x] **Step 2: Owner go-ahead.** Show the owner the full output of both `pgrep` commands and ask for the go-ahead to acquire, which also confirms that no Stage 9 freeze window is open. Choose a fresh ID `stage11_cps_references_<YYYYMMDD>_r1` and check that `ROOT/raw/references/cps-job-flows/` holds no such name. Record the baseline: `wc -c < ROOT/raw/manifest.jsonl` and `shasum -a 256 ROOT/raw/manifest.jsonl`.
+- [x] **Step 3: Acquire.**
 
   ```bash
   uv run --offline --locked python -m embedding_data.cps_job_flows acquire-references <REFERENCE_ID> --data-dir /Users/lowell/Projects/embedding-data/data
   ```
 
   Expected: one JSON line and a published snapshot, or `CPS job flows acquire-references failed: validation; ...`. A refusal names the refused kinds in staging (BLS refuses non-browser clients).
-- [ ] **Step 4: Import each refused kind.** The owner downloads the original in a browser into a new, empty directory outside every checkout. Ask for the go-ahead of each import, then run `import-reference <REFERENCE_ID> <KIND> <FILE> --data-dir ...`. The last import publishes the snapshot.
-- [ ] **Step 5: Handle an anchor failure.** A failed validator names the kind. Stop. Show the owner the message and the original's relevant cells, and let the owner decide. Never import a file from `/tmp/cps_research_dl/`, never loosen an anchor to pass, and use a new reference ID after any change.
-- [ ] **Step 6: Record and preserve.** Record `shasum -a 256 ROOT/raw/references/cps-job-flows/<REFERENCE_ID>/receipt.json` as the receipt pin. Check that `head -c <baseline size> ROOT/raw/manifest.jsonl | shasum -a 256` equals the baseline hash, and that `uv run embedding-data audit --data-dir ROOT` exits 0 with zero discrepancies.
-- [ ] **Step 7: Commit** the receipt ID and pin in the README placeholders of Task 12 (`docs(cps-flows): record the Stage 11 references receipt`).
+- [x] **Step 4: Import each refused kind.** The owner downloads the original in a browser into a new, empty directory outside every checkout. Ask for the go-ahead of each import, then run `import-reference <REFERENCE_ID> <KIND> <FILE> --data-dir ...`. The last import publishes the snapshot.
+- [x] **Step 5: Handle an anchor failure.** A failed validator names the kind. Stop. Show the owner the message and the original's relevant cells, and let the owner decide. Never import a file from `/tmp/cps_research_dl/`, never loosen an anchor to pass, and use a new reference ID after any change.
+- [x] **Step 6: Record and preserve.** Record `shasum -a 256 ROOT/raw/references/cps-job-flows/<REFERENCE_ID>/receipt.json` as the receipt pin. Check that `head -c <baseline size> ROOT/raw/manifest.jsonl | shasum -a 256` equals the baseline hash, and that `uv run embedding-data audit --data-dir ROOT` exits 0 with zero discrepancies.
+- [x] **Step 7: Commit** the receipt ID and pin in the README placeholders of Task 12 (`docs(cps-flows): record the Stage 11 references receipt`).
 
 ### Task 16: First full-data build, verification and acceptance (controller, owner-gated)
 
 **Files:** none in git. Bundle under `ROOT/derived/cps/job-flows/<RUN_ID>/`. Logs under `/Users/lowell/.cache/embedding-data/stage-11/`, outside every checkout, so the tree stays clean (`inputs.json` records `dirty`).
 
-- [ ] **Step 1: Pre-flight.** The tree is clean and the branch is committed. Run `pgrep -fl 'embedding_data\.acs_targets|stage9_independent|reconcile_stage9'` and `pgrep -fl 'embedding_data|embedding-data'`, show the owner both outputs, and ask for the go-ahead to build, which also confirms no Stage 9 freeze window. Choose a fresh `RUN_ID = stage11_cps_job_flows_<YYYYMMDD>_r1` and check that neither it nor its `.part` exists.
-- [ ] **Step 2: Baselines.** Record `shasum -a 256` of both CPS Parquets, both raw `.csv.gz` and `.xml` files, the `outputs.json` of the Stage 4, 7 and 8 runs, and the manifest size and hash. Run `uv run embedding-data audit --data-dir ROOT`. Expected: exit 0.
-- [ ] **Step 3: Build** under `/usr/bin/time -l`:
+- [x] **Step 1: Pre-flight.** The tree is clean and the branch is committed. Run `pgrep -fl 'embedding_data\.acs_targets|stage9_independent|reconcile_stage9'` and `pgrep -fl 'embedding_data|embedding-data'`, show the owner both outputs, and ask for the go-ahead to build, which also confirms no Stage 9 freeze window. Choose a fresh `RUN_ID = stage11_cps_job_flows_<YYYYMMDD>_r1` and check that neither it nor its `.part` exists.
+- [x] **Step 2: Baselines.** Record `shasum -a 256` of both CPS Parquets, both raw `.csv.gz` and `.xml` files, the `outputs.json` of the Stage 4, 7 and 8 runs, and the manifest size and hash. Run `uv run embedding-data audit --data-dir ROOT`. Expected: exit 0.
+- [x] **Step 3: Build** under `/usr/bin/time -l`:
 
   ```bash
   /usr/bin/time -l uv run --offline --locked python -m embedding_data.cps_job_flows build <RUN_ID> --data-dir /Users/lowell/Projects/embedding-data/data --stage7-run stage7_ipums_verification_20261015_r2 --stage7-outputs-sha256 db129a788daa312408f793df1b94fa3f211190a5541fc17ae87b96e84df913dc --stage7-receipt stage7_ipums_references_20261015_r2 --stage7-receipt-sha256 3163968dde603ba53f807976dd09b9e40d73235a98c6f36e4e02c67ec4239c9c --stage8-receipt stage8_acs_references_20261018_r4 --stage8-receipt-sha256 052135beb2e77d3cd14b4b800602be9ab36d54aaa43eaf05abffb4d5c14fd2d5 --stage8-mapping-run stage8_acs_mapping_20261018_r7 --stage8-mapping-outputs-sha256 1ec9701092f576b122b01464cdb6fa3fbee49db030e4ad3df7b64e621b8e75f4 --codes-run stage4_v11_20261013_r2 --codes-outputs-sha256 15b958467f22a06efcfa4fbd968e1e4c9a37ab490a3ec1d670709ca6fcfe9c3a --cps-receipt <REFERENCE_ID> --cps-receipt-sha256 <RECEIPT_PIN>
   ```
 
   Expected: one JSON line with `outputs_sha256`, and the `time` report in the log. Record the wall time, the "maximum resident set size" and `du -sk` of the bundle. A failure leaves `<RUN_ID>.part` only if cleanup itself failed. Never delete staging without the owner's go-ahead. A memory kill (exit 137) is a finding, not a retry: stop and report, as Stage 9 did.
-- [ ] **Step 4: Verify** (no replay build runs in this stage) with the detached pin: `... cps_job_flows verify <RUN_ID> --outputs-sha256 <PIN> --data-dir ...`. Expected: exit 0.
-- [ ] **Step 5: Reconcile:** `uv run --offline --locked python scripts/reconcile_cps_job_flows.py --data-dir ... --run <RUN_ID> --outputs-sha256 <PIN>`. Expected: exit 0 with `equal` true.
-- [ ] **Step 6: Check the data gates** in `report.json` and report each result, never smooth it over: `v11.unparseable_values` is 0, the registry has 266 industry and 570 occupation codes plus the two specials, `x_categories` reads 30 `equal`, 7 `strict_subset` and 1 `not_delivered_no_pums_list` (design time: `1240`, `1970`, `3090`, `7100`, `7640`, `7750`, `8990` are the strict subsets, `8865` has no list), `9890` and `9840` appear only as sensitivity ends, September→November 2025 shows about 19,498 two-month matches and no flow, and the one-month link count is near 530,017. A different X outcome or a failed cross-check stops the stage for an owner decision (decision 5).
-- [ ] **Step 7: Preserve.** Repeat Step 2's hashes and `audit`: every earlier raw file is byte-identical, the manifest keeps its earlier bytes as a prefix (`head -c`), the audit reports zero discrepancies, and the Stage 4, 7 and 8 bundles and the CPS Parquets are byte-identical. Record the `pgrep` list taken after the command.
+- [x] **Step 4: Verify** (no replay build runs in this stage) with the detached pin: `... cps_job_flows verify <RUN_ID> --outputs-sha256 <PIN> --data-dir ...`. Expected: exit 0.
+- [x] **Step 5: Reconcile:** `uv run --offline --locked python scripts/reconcile_cps_job_flows.py --data-dir ... --run <RUN_ID> --outputs-sha256 <PIN>`. Expected: exit 0 with `equal` true.
+- [x] **Step 6: Check the data gates** in `report.json` and report each result, never smooth it over: `v11.unparseable_values` is 0, the registry has 266 industry and 570 occupation codes plus the two specials, `x_categories` reads 30 `equal`, 7 `strict_subset` and 1 `not_delivered_no_pums_list` (design time: `1240`, `1970`, `3090`, `7100`, `7640`, `7750`, `8990` are the strict subsets, `8865` has no list), `9890` and `9840` appear only as sensitivity ends, September→November 2025 shows about 19,498 two-month matches and no flow, and the one-month link count is near 530,017. A different X outcome or a failed cross-check stops the stage for an owner decision (decision 5).
+- [x] **Step 7: Preserve.** Repeat Step 2's hashes and `audit`: every earlier raw file is byte-identical, the manifest keeps its earlier bytes as a prefix (`head -c`), the audit reports zero discrepancies, and the Stage 4, 7 and 8 bundles and the CPS Parquets are byte-identical. Record the `pgrep` list taken after the command.
 
 ### Task 17: Findings, source-spec amendments and plan completion (controller)
 
@@ -615,9 +621,16 @@ All new, under `src/embedding_data/` unless stated. Each test file sits in `test
 - Create: `specs/naics-evaluation-data-stage-11-findings.md`
 - Modify: `specs/embedding-evaluation-data-spec.md`, `specs/evaluation-targets-methodology.md`, `CLAUDE.md`, `specs/deferred_items.md`, `specs/naics-evaluation-data-roadmap.md`, this plan (markup)
 
-- [ ] **Step 1: Write the findings file.** Facts only, from `report.json`, the logs and Task 16: the run ID and pin, the references receipt ID and pin, the `9890` and `9840` outcome with each source and year (monthly settled by the Census 2026 basic code lists, ASEC 2026 `9890` recorded as unresolved by owner decision), wall time, maximum RSS, bundle size, the usable-guard shares, the linkage rates by month pair, the funnels, the X cross-check counts, the `n_unweighted` distribution, and what is not claimed (the spec's Methodological limits, one line each). Link it from the roadmap entry.
-- [ ] **Step 2: Apply the source-spec amendments** exactly as the stage spec's "Source spec amendment" section words them, each tagged *(owner, Stage 11 design, 2026-11-23; [stage spec](cps-job-change-flows.md))*: V11 (after the ACS `559830` exception), R4.7, R4.8, R5.3 and R4.9 in `specs/embedding-evaluation-data-spec.md`, and the K8 step 7 pointer in `specs/evaluation-targets-methodology.md`.
-- [ ] **Step 3: CLAUDE.md.** Add a "CPS job-change flows (roadmap Stage 11)" section in the style of the TRI and Stage 14 sections: the five commands, the bundle files, the offline rules, the guard and value-class rules, the software-identity rule and its consequence for `verify`, the host rule, and R8.4. Run pins wait for the later hardening outcome, so cite the findings file for them.
-- [ ] **Step 4: Deferred items.** Tick the `9890` item in section `7-ipums-extract-verification` and the old Stage 11 item with `→ done <date>`, citing the findings file.
-- [ ] **Step 5: Run the Plan Completion Protocol** of the writing-plans skill: the resolve-before-defer gate, the markup of this plan, `specs/deferred_items.md`, step 3a (the roadmap stamp `> Stage 11: COMPLETE (<date>) — implemented by plan 23 (specs/plans/completed/23-cps-job-change-flows.md). Its Handoff section names what O21, the V9 headline minimum and old Stage 12 consume.` and `> Next: resume the roadmap.`, and the `## Handoff to later stages` section for O21 (products, policies, flags, usable-guard shares, the unguarded upper-bound label, the specials, R8.4), the later hardening outcome (run ID, pin, receipt), V9 (the `n_unweighted` distribution and `size_gate_pending`) and old Stage 12 (the helper modules and the unit registry)), the backlog report and the retirement commit.
-- [ ] **Step 6: Open the PR** under the standing PR lifecycle (enable Auto-fix and auto-merge, verify the merge, clean up). The docs-only commits skip the coverage hook by themselves.
+- [x] **Step 1: Write the findings file.** Facts only, from `report.json`, the logs and Task 16: the run ID and pin, the references receipt ID and pin, the `9890` and `9840` outcome with each source and year (monthly settled by the Census 2026 basic code lists, ASEC 2026 `9890` recorded as unresolved by owner decision), wall time, maximum RSS, bundle size, the usable-guard shares, the linkage rates by month pair, the funnels, the X cross-check counts, the `n_unweighted` distribution, and what is not claimed (the spec's Methodological limits, one line each). Link it from the roadmap entry.
+- [x] **Step 2: Apply the source-spec amendments** exactly as the stage spec's "Source spec amendment" section words them, each tagged *(owner, Stage 11 design, 2026-11-23; [stage spec](cps-job-change-flows.md))*: V11 (after the ACS `559830` exception), R4.7, R4.8, R5.3 and R4.9 in `specs/embedding-evaluation-data-spec.md`, and the K8 step 7 pointer in `specs/evaluation-targets-methodology.md`.
+- [x] **Step 3: CLAUDE.md.** Add a "CPS job-change flows (roadmap Stage 11)" section in the style of the TRI and Stage 14 sections: the five commands, the bundle files, the offline rules, the guard and value-class rules, the software-identity rule and its consequence for `verify`, the host rule, and R8.4. Run pins wait for the later hardening outcome, so cite the findings file for them.
+- [x] **Step 4: Deferred items.** Tick the `9890` item in section `7-ipums-extract-verification` and the old Stage 11 item with `→ done <date>`, citing the findings file.
+- [x] **Step 5: Run the Plan Completion Protocol** of the writing-plans skill: the resolve-before-defer gate, the markup of this plan, `specs/deferred_items.md`, step 3a (the roadmap stamp `> Stage 11: COMPLETE (<date>) — implemented by plan 23 (specs/plans/completed/23-cps-job-change-flows.md). Its Handoff section names what O21, the V9 headline minimum and old Stage 12 consume.` and `> Next: resume the roadmap.`, and the `## Handoff to later stages` section for O21 (products, policies, flags, usable-guard shares, the unguarded upper-bound label, the specials, R8.4), the later hardening outcome (run ID, pin, receipt), V9 (the `n_unweighted` distribution and `size_gate_pending`) and old Stage 12 (the helper modules and the unit registry)), the backlog report and the retirement commit.
+- [x] **Step 6: Open the PR** under the standing PR lifecycle (enable Auto-fix and auto-merge, verify the merge, clean up). The docs-only commits skip the coverage hook by themselves.
+
+## Handoff to later stages
+
+- **O21 (CPS protocol section, design sessions).** Consumes the bundle `derived/cps/job-flows/stage11_cps_job_flows_20261124_r1/`, detached pin `0c815cbeb701bceeb3e1b13dac3678c8142e89bda4c48aa26d4524e79b77e69e`, built from references snapshot `stage11_cps_references_20261124_r1` (receipt pin `89c59cfa3fa8b4d70bc726b00628db23287b5cc998b05fc8ee71910fafff6c2d`) at commit `2fdf373`. The products are `monthly_ee`, `monthly_ue` and `asec_retro`, each in `strict` and `sensitivity` (`asec_retro` has `sensitivity` only), with the flags `size_gate_pending`, `bootstrap_approximate`, `special_military` and `unguarded_upper_bound` in `cps_job_flows.parquet` (`targets-v1`). The usable-guard shares are in `report.json` (0.9253 industry, 0.9176 occupation for `monthly_ee`). `9890` and `9840` appear only in sensitivity universes, and the ASEC 2026 `9890` meaning stays unresolved by owner decision. No output may feed embedder training, curriculum, hard-negative mining or model selection (R8.4). The findings are in `specs/naics-evaluation-data-stage-11-findings.md`. Traps: the support and replicates tables carry bare codes while the targets table carries `feature:<type>:<code>`, and funnels carry period `all`. Deferred into it: per-period funnels (`specs/deferred_items.md`, § 23-cps-job-change-flows).
+- **Later hardening outcome (replay and long-form acceptance, not staged).** The first build has no replay run. `verify` and the independent reconciler passed. A replay needs a fresh run ID and the owner's go-ahead, and any change to a file in `cps_flow_bundle.SOFTWARE_FILES` (this includes `pyproject.toml` and `uv.lock`) makes `verify` refuse the first run. Deferred into it: the reconciler's reach and the `_refuse_outside` subset check (`specs/deferred_items.md`, § 23-cps-job-change-flows).
+- **V9 (headline minimum count).** Consumes the `n_unweighted` distribution in `report.json` (`n_unweighted_distribution`, by product, dimension and policy) and the `cps_flow_support.parquet` support table. Every target keeps `size_gate_pending`. The median cell has 1 unweighted record. No minimum is set. Deferred into it: nothing.
+- **Old Stage 12 (worker profiles and CPS cross-sections).** Consumes the helper modules `cps_flow_references`, `cps_flow_lists`, `cps_flow_units`, `cps_flow_inputs`, `cps_flow_linkage`, `cps_flow_guards`, `cps_flow_weights`, `cps_flow_estimation`, `cps_flow_targets` and `cps_flow_bundle` (all in `src/embedding_data/`), and the unit registry `cps_category_units.parquet` (838 rows: 266 industry and 570 occupation categories plus the two specials). Traps: `LNKFW1MWT` is read from the raw CSV as an exact Decimal, aligned to the Parquet by row number, because the Parquet stores weights as Float64. Importing the command module loads the `dotenv` and `ipumspy` modules, but no command reads a credential. Deferred into it: nothing.
