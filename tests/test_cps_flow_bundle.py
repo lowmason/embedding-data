@@ -815,8 +815,14 @@ REFUSED_ROWS = {
         monthly_row(CPSIDV=5, YEAR=2026, MONTH=9, MISH=1),
         monthly_row(CPSIDV=5, YEAR=2026, MONTH=10, MISH=2)]),
         'a one-month link falls outside the frozen link months'),
+    'october_2025': (dict(monthly=[
+        monthly_row(CPSIDV=5, YEAR=2025, MONTH=9, MISH=1),
+        monthly_row(CPSIDV=5, YEAR=2025, MONTH=10, MISH=2)]),
+        'a one-month link falls outside the frozen link months'),
     'asec_year_outside': (dict(asec=[asec_row(YEAR=2024)]),
                           'an ASEC year falls outside the frozen periods'),
+    'asec_year_after': (dict(asec=[asec_row(YEAR=2027)]),
+                        'an ASEC year falls outside the frozen periods'),
 }
 
 
@@ -1087,6 +1093,24 @@ def test_compare_runs_reports_a_report_difference(built, tmp_path):
     assert result['report_equal'] is False
     assert result['equal'] is False
     assert all(comparison['values_equal'] for comparison in result['tables'].values())
+
+
+def test_ordered_equal_counts_a_null_against_a_value_order_and_dtype():
+    first = pl.LazyFrame({'a': [1, None], 'b': ['x', 'y']})
+    assert cps_flow_bundle.ordered_equal(first, first) == {
+        'schema_equal': True, 'values_equal': True, 'first_rows': 2, 'second_rows': 2}
+    filled = pl.LazyFrame({'a': [1, 2], 'b': ['x', 'y']})
+    for one, other in ((first, filled), (filled, first)):
+        assert cps_flow_bundle.ordered_equal(one, other)['values_equal'] is False
+    reordered = pl.LazyFrame({'a': [None, 1], 'b': ['y', 'x']})
+    assert cps_flow_bundle.ordered_equal(first, reordered)['values_equal'] is False
+    narrower = first.with_columns(pl.col('a').cast(pl.Int32))
+    swapped = first.select('b', 'a')
+    for other in (narrower, swapped):
+        assert cps_flow_bundle.ordered_equal(first, other) == {
+            'schema_equal': False, 'values_equal': False, 'first_rows': 2, 'second_rows': 2}
+    assert cps_flow_bundle.ordered_equal(first, first.head(1)) == {
+        'schema_equal': True, 'values_equal': False, 'first_rows': 2, 'second_rows': 1}
 
 
 def fake_git(status: str, calls: list):
