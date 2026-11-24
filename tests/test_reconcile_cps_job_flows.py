@@ -37,6 +37,7 @@ SCRIPT = Path(__file__).resolve().parents[1] / 'scripts' / 'reconcile_cps_job_fl
 CHECKS = ('value_classes', 'x_residuals', 'links', 'guards', 'eligibility', 'targets', 'asec_se')
 RUN = 'first'
 FAILURE = 'CPS job flows reconcile failed: '
+SOURCE_EXCEPTION = 'empsame_in_mish_1_or_5'
 
 
 @functools.cache
@@ -162,6 +163,14 @@ def bump_report(*keys: str):
     return edit_report(change)
 
 
+def both(*changes: Callable[[Path], None]) -> Callable[[Path], None]:
+    '''Apply each bundle change in turn.'''
+    def apply(directory: Path) -> None:
+        for change in changes:
+            change(directory)
+    return apply
+
+
 def topic(name: str, reason: str | None = None) -> Callable[[dict], bool]:
     return lambda row: row['topic'] == name and reason in (None, row['reason'])
 
@@ -211,6 +220,16 @@ MUTATIONS = {
         'cps_flow_diagnostics', topic('guard', 'noise_after_duty_change'), add('count', 1))),
     'usable_guard_share': ('guards', edit_report(
         lambda report: report['usable_guard_share'].update({'monthly_ee:industry': 0.5}))),
+    # The source exceptions: panel rows in MISH 1 or 5 with EMPSAME 1 or 2 (controller ruling).
+    'source_exception_row': ('guards', edit_row(
+        'cps_flow_diagnostics', topic('guard', SOURCE_EXCEPTION), add('count', 1))),
+    'source_exception_report': ('guards', bump_report('guard_source_exceptions',
+                                                      SOURCE_EXCEPTION)),
+    # A count of links, not rows, gives 0: no one-month link has MISH 1 or 5 at its later month.
+    'source_exception_as_links': ('guards', both(
+        edit_row('cps_flow_diagnostics', topic('guard', SOURCE_EXCEPTION), put('count', 0)),
+        edit_report(lambda report: report['guard_source_exceptions'].update(
+            {SOURCE_EXCEPTION: 0})))),
     # x_residuals: the occupation registry rows and the cross-check counts.
     'x_candidate': ('x_residuals', edit_row(
         'cps_category_units', is_x, drop_last('candidates'))),
@@ -376,6 +395,43 @@ def test_a_changed_undefined_replicate_list_is_detected(negative_replicate, tmp_
         and row['kind'] == 'undefined_share', put('replicates', [7, 8])))
     status, result = result_of(data_dir, pin)
     assert result['checks'] == {other: other != 'asec_se' for other in CHECKS}
+    assert status == 1
+
+
+# The guard source exceptions: monthly panel rows, not links (controller ruling, 2026-11-24).
+
+def test_source_exceptions_count_substantive_empsame_in_mish_1_or_5():
+    panel = pl.DataFrame({'MISH': [1, 5, 1, 5, 2, 4, 6, 8, 1, 5],
+                          'EMPSAME': [1, 2, 96, 97, 1, 2, 1, 2, None, 99]})
+    assert reconcile.source_exceptions(panel) == 2
+
+
+# Earlier-month rows in MISH 1 or 5 that a count of links would miss or that the value set
+# leaves out. The seeded case already has one linked MISH 1 row and one unlinked MISH 5 row.
+SOURCE_EXCEPTION_CHANGES = {
+    'U4': {'CPSIDV': JOB_FLOW_CPSIDV + 900, 'EMPSAME': 2},  # MISH 1, its own CPSIDV: no link
+    'U1': {'EMPSAME': 1},  # MISH 1, unemployed at the earlier month: a row all the same
+    'L1': {'EMPSAME': 2},  # MISH 1, the earlier row of the two-month link
+    'E15': {'EMPSAME': 1},  # MISH 5, the earlier row of a 2026 one-month link
+    'U2': {'EMPSAME': 97},  # MISH 1, not a substantive answer
+}
+
+
+def test_source_exceptions_count_panel_rows_not_links(tmp_path):
+    variant = seeded_build(tmp_path, SOURCE_EXCEPTION_CHANGES)
+    status, result = result_of(variant.data_dir, variant.pin)
+    assert result == {'checks': dict.fromkeys(CHECKS, True), 'equal': True}
+    assert status == 0
+    diagnostics = pl.read_parquet(variant.directory / 'cps_flow_diagnostics.parquet')
+    published = diagnostics.filter(pl.col('topic') == 'guard',
+                                   pl.col('reason') == SOURCE_EXCEPTION)['count'].to_list()
+    report = json.loads((variant.directory / 'report.json').read_text())
+    assert published == [report['guard_source_exceptions'][SOURCE_EXCEPTION]] == [6]
+    pairs = pl.read_parquet(variant.directory / 'cps_linked_pairs.parquet')
+    assert pairs.filter(pl.col('mish_b').is_in([1, 5])).height == 0
+    data_dir, pin = tampered(variant, tmp_path / 'tampered', MUTATIONS['source_exception_row'][1])
+    status, result = result_of(data_dir, pin)
+    assert result['checks'] == {other: other != 'guards' for other in CHECKS}
     assert status == 1
 
 

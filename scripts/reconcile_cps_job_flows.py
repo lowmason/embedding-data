@@ -172,6 +172,11 @@ LINK_SIDE = ('source_row', 'label', 'CPSID', 'MISH', 'EMPSTAT', 'IND', 'OCC', 'Q
 ALIGNMENT = {'monthly': ('YEAR', 'MONTH', 'SERIAL', 'PERNUM', 'MISH', 'CPSIDV'),
              'asec': ('YEAR', 'SERIAL', 'PERNUM', 'CPSIDV')}
 WEIGHT = {'monthly': 'LNKFW1MWT', 'asec': 'ASECWT'}
+# Guard source exceptions: EMPSAME is not in universe in MISH 1 and 5, so a delivered substantive
+# answer there is counted (spec, Guard; controller ruling 2026-11-24: rows, values 1 and 2).
+SOURCE_EXCEPTION = 'empsame_in_mish_1_or_5'
+SOURCE_EXCEPTION_MISH = (1, 5)
+SUBSTANTIVE_EMPSAME = (1, 2)
 
 
 class Refused(Exception):
@@ -873,6 +878,17 @@ def expected_pairs(links: pl.DataFrame) -> pl.DataFrame:
     return links.select([pl.col(name).cast(dtype) for name, dtype in LINKED_PAIRS_SCHEMA.items()])
 
 
+def source_exceptions(panel: pl.DataFrame) -> int:
+    '''Monthly panel rows in MISH 1 or 5 that deliver a substantive EMPSAME answer, 1 or 2.
+
+    EMPSAME is not in universe in MISH 1 and 5, so each such row is a source exception. The
+    count is of panel rows, whatever their EMPSTAT, weight or link status (controller ruling,
+    2026-11-24): a one-month link never has MISH 1 or 5 at its later month.
+    '''
+    return panel.filter(pl.col('MISH').is_in(SOURCE_EXCEPTION_MISH),
+                        pl.col('EMPSAME').is_in(SUBSTANTIVE_EMPSAME)).height
+
+
 def guard_population(links: pl.DataFrame) -> pl.DataFrame:
     '''SD3: employed-to-employed one-month links with positive weight.'''
     return links.filter(pl.col('link_type') == 'one_month', EMPLOYED_BOTH,
@@ -880,7 +896,7 @@ def guard_population(links: pl.DataFrame) -> pl.DataFrame:
 
 
 def check_guards(links: pl.DataFrame, ours: pl.DataFrame, pairs: pl.DataFrame, report: dict,
-                 diagnostics: pl.DataFrame) -> bool:
+                 diagnostics: pl.DataFrame, exceptions: int) -> bool:
     population = guard_population(links)
     rows, shares = [], {}
     for dimension in DIMENSIONS:
@@ -898,12 +914,12 @@ def check_guards(links: pl.DataFrame, ours: pl.DataFrame, pairs: pl.DataFrame, r
     rows.append(diagnostic('guard', 'noise_after_duty_change', noise, product='monthly_ee',
                            dimension='industry'))
     shares |= {'monthly_ue': 'not_applicable', 'asec_retro': 'not_applicable'}
-    # The source-exception count (delivered EMPSAME values in MISH 1 or 5) is not compared.
-    recorded = [row for row in diagnostics_rows(diagnostics, 'guard') if row[1] is not None]
+    rows.append(diagnostic('guard', SOURCE_EXCEPTION, exceptions))
     return all((
         columns_equal(ours, pairs, GUARD_COLUMNS),
-        same_rows(rows, recorded),
+        same_rows(rows, diagnostics_rows(diagnostics, 'guard')),
         same_json(report.get('usable_guard_share'), shares),
+        same_json(report.get('guard_source_exceptions'), {SOURCE_EXCEPTION: exceptions}),
     ))
 
 
@@ -1205,6 +1221,7 @@ def reconcile(data_dir: Path, run_id: str, pin: str) -> dict[str, bool]:
     }
     links, link_weights, linkage, link_rows = recompute_links(panel, upstream.monthly,
                                                               nonallocation)
+    exceptions = source_exceptions(panel)
     del panel
     asec_weights = read_weights(upstream.asec, None, asec_candidates(asec))
     reasons = asec_reasons(asec, asec_weights.full)
@@ -1213,7 +1230,7 @@ def reconcile(data_dir: Path, run_id: str, pin: str) -> dict[str, bool]:
     ours = expected_pairs(links)
     checks |= {
         'links': check_links(links, ours, pairs, linkage, link_rows, report, diagnostics),
-        'guards': check_guards(links, ours, pairs, report, diagnostics),
+        'guards': check_guards(links, ours, pairs, report, diagnostics, exceptions),
         'eligibility': check_eligibility(links, ours, reasons, pairs, report, diagnostics),
         'targets': check_targets(expected, targets, support),
         'asec_se': check_asec_se(expected, targets, support),
