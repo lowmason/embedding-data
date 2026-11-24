@@ -279,6 +279,17 @@ def test_every_pin_is_checked_before_any_other_file_is_read(upstreams, monkeypat
     assert read == []
 
 
+def test_a_missing_pinned_file_fails(upstreams):
+    for upstream in UPSTREAMS:
+        name = 'outputs.json' if upstream.endswith('_run') else 'receipt.json'
+        file = run_directory(upstreams, upstream) / name
+        file.rename(file.with_name('moved'))
+        with pytest.raises(ValueError, match=f'{upstream}: detached checksum differs'):
+            cps_flow_inputs.select_inputs(upstreams.data_dir, upstreams.request)
+        file.with_name('moved').rename(file)
+    cps_flow_inputs.select_inputs(upstreams.data_dir, upstreams.request)
+
+
 def test_changed_parquet_raw_csv_or_manifest_entry_fails(upstreams):
     data_dir = upstreams.data_dir
     cases = {
@@ -301,7 +312,7 @@ def test_changed_parquet_raw_csv_or_manifest_entry_fails(upstreams):
 
 @pytest.mark.parametrize('case', ['asec_parquet', 'asec_xml', 'monthly_extract',
                                   'unrecorded_csv', 'parquet_part_of_record',
-                                  'truncated_parquet'])
+                                  'truncated_parquet', 'missing_parquet'])
 def test_each_delivery_file_is_authenticated(upstreams, case):
     data_dir = upstreams.data_dir
     stage7 = run_directory(upstreams, 'stage7_run')
@@ -319,6 +330,9 @@ def test_each_delivery_file_is_authenticated(upstreams, case):
     elif case == 'unrecorded_csv':
         edit_manifest(data_dir, 'cps_00002/cps_00002.csv.gz', lambda entry: None)
         message = 'raw file is not recorded'
+    elif case == 'missing_parquet':
+        (data_dir / 'derived/cps/monthly/cps_00001.parquet').unlink()
+        message = 'monthly: Parquet differs from its Stage 7 record'
     elif case == 'truncated_parquet':
         truncate(data_dir / 'derived/cps/monthly/cps_00001.parquet')
         message = 'monthly: Parquet differs from its Stage 7 record'
@@ -385,7 +399,8 @@ def test_only_the_used_files_are_read(upstreams):
 @pytest.mark.parametrize('case', ['industry_workbook', 'occupation_workbook',
                                   'documentary_original', 'original_manifest_entry',
                                   'receipt_manifest_entry', 'unrecorded_receipt',
-                                  'citation_of_another_file', 'stage11_original'])
+                                  'citation_of_another_file', 'stage11_original',
+                                  'missing_original', 'unrecorded_stage11_receipt'])
 def test_each_used_receipt_original_is_authenticated(upstreams, case):
     data_dir = upstreams.data_dir
     stage7 = run_directory(upstreams, 'stage7_receipt')
@@ -411,6 +426,13 @@ def test_each_used_receipt_original_is_authenticated(upstreams, case):
     elif case == 'unrecorded_receipt':
         edit_manifest(data_dir, f'{stage8.name}/receipt.json', lambda entry: None)
         message = 'raw file is not recorded'
+    elif case == 'missing_original':
+        (stage7 / 'census_industry_2022.xlsx').unlink()
+        message = 'census_industry_2022: original differs from its receipt'
+    elif case == 'unrecorded_stage11_receipt':
+        edit_manifest(data_dir, f'{upstreams.request.cps_receipt}/receipt.json',
+                      lambda entry: None)
+        message = 'cps_receipt: raw file is not recorded'
     elif case == 'stage11_original':
         flip(run_directory(upstreams, 'cps_receipt') / 'cps_industry_codes.csv')
         message = 'reference inventory hash or size differs'
