@@ -307,6 +307,24 @@ def test_import_reference_failure_prints_only_the_fixed_line(cli_runner, data_di
     assert not data_directory.exists()
 
 
+def test_import_of_a_missing_file_or_into_a_published_snapshot_is_a_validation_failure(
+        cli_runner, seeded, tmp_path):
+    kind = 'bls_cps_industry_2022'
+    empty = tmp_path / 'empty'
+    missing = invoke(cli_runner, 'import-reference', empty, 'refs', kind,
+                     str(tmp_path / 'absent.xlsx'))
+    assert missing.exit_code == 2
+    assert missing.stderr == reference_failure('import-reference', 'validation')
+    assert missing.stdout == ''
+    assert not empty.exists()
+    original = reference_originals(tmp_path / 'originals')[kind]
+    published = invoke(cli_runner, 'import-reference', seeded.data_dir,
+                       seeded.reference_id, kind, str(original))
+    assert published.exit_code == 2
+    assert published.stderr == reference_failure('import-reference', 'validation')
+    assert published.stdout == ''
+
+
 @pytest.mark.parametrize('error,reason', [
     (ValueError(SECRET), 'validation'),
     # Both an OSError and a ValueError: validation is checked first.
