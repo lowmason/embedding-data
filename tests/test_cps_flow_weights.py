@@ -84,15 +84,21 @@ def test_diagnostics_and_rules_are_kept_for_both_sets(seeded_selected, tmp_path)
         assert weighted.rules['monthly']['numeric_rule'] == 'literal_csv_value'
 
 
-@pytest.mark.parametrize('parity', [
-    {'schema_equal': True, 'values_equal': False, 'expected_rows': 5, 'actual_rows': 5},
-    {'schema_equal': False, 'values_equal': True, 'expected_rows': 5, 'actual_rows': 5},
-    {'schema_equal': True, 'values_equal': True, 'expected_rows': 4, 'actual_rows': 5},
-    {'schema_equal': True, 'values_equal': True, 'expected_rows': 5, 'actual_rows': 4},
+@pytest.mark.parametrize(('schema_equal', 'values_equal', 'extra_expected', 'extra_actual'), [
+    (True, False, 0, 0),
+    (False, True, 0, 0),
+    (True, True, -1, 0),
+    (True, True, 0, 1),
 ], ids=['values', 'schema', 'expected-rows', 'actual-rows'])
 def test_positional_alignment_failure_is_refused(seeded_selected, tmp_path, monkeypatch,
-                                                 parity):
-    monkeypatch.setattr(ipums_parity, 'compare_ordered', lambda *args, **kwargs: parity)
+                                                 schema_equal, values_equal, extra_expected,
+                                                 extra_actual):
+    def report(left, right, **kwargs):
+        rows = right.select(pl.len()).collect().item()
+        return {'schema_equal': schema_equal, 'values_equal': values_equal,
+                'expected_rows': rows + extra_expected, 'actual_rows': rows + extra_actual}
+
+    monkeypatch.setattr(ipums_parity, 'compare_ordered', report)
     with pytest.raises(ValueError, match='before weight alignment'):
         with weighted_sources(seeded_selected, tmp_path / 'scratch'):
             pytest.fail('the context must not be entered')
@@ -192,13 +198,14 @@ def test_a_negative_replicate_is_kept_and_a_null_weight_stays_null(tmp_path):
 
 def test_link_weight_status_values():
     frame = pl.DataFrame({
-        'weight': [Decimal('1.5'), Decimal('0.0'), None, Decimal('2.0'), None, Decimal('0.0')],
+        'weight': [Decimal('1.5'), Decimal('0.0'), None, Decimal('2.0'), None, Decimal('0.0'),
+                   Decimal('0.5')],
         'link_type': ['one_month', 'one_month', 'one_month', 'two_month', 'two_month',
-                      'two_month'],
+                      'two_month', 'one_month'],
     }, schema={'weight': pl.Decimal(38, 1), 'link_type': pl.String})
     result = frame.select(weight_status_expr(pl.col('weight'), pl.col('link_type')).alias('s'))
     assert result['s'].to_list() == ['positive', 'zero', 'null', 'not_linkable',
-                                     'not_linkable', 'not_linkable']
+                                     'not_linkable', 'not_linkable', 'positive']
     assert result.schema['s'] == pl.String
 
 
