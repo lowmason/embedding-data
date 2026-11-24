@@ -83,6 +83,13 @@ def test_delivered_no_equivalent_statuses_fail():
         classes(codes(['0170'], ['9830']), 'OCC', 'occupation')
 
 
+def test_one_delivered_no_equivalent_code_among_valid_rows_fails():
+    with pytest.raises(ValueError):
+        classes(codes(['0170', '9920', '0170']), 'IND', 'industry')
+    with pytest.raises(ValueError):
+        classes(codes(['0170'] * 3, ['0010', '0010', '9830']), 'OCC', 'occupation')
+
+
 def test_each_failure_has_a_fixed_message_without_the_value():
     for value in ('1234', '170', '9920'):
         with pytest.raises(ValueError) as caught:
@@ -395,6 +402,9 @@ def test_link_counts_list_each_candidate_month_pair_present_in_the_panel():
     assert counts['other_gap_matches'].to_list() == [0, 1, 0, 0]
     only_gap = link_counts(monthly_panel(frame(person(2025, 9, 1, 1), person(2025, 11, 2, 1))))
     assert only_gap['link_type'].to_list() == ['two_month']
+    assert only_gap.row(0, named=True) == {
+        'month_a': '2025-09', 'month_b': '2025-11', 'link_type': 'two_month', 'cpsidv': 0,
+        'cpsidp': 0, 'other_gap_matches': 0}
     for month in (9, 11):
         assert link_counts(monthly_panel(frame(person(2025, month, 1, 1)))).height == 0
     assert link_counts(monthly_panel(frame(person(2025, 1, 1, 1), person(2025, 3, 1, 3)))
