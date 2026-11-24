@@ -1,6 +1,7 @@
 # NAICS evaluation data — Stage 15 findings: BEA input-output tables
 
-Status: Stage 15 is stopped at Task 5 (Owner Checkpoint 5). Tasks 1 to 4 are committed.
+Status: Stage 15 is stopped at Task 5 (Owner Checkpoint 5). Tasks 1 to 4 are committed on
+branch `feat/stage-15-bea-io`, which is not merged.
 The preflight `measure` run on the real files lists three stops and one ask. The owner
 chose on 2026-11-23 to stop the stage and to record O9 and O10 as uncovered. Tasks 6 to 14
 did not start. The document checks E1 to E3 are not done.
@@ -85,8 +86,8 @@ a plan amendment.
 ## Decision
 
 On 2026-11-23 the owner chose to stop Stage 15 at the preflight and to record O9 and O10 as
-uncovered. The stage does not tick on the roadmap. No bundle exists. The branch keeps Tasks 1
-to 4 and this file.
+uncovered. The stage does not tick on the roadmap. No bundle exists. Tasks 1 to 4 (reader, layout, selection and preflight script, with tests) stay on branch
+`feat/stage-15-bea-io`, unmerged. This file is the only Stage 15 file on `main`.
 
 ## Not done
 
