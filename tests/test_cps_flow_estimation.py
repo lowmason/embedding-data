@@ -420,6 +420,8 @@ def test_a_negative_full_denominator_publishes_no_share():
                             'replicates').rows() == [
         ('0170', '0180', 'all', 1, 1.0, 'nonpositive_denominator', None),
         ('0170', '0190', 'all', 0, -2.0, 'nonpositive_denominator', None)]
+    for unit_b in ('0180', '0190'):
+        assert cell_replicates(found, '0170', unit_b)['replicate'].to_list() == REPLICATES
 
 
 def test_support_counts_each_contributing_period():
