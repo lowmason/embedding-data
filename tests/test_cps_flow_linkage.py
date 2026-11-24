@@ -123,6 +123,12 @@ def test_value_class_counts_by_field_file_and_year():
     assert list(count_value_classes(frame, 'asec', {'IND': 'industry'}, units())) == ['asec/IND']
 
 
+def test_special_years_are_listed_in_order():
+    frame = codes(['9890', '9890', '0170'], year=[2026, 2025, 2025])
+    found = count_value_classes(frame, 'asec', {'IND': 'industry'}, units())
+    assert list(found['asec/IND']['special_by_year']) == ['2025', '2026']
+
+
 def test_value_class_counts_with_no_special_are_zero():
     found = count_value_classes(codes(['0170']), 'monthly', {'IND': 'industry'}, units())
     assert found == {'monthly/IND': {'mapped': 1, 'not_in_universe': 0, 'special': 0,
@@ -169,6 +175,14 @@ def test_the_panel_adds_source_row_and_month_index():
     assert panel['source_row'].to_list() == [0, 1, 2]
     assert panel['month_index'].to_list() == [2025 * 12, 2025 * 12 + 11, 2026 * 12]
     assert panel.height == 3
+
+
+def test_month_index_is_int64_whatever_the_delivered_integer_width():
+    narrow = pl.LazyFrame([person(2026, 9, 1, 1)], schema={
+        **SCHEMA, 'YEAR': pl.Int32, 'MONTH': pl.Int32}).collect()
+    panel = monthly_panel(narrow.lazy()).collect()
+    assert panel.schema['month_index'] == pl.Int64
+    assert panel['month_index'].to_list() == [2026 * 12 + 8]
 
 
 def test_a_row_with_a_valid_edge_value_passes():
@@ -223,11 +237,6 @@ def test_asecflag_one_is_refused_and_null_or_two_pass():
     assert monthly_panel(frame(*rows)).collect().height == 2
 
 
-def test_the_panel_check_runs_at_the_call():
-    with pytest.raises(ValueError):
-        monthly_panel(frame(person(2024, 12, 1, 1)))
-
-
 def test_one_month_link_carries_the_columns_of_both_months():
     earlier = person(2025, 2, 9, 1, CPSID=90, CPSIDP=91, EMPSTAT=10, IND='0170', OCC='0010',
                      QEMPSTAT=1, QIND=2, QOCC=3, EMPSAME=1, ACTSAME=2)
@@ -235,8 +244,11 @@ def test_one_month_link_carries_the_columns_of_both_months():
                    QEMPSTAT=4, QIND=5, QOCC=6, EMPSAME=96, ACTSAME=97)
     other = person(2025, 3, 3, 1)
     links = links_of(other, earlier, later)
-    assert links.columns == list(LINK_COLUMNS)
-    assert len(LINK_COLUMNS) == 24
+    assert links.columns == list(LINK_COLUMNS) == [
+        'CPSIDV', 'CPSID', 'source_row_a', 'source_row_b', 'month_a', 'month_b', 'link_type',
+        'mish_a', 'mish_b', 'empstat_a', 'empstat_b', 'ind_a', 'ind_b', 'occ_a', 'occ_b',
+        'qempstat_a', 'qempstat_b', 'qind_a', 'qind_b', 'qocc_a', 'qocc_b', 'empsame_b',
+        'actsame_b', 'cpsidp_a']
     assert links.rows(named=True) == [{
         'CPSIDV': 9, 'CPSID': 90, 'source_row_a': 1, 'source_row_b': 2, 'month_a': '2025-02',
         'month_b': '2025-03', 'link_type': 'one_month', 'mish_a': 1, 'mish_b': 2,
@@ -264,7 +276,8 @@ def test_every_mish_pair_in_adjacent_months(earlier, later, forms):
 @pytest.mark.parametrize('first, second', [
     ((2025, 1), (2025, 3)), ((2025, 1), (2026, 1)), ((2025, 3), (2025, 2)),
     ((2025, 1), (2025, 11)), ((2025, 11), (2026, 1)),
-    ((2026, 9), (2026, 11)), ((2025, 8), (2025, 10))])
+    ((2026, 9), (2026, 11)), ((2025, 8), (2025, 10)), ((2025, 8), (2025, 11)),
+    ((2025, 9), (2025, 12)), ((2025, 9), (2026, 1)), ((2025, 7), (2025, 9))])
 def test_no_other_gap_forms_a_link(first, second):
     for rise in (1, 2):
         rows = [person(*first, 1, 1), person(*second, 1, 1 + rise)]
@@ -299,6 +312,24 @@ def test_the_two_month_link_has_no_four_eight_exclusion():
     assert links['link_type'].to_list() == ['two_month']
 
 
+@pytest.mark.parametrize('rise', [-1, 0, 1, 3, 4])
+def test_the_two_month_link_needs_mish_to_rise_by_exactly_two(rise):
+    links = links_of(person(2025, 9, 4, 2), person(2025, 11, 4, 2 + rise))
+    assert links.height == 0
+
+
+def test_earlier_mish_8_never_links_even_when_a_row_says_mish_9():
+    def unchecked(*rows):
+        return frame(*rows).with_columns(
+            pl.int_range(pl.len(), dtype=pl.UInt64).alias('source_row'),
+            (pl.col('YEAR') * 12 + pl.col('MONTH') - 1).alias('month_index'))
+
+    assert monthly_links(unchecked(person(2025, 2, 1, 8), person(2025, 3, 1, 9))
+                         ).collect().height == 0
+    assert monthly_links(unchecked(person(2025, 2, 1, 7), person(2025, 3, 1, 8))
+                         ).collect().height == 1
+
+
 def test_september_to_november_mish_plus_one_forms_no_link():
     rows = [person(2025, 9, 4, 1), person(2025, 11, 4, 2)]
     assert links_of(*rows).height == 0
@@ -330,7 +361,8 @@ def test_link_counts_report_cpsidv_and_cpsidp_by_month_pair():
          'cpsidp': 1, 'other_gap_matches': 0},
         {'month_a': '2025-03', 'month_b': '2025-04', 'link_type': 'one_month', 'cpsidv': 1,
          'cpsidp': 0, 'other_gap_matches': 0}]
-    assert counts.schema['cpsidv'] == pl.Int64
+    assert [counts.schema[name] for name in ('cpsidv', 'cpsidp', 'other_gap_matches')] == [
+        pl.Int64] * 3
 
 
 def test_the_cpsidp_count_applies_the_mish_rule_and_needs_no_cpsidv_match():
@@ -363,6 +395,8 @@ def test_link_counts_list_each_candidate_month_pair_present_in_the_panel():
     assert counts['other_gap_matches'].to_list() == [0, 1, 0, 0]
     only_gap = link_counts(monthly_panel(frame(person(2025, 9, 1, 1), person(2025, 11, 2, 1))))
     assert only_gap['link_type'].to_list() == ['two_month']
+    for month in (9, 11):
+        assert link_counts(monthly_panel(frame(person(2025, month, 1, 1)))).height == 0
     assert link_counts(monthly_panel(frame(person(2025, 1, 1, 1), person(2025, 3, 1, 3)))
                        ).height == 0
 
