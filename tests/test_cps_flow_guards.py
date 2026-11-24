@@ -664,17 +664,20 @@ def test_each_refusal_has_a_fixed_message_without_row_content():
 
 
 def test_a_failing_expression_raises_one_fixed_message_without_the_value():
-    for failing in (lambda value: guards('industry', [1, value], [99, 1]),
-                    lambda value: guards('occupation', [2, 2], [1, value]),
-                    lambda value: classes('monthly', 'QIND', [0, value])):
-        messages = []
+    for failing in (lambda value, at: guards('industry', at([1, value]), [99, 99, 1]),
+                    lambda value, at: guards('occupation', [2, 2, 2], at([1, value])),
+                    lambda value, at: classes('monthly', 'QIND', at([0, value]))):
+        messages = set()
         for value in (4242, 5353):
-            with pytest.raises(ValueError) as caught:
-                failing(value)
-            assert str(value) not in str(caught.value)
-            messages.append(str(caught.value).splitlines()[0])
-        assert messages[0] == messages[1]
-        assert not any(character.isdigit() for character in messages[0])
+            for at in (lambda pair: [pair[1], pair[0], pair[0]],
+                       lambda pair: [pair[0], pair[1], pair[0]],
+                       lambda pair: [pair[0], pair[1], pair[1]]):
+                with pytest.raises(ValueError) as caught:
+                    failing(value, at)
+                assert str(value) not in str(caught.value)
+                messages.add(str(caught.value).splitlines()[0])
+        assert len(messages) == 1
+        assert not any(character.isdigit() for character in messages.pop())
 
 
 # Guard diagnostics.
