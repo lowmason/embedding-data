@@ -415,14 +415,20 @@ race match and whose age changes plausibly; keep `CPSIDP` for a linkage-rate
 comparison, and order each person's records by `MISH`. September-to-November
 2025 pairs are two-month links: flag them and keep them out of month-to-month
 rates. `LNKFW1MWT` is missing for September 2025 months-in-sample 1–7.
-*(verified; CPS)*
+*(verified; CPS)* `LNKFW1MWT` sits on the earlier month of a link. September
+2025 has none, so September-to-November 2025 links are unweighted and enter no
+weighted flow. *(owner, Stage 11 design, 2026-11-23;
+[stage spec](cps-job-change-flows.md))*
 
 **R4.8** **A code change is a transition only when the respondent says the job
 changed.** Under dependent interviewing, last month's industry and occupation
 are carried forward when the respondent reports the same employer and unchanged
 duties. Count an employment-to-employment transition only when `EMPSAME` reports
 a different employer or `ACTSAME` reports changed duties; code differences
-without either are flagged as coding noise and excluded. `EMPSAME` is undefined
+without either are flagged as coding noise and excluded. An industry move
+counts only when `EMPSAME` reports a different employer. A same-employer duty
+change admits an occupation move only. *(owner, Stage 11 design, 2026-11-23;
+[stage spec](cps-job-change-flows.md))* `EMPSAME` is undefined
 in months-in-sample 1 and 5 and has documented not-in-universe gaps, so every
 transition target reports the share of linked pairs with a usable flag.
 Unemployment-to-employment transitions use the industry and occupation the
@@ -433,9 +439,11 @@ unemployed report for their last job. *(verified; CPS)*
 employed. `INDLY` uses the same 2022 scheme as `IND` in both measured ASEC years,
 2025 and 2026;
 source documentation, original-code retention and 33 discriminators per field/year
-support the 2022 scheme. Special-code 9890 remains outside-list, with 2026 meaning
-unresolved. *(verified V6, plan 7, 2026-10-15;
-[measured field/year matrix](findings/stage-7-ipums-extract-verification.md#v6-field--and-year-specific-asec-industry-evidence))*
+support the 2022 scheme. `9890` is the CPS Armed Forces code. Census settles it
+for the 2026 basic monthly files. No 2026 ASEC document defines it, so its ASEC
+2026 meaning stays unresolved by owner decision. *(verified V6, plan 7, 2026-10-15;
+[measured field/year matrix](findings/stage-7-ipums-extract-verification.md#v6-field--and-year-specific-asec-industry-evidence);
+owner, Stage 11 design, 2026-11-23; [stage spec](cps-job-change-flows.md))*
 
 **R4.10** Migration targets are state-to-state flows from `MIGSTA1` to
 `STATEFIP`, with a job-related subset defined by `WHYMOVE`: new job or transfer,
@@ -481,6 +489,11 @@ When the official references do not identify a particular aggregated OCCSOC code
 reason, retain an explicit unknown reason with provenance rather than inferring
 one; supported candidate membership is still required. *(owner, Stage 8 design,
 2026-10-16; [stage spec](completed/acs-codes-area-allocation.md))*
+A CPS occupation category whose SOC entry is an X token takes as candidates the
+detailed codes matching the token minus those that other list rows and narrower
+X rows claim. Each set must be a subset of the ACS PUMS member list, whose extra
+members other Census rows claim. A failed check fails the build. *(owner,
+Stage 11 design, 2026-11-23; [stage spec](cps-job-change-flows.md))*
 
 **R5.4** Vintage concordances — ITA's 2012 and 2017 codes, and the 2022 ACS
 comparator's 2017-based codes — carry one-to-many and many-to-many relationships
@@ -677,6 +690,12 @@ bullet here.
   and report it separately from both mapped and unparseable codes. It asserts
   no canonical occupation and admits no other unsupported value. *(owner,
   Stage 8 design, 2026-10-16; [stage spec](completed/acs-codes-area-allocation.md))*
+  CPS industry `9890` and occupation `9840` are the narrow documented
+  armed-forces specials. Preserve the original values and every row, leave
+  candidates empty and nodes null, and report them separately from mapped and
+  unparseable codes. They enter no headline product and admit no other
+  unsupported value. *(owner, Stage 11 design, 2026-11-23;
+  [stage spec](cps-job-change-flows.md))*
 - **V12 — offline contract test**. From fixture raw files through Parquet
   conversion, code parsing, geography allocation, one target per family, and the
   manifest, with no network and no credentials.

@@ -126,7 +126,7 @@
       Done when: each gap has a test or a recorded decision to accept it.
 
 ## 7-ipums-extract-verification — 2026-10-15
-- [ ] Clarify the 2026 ASEC industry code `9890` before Stage 11 mapping. The
+- [x] Clarify the 2026 ASEC industry code `9890` before Stage 11 mapping. The
       actual IND/INDLY counts are 13/286 in 2026 and 7/339 in 2025. The frozen
       2025 source appendix labels it Military, while both full Census lists,
       the 2025-onward IPUMS codebook and the 2026 appendix omit it. Do not infer
@@ -139,6 +139,7 @@
       regression-tested explicit special/mapping behavior retaining original
       values and provenance, with no silent leaf assignment or headline inclusion.
       → planned 2026-11-18: specs/naics-evaluation-data-roadmap.md
+      → done 2026-11-24 (plan 23): `9890` and `9840` are explicit specials, with original values and every row kept and no node, in `specs/naics-evaluation-data-stage-11-findings.md`; the ASEC 2026 meaning stays unresolved by owner decision
 
 ## embedding-evaluation-data-spec-roadmap — 2026-11-16
 - [ ] ACS targets (old Stage 9): ACS staffing-pattern, workplace area-mix,
@@ -158,7 +159,7 @@
       allocation-flag helpers, is published and verified on real data, or the
       owner retires plan 9.
       → planned 2026-11-18: specs/naics-evaluation-data-roadmap.md
-- [ ] CPS panel linkage and job-change flows (old Stage 11): CPS codes mapped
+- [x] CPS panel linkage and job-change flows (old Stage 11): CPS codes mapped
       to NAICS and SOC, linked person-month pairs, and occupation→occupation and
       industry→industry job-change flows (spec R4.3, R4.6–R4.9, R4.11, R5.1, the
       job-change row of R7.2 and V11 for CPS). Parked on 2026-11-16, because the
@@ -169,6 +170,7 @@
       pairs and the CPS weight and SE helpers exist, and job-change flows are
       built on real data.
       → planned 2026-11-18: specs/naics-evaluation-data-roadmap.md
+      → done 2026-11-24 (plan 23): `specs/naics-evaluation-data-stage-11-findings.md`; the code mapping, linked pairs, weights, standard errors and job-change flows are built on real data
 - [ ] Worker profiles and CPS cross-sections (old Stage 12): worker profiles,
       the CPS staffing check and CPS state-migration targets (spec R4.4,
       R4.10–R4.12 and the worker-profile, staffing and migration rows of R7.2).

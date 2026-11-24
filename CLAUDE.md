@@ -503,3 +503,56 @@ Reads follow `specs/evaluation-protocol.md`, Section 6, and none is allowed unti
 there the relatedness spec's commit that admits TRI (TR8). Every target keeps
 `size_gate_pending`. The headline minimum count (O13) is in
 `specs/findings/v9-tri-minimum-counts.md`.
+
+**CPS job-change flows (roadmap Stage 11).** `python -m embedding_data.cps_job_flows` exposes
+exactly five commands, separate from the frozen top-level CLI: `acquire-references`,
+`import-reference`, `build`, `verify` and `compare-runs`. Always pass an explicit `--data-dir`.
+Only `acquire-references` uses the network. BLS refuses non-browser clients, so the owner
+downloads the two BLS workbooks in a browser and `import-reference` records the exact bytes. The
+other four load no `.env`, read no credential and construct no HTTP client, and no command reads
+`IPUMS_API_KEY`. A transport failure prints reason `network`, a refused kind stays missing in
+`<REFERENCE_ID>.part`. Failure prints only `CPS job flows <command> failed: <reason>; run
+<run_id>; path <path>` and exits 2. An unequal `compare-runs` exits 1. `build` reads the two
+Stage 7 CPS Parquets and raw deliveries in place, plus the Stage 4, 7 and 8 upstream runs and the
+Stage 11 references receipt, each with a detached pin. A bundle lives in
+`derived/cps/job-flows/<RUN_ID>/`: six Parquets (`cps_job_flows` in `targets-v1`,
+`cps_category_units`, `cps_flow_support`, `cps_flow_replicates`, `cps_flow_diagnostics` and
+`cps_linked_pairs`), `inputs.json`, `report.json` and the detached `outputs.json`. Only
+`cps_linked_pairs` holds person identifiers (`CPSIDV`). It stays on this machine and never enters
+git. Build scratch in `<RUN_ID>.part/.scratch/` holds decompressed raw CSVs and is removed before
+publication.
+
+Guard and code rules: industry and occupation each have their own guard. An industry move counts
+only when `EMPSAME` reports a different employer, and a same-employer duty change admits an
+occupation move only. A difference without it is coding noise and is excluded. The usable-guard
+share is in `report.json` only. `strict` needs nonallocation flags at both months. `sensitivity`
+admits allocated, edited, longitudinal and unavailable flag evidence and the specials, and it is
+the only policy for `asec_retro`. CPS industry `9890` and occupation `9840` are armed-forces
+specials. They keep every row, have no candidate or node, and appear only in sensitivity
+universes. Their ASEC 2026 meaning stays unresolved by owner decision. A delivered code that is
+short, padded or unlisted fails the build. `LNKFW1MWT` sits on the earlier month of a link, so a
+September to November 2025 two-month link has no linking weight and enters no flow. Weights are
+literal factor 1 Decimal sums with `float(S) / k`, with `k` fixed at 18 (monthly) and 2 (ASEC).
+Monthly standard errors come from a seeded household-cluster bootstrap and are labeled
+approximate. ASEC standard errors use the 160 replicate weights.
+
+Software identity: `verify` refuses a bundle if any file in `cps_flow_bundle.SOFTWARE_FILES`
+(the measured import closure of `cps_job_flows`, plus `pyproject.toml` and `uv.lock`), the Python
+build or an installed distribution differs from the build's record. A change to any of them needs
+a fresh run ID and the owner's go-ahead for a new build. The independent
+`scripts/reconcile_cps_job_flows.py` imports no `embedding_data` module and reconciles seven
+checks (`value_classes`, `x_residuals`, `links`, `guards`, `eligibility`, `targets`, `asec_se`)
+exactly. It never recomputes a bootstrap standard error.
+
+Host rule: run one acquisition or one full-data build at a time. Before every commit, full pytest
+run, acquisition and full-data command, run `pgrep -fl
+'embedding_data\.acs_targets|stage9_independent|reconcile_stage9'` and `pgrep -fl
+'embedding_data|embedding-data'` and stop on a real hit. Each production write needs the owner's
+go-ahead, which also confirms that no Stage 9 freeze window is open. Never delete staging without
+it. The selected run is `stage11_cps_job_flows_20261124_r1` (built from references snapshot
+`stage11_cps_references_20261124_r1`), and the
+[Stage 11 findings](specs/naics-evaluation-data-stage-11-findings.md) record its pin, the
+commands, the cost, the checks and the limits. No replay build ran. No output may feed embedder
+training, curriculum, hard-negative mining or model selection (R8.4). Every target keeps
+`size_gate_pending`. Reads of the flows follow a protocol section that the owner has not yet
+written (O21).
